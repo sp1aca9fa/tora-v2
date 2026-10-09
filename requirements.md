@@ -15,7 +15,7 @@
 | S1 | Foundation: monorepo, schema, i18n, access | done |
 | S2 | Registration UI (products, lots, pulls, events) | done (reworked by S2b) |
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
-| S3 | Collector framework + SNKRDUNK + source matching | in progress |
+| S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | todo |
 | S6 | Export / import (JSON, CSV) + backups | todo |
