@@ -56,6 +56,8 @@
 - 2026-10-09: SNKRDUNK sales history has no transaction ids and shows the last ~3 days as relative times. Trades are saved per finished day (older than 5 days) with refs `<listing>|<day>|<price>|<lot>|<condition>|<label>#n`; the history sweep only saves a day once all its entries are seen and resumes across runs (60 pages per item per run). Lot trades ("10個") are stored per unit with the original lot price kept.
 - 2026-10-09: SNKRDUNK lists no-shrink boxes as separate products, so a product may have several active listings per source; the no-shrink listing's trades go to `sealed:no_shrink`, other sealed trades to `sealed:shrink`.
 - 2026-10-10: `collectors/` is not a pnpm workspace member: Vercel cannot fetch the private submodule and a frozen install failed when the lockfile listed it. The root links `@tora/collector-sdk`, `@tora/core` and `@tora/db` so the private code resolves them; `pnpm typecheck` checks it when present.
+- 2026-10-10: Once an item has an active listing, its remaining suggestions and the paste-link box collapse under "Add another listing" (kept for the no-shrink variant) and it no longer counts as "to confirm".
+- 2026-10-10: Collection is event-triggered (logon + daily catch-up) with a once-per-day guard instead of a fixed 04:00 cron, since the PC is often off.
 - 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
 
 ---
@@ -103,7 +105,7 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
   - Sessions do not expire: the cookie (signed, httpOnly, Secure, SameSite=Lax) is renewed automatically on use (browsers cap cookie lifetime at ~400 days). A revoked device, password change or 2FA reset ends its sessions.
   - Failed attempts are counted in the DB per IP and per username, with temporary lockout. Every page and API route requires a session except the login pages and static assets.
 - Phone use is first-class: registration flows must be mobile-first. Add a PWA manifest so it can be added to the home screen.
-- Scheduling: cron in WSL calling `pnpm collect` (daily, with random jitter). Document a fallback using Windows Task Scheduler -> `wsl` if WSL is not always running.
+- Scheduling: the PC is not always on, so Windows Task Scheduler starts `scripts/collect-cron.sh` in WSL at logon (+5 min) and daily with catch-up; the script runs at most once per day (stamp file), with jitter. cron is the fallback when WSL stays running.
 
 ## 4. Repo layout and public/private split
 

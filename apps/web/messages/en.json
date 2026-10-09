@@ -340,6 +340,7 @@
     "matchesTitle": "Matches to confirm",
     "matchesInfo": "The collector found possible SNKRDUNK listings for these items. Open one to confirm the right match.",
     "noMatches": "Nothing to confirm.",
-    "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm"
+    "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm",
+    "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}}), e.g. the no-shrink box"
   }
 }

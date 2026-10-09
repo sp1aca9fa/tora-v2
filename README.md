@@ -173,31 +173,29 @@ tests work as usual. Vercel builds skip it (private submodules are not fetched),
 Commit collector changes inside `collectors/` first, push them, then commit the updated submodule
 pointer in the main repo.
 
-### Daily schedule (cron in WSL)
+### Daily schedule
 
-`scripts/collect-cron.sh` loads nvm, sleeps a random 0-60 min (jitter), runs `pnpm collect`, and
-appends to `~/.local/state/tora/collect.log`.
+`scripts/collect-cron.sh` runs `pnpm collect` **at most once per day**: it exits right away when
+today's run already succeeded, waits a random 0-5 min first (jitter), loads nvm, and logs to
+`~/.local/state/tora/collect.log`. Because it is safe to trigger often, it is started by events
+rather than a fixed time.
+
+**Windows Task Scheduler (recommended, PC not always on):**
 
 ```bash
-chmod +x scripts/collect-cron.sh
-crontab -e
-# every day at 04:00 (+ up to 60 min jitter)
-0 4 * * * /home/<user>/code/<path>/tora-v2/scripts/collect-cron.sh
+./scripts/install-windows-task.sh     # from WSL; no admin needed
 ```
 
-cron must be running in WSL. Either enable systemd (`/etc/wsl.conf` -> `[boot]` `systemd=true`,
-then `wsl --shutdown` from Windows) or start it manually with `sudo service cron start`.
+This registers the `tora-collect` task: 5 minutes after you log on to Windows, plus daily at
+12:00 and "as soon as possible" if the PC was off then. It starts WSL by itself.
+Remove it with `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"`.
 
-### Fallback: Windows Task Scheduler
+**cron (only if WSL stays running):**
 
-If WSL is not always running, let Windows start it:
+```bash
+crontab -e
+0 * * * * /home/<user>/code/<path>/tora-v2/scripts/collect-cron.sh   # hourly; runs once a day
+```
 
-1. Task Scheduler -> Create Task -> Triggers: Daily 04:00 (optionally "Delay task for up to
-   1 hour" for jitter).
-2. Action: Program `wsl.exe`, arguments:
-   ```
-   -d Ubuntu -- bash -lc "NO_JITTER=1 /home/<user>/code/<path>/tora-v2/scripts/collect-cron.sh"
-   ```
-3. Settings: "Run task as soon as possible after a scheduled start is missed".
-
-Use either cron or Task Scheduler, not both.
+Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`
+to go through the scheduled path.

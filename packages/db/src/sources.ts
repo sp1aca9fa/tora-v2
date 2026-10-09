@@ -170,23 +170,36 @@ export async function unlinkSource(db: Db, sourceId: string): Promise<void> {
   await db.update(productSources).set({ active: false }).where(eq(productSources.id, sourceId));
 }
 
-/** Products the user holds that have matches waiting for confirmation, with one holding each. */
+/** Unlinked products the user holds that have matches waiting for confirmation, one holding each. */
 export async function pendingMatchesForUser(db: Db, userId: string) {
   return db
     .select({ product: products, holdingId: sql<string>`min(${holdings.id})` })
     .from(products)
     .innerJoin(holdings, and(eq(holdings.productId, products.id), eq(holdings.userId, userId)))
     .where(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(sourceCandidates)
-          .where(
-            and(
-              eq(sourceCandidates.productId, products.id),
-              eq(sourceCandidates.status, 'pending'),
+      and(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(sourceCandidates)
+            .where(
+              and(
+                eq(sourceCandidates.productId, products.id),
+                eq(sourceCandidates.status, 'pending'),
+              ),
             ),
+        ),
+        // Already linked: leftover suggestions (e.g. a no-shrink variant) are optional.
+        not(
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(productSources)
+              .where(
+                and(eq(productSources.productId, products.id), eq(productSources.active, true)),
+              ),
           ),
+        ),
       ),
     )
     .groupBy(products.id)
