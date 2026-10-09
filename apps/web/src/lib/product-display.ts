@@ -32,3 +32,15 @@ export function productMeta(
     .filter(Boolean)
     .join(' · ');
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  snkrdunk: 'SNKRDUNK',
+  mercari: 'Mercari',
+  surugaya: '駿河屋',
+  tcgcsv: 'TCGplayer',
+  ebay: 'eBay',
+};
+
+export function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source;
+}

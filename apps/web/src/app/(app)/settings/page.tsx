@@ -1,10 +1,17 @@
-import { MAX_ACTIVE_DEVICES, listDevices, listRecentCollectorRuns } from '@tora/db';
+import {
+  MAX_ACTIVE_DEVICES,
+  collectorHealth,
+  listDevices,
+  listRecentCollectorRuns,
+} from '@tora/db';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { logout, revokeDeviceAction } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
+import { sourceLabel } from '@/lib/product-display';
+import { formatJpy } from '@/lib/utils';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
@@ -12,13 +19,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SettingsPage() {
   const { db, user, device: current } = await authed();
-  const [runs, devices, t, format] = await Promise.all([
+  const [runs, health, devices, t, format] = await Promise.all([
     listRecentCollectorRuns(db, 10),
+    collectorHealth(db),
     listDevices(db, user.id),
     getTranslations(),
     getFormatter(),
   ]);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
+  const dateTime = (iso: string) =>
+    format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
 
   return (
     <div className="space-y-4">
@@ -79,26 +89,85 @@ export default async function SettingsPage() {
           <CardTitle>{t('settings.collectors')}</CardTitle>
           <CardDescription>{t('settings.collectorsInfo')}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {health.map((h) => (
+            <div key={h.source} className="space-y-2 rounded-md border p-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-medium">{sourceLabel(h.source)}</p>
+                {h.lastRun && (
+                  <span
+                    className={
+                      h.lastRun.status === 'ok'
+                        ? 'text-xs text-muted-foreground'
+                        : 'text-xs font-medium text-destructive'
+                    }
+                  >
+                    {t(`runStatus.${h.lastRun.status}`)} · {dateTime(h.lastRun.startedAt)}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t('settings.sourceCounts', { linked: h.linked, pending: h.pending })}
+                {h.lastRun &&
+                  ` · ${t('settings.lastRunCounts', { requests: h.lastRun.requests, added: h.lastRun.observationsAdded })}`}
+              </p>
+              {h.lastRun?.error && (
+                <pre className="overflow-x-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap">
+                  {h.lastRun.error}
+                </pre>
+              )}
+              {h.stale.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-destructive">{t('settings.stale')}</p>
+                  <ul className="text-xs text-muted-foreground">
+                    {h.stale.map((s) => (
+                      <li key={s.product.id}>
+                        {s.product.name} ·{' '}
+                        {s.lastSuccessAt ? dateTime(s.lastSuccessAt) : t('settings.never')}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {h.jumps.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-destructive">{t('settings.jumps')}</p>
+                  <ul className="text-xs text-muted-foreground">
+                    {h.jumps.map((j) => (
+                      <li key={`${j.product.id}-${j.bucket}`}>
+                        {j.product.name} <code>{j.bucket ?? '-'}</code>:{' '}
+                        {formatJpy(Math.round(j.before))} → {formatJpy(Math.round(j.recent))}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ))}
           {runs.length === 0 ? (
             <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
               {t('settings.noRuns')}
             </p>
           ) : (
-            <ul className="divide-y text-sm">
-              {runs.map((run) => (
-                <li key={run.id} className="flex justify-between gap-4 py-2">
-                  <span>{run.source}</span>
-                  <span className="text-muted-foreground">
-                    {t(`runStatus.${run.status}`)} ·{' '}
-                    {format.dateTime(new Date(run.startedAt), {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    })}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                {t('settings.recentRuns')}
+              </summary>
+              <ul className="mt-2 divide-y">
+                {runs.map((run) => (
+                  <li key={run.id} className="flex justify-between gap-4 py-2">
+                    <span>{sourceLabel(run.source)}</span>
+                    <span className="text-muted-foreground">
+                      {t(`runStatus.${run.status}`)} · {dateTime(run.startedAt)} ·{' '}
+                      {t('settings.lastRunCounts', {
+                        requests: run.requests,
+                        added: run.observationsAdded,
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </CardContent>
       </Card>

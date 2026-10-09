@@ -14,8 +14,8 @@
 |---|---|---|
 | S1 | Foundation: monorepo, schema, i18n, access | done |
 | S2 | Registration UI (products, lots, pulls, events) | done (reworked by S2b) |
-| S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | built; awaiting user check |
-| S3 | Collector framework + SNKRDUNK + catalog search | todo |
+| S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
+| S3 | Collector framework + SNKRDUNK + source matching | in progress |
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | todo |
 | S6 | Export / import (JSON, CSV) + backups | todo |
@@ -52,6 +52,10 @@
 - 2026-10-09: Products are shared: only their creator or an admin can edit them; catalog-generated products only by an admin.
 - 2026-10-09: Portfolio header shows total spent and item counts now; market value arrives in S5.
 - 2026-10-09: Pokemon catalog switched from TCGdex to the official pokemon-card.com product list (TCGdex lagged behind new releases and had wrong names/duplicates). Set codes are copied from TCGdex only when name and release date match. `catalog:sync` now removes sets that left the catalog, re-pointing products that used them.
+- 2026-10-09: S3 matching runs on the home PC, not in the add flow (SNKRDUNK must not be queried from Vercel). Candidates are confirmed on the item page or a SNKRDUNK link is pasted. Owned and opened (consumed) products are matched: opened boxes still need a value "as received".
+- 2026-10-09: SNKRDUNK sales history has no transaction ids and shows the last ~3 days as relative times. Trades are saved per finished day (older than 5 days) with refs `<listing>|<day>|<price>|<lot>|<condition>|<label>#n`; the history sweep only saves a day once all its entries are seen and resumes across runs (60 pages per item per run). Lot trades ("10個") are stored per unit with the original lot price kept.
+- 2026-10-09: SNKRDUNK lists no-shrink boxes as separate products, so a product may have several active listings per source; the no-shrink listing's trades go to `sealed:no_shrink`, other sealed trades to `sealed:shrink`.
+- 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
 
 ---
 
@@ -274,18 +278,19 @@ Acceptance:
 - A second user cannot see the first user's holdings.
 - A Pokemon booster box from a recent set can be registered by picking the set; its release date comes from the catalog.
 
-## S3: Collector framework + SNKRDUNK + catalog search
+## S3: Collector framework + SNKRDUNK + source matching
 
 Build:
-- `collector-sdk`: Collector interface (`search(query)`, `fetchObservations(productSource)`, condition-to-bucket mapping), runner CLI `pnpm collect [--source x] [--product id]`, rate limiter, retry, `collector_runs` logging.
-- **SNKRDUNK collector** (private submodule): inspect the site's network calls in a browser to find the JSON endpoints used by product pages. Implement product search, product mapping, and sales history (trades with condition labels, graded and sealed). Backfill all available history on first mapping.
-- Add flow step 1: **search sources** (SNKRDUNK now, others later) and create the product + product_source from a result. Manual creation stays available.
+- `collector-sdk`: Collector interface (`search(keywords)`, `fetchObservations(productSource)`, condition-to-bucket mapping), polite HTTP (2-5 s random delay, per-run request cap, retry with backoff on 5xx, stop on 403/429/captcha), resumable history sweeps, runner CLI `pnpm collect [--source x] [--product id] [--match-only] [--no-jitter]`, `collector_runs` logging.
+- **SNKRDUNK collector** (private submodule `collectors/`, repo `sp1aca9fa/tora-collectors`): product search and sales history (trades with condition labels, graded and sealed). Backfill all available history on first mapping, resumable across runs.
+- **Matching** (SNKRDUNK can only be queried from the home PC, never from Vercel): each run searches SNKRDUNK for owned TCG products that have no SNKRDUNK source and stores the best candidates. The item page shows them under "Price sources": confirm or reject, or paste a SNKRDUNK product URL. A confirmed match becomes an active `product_source`; history backfills on the next run.
+- Item page: recent SNKRDUNK trades and a simple median per bucket (full valuation is S5), so the data gate can be checked.
 - Settings: collector status, last runs, flagged health issues.
 - Cron setup documented and working.
 
 Acceptance:
-- Create the 30th anniversary box and 3 pulled cards from SNKRDUNK search; history is backfilled into `price_observations` with correct buckets.
-- **Data gate (with the user)**: for 5 real owned items, compare our computed medians against what the user sees on the site. Agree it is trustworthy before continuing.
+- Register the 30th anniversary box and 3 pulled cards, confirm their SNKRDUNK matches; history is backfilled into `price_observations` with correct buckets.
+- **Data gate (with the user)**: for 5 real owned items, compare our medians against what the user sees on the site. Agree it is trustworthy before continuing.
 
 ## S4: Mercari sold collector
 

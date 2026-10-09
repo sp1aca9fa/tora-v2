@@ -164,7 +164,7 @@
   "settings": {
     "title": "設定",
     "collectors": "価格収集",
-    "collectorsInfo": "価格収集は自宅PC上で実行され（pnpm collect）、データベースに書き込みます。非公開のコレクターは任意のサブモジュールです。",
+    "collectorsInfo": "価格収集は自宅PCで実行され（pnpm collect、cronで毎日）、データベースに書き込みます。Vercelでは実行されません。",
     "noRuns": "収集の実行履歴はまだありません。",
     "account": "アカウント",
     "logout": "ログアウト",
@@ -173,7 +173,13 @@
     "devicesInfo": "1つのアカウントでログインできる端末は2台までです。ログアウトまたは解除すると枠が空きます。新しい端末ではパスワードと認証コードが必要です。",
     "thisDevice": "この端末",
     "deviceDates": "{since}から · 最終利用 {seen}",
-    "revoke": "解除"
+    "revoke": "解除",
+    "sourceCounts": "リンク {linked}件 · 確認待ち {pending}件",
+    "lastRunCounts": "{requests}リクエスト · +{added}取引",
+    "stale": "3日以上収集されていません:",
+    "never": "未実行",
+    "jumps": "中央値が50%以上変動（直近7日 vs その前30日）:",
+    "recentRuns": "最近の実行"
   },
   "fields": {
     "type": "種類",
@@ -229,7 +235,8 @@
     "not_at_grader": "このカードは鑑定中ではありません。",
     "no_change": "変更がありません。",
     "has_dependents": "他の登録（開封結果や分割）が関連しているため削除できません。",
-    "forbidden": "このアイテムを作成した人だけが変更できます。"
+    "forbidden": "このアイテムを作成した人だけが変更できます。",
+    "badSourceUrl": "スニダンの商品リンク（https://snkrdunk.com/apparels/…）ではありません。"
   },
   "acquisitionType": {
     "purchase": "購入",
@@ -308,5 +315,31 @@
     "th": "タイ語版",
     "id": "インドネシア語版",
     "other": "その他"
+  },
+  "sources": {
+    "title": "価格ソース",
+    "info": "この商品の相場の取得元です。価格は自宅PCが1日1回収集します。",
+    "open": "開く",
+    "collected": "取引{count}件を収集 · 最終実行 {date}",
+    "waiting": "リンク済み。次回の実行で取引を収集します。",
+    "unlink": "解除",
+    "confirmTitle": "同じ商品ですか？",
+    "confirm": "はい、リンク",
+    "reject": "いいえ",
+    "score": "一致度 {score}%",
+    "noneYet": "未リンクです。次回の収集でスニダンから探します。リンクを下に貼り付けることもできます。",
+    "noneForGames": "ゲーム・グッズの価格ソース（メルカリ）は次のアップデートで追加されます。",
+    "pasteUrl": "スニダンの商品リンクを貼り付け",
+    "link": "リンク",
+    "last30": "直近30日",
+    "median": "中央値",
+    "trades": "取引数",
+    "unmapped": "未分類",
+    "yours": "あなたの区分",
+    "recentTrades": "最近の取引",
+    "matchesTitle": "確認待ちのマッチ",
+    "matchesInfo": "収集処理がスニダンの候補を見つけました。開いて正しい商品を確認してください。",
+    "noMatches": "確認待ちはありません。",
+    "banner": "{count}件の商品に確認待ちの価格ソースがあります"
   }
 }

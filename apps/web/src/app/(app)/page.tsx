@@ -7,7 +7,7 @@ import {
   kindsFor,
   productClass,
 } from '@tora/core';
-import { listInventory, ownedTotals } from '@tora/db';
+import { listInventory, ownedTotals, pendingMatchesForUser } from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -45,9 +45,10 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, totals, t] = await Promise.all([
+  const [rows, totals, matches, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
     ownedTotals(db, user.id),
+    pendingMatchesForUser(db, user.id),
     getTranslations(),
   ]);
   const filtered = Boolean(category || q || status !== 'owned');
@@ -79,6 +80,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
           <p className="text-sm text-muted-foreground">{t('portfolio.marketValueSoon')}</p>
         </div>
       </section>
+
+      {matches.length > 0 && (
+        <Link
+          href="/matches"
+          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <span>{t('sources.banner', { count: matches.length })}</span>
+          <ChevronRight className="size-4" />
+        </Link>
+      )}
 
       <Suspense>
         <InventoryFilters />

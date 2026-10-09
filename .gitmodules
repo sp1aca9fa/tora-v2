@@ -1,0 +1,3 @@
+[submodule "collectors"]
+	path = collectors
+	url = git@github.com:sp1aca9fa/tora-collectors.git

@@ -171,6 +171,10 @@ export const productSources = sqliteTable(
     source: text('source').notNull(),
     externalId: text('external_id'),
     query: text('query', { mode: 'json' }).$type<SourceQuery>(),
+    title: text('title'),
+    url: text('url'),
+    /** Collector progress (e.g. history backfill cursor). Opaque to everything but the collector. */
+    state: text('state', { mode: 'json' }).$type<unknown>(),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     lastSuccessAt: text('last_success_at'),
     ...timestamps,
@@ -178,6 +182,34 @@ export const productSources = sqliteTable(
   (t) => [
     index('product_sources_product_idx').on(t.productId),
     index('product_sources_source_idx').on(t.source, t.active),
+    uniqueIndex('product_sources_external_uq').on(t.productId, t.source, t.externalId),
+  ],
+);
+
+export const CANDIDATE_STATUSES = ['pending', 'rejected'] as const;
+
+/** Possible matches found by a collector for a product, waiting for the user to confirm. */
+export const sourceCandidates = sqliteTable(
+  'source_candidates',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    source: text('source').notNull(),
+    externalId: text('external_id').notNull(),
+    title: text('title').notNull(),
+    url: text('url'),
+    imageUrl: text('image_url'),
+    priceJpy: integer('price_jpy'),
+    score: real('score').notNull().default(0),
+    status: text('status', { enum: CANDIDATE_STATUSES }).notNull().default('pending'),
+    ...timestamps,
+  },
+  (t) => [
+    check('source_candidates_status_check', oneOf(t.status, CANDIDATE_STATUSES)),
+    uniqueIndex('source_candidates_uq').on(t.productId, t.source, t.externalId),
+    index('source_candidates_pending_idx').on(t.source, t.status),
   ],
 );
 
@@ -374,6 +406,8 @@ export type NewTcgSet = typeof tcgSets.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type ProductSource = typeof productSources.$inferSelect;
+export type SourceCandidate = typeof sourceCandidates.$inferSelect;
+export type NewPriceObservation = typeof priceObservations.$inferInsert;
 export type Holding = typeof holdings.$inferSelect;
 export type NewHolding = typeof holdings.$inferInsert;
 export type HoldingEvent = typeof holdingEvents.$inferSelect;

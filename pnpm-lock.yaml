@@ -264,6 +264,18 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0
 
+  collectors:
+    dependencies:
+      '@tora/collector-sdk':
+        specifier: workspace:*
+        version: link:../packages/collector-sdk
+      '@tora/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@tora/db':
+        specifier: workspace:*
+        version: link:../packages/db
+
   collectors-public:
     dependencies:
       '@tora/collector-sdk':

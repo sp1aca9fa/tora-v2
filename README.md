@@ -130,18 +130,48 @@ pnpm catalog:sync                                   # load into the database; re
 
 ## Collectors
 
-Collectors only fetch for products with active sources, at a polite pace, and only from the home
-PC. Never run them on Vercel or CI.
+Collectors only fetch for products with active sources, at a polite pace (2-5 s between requests,
+a request cap per run, stop on 403/429/captcha), and only from the home PC. Never run them on
+Vercel or CI (the CLI refuses when `VERCEL` or `CI` is set).
+
+```bash
+pnpm collect                         # all collectors: match, then collect
+pnpm collect --source snkrdunk       # one collector
+pnpm collect --match-only            # only look for listings of unlinked items
+pnpm collect --collect-only          # only fetch trades for linked listings
+pnpm collect --product <product-id>  # one product
+```
+
+### How items get prices (SNKRDUNK)
+
+1. Register an item in the app as usual.
+2. On the next run, the collector searches SNKRDUNK for owned (or opened) TCG items without a
+   listing and stores the best candidates.
+3. In the app, the item page shows them under **Price sources** (and Portfolio shows a banner):
+   confirm the right one, or paste a SNKRDUNK product link instead. Boxes can have two listings
+   (with and without shrink wrap); each feeds its own price bucket.
+4. The next runs backfill the full sales history (up to 60 pages per item per run, resuming where
+   they stopped), then add new days. Trades are saved per finished day; SNKRDUNK shows the last
+   few days with relative times, so prices lag about 5 days.
+
+Settings shows each source's last run, items waiting for confirmation, listings not collected for
+3+ days and big median moves.
 
 ### Private submodule
 
+The private collectors live in `collectors/` (git submodule, `sp1aca9fa/tora-collectors`).
+
 ```bash
-git submodule add git@github.com:<you>/<private-collectors-repo>.git collectors
+git clone --recurse-submodules git@github.com:sp1aca9fa/tora-v2.git
+# or, in an existing checkout:
+git submodule update --init
 pnpm install
 ```
 
-Without it, `pnpm collect` reports the package as missing and does nothing. The app's Settings
-page shows collector runs once they exist.
+Without it, `pnpm collect` reports the package as missing and does nothing; the app, build and
+tests work as usual. Vercel builds skip it (private submodules are not fetched), which is intended.
+Commit collector changes inside `collectors/` first, push them, then commit the updated submodule
+pointer in the main repo.
 
 ### Daily schedule (cron in WSL)
 

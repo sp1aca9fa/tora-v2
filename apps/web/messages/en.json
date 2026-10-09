@@ -164,7 +164,7 @@
   "settings": {
     "title": "Settings",
     "collectors": "Collectors",
-    "collectorsInfo": "Collectors run on your home PC (pnpm collect) and write to the database. Private collectors live in an optional submodule.",
+    "collectorsInfo": "Collectors run on your home PC (pnpm collect, daily via cron) and write to the database. They never run on Vercel.",
     "noRuns": "No collector runs recorded yet.",
     "account": "Account",
     "logout": "Sign out",
@@ -173,7 +173,13 @@
     "devicesInfo": "Each account can be signed in on up to 2 devices. Signing out or revoking frees a slot; a new device needs the password and an authenticator code.",
     "thisDevice": "This device",
     "deviceDates": "Since {since} · last used {seen}",
-    "revoke": "Revoke"
+    "revoke": "Revoke",
+    "sourceCounts": "{linked} linked · {pending} waiting for confirmation",
+    "lastRunCounts": "{requests} requests · +{added} trades",
+    "stale": "Not collected for 3+ days:",
+    "never": "never",
+    "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
+    "recentRuns": "Recent runs"
   },
   "fields": {
     "type": "Type",
@@ -229,7 +235,8 @@
     "not_at_grader": "This card is not at a grader.",
     "no_change": "Nothing changed.",
     "has_dependents": "Other entries depend on this one (pulls or splits), so it cannot be deleted.",
-    "forbidden": "Only the person who created this item can change it."
+    "forbidden": "Only the person who created this item can change it.",
+    "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…)."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -308,5 +315,31 @@
     "th": "Thai",
     "id": "Indonesian",
     "other": "Other"
+  },
+  "sources": {
+    "title": "Price sources",
+    "info": "Where this item's market prices come from. Prices are collected by the home PC once a day.",
+    "open": "Open",
+    "collected": "{count} trades collected · last run {date}",
+    "waiting": "Linked. Trades are collected on the next run.",
+    "unlink": "Unlink",
+    "confirmTitle": "Is this the same item?",
+    "confirm": "Yes, link",
+    "reject": "No",
+    "score": "{score}% match",
+    "noneYet": "Not linked yet. The next collector run will look for this item on SNKRDUNK, or paste its link below.",
+    "noneForGames": "Price sources for games and merch (Mercari) come in the next update.",
+    "pasteUrl": "Paste a SNKRDUNK product link",
+    "link": "Link",
+    "last30": "Last 30 days",
+    "median": "Median",
+    "trades": "Trades",
+    "unmapped": "unmapped",
+    "yours": "yours",
+    "recentTrades": "Recent trades",
+    "matchesTitle": "Matches to confirm",
+    "matchesInfo": "The collector found possible SNKRDUNK listings for these items. Open one to confirm the right match.",
+    "noMatches": "Nothing to confirm.",
+    "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm"
   }
 }

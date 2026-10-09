@@ -11,6 +11,7 @@ import { authed } from '@/lib/auth/guard';
 import { productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { EventList } from './event-list';
+import { PriceSources } from './price-sources';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -207,6 +208,8 @@ export default async function HoldingPage({ params }: Params) {
           </CardContent>
         </Card>
       )}
+
+      <PriceSources db={db} product={product} holdingId={holding.id} bucket={bucket} />
 
       <section className="space-y-3">
         <h2 className="font-semibold">{t('holding.history')}</h2>
