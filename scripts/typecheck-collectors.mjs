@@ -1,3 +1,4 @@
+/* global console */
 // Typechecks the private collectors/ submodule when it is checked out (it is not a workspace
 // member, so `pnpm -r typecheck` does not reach it).
 import { execFileSync } from 'node:child_process';

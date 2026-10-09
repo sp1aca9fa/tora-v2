@@ -138,7 +138,7 @@
       "existing": "Registered card"
     },
     "name": "Card name",
-    "nameHint": "Set, franchise and region come from the box.",
+    "nameHint": "Japanese name as printed (e.g. メガレックウザex) lets prices match automatically. Set, franchise and region come from the box.",
     "add": "Add pull",
     "done": "Done"
   },

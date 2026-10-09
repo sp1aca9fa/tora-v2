@@ -74,7 +74,7 @@ export async function runCollector(
       for (const product of toMatch) {
         try {
           const found = await collector.findCandidates(product, ctx);
-          const n = await saveCandidates(db, product.id, collector.source, found.slice(0, 5));
+          const n = await saveCandidates(db, product.id, collector.source, found.slice(0, 8));
           summary.candidates += n;
           log(`match "${product.name}": ${found.length} found, ${n} new`);
         } catch (e) {
