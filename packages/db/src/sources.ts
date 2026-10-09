@@ -22,6 +22,7 @@ import {
   type NewPriceObservation,
   type Product,
   type ProductSource,
+  type RecentSale,
   type SourceCandidate,
   collectorRuns,
   holdings,
@@ -431,7 +432,13 @@ export async function syncProductDetails(
 export async function updateSourceProgress(
   db: Db,
   sourceId: string,
-  patch: { state?: unknown; success?: boolean; title?: string | null; url?: string | null },
+  patch: {
+    state?: unknown;
+    success?: boolean;
+    title?: string | null;
+    url?: string | null;
+    recentSales?: RecentSale[];
+  },
 ): Promise<void> {
   await db
     .update(productSources)
@@ -440,6 +447,7 @@ export async function updateSourceProgress(
       ...(patch.success ? { lastSuccessAt: toTokyoIso() } : {}),
       ...(patch.title ? { title: patch.title } : {}),
       ...(patch.url ? { url: patch.url } : {}),
+      ...(patch.recentSales ? { recentSales: patch.recentSales } : {}),
     })
     .where(eq(productSources.id, sourceId));
 }

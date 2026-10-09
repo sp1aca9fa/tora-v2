@@ -51,6 +51,14 @@ function oneOf(column: AnySQLiteColumn, values: readonly string[]): SQL {
   return sql`${column} IN (${sql.raw(list)})`;
 }
 
+export interface RecentSale {
+  bucket: string | null;
+  priceJpy: number;
+  observedAt: string;
+  /** True when the site only gave a relative time ("5時間前"). */
+  approximate?: boolean;
+}
+
 export interface SourceQuery {
   keywords?: string[];
   excludeKeywords?: string[];
@@ -179,6 +187,11 @@ export const productSources = sqliteTable(
     lastSuccessAt: text('last_success_at'),
     /** When the product's details were rewritten from this listing (once per link). */
     detailsSyncedAt: text('details_synced_at'),
+    /**
+     * Newest trades as last seen on the site, refreshed every run (may carry approximate
+     * times). Shown as "last sale"; history and medians use price_observations only.
+     */
+    recentSales: text('recent_sales', { mode: 'json' }).$type<RecentSale[]>(),
     ...timestamps,
   },
   (t) => [

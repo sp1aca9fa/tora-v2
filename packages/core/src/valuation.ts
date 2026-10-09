@@ -164,3 +164,102 @@ export function buylistFloor(
     ? { priceJpy: latest.priceJpy, source: latest.source, observedAt: latest.observedAt }
     : null;
 }
+
+/** A recent trade as last seen on a source (see product_sources.recent_sales). */
+export interface RecentSaleInput {
+  source: string;
+  bucket: string | null;
+  priceJpy: number;
+  observedAt: string;
+  approximate?: boolean;
+}
+
+export interface LastSale {
+  source: string;
+  priceJpy: number;
+  observedAt: string;
+  approximate: boolean;
+}
+
+/** Newest real sale in the bucket, from stored history or the fresher recent trades. */
+export function lastSale(
+  observations: readonly ValuationObservation[],
+  recent: readonly RecentSaleInput[],
+  bucket: string | null,
+  source?: string,
+  now: Date = new Date(),
+): LastSale | null {
+  if (!bucket) return null;
+  const candidates: LastSale[] = [
+    ...observations
+      .filter((o) => o.observationType === 'sold' && !o.excluded && o.bucket === bucket)
+      .map((o) => ({
+        source: o.source,
+        priceJpy: o.priceJpy,
+        observedAt: o.observedAt,
+        approximate: false,
+      })),
+    ...recent
+      .filter((r) => r.bucket === bucket)
+      .map((r) => ({
+        source: r.source,
+        priceJpy: r.priceJpy,
+        observedAt: r.observedAt,
+        approximate: Boolean(r.approximate),
+      })),
+  ].filter((s) => (!source || s.source === source) && Date.parse(s.observedAt) <= now.getTime());
+  return candidates.toSorted((a, b) => b.observedAt.localeCompare(a.observedAt))[0] ?? null;
+}
+
+export interface SourceSummary {
+  source: string;
+  last: LastSale | null;
+  /** Median in the bucket for this source (same windows and IQR as valuation). */
+  medianJpy: number | null;
+  sampleSize: number;
+  windowDays: number | null;
+  confidence: Confidence | null;
+  /** Last sale vs median, in percent (positive: the last sale was above the median). */
+  trendPct: number | null;
+}
+
+/** One summary per source with data in the bucket, in fallback order. */
+export function sourceSummaries(
+  observations: readonly ValuationObservation[],
+  recent: readonly RecentSaleInput[],
+  bucket: string | null,
+  now: Date = new Date(),
+): SourceSummary[] {
+  if (!bucket) return [];
+  const sources = new Set([
+    ...observations
+      .filter((o) => o.observationType === 'sold' && o.bucket === bucket)
+      .map((o) => o.source),
+    ...recent.filter((r) => r.bucket === bucket).map((r) => r.source),
+  ]);
+  return sourceOrder([...sources]).map((source) => {
+    const v = valueUnit({
+      bucket,
+      observations: observations.filter((o) => o.source === source),
+      now,
+    });
+    const last = lastSale(observations, recent, bucket, source, now);
+    return {
+      source,
+      last,
+      medianJpy: v.method === 'median' ? v.unitJpy : null,
+      sampleSize: v.sampleSize,
+      windowDays: v.windowDays,
+      confidence: v.confidence,
+      trendPct: trend(last?.priceJpy, v.method === 'median' ? v.unitJpy : null),
+    };
+  });
+}
+
+export function trend(
+  last: number | null | undefined,
+  typical: number | null | undefined,
+): number | null {
+  if (!last || !typical) return null;
+  return Math.round(((last - typical) / typical) * 1000) / 10;
+}

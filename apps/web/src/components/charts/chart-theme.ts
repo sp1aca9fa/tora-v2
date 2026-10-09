@@ -46,3 +46,11 @@ export const tickMarkFormatter = (time: unknown) => {
   const d = new Date(time * 1000);
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 };
+
+/** Fixed color slot per source, so a source keeps its color everywhere (badges and charts). */
+const SOURCE_SLOTS: Record<string, number> = { snkrdunk: 0, mercari: 1, surugaya: 2 };
+
+export function sourceColor(theme: ChartTheme, source: string, others: string[] = []): string {
+  const slot = SOURCE_SLOTS[source] ?? Math.max(0, others.indexOf(source));
+  return theme.series[slot % theme.series.length]!;
+}

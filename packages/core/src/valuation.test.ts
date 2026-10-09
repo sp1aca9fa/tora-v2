@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { type ValuationObservation, buylistFloor, valueUnit, withoutOutliers } from './valuation';
+import {
+  type ValuationObservation,
+  buylistFloor,
+  lastSale,
+  sourceSummaries,
+  valueUnit,
+  withoutOutliers,
+} from './valuation';
 
 const now = new Date('2026-10-10T03:00:00Z');
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000).toISOString();
@@ -116,5 +123,54 @@ describe('buylistFloor', () => {
     ];
     expect(buylistFloor(obs, 'sealed:shrink', now)?.priceJpy).toBe(7000);
     expect(valueUnit({ bucket: 'sealed:shrink', observations: obs, now }).method).toBe('none');
+  });
+});
+
+describe('last sale and per-source summaries', () => {
+  const obs = [
+    sold('snkrdunk', 10_000, 6),
+    sold('snkrdunk', 10_400, 7),
+    sold('snkrdunk', 9_800, 8),
+    sold('mercari', 9_000, 3),
+  ];
+  const recent = [
+    {
+      source: 'snkrdunk',
+      bucket: 'sealed:shrink',
+      priceJpy: 10_800,
+      observedAt: daysAgo(0.2),
+      approximate: true,
+    },
+    {
+      source: 'snkrdunk',
+      bucket: 'sealed:no_shrink',
+      priceJpy: 8_000,
+      observedAt: daysAgo(0.1),
+      approximate: true,
+    },
+  ];
+
+  it('takes the newest real sale in the bucket, including fresh recent trades', () => {
+    expect(lastSale(obs, recent, 'sealed:shrink', undefined, now)).toMatchObject({
+      priceJpy: 10_800,
+      approximate: true,
+    });
+    expect(lastSale(obs, [], 'sealed:shrink', 'mercari', now)).toMatchObject({
+      priceJpy: 9_000,
+      approximate: false,
+    });
+    expect(lastSale(obs, recent, null, undefined, now)).toBeNull();
+  });
+
+  it('summarizes each source with its median and the last sale trend', () => {
+    const s = sourceSummaries(obs, recent, 'sealed:shrink', now);
+    expect(s.map((x) => x.source)).toEqual(['snkrdunk', 'mercari']);
+    expect(s[0]).toMatchObject({
+      medianJpy: 10_000,
+      sampleSize: 3,
+      last: { priceJpy: 10_800 },
+      trendPct: 8,
+    });
+    expect(s[1]).toMatchObject({ medianJpy: 9_000, sampleSize: 1, trendPct: 0 });
   });
 });

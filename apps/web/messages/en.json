@@ -53,7 +53,8 @@
     "chartLabel": "Market value and cost of valued holdings per day",
     "breakdown": "By kind",
     "breakdownHint": "Bars: market value. Right: value / cost.",
-    "cost": "cost {cost}"
+    "cost": "cost {cost}",
+    "last": "last {price}"
   },
   "inventory": {
     "search": "Search name, set, card number",
@@ -352,7 +353,7 @@
     "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}}), e.g. the no-shrink box"
   },
   "valuation": {
-    "title": "Market value",
+    "title": "Market value (median)",
     "perUnit": "{amount} each × {qty}",
     "pl": "vs cost",
     "bucket": "Valued as",
@@ -390,7 +391,11 @@
     "noHistory": "No trades collected yet.",
     "yours": "yours",
     "daysWithTrades": "{count, plural, one {# day} other {# days}} with trades",
-    "chartLabel": "Daily median sale price per source for the selected condition"
+    "chartLabel": "Daily median sale price per source for the selected condition",
+    "lastSale": "Last sale",
+    "vsMedian": "vs median",
+    "medianOf": "Median of {count} / {days}d",
+    "noMedian": "No sales in this condition"
   },
   "box": {
     "paid": "Paid",

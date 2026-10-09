@@ -2,6 +2,8 @@ import { type Db, type Holding, type Product, loadMarketData, valueHolding } fro
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { SourceBadge } from '@/components/source-badge';
+import { Trend } from '@/components/trend';
 import { ValuationMeta } from '@/components/valuation-meta';
 import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
@@ -28,6 +30,15 @@ export async function ValuationCard({
     loadMarketData(db, userId, [product.id]),
   ]);
   const v = valueHolding(holding, product, market);
+  const now = new Date();
+  /** "~5 hours ago" for recent (approximate) trades, else the date. */
+  const when = (iso: string, approximate: boolean) => {
+    const at = new Date(iso);
+    if (now.getTime() - at.getTime() < 7 * 86_400_000) {
+      return `${approximate ? '~' : ''}${format.relativeTime(at, now)}`;
+    }
+    return format.dateTime(at, { dateStyle: 'medium' });
+  };
   const pl = v.valueJpy === null ? null : v.valueJpy - holding.costTotalJpy;
 
   return (
@@ -55,7 +66,54 @@ export async function ValuationCard({
             </div>
           )}
         </div>
+        {v.last && (
+          <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span className="text-muted-foreground">{t('lastSale')}</span>
+            <span className="font-medium tabular-nums">{formatJpy(v.last.priceJpy)}</span>
+            <span className="text-xs text-muted-foreground">
+              {sourceLabel(v.last.source)} · {when(v.last.observedAt, v.last.approximate)}
+            </span>
+            {v.trendPct !== null && (
+              <span className="text-xs text-muted-foreground">
+                <Trend pct={v.trendPct} /> {t('vsMedian')}
+              </span>
+            )}
+          </p>
+        )}
         <ValuationMeta v={v} />
+        {v.sources.length > 0 && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {v.sources.map((src) => (
+              <div key={src.source} className="space-y-1 rounded-md border px-3 py-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <SourceBadge source={src.source} />
+                  {src.last && (
+                    <span className="text-xs text-muted-foreground">
+                      {when(src.last.observedAt, src.last.approximate)}
+                    </span>
+                  )}
+                </div>
+                <p className="flex items-baseline justify-between gap-2">
+                  <span className="text-xs text-muted-foreground">{t('lastSale')}</span>
+                  <span className="font-medium tabular-nums">
+                    {src.last ? formatJpy(src.last.priceJpy) : '-'}
+                  </span>
+                </p>
+                <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {src.medianJpy === null
+                      ? t('noMedian')
+                      : t('medianOf', { count: src.sampleSize, days: src.windowDays ?? 0 })}
+                  </span>
+                  <span className="tabular-nums">
+                    {src.medianJpy === null ? '' : formatJpy(src.medianJpy)}{' '}
+                    <Trend pct={src.trendPct} />
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
         {bucket && (
           <p className="text-xs text-muted-foreground">
             {t('bucket')}: <code>{bucket}</code>

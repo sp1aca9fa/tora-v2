@@ -1,4 +1,10 @@
-import type { CandidateInput, NewPriceObservation, Product, ProductSource } from '@tora/db';
+import type {
+  CandidateInput,
+  NewPriceObservation,
+  Product,
+  ProductSource,
+  RecentSale,
+} from '@tora/db';
 import type { PoliteHttp } from './http';
 
 export interface CollectorContext {
@@ -16,6 +22,8 @@ export interface CollectResult {
   complete: boolean;
   title?: string | null;
   url?: string | null;
+  /** Newest trades as seen now (may have approximate times); shown as "last sale". */
+  recentSales?: RecentSale[];
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

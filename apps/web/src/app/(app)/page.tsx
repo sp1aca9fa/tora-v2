@@ -20,6 +20,7 @@ import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { Button } from '@/components/ui/button';
+import { Trend } from '@/components/trend';
 import { ConfidenceBadge } from '@/components/valuation-meta';
 import { authed } from '@/lib/auth/guard';
 import { franchiseLabel } from '@/lib/product-display';
@@ -213,9 +214,12 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
                     {valuation?.valueJpy != null ? (
                       <>
                         <p className="font-medium tabular-nums">{formatJpy(valuation.valueJpy)}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {t('portfolio.cost', { cost: formatJpy(holding.costTotalJpy) })}
-                        </p>
+                        {valuation.last && (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            {t('portfolio.last', { price: formatJpy(valuation.last.priceJpy) })}{' '}
+                            <Trend pct={valuation.trendPct} />
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           {valuation.method === 'median' ? (
                             <ConfidenceBadge confidence={valuation.confidence} />

@@ -1,0 +1,1 @@
+ALTER TABLE `product_sources` ADD `recent_sales` text;

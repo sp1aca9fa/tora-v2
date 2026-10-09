@@ -1,5 +1,8 @@
 // Holding valuation, box view, manual prices and daily snapshots (requirements section 6, S5).
 import {
+  type LastSale,
+  type RecentSaleInput,
+  type SourceSummary,
   type Valuation,
   type ValuationObservation,
   buylistFloor,
@@ -8,6 +11,9 @@ import {
   productClass,
   tokyoDate,
   toTokyoIso,
+  lastSale,
+  sourceSummaries,
+  trend,
   valueUnit,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
@@ -20,6 +26,7 @@ import {
   holdings,
   manualPrices,
   priceObservations,
+  productSources,
   products,
   valuationSnapshots,
 } from './schema';
@@ -30,6 +37,12 @@ const LOOKBACK_DAYS = 180 + 90;
 
 export interface HoldingValuation extends Valuation {
   bucket: string | null;
+  /** Newest real sale in the bucket (any source), shown next to the median value. */
+  last: LastSale | null;
+  /** Last sale vs the value, in percent. */
+  trendPct: number | null;
+  /** Each source's last sale and median, for side-by-side comparison. */
+  sources: SourceSummary[];
   /** Unit value x quantity. */
   valueJpy: number | null;
   buylist: { priceJpy: number; source: string; observedAt: string } | null;
@@ -37,6 +50,7 @@ export interface HoldingValuation extends Valuation {
 
 export interface MarketData {
   observations: Map<string, ValuationObservation[]>;
+  recent: Map<string, RecentSaleInput[]>;
   manual: Map<string, { bucket: string; priceJpy: number; setAt: string }[]>;
 }
 
@@ -48,8 +62,9 @@ export async function loadMarketData(
   now = new Date(),
 ): Promise<MarketData> {
   const observations = new Map<string, ValuationObservation[]>();
+  const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
-  if (productIds.length === 0) return { observations, manual };
+  if (productIds.length === 0) return { observations, recent, manual };
   const since = toTokyoIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY));
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
@@ -80,8 +95,20 @@ export async function loadMarketData(
       .from(manualPrices)
       .where(and(eq(manualPrices.userId, userId), inArray(manualPrices.productId, ids)));
     for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
+    const links = await db
+      .select({
+        productId: productSources.productId,
+        source: productSources.source,
+        recentSales: productSources.recentSales,
+      })
+      .from(productSources)
+      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
+    for (const l of links) {
+      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
+      recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
+    }
   }
-  return { observations, manual };
+  return { observations, recent, manual };
 }
 
 export function holdingBucket(holding: Holding, product: Product): string | null {
@@ -103,11 +130,16 @@ export function valueHolding(
     retailPriceJpy: product.retailPriceJpy,
     now,
   });
+  const recent = market.recent.get(product.id) ?? [];
+  const last = lastSale(observations, recent, bucket, undefined, now);
   return {
     ...v,
     bucket,
     valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
     buylist: buylistFloor(observations, bucket, now),
+    last,
+    trendPct: v.method === 'median' ? trend(last?.priceJpy, v.unitJpy) : null,
+    sources: sourceSummaries(observations, recent, bucket, now),
   };
 }
 

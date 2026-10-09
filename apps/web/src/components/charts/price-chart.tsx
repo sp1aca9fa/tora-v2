@@ -10,7 +10,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { formatYen, tickMarkFormatter, useChartTheme } from './chart-theme';
+import { formatYen, sourceColor, tickMarkFormatter, useChartTheme } from './chart-theme';
 
 export interface PriceChartPoint {
   day: string;
@@ -45,7 +45,7 @@ export function PriceChart({
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([b]) => b);
   }, [points]);
   const sources = useMemo(() => [...new Set(points.map((p) => p.source))].sort(), [points]);
-  const colorOf = (s: string) => theme.series[sources.indexOf(s) % theme.series.length]!;
+  const colorOf = (s: string) => sourceColor(theme, s, sources);
 
   const [bucket, setBucket] = useState<string | null>(
     defaultBucket && buckets.includes(defaultBucket) ? defaultBucket : (buckets[0] ?? null),

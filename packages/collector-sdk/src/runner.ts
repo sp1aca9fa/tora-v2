@@ -96,6 +96,7 @@ export async function runCollector(
             success: true,
             title: result.title,
             url: result.url,
+            recentSales: result.recentSales,
           });
           const title = result.title ?? link.title;
           if (!link.detailsSyncedAt && title && collector.productDetails) {
