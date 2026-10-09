@@ -120,12 +120,12 @@ account you create takes it over.
 
 `packages/catalog/data/*.json` holds Japanese sets with release dates (Magic sets apply to every
 region). Sealed products (box, pack, deck) are created from a set the first time someone registers
-one. Sources: TCGdex (Pokemon), the One Piece Card Game official product list, Yugipedia
+one. Sources: the official Pokemon card product list (codes cross-checked with TCGdex), the One Piece Card Game official product list, Yugipedia
 (Yu-Gi-Oh! OCG) and Scryfall (Magic). Only set names, codes, types and dates are taken.
 
 ```bash
 pnpm catalog:fetch [pokemon|one_piece|yugioh|mtg]   # refresh the JSON (a few minutes), review, commit
-pnpm catalog:sync                                   # load into the database (idempotent)
+pnpm catalog:sync                                   # load into the database; removes sets that left the catalog
 ```
 
 ## Collectors

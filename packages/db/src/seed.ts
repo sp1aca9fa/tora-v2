@@ -1,6 +1,6 @@
 // Sample data covering requirement scenarios 1-5 for a demo account. Local DB only.
 import { encryptSecret, generateBackupCodes, hashPassword } from '@tora/auth';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from './client';
 import { addPull, createHolding, markOpened } from './mutations';
 import { tcgSets } from './schema';
@@ -95,7 +95,16 @@ export async function seedCollection(db: Db, userId: string) {
   );
 
   // Scenario 4-5: a Pokemon box from the catalog when loaded, else entered manually.
-  const [set] = await db.select().from(tcgSets).where(eq(tcgSets.sourceKey, 'ja:SV9'));
+  const [set] = await db
+    .select()
+    .from(tcgSets)
+    .where(
+      and(
+        eq(tcgSets.franchise, 'pokemon'),
+        eq(tcgSets.code, 'SV9'),
+        eq(tcgSets.setType, 'expansion'),
+      ),
+    );
   const { holding: box } = await createHolding(
     db,
     userId,

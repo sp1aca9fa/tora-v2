@@ -51,6 +51,7 @@
 - 2026-10-09: TCG catalog = sets (with release date and type) for Pokemon, One Piece, Yu-Gi-Oh! OCG (Japanese) and Magic (region-less). Sealed products are generated on first use per set + kind + variant + region, named in the set name's language (e.g. "バトルパートナーズ BOX"). Singles stay manual until SNKRDUNK search (S3).
 - 2026-10-09: Products are shared: only their creator or an admin can edit them; catalog-generated products only by an admin.
 - 2026-10-09: Portfolio header shows total spent and item counts now; market value arrives in S5.
+- 2026-10-09: Pokemon catalog switched from TCGdex to the official pokemon-card.com product list (TCGdex lagged behind new releases and had wrong names/duplicates). Set codes are copied from TCGdex only when name and release date match. `catalog:sync` now removes sets that left the catalog, re-pointing products that used them.
 
 ---
 
@@ -132,7 +133,7 @@ General rules:
 
 ### tcg_sets (pre-registered TCG catalog, shared)
 - `franchise` (pokemon | one_piece | yugioh | mtg), `region` (null = all regions, e.g. Magic), `code`, `name`, `name_alias` (search only), `set_type`: expansion | deck | special, `release_date`, `source` + `source_key` (unique; for idempotent re-sync)
-- Built from public sources by `pnpm catalog:fetch` (TCGdex, One Piece official site, Yugipedia, Scryfall) into JSON files in the repo, loaded with `pnpm catalog:sync`.
+- Built from public sources by `pnpm catalog:fetch` (Pokemon official product list, One Piece official site, Yugipedia, Scryfall) into JSON files in the repo, loaded with `pnpm catalog:sync`.
 
 ### products (catalog entry, one per distinct item; shared by all users)
 - `category`: tcg | game

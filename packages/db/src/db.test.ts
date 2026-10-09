@@ -136,3 +136,67 @@ describe('constraints', () => {
     expect(rows).toHaveLength(2);
   });
 });
+
+describe('catalog sync cleanup', () => {
+  const base = {
+    franchise: 'pokemon' as const,
+    region: 'jp' as const,
+    nameAlias: null,
+    setType: 'expansion' as const,
+  };
+
+  it('removes obsolete sets and re-points products that used them', async () => {
+    const { user } = await createUser(db, 'alice', creds);
+    await syncCatalog(db, [
+      {
+        ...base,
+        code: 'SV9',
+        name: 'バトルパートナーズ',
+        releaseDate: '2025-01-24',
+        source: 'old',
+        sourceKey: 'a',
+      },
+      {
+        ...base,
+        code: 'X1',
+        name: 'Unused',
+        releaseDate: '2020-01-01',
+        source: 'old',
+        sourceKey: 'b',
+      },
+      {
+        ...base,
+        code: 'Q1',
+        name: 'Orphan',
+        releaseDate: '2019-01-01',
+        source: 'old',
+        sourceKey: 'c',
+      },
+    ]);
+    const old = Object.fromEntries((await db.select().from(tcgSets)).map((s) => [s.sourceKey, s]));
+    const [usedProduct] = await db
+      .insert(products)
+      .values([
+        { category: 'tcg', kind: 'booster_box', name: 'BP BOX', setId: old.a!.id },
+        { category: 'tcg', kind: 'booster_box', name: 'Orphan BOX', setId: old.c!.id },
+      ])
+      .returning();
+    expect(user).toBeTruthy();
+
+    const r = await syncCatalog(db, [
+      {
+        ...base,
+        code: 'SV9',
+        name: 'バトルパートナーズ',
+        releaseDate: '2025-01-24',
+        source: 'new',
+        sourceKey: 'pg:1',
+      },
+    ]);
+    expect(r).toEqual({ upserted: 1, removed: 2, remapped: 1, kept: 1 });
+    const sets = await db.select().from(tcgSets);
+    expect(sets.map((s) => s.sourceKey).sort()).toEqual(['c', 'pg:1']);
+    const [moved] = await db.select().from(products).where(eq(products.id, usedProduct!.id));
+    expect(moved?.setId).toBe(sets.find((s) => s.sourceKey === 'pg:1')?.id);
+  });
+});

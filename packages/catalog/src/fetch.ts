@@ -3,7 +3,8 @@
 // `pnpm catalog:sync` to load it into the database.
 //
 // Sources (set names, codes, types and release dates are facts; nothing else is copied):
-//   Pokemon (JP)   TCGdex API            https://api.tcgdex.net/v2/ja/sets
+//   Pokemon (JP)   Official product list https://www.pokemon-card.com/products/
+//                  (+ set codes from TCGdex when name and date match)
 //   One Piece (JP) Official product list https://www.onepiece-cardgame.com/products/
 //   Yu-Gi-Oh! OCG  Yugipedia (SMW API)   https://yugipedia.com/api.php
 //   Magic          Scryfall API          https://api.scryfall.com/sets
@@ -37,34 +38,79 @@ const clean = (s: string) =>
 
 // ---------------------------------------------------------------------------------------------
 
+/** "2026年 7月31日（金）" -> "2026-07-31" (month-only dates keep YYYY-MM). */
+function jaDate(text: string): string | null {
+  const m = text.normalize('NFKC').match(/(\d{4})年\s*(\d{1,2})月(?:\s*(\d{1,2})日)?/);
+  if (!m) return null;
+  return [m[1], m[2]!.padStart(2, '0'), m[3]?.padStart(2, '0')].filter(Boolean).join('-');
+}
+
 async function pokemon(): Promise<CatalogSetEntry[]> {
-  const list = await getJson<{ id: string; name: string }[]>('https://api.tcgdex.net/v2/ja/sets');
+  type Item = {
+    productTitle: string;
+    releaseDate: string;
+    link_cardList: string;
+    link_detailPage: string;
+  };
+  const types: [string, SetType][] = [
+    ['expansion', 'expansion'],
+    ['construction', 'deck'],
+    ['others', 'special'],
+  ];
   const out: CatalogSetEntry[] = [];
+  for (const [productType, setType] of types) {
+    for (let page = 1, maxPage = 1; page <= maxPage; page++) {
+      await sleep(1000);
+      const d = await getJson<{ maxPage: number; products: Item[] }>(
+        `https://www.pokemon-card.com/products/resultAPI.php?productType=${productType}&page=${page}`,
+      );
+      maxPage = d.maxPage;
+      for (const item of d.products) {
+        const title = clean(item.productTitle);
+        // 拡張パック「ストームエメラルダ」 -> ストームエメラルダ; other titles lose wrapping quotes.
+        const inner = title.match(/^(?:強化)?(?:拡張パック|ハイクラスパック)\s*「(.+)」$/)?.[1];
+        const name = inner ?? title.replace(/^「(.+)」$/, '$1');
+        const slug = item.link_detailPage.match(
+          /(?:\/ex\/|\/product\/)([a-z]{1,3}\d+[a-z]?)\/?$/i,
+        )?.[1];
+        const pg = item.link_cardList.match(/[?&]pg=(\d+)/)?.[1];
+        const releaseDate = jaDate(item.releaseDate);
+        out.push({
+          franchise: 'pokemon',
+          region: 'jp',
+          code: slug ? slug.toUpperCase() : null,
+          name,
+          nameAlias: inner ? title : null,
+          setType,
+          releaseDate,
+          source: 'pokemon-official',
+          sourceKey: pg ? `pg:${pg}` : `${productType}:${name}:${releaseDate ?? ''}`,
+        });
+      }
+    }
+  }
+  return backfillPokemonCodes(out);
+}
+
+/**
+ * The official list has no set codes (SV9, M4, ...). TCGdex has them but some of its names and
+ * dates are wrong, so a code is copied only when name AND release date agree exactly.
+ */
+async function backfillPokemonCodes(entries: CatalogSetEntry[]): Promise<CatalogSetEntry[]> {
+  const list = await getJson<{ id: string }[]>('https://api.tcgdex.net/v2/ja/sets');
+  const codes = new Map<string, string>();
   for (const s of list) {
     await sleep(150);
     const d = await getJson<{ id: string; name: string; releaseDate?: string }>(
       `https://api.tcgdex.net/v2/ja/sets/${encodeURIComponent(s.id)}`,
     ).catch(() => null);
-    const name = clean(d?.name ?? s.name);
-    if (/プロモ|promo/i.test(name)) continue;
-    const setType: SetType = /デッキ|スターター|スタートセット|構築/.test(name)
-      ? 'deck'
-      : /スペシャル|プレミアム|コレクション|セット|ギフト/.test(name)
-        ? 'special'
-        : 'expansion';
-    out.push({
-      franchise: 'pokemon',
-      region: 'jp',
-      code: s.id,
-      name,
-      nameAlias: null,
-      setType,
-      releaseDate: d?.releaseDate ?? null,
-      source: 'tcgdex',
-      sourceKey: `ja:${s.id}`,
-    });
+    if (d?.releaseDate) codes.set(`${clean(d.name)}|${d.releaseDate}`, d.id);
   }
-  return out;
+  return entries.map((e) =>
+    e.code || e.setType !== 'expansion'
+      ? e
+      : { ...e, code: codes.get(`${e.name}|${e.releaseDate}`)?.toUpperCase() ?? null },
+  );
 }
 
 async function onePiece(): Promise<CatalogSetEntry[]> {

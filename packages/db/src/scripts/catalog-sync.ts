@@ -13,5 +13,7 @@ if (entries.length === 0) {
 console.log(
   `Syncing ${entries.length} sets into ${config.url.startsWith('file:') ? 'local DB' : config.url}`,
 );
-await syncCatalog(createDb(config), entries);
-console.log('Done.');
+const r = await syncCatalog(createDb(config), entries);
+console.log(
+  `Done: ${r.upserted} sets loaded, ${r.removed} obsolete removed (${r.remapped} re-pointed), ${r.kept} obsolete kept (in use, no match).`,
+);
