@@ -5,7 +5,7 @@ import {
   GRADERS,
   type Grading,
   PACKAGING_STATES,
-  type ProductType,
+  type ProductClass,
   RAW_GRADES,
   holdingFieldsFor,
 } from '@tora/core';
@@ -26,16 +26,16 @@ export interface ConditionDefaults {
   certNumber?: string | null;
 }
 
-/** Condition / packaging / grading inputs relevant to the product type. */
+/** Condition / packaging / grading inputs relevant to the product class. */
 export function ConditionFields({
-  type,
+  cls,
   defaults = {},
 }: {
-  type: ProductType;
+  cls: ProductClass;
   defaults?: ConditionDefaults;
 }) {
   const t = useTranslations();
-  const show = holdingFieldsFor(type);
+  const show = holdingFieldsFor(cls);
   const [grading, setGrading] = useState<Grading>(defaults.grading === 'graded' ? 'graded' : 'raw');
 
   return (
@@ -62,12 +62,12 @@ export function ConditionFields({
           <NativeSelect
             id="c-packaging"
             name="packagingState"
-            required={type === 'sealed_tcg'}
-            defaultValue={defaults.packagingState ?? (type === 'sealed_tcg' ? 'sealed_shrink' : '')}
+            required={cls === 'sealed'}
+            defaultValue={defaults.packagingState ?? (cls === 'sealed' ? 'sealed_shrink' : '')}
           >
-            {type !== 'sealed_tcg' && <option value="">{t('common.notSet')}</option>}
+            {cls !== 'sealed' && <option value="">{t('common.notSet')}</option>}
             {PACKAGING_STATES.filter(
-              (p) => p !== 'n/a' && (type === 'sealed_tcg' || p !== 'box_opened_contents_sealed'),
+              (p) => p !== 'n/a' && (cls === 'sealed' || p !== 'box_opened_contents_sealed'),
             ).map((p) => (
               <option key={p} value={p}>
                 {t(`packaging.${p}`)}

@@ -1,6 +1,13 @@
 {
-  "app": { "name": "Tora", "description": "コレクション管理" },
-  "nav": { "portfolio": "ポートフォリオ", "add": "登録", "settings": "設定" },
+  "app": {
+    "name": "Tora",
+    "description": "コレクション管理"
+  },
+  "nav": {
+    "portfolio": "ポートフォリオ",
+    "add": "登録",
+    "settings": "設定"
+  },
   "common": {
     "save": "保存",
     "cancel": "キャンセル",
@@ -14,41 +21,74 @@
     "title": "ログイン",
     "password": "パスワード",
     "submit": "ログイン",
-    "invalid": "パスワードが違います。",
-    "locked": "試行回数が多すぎます。数分後にもう一度お試しください。",
-    "notConfigured": "ログインが未設定です。AUTH_PASSWORD_HASH と AUTH_SECRET を設定してください（README参照）。"
+    "username": "ユーザー名",
+    "continue": "次へ",
+    "codeTitle": "認証コード",
+    "code": "6桁のコード",
+    "codeHint": "認証アプリに表示されるコード。アプリを失くした場合はバックアップコードを入力してください。",
+    "startOver": "最初からやり直す",
+    "errors": {
+      "invalid": "一致しません。もう一度お試しください。",
+      "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
+      "notConfigured": "ログインが未設定です（AUTH_SECRET がありません。README参照）。",
+      "deviceLimit": "このアカウントはすでに2台の端末でログインしています。別の端末の設定からログアウトまたは端末を解除してください（自宅PCで `pnpm user revoke` も可）。",
+      "notEnrolled": "このアカウントには認証アプリが未登録です。自宅PCで `pnpm user reset-2fa` を実行してください。",
+      "expired": "時間切れです。最初からやり直してください。"
+    }
   },
   "portfolio": {
     "title": "ポートフォリオ",
     "empty": "まだ登録がありません。",
-    "count": "{count}件",
     "qty": "数量 {qty}",
-    "pulledFrom": "{name} から開封"
+    "pulledFrom": "{name} から開封",
+    "spent": "合計取得額",
+    "items": "所有数",
+    "itemsValue": "{units}点（{lots}件）",
+    "marketValue": "時価",
+    "marketValueSoon": "価格の収集が始まると表示されます。"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
     "allTypes": "すべての種類",
     "allStatuses": "すべての状態",
     "emptyFiltered": "条件に一致する登録はありません。",
-    "addFirst": "最初のアイテムを登録"
+    "addFirst": "最初のアイテムを登録",
+    "allOf": "{category}すべて"
   },
   "add": {
     "title": "登録",
-    "steps": { "what": "アイテム", "how": "購入情報", "details": "状態" },
-    "mode": { "new": "新規", "existing": "登録済み", "source": "サイトから" },
+    "steps": {
+      "what": "アイテム",
+      "how": "購入情報",
+      "details": "状態"
+    },
+    "mode": {
+      "new": "新規",
+      "existing": "登録済み",
+      "source": "サイトから"
+    },
     "sourceSearchSoon": "スニダン等のサイト検索は今後のアップデートで追加されます。",
     "searchPlaceholder": "登録済みのアイテムを検索",
     "noResults": "見つかりません。「新規」から作成してください。",
     "change": "変更",
-    "nameHint": "英語名か日本語名のどちらかは必須です。",
     "costHint": "全数量の合計支払額（送料など含めたいものを含む）。",
     "rawGradeHint": "S: 完美品、A: 美品、B: 小傷、C: 傷あり、D: ダメージ。",
     "submit": "登録する",
     "errors": {
       "pickProduct": "検索結果からアイテムを選んでください。",
-      "pickType": "アイテムの種類を選んでください。",
-      "nameRequired": "英語名か日本語名を入力してください。"
-    }
+      "pickCategory": "TCGかゲームを選んでください。",
+      "pickFranchise": "タイトルを選んでください。",
+      "pickKind": "アイテムの種類を選んでください。",
+      "pickSet": "セットを選ぶか、手入力してください。"
+    },
+    "category": "カテゴリー",
+    "otherFranchise": "タイトル名",
+    "set": "セット",
+    "setSearchPlaceholder": "セット名・型番で検索",
+    "noSets": "該当するセットがありません。下の「一覧にない場合」から入力してください。",
+    "released": "{date}発売",
+    "notInList": "一覧にない場合は手入力",
+    "variantPlaceholder": "例: Collector"
   },
   "holding": {
     "costBasis": "取得原価",
@@ -93,9 +133,12 @@
     }
   },
   "pulls": {
-    "mode": { "new": "新しいカード", "existing": "登録済みカード" },
+    "mode": {
+      "new": "新しいカード",
+      "existing": "登録済みカード"
+    },
     "name": "カード名",
-    "nameHint": "日本語でも英語でも可。セットと言語はBOXから引き継ぎます。",
+    "nameHint": "セット・タイトル・地域はBOXから引き継ぎます。",
     "add": "追加",
     "done": "完了"
   },
@@ -124,13 +167,17 @@
     "collectorsInfo": "価格収集は自宅PC上で実行され（pnpm collect）、データベースに書き込みます。非公開のコレクターは任意のサブモジュールです。",
     "noRuns": "収集の実行履歴はまだありません。",
     "account": "アカウント",
-    "logout": "ログアウト"
+    "logout": "ログアウト",
+    "signedInAs": "{username} としてログイン中",
+    "devices": "端末（{count}/{max}）",
+    "devicesInfo": "1つのアカウントでログインできる端末は2台までです。ログアウトまたは解除すると枠が空きます。新しい端末ではパスワードと認証コードが必要です。",
+    "thisDevice": "この端末",
+    "deviceDates": "{since}から · 最終利用 {seen}",
+    "revoke": "解除"
   },
   "fields": {
     "type": "種類",
     "status": "状態",
-    "nameEn": "名前（英語）",
-    "nameJa": "名前（日本語）",
     "name": "名前",
     "franchise": "シリーズ",
     "setName": "セット",
@@ -159,9 +206,14 @@
     "service": "サービス",
     "priceJpy": "売却価格",
     "feesJpy": "手数料",
-    "platform": "販売先",
+    "platform": "機種",
     "text": "メモ",
-    "confirm": "確認"
+    "confirm": "確認",
+    "region": "地域・言語",
+    "kind": "種類",
+    "category": "カテゴリー",
+    "variant": "バリエーション",
+    "username": "ユーザー名"
   },
   "errors": {
     "check": "入力内容を確認してください",
@@ -176,21 +228,19 @@
     "already_at_grader": "このカードはすでに鑑定中です。",
     "not_at_grader": "このカードは鑑定中ではありません。",
     "no_change": "変更がありません。",
-    "has_dependents": "他の登録（開封結果や分割）が関連しているため削除できません。"
+    "has_dependents": "他の登録（開封結果や分割）が関連しているため削除できません。",
+    "forbidden": "このアイテムを作成した人だけが変更できます。"
   },
-  "productType": {
-    "card_single": "カード",
-    "sealed_tcg": "未開封BOX・パック",
-    "game_ce": "限定版",
-    "game": "ゲーム",
-    "amiibo": "amiibo",
-    "controller": "コントローラー",
-    "figure": "フィギュア",
-    "other": "その他"
+  "acquisitionType": {
+    "purchase": "購入",
+    "pull": "開封",
+    "gift": "贈り物",
+    "trade": "交換"
   },
-  "acquisitionType": { "purchase": "購入", "pull": "開封", "gift": "贈り物", "trade": "交換" },
-  "grading": { "raw": "未鑑定", "graded": "鑑定済み" },
-  "language": { "JP": "日本語", "EN": "英語", "other": "その他" },
+  "grading": {
+    "raw": "未鑑定",
+    "graded": "鑑定済み"
+  },
   "condition": {
     "new_unused": "新品、未使用",
     "like_new": "未使用に近い",
@@ -207,12 +257,56 @@
     "empty": "空箱",
     "n/a": "該当なし"
   },
-  "status": { "owned": "所有中", "sold": "売却済み", "consumed": "開封・消費済み", "lost": "紛失" },
+  "status": {
+    "owned": "所有中",
+    "sold": "売却済み",
+    "consumed": "開封・消費済み",
+    "lost": "紛失"
+  },
   "runStatus": {
     "running": "実行中",
     "ok": "正常",
     "partial": "一部失敗",
     "failed": "失敗",
     "blocked": "ブロック"
+  },
+  "category": {
+    "tcg": "トレカ",
+    "game": "ゲーム・グッズ"
+  },
+  "kind": {
+    "single": "シングルカード",
+    "booster_box": "BOX",
+    "booster_pack": "パック",
+    "deck": "デッキ",
+    "special_set": "スペシャルセット",
+    "supply": "サプライ",
+    "software": "ゲームソフト",
+    "collectors_edition": "限定版",
+    "amiibo": "amiibo",
+    "controller": "コントローラー",
+    "figure": "フィギュア",
+    "console": "本体",
+    "other": "その他"
+  },
+  "franchise": {
+    "pokemon": "ポケモン",
+    "one_piece": "ワンピース",
+    "yugioh": "遊戯王",
+    "mtg": "MTG",
+    "other": "その他"
+  },
+  "region": {
+    "jp": "日本版",
+    "en": "英語版",
+    "na": "北米版",
+    "eu": "欧州版",
+    "asia": "アジア版",
+    "kr": "韓国版",
+    "zh_cn": "簡体字版",
+    "zh_tw": "繁体字版",
+    "th": "タイ語版",
+    "id": "インドネシア語版",
+    "other": "その他"
   }
 }

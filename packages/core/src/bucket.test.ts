@@ -3,56 +3,52 @@ import { deriveBucket, gradedBucket } from './bucket';
 
 describe('deriveBucket', () => {
   it('raw cards use the raw grade', () => {
-    expect(deriveBucket({ productType: 'card_single', grading: 'raw', rawGrade: 'A' })).toBe(
-      'raw:A',
-    );
-    expect(deriveBucket({ productType: 'card_single', rawGrade: 'S' })).toBe('raw:S');
-    expect(deriveBucket({ productType: 'card_single', grading: 'raw' })).toBeNull();
+    expect(deriveBucket({ productClass: 'card', grading: 'raw', rawGrade: 'A' })).toBe('raw:A');
+    expect(deriveBucket({ productClass: 'card', rawGrade: 'S' })).toBe('raw:S');
+    expect(deriveBucket({ productClass: 'card', grading: 'raw' })).toBeNull();
   });
 
   it('graded cards use grader and grade', () => {
     expect(
-      deriveBucket({ productType: 'card_single', grading: 'graded', grader: 'PSA', grade: '10' }),
+      deriveBucket({ productClass: 'card', grading: 'graded', grader: 'PSA', grade: '10' }),
     ).toBe('graded:PSA:10');
     expect(
       deriveBucket({
-        productType: 'card_single',
+        productClass: 'card',
         grading: 'graded',
         grader: 'BGS',
         grade: ' 9.5 ',
         rawGrade: 'A',
       }),
     ).toBe('graded:BGS:9.5');
-    expect(
-      deriveBucket({ productType: 'card_single', grading: 'graded', grader: 'PSA' }),
-    ).toBeNull();
+    expect(deriveBucket({ productClass: 'card', grading: 'graded', grader: 'PSA' })).toBeNull();
   });
 
-  it('sealed TCG uses packaging state', () => {
-    expect(deriveBucket({ productType: 'sealed_tcg', packagingState: 'sealed_shrink' })).toBe(
+  it('sealed products use packaging state', () => {
+    expect(deriveBucket({ productClass: 'sealed', packagingState: 'sealed_shrink' })).toBe(
       'sealed:shrink',
     );
-    expect(deriveBucket({ productType: 'sealed_tcg', packagingState: 'sealed_no_shrink' })).toBe(
+    expect(deriveBucket({ productClass: 'sealed', packagingState: 'sealed_no_shrink' })).toBe(
       'sealed:no_shrink',
     );
     expect(
-      deriveBucket({ productType: 'sealed_tcg', packagingState: 'box_opened_contents_sealed' }),
+      deriveBucket({ productClass: 'sealed', packagingState: 'box_opened_contents_sealed' }),
     ).toBe('sealed:box_opened_contents_sealed');
-    expect(deriveBucket({ productType: 'sealed_tcg', packagingState: 'n/a' })).toBeNull();
+    expect(deriveBucket({ productClass: 'sealed', packagingState: 'n/a' })).toBeNull();
     // Condition is irrelevant for sealed products.
-    expect(deriveBucket({ productType: 'sealed_tcg', condition: 'new_unused' })).toBeNull();
+    expect(deriveBucket({ productClass: 'sealed', condition: 'new_unused' })).toBeNull();
   });
 
   it('other items use the condition scale', () => {
-    expect(deriveBucket({ productType: 'amiibo', condition: 'new_unused' })).toBe('cond:new');
-    expect(deriveBucket({ productType: 'game_ce', condition: 'like_new' })).toBe('cond:like_new');
-    expect(deriveBucket({ productType: 'controller', condition: 'no_noticeable_damage' })).toBe(
+    expect(deriveBucket({ productClass: 'item', condition: 'new_unused' })).toBe('cond:new');
+    expect(deriveBucket({ productClass: 'item', condition: 'like_new' })).toBe('cond:like_new');
+    expect(deriveBucket({ productClass: 'item', condition: 'no_noticeable_damage' })).toBe(
       'cond:good',
     );
     for (const condition of ['minor_damage', 'damaged', 'poor'] as const) {
-      expect(deriveBucket({ productType: 'figure', condition })).toBe('cond:fair');
+      expect(deriveBucket({ productClass: 'item', condition })).toBe('cond:fair');
     }
-    expect(deriveBucket({ productType: 'other' })).toBeNull();
+    expect(deriveBucket({ productClass: 'item' })).toBeNull();
   });
 });
 

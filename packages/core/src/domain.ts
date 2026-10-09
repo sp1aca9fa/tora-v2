@@ -1,19 +1,5 @@
 // Enumerations shared by the schema, domain logic and UI (requirements section 5).
-
-export const PRODUCT_TYPES = [
-  'card_single',
-  'sealed_tcg',
-  'game_ce',
-  'game',
-  'amiibo',
-  'controller',
-  'figure',
-  'other',
-] as const;
-export type ProductType = (typeof PRODUCT_TYPES)[number];
-
-export const LANGUAGES = ['JP', 'EN', 'other'] as const;
-export type Language = (typeof LANGUAGES)[number];
+// Product taxonomy (category, kind, region) lives in taxonomy.ts.
 
 export const SOURCES = ['snkrdunk', 'mercari', 'surugaya', 'tcgcsv', 'ebay', 'manual'] as const;
 export type Source = (typeof SOURCES)[number];
@@ -76,15 +62,8 @@ export type ExcludedReason = (typeof EXCLUDED_REASONS)[number];
 export const VALUATION_CONFIDENCES = ['high', 'medium', 'low'] as const;
 export type ValuationConfidence = (typeof VALUATION_CONFIDENCES)[number];
 
+export const USER_ROLES = ['admin', 'member'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
 export const COLLECTOR_RUN_STATUSES = ['running', 'ok', 'partial', 'failed', 'blocked'] as const;
 export type CollectorRunStatus = (typeof COLLECTOR_RUN_STATUSES)[number];
-
-/** Product types that come in a box / packaging, so packaging_state applies. */
-export const PACKAGED_TYPES: readonly ProductType[] = [
-  'sealed_tcg',
-  'game_ce',
-  'game',
-  'amiibo',
-  'controller',
-  'figure',
-];

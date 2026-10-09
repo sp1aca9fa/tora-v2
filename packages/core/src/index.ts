@@ -4,3 +4,5 @@ export * from './split';
 export * from './bucket';
 export * from './names';
 export * from './holding-state';
+export * from './taxonomy';
+export * from './text';

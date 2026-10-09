@@ -1,6 +1,6 @@
 'use client';
 
-import { HOLDING_STATUSES, PRODUCT_TYPES } from '@tora/core';
+import { CATEGORIES, HOLDING_STATUSES, kindsFor } from '@tora/core';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -51,10 +51,15 @@ export function InventoryFilters() {
           onChange={(e) => update('type', e.target.value)}
         >
           <option value="">{t('inventory.allTypes')}</option>
-          {PRODUCT_TYPES.map((p) => (
-            <option key={p} value={p}>
-              {t(`productType.${p}`)}
-            </option>
+          {CATEGORIES.map((c) => (
+            <optgroup key={c} label={t(`category.${c}`)}>
+              <option value={c}>{t('inventory.allOf', { category: t(`category.${c}`) })}</option>
+              {kindsFor(c).map((k) => (
+                <option key={k} value={`${c}:${k}`}>
+                  {t(`kind.${k}`)}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </NativeSelect>
         <NativeSelect

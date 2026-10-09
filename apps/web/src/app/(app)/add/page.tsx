@@ -1,13 +1,15 @@
+import { acquiredFromSuggestions, getProduct, productValueSuggestions } from '@tora/db';
 import { tokyoDate } from '@tora/core';
-import { acquiredFromSuggestions, getProduct } from '@tora/db';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { authedDb } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
 import { AddFlow } from './add-flow';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('add'))('title') };
 }
+
+const STORES = ['Yodobashi', 'Bic Camera', 'Amazon', 'Mercari', 'SNKRDUNK', 'Pokemon Center'];
 
 /** `?product=<id>` starts from an existing product (e.g. "add another" on a holding). */
 export default async function AddPage({
@@ -15,33 +17,33 @@ export default async function AddPage({
 }: {
   searchParams: Promise<{ product?: string }>;
 }) {
-  const db = await authedDb();
+  const { db, user } = await authed();
   const { product: productId } = await searchParams;
-  const [t, suggestions, product] = await Promise.all([
+  const [t, fromHistory, franchises, product] = await Promise.all([
     getTranslations('add'),
-    acquiredFromSuggestions(db),
+    acquiredFromSuggestions(db, user.id),
+    productValueSuggestions(db, 'franchise', 'game'),
     productId ? getProduct(db, productId) : null,
   ]);
-  const defaults = ['Yodobashi', 'Bic Camera', 'Amazon', 'Mercari', 'SNKRDUNK', 'Pokemon Center'];
-  const fromSuggestions = [...new Set([...suggestions, ...defaults])];
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <AddFlow
         today={tokyoDate()}
-        fromSuggestions={fromSuggestions}
+        fromSuggestions={[...new Set([...fromHistory, ...STORES])]}
+        franchiseSuggestions={franchises}
         initialProduct={
-          product
-            ? {
-                id: product.id,
-                type: product.type,
-                nameJa: product.nameJa,
-                nameEn: product.nameEn,
-                setName: product.setName,
-                cardNumber: product.cardNumber,
-              }
-            : null
+          product && {
+            id: product.id,
+            category: product.category,
+            kind: product.kind,
+            name: product.name,
+            region: product.region,
+            setName: product.setName,
+            cardNumber: product.cardNumber,
+            platform: product.platform,
+          }
         }
       />
     </div>

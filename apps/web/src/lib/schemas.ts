@@ -1,48 +1,60 @@
 import {
+  CATEGORIES,
   CONDITIONS,
   GRADERS,
   GRADINGS,
-  LANGUAGES,
   PACKAGING_STATES,
-  PRODUCT_FIELDS,
-  PRODUCT_TYPES,
-  type ProductType,
+  PRODUCT_KINDS,
+  type ProductClass,
   RAW_GRADES,
+  REGIONS,
   holdingFieldsFor,
+  productFieldsFor,
 } from '@tora/core';
 import type { HoldingInput, ProductInput } from '@tora/db';
 import { z } from 'zod';
 import { optDateText, optEnum, optText, optYen, reqEnum } from './form';
 
 export const productSchema = z.object({
-  type: reqEnum(PRODUCT_TYPES),
-  nameJa: optText,
-  nameEn: optText,
+  category: reqEnum(CATEGORIES),
+  kind: reqEnum(PRODUCT_KINDS),
+  name: optText,
   franchise: optText,
+  region: optEnum(REGIONS),
+  platform: optText,
+  setId: optText,
   setName: optText,
   setCode: optText,
+  variant: optText,
   cardNumber: optText,
   rarity: optText,
-  language: optEnum(LANGUAGES),
   releaseDate: optDateText,
   retailPriceJpy: optYen,
 });
 
-/** Keeps only the fields that apply to the type; the rest are stored as null. */
-export function productInputFrom(data: z.infer<typeof productSchema>): ProductInput {
-  const allowed = new Set<string>(PRODUCT_FIELDS[data.type]);
+/**
+ * Keeps the fields that apply to the category + kind (the rest are stored as null). Returns null
+ * when the name is missing.
+ */
+export function productInputFrom(data: z.infer<typeof productSchema>): ProductInput | null {
+  if (!data.name) return null;
+  const allowed = new Set<string>(productFieldsFor(data.category, data.kind));
   const pick = <K extends keyof typeof data>(key: K) =>
     allowed.has(key as string) ? (data[key] ?? null) : null;
   return {
-    type: data.type,
-    nameJa: data.nameJa ?? null,
-    nameEn: data.nameEn ?? null,
-    franchise: pick('franchise'),
+    category: data.category,
+    kind: data.kind,
+    name: data.name,
+    // TCG franchise comes from the franchise chips, so it is always kept.
+    franchise: data.franchise ?? null,
+    region: data.region ?? null,
+    platform: pick('platform'),
+    setId: data.category === 'tcg' ? (data.setId ?? null) : null,
     setName: pick('setName'),
     setCode: pick('setCode'),
+    variant: pick('variant'),
     cardNumber: pick('cardNumber'),
     rarity: pick('rarity'),
-    language: pick('language'),
     releaseDate: pick('releaseDate'),
     retailPriceJpy: pick('retailPriceJpy'),
   };
@@ -63,12 +75,12 @@ type ConditionInput = Pick<
   'condition' | 'packagingState' | 'grading' | 'rawGrade' | 'grader' | 'grade' | 'certNumber'
 >;
 
-/** Condition fields for the type, plus the names of required fields that are missing. */
+/** Condition fields for the product class, plus the names of required fields that are missing. */
 export function conditionInputFrom(
-  type: ProductType,
+  cls: ProductClass,
   data: z.infer<typeof conditionSchema>,
 ): { input: ConditionInput; missing: string[] } {
-  const show = holdingFieldsFor(type);
+  const show = holdingFieldsFor(cls);
   const missing: string[] = [];
   const input: ConditionInput = {
     condition: null,
@@ -85,7 +97,7 @@ export function conditionInputFrom(
   }
   if (show.packaging) {
     input.packagingState = data.packagingState ?? null;
-    if (type === 'sealed_tcg' && !input.packagingState) missing.push('packagingState');
+    if (cls === 'sealed' && !input.packagingState) missing.push('packagingState');
   }
   if (show.grading) {
     input.grading = data.grading ?? 'raw';

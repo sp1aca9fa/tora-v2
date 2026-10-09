@@ -1,43 +1,50 @@
 'use client';
 
-import { type Locale, type ProductType, displayName } from '@tora/core';
+import type { Category, ProductKind } from '@tora/core';
 import { Search } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { type ProductSummary, searchProductsAction } from '@/app/(app)/add/actions';
 import { Input } from '@/components/ui/input';
 
 /** Search-as-you-type over existing products. */
 export function ProductPicker({
-  types,
+  category,
+  kinds,
   onSelect,
   autoFocus,
   placeholder,
 }: {
-  types?: ProductType[];
+  category?: Category;
+  kinds?: ProductKind[];
   onSelect: (product: ProductSummary) => void;
   autoFocus?: boolean;
   placeholder?: string;
 }) {
   const t = useTranslations();
-  const locale = useLocale() as Locale;
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ProductSummary[]>([]);
   const [searched, setSearched] = useState('');
   const [pending, startTransition] = useTransition();
-  const typesKey = types?.join(',');
+  const filterKey = `${category ?? ''}|${kinds?.join(',') ?? ''}`;
 
   useEffect(() => {
     const query = q.trim();
     if (!query) return;
     const timer = setTimeout(() => {
       startTransition(async () => {
-        setResults(await searchProductsAction(query, typesKey?.split(',') as ProductType[]));
+        const [c, k] = filterKey.split('|');
+        setResults(
+          await searchProductsAction(query, {
+            category: (c || undefined) as Category | undefined,
+            kinds: k ? (k.split(',') as ProductKind[]) : undefined,
+          }),
+        );
         setSearched(query);
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [q, typesKey]);
+  }, [q, filterKey]);
 
   const showResults = q.trim() !== '' && searched === q.trim();
 
@@ -67,9 +74,15 @@ export function ProductPicker({
                   onClick={() => onSelect(p)}
                   className="w-full px-3 py-2.5 text-left hover:bg-accent"
                 >
-                  <span className="block text-sm font-medium">{displayName(p, locale)}</span>
+                  <span className="block text-sm font-medium">{p.name}</span>
                   <span className="block text-xs text-muted-foreground">
-                    {[t(`productType.${p.type}`), p.setName, p.cardNumber]
+                    {[
+                      t(`kind.${p.kind}`),
+                      p.region && t(`region.${p.region}`),
+                      p.platform,
+                      p.setName,
+                      p.cardNumber,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </span>

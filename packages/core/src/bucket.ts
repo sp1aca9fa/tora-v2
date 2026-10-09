@@ -1,10 +1,11 @@
-import type { Condition, Grader, Grading, PackagingState, ProductType, RawGrade } from './domain';
+import type { Condition, Grader, Grading, PackagingState, RawGrade } from './domain';
+import type { ProductClass } from './taxonomy';
 
 /** Valuation bucket (requirements section 6), e.g. `raw:A`, `graded:PSA:10`, `sealed:shrink`, `cond:new`. */
 export type Bucket = string;
 
 export interface BucketInput {
-  productType: ProductType;
+  productClass: ProductClass;
   condition?: Condition | null;
   packagingState?: PackagingState | null;
   grading?: Grading | null;
@@ -42,15 +43,15 @@ export function gradedBucket(grader: Grader, grade: string): Bucket {
  * needed to decide (e.g. a raw card without a raw grade).
  */
 export function deriveBucket(input: BucketInput): Bucket | null {
-  switch (input.productType) {
-    case 'card_single': {
+  switch (input.productClass) {
+    case 'card': {
       if (input.grading === 'graded') {
         if (!input.grader || !input.grade?.trim()) return null;
         return gradedBucket(input.grader, input.grade);
       }
       return input.rawGrade ? `raw:${input.rawGrade}` : null;
     }
-    case 'sealed_tcg':
+    case 'sealed':
       return input.packagingState ? SEALED_BUCKETS[input.packagingState] : null;
     default:
       return input.condition ? CONDITION_BUCKETS[input.condition] : null;

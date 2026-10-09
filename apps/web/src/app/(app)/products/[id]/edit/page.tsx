@@ -1,10 +1,11 @@
-import { getProduct } from '@tora/db';
+import { canEditProduct, getProduct } from '@tora/db';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { editProductAction } from '@/app/(app)/holdings/[id]/actions';
 import { ActionForm } from '@/components/action-form';
 import { ProductFields } from '@/components/product-fields';
-import { authedDb } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
+import { franchiseLabel } from '@/lib/product-display';
 
 export default async function EditProductPage({
   params,
@@ -15,15 +16,22 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
   const { from } = await searchParams;
-  const product = await getProduct(await authedDb(), id);
-  if (!product) notFound();
+  const { db, user } = await authed();
+  const product = await getProduct(db, id);
+  // Products are shared: only the creator (or an admin) may edit one.
+  if (!product || !canEditProduct(user, product)) notFound();
   const t = await getTranslations();
   const back = from?.startsWith('/holdings/') ? from : '/';
+  const isTcg = product.category === 'tcg';
 
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <p className="text-sm text-muted-foreground">{t(`productType.${product.type}`)}</p>
+        <p className="text-sm text-muted-foreground">
+          {[t(`kind.${product.kind}`), isTcg && franchiseLabel(product.franchise, t)]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
         <h1 className="text-2xl font-semibold tracking-tight">{t('holding.editProduct')}</h1>
         <p className="text-sm text-muted-foreground">{t('actions.intro.editProduct')}</p>
       </header>
@@ -32,8 +40,16 @@ export default async function EditProductPage({
         submitLabel={t('common.save')}
         cancelHref={back}
       >
-        <input type="hidden" name="type" value={product.type} />
-        <ProductFields type={product.type} defaults={product} />
+        <input type="hidden" name="category" value={product.category} />
+        <input type="hidden" name="kind" value={product.kind} />
+        {isTcg && <input type="hidden" name="franchise" value={product.franchise ?? ''} />}
+        {product.setId && <input type="hidden" name="setId" value={product.setId} />}
+        <ProductFields
+          category={product.category}
+          kind={product.kind}
+          franchiseInput={!isTcg}
+          defaults={product}
+        />
       </ActionForm>
     </div>
   );

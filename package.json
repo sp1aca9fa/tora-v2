@@ -19,7 +19,9 @@
     "db:migrate": "pnpm --filter @tora/db migrate",
     "db:seed": "pnpm --filter @tora/db seed",
     "collect": "pnpm --filter @tora/collector-sdk collect",
-    "hash-password": "tsx apps/web/scripts/hash-password.ts"
+    "user": "pnpm --silent --filter @tora/db user",
+    "catalog:fetch": "pnpm --filter @tora/catalog run fetch",
+    "catalog:sync": "pnpm --filter @tora/db catalog:sync"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

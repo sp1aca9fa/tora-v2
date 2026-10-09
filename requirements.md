@@ -13,7 +13,8 @@
 | Session | Topic | Status |
 |---|---|---|
 | S1 | Foundation: monorepo, schema, i18n, access | done |
-| S2 | Registration UI (products, lots, pulls, events) | built; awaiting user check on phone |
+| S2 | Registration UI (products, lots, pulls, events) | done (reworked by S2b) |
+| S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | built; awaiting user check |
 | S3 | Collector framework + SNKRDUNK + catalog search | todo |
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | todo |
@@ -43,6 +44,13 @@
 - 2026-10-09: Grading return accepts an optional extra fee (upcharge, return shipping), added to the cost basis like the submission fee.
 - 2026-10-09: "Delete entry" exists for mistakes only: refused once pulls or splits depend on the holding; removes its events.
 - 2026-10-09: Product details are edited separately (applies to every holding of that product).
+- 2026-10-09: S2b added at the user's request before S3: accounts for family use (own collection each; catalog and prices shared), TOTP 2FA, max 2 active devices per account (revoke frees a slot), sessions that renew on use, TCG/Game taxonomy with region, single product name.
+- 2026-10-09: Authenticator secrets are encrypted with a key derived from AUTH_SECRET, so local `.env` and Vercel must share AUTH_SECRET. Signing everyone out is `pnpm user revoke <u> all`, not rotating the secret.
+- 2026-10-09: Accounts are created only via CLI (`pnpm user create`), which shows the QR code in the terminal and requires one valid code before saving (a bad scan cannot lock the user out). 8 one-time backup codes per account.
+- 2026-10-09: Migration 0001 assigns pre-account data to a placeholder `owner` account (no password); the first `pnpm user create` claims it. Verified by a migration upgrade test.
+- 2026-10-09: TCG catalog = sets (with release date and type) for Pokemon, One Piece, Yu-Gi-Oh! OCG (Japanese) and Magic (region-less). Sealed products are generated on first use per set + kind + variant + region, named in the set name's language (e.g. "バトルパートナーズ BOX"). Singles stay manual until SNKRDUNK search (S3).
+- 2026-10-09: Products are shared: only their creator or an admin can edit them; catalog-generated products only by an admin.
+- 2026-10-09: Portfolio header shows total spent and item counts now; market value arrives in S5.
 
 ---
 
@@ -58,7 +66,7 @@ A personal, single-user app to track collectibles (Pokemon and other TCG singles
 
 Priority right now: **start registering items and accumulating price data as early as possible.**
 
-Personal use only. Data is never published or served to anyone else (the hosted app sits behind a login).
+Personal use: a handful of accounts (the owner, possibly family). **Each user sees only their own collection**; the product catalog, TCG set catalog and market data are shared. Data is never published or served to anyone else (the hosted app sits behind a login).
 
 ## 2. Example scenarios (acceptance reference for the whole project)
 
@@ -82,7 +90,12 @@ Personal use only. Data is never published or served to anyone else (the hosted 
   - Web app: **Vercel** (Hobby, free), connected to the public GitHub repo. Talks to Turso over HTTPS.
   - Collectors: run only on the user's home Windows PC inside **WSL2** (residential IP is required for scraping; never run collectors on Vercel/cloud/CI). They write directly to Turso using a DB token from `.env`.
   - Jobs that do not scrape (valuation snapshots) also run locally right after collectors, so all scheduling lives in one place.
-- **Auth** (app is on the public internet): single-user password login. Only a hash of the password is stored (env var). Session = signed, httpOnly, Secure, SameSite=Lax cookie, long-lived for the phone PWA. Failed attempts are counted in the DB with temporary lockout. Rotating the session secret logs out all devices. Every page and API route requires a session except the login page and static assets.
+- **Auth** (app is on the public internet):
+  - Accounts have a username, a password (scrypt hash) and a TOTP authenticator secret (encrypted at rest), plus one-time backup codes. No public sign-up: accounts are created and managed with a CLI on the home PC (`pnpm user ...`).
+  - Login = username + password, then a 6-digit authenticator code (or a backup code). Every new device login needs both steps.
+  - **At most 2 active devices per user.** Each successful login registers a device; a third login is refused. Revoking a device (Settings, or CLI) frees its slot. Signing out revokes the current device.
+  - Sessions do not expire: the cookie (signed, httpOnly, Secure, SameSite=Lax) is renewed automatically on use (browsers cap cookie lifetime at ~400 days). A revoked device, password change or 2FA reset ends its sessions.
+  - Failed attempts are counted in the DB per IP and per username, with temporary lockout. Every page and API route requires a session except the login pages and static assets.
 - Phone use is first-class: registration flows must be mobile-first. Add a PWA manifest so it can be added to the home screen.
 - Scheduling: cron in WSL calling `pnpm collect` (daily, with random jitter). Document a fallback using Windows Task Scheduler -> `wsl` if WSL is not always running.
 
@@ -111,16 +124,31 @@ General rules:
 - Timestamps: ISO 8601 with offset, user timezone Asia/Tokyo.
 - Every table has `created_at`, `updated_at`.
 
-### products (catalog entry, one per distinct item)
-- `type`: card_single | sealed_tcg | game_ce | game | amiibo | controller | figure | other
-- `name_ja`, `name_en` (at least one required), `franchise` (e.g. Pokemon, One Piece, Fire Emblem), `set_name`, `set_code`, `card_number`, `rarity`, `language` (JP/EN/other), `release_date`, `retail_price_jpy`, `image_url`, `notes`
+### users
+- `username` (unique, lowercase), `password_hash`, `totp_secret_enc`, `totp_last_step` (replay protection), `backup_code_hashes` (JSON), `role`: admin | member, `disabled_at`
+
+### user_devices (login slots; max 2 active per user)
+- `user_id`, `label` (browser / OS), `last_seen_at`, `revoked_at`
+
+### tcg_sets (pre-registered TCG catalog, shared)
+- `franchise` (pokemon | one_piece | yugioh | mtg), `region` (null = all regions, e.g. Magic), `code`, `name`, `name_alias` (search only), `set_type`: expansion | deck | special, `release_date`, `source` + `source_key` (unique; for idempotent re-sync)
+- Built from public sources by `pnpm catalog:fetch` (TCGdex, One Piece official site, Yugipedia, Scryfall) into JSON files in the repo, loaded with `pnpm catalog:sync`.
+
+### products (catalog entry, one per distinct item; shared by all users)
+- `category`: tcg | game
+- `kind`: tcg: single | booster_box | booster_pack | deck | special_set | supply | other; game: software | collectors_edition | amiibo | controller | figure | console | other
+- `name` (one name, in whatever language it is sold under), `name_alias` (optional, search only)
+- `franchise` (TCG: pokemon | one_piece | yugioh | mtg | free text; games: free text), `region` (TCG: jp | en | zh_cn | zh_tw | kr | th | id | other; games: jp | na | eu | asia | kr | other), `platform` (games)
+- `set_id` (tcg_sets, nullable), `set_name`, `set_code` (free text when the set is not in the catalog), `variant` (e.g. Magic "Collector" vs "Play" booster), `card_number`, `rarity`, `release_date`, `retail_price_jpy`, `image_url`, `notes`, `created_by` (null for catalog-generated products)
+- Sealed products for a catalog set are created on first use (find-or-create by set + kind + variant), named from the set.
+- Product class drives condition and valuation: tcg single = card; tcg booster_box / booster_pack / deck / special_set = sealed; everything else = item.
 
 ### product_sources (how to fetch prices for a product)
 - `product_id`, `source` (snkrdunk | mercari | surugaya | tcgcsv | ebay | ...), `external_id` (nullable), `query` (JSON: keywords, exclude_keywords, category_id, price_min, price_max, extra), `active`, `last_success_at`
 - A product can have several sources. Sources are created automatically when a product is created from a source search (S3), or edited manually.
 
 ### holdings (a lot of identical units I own)
-- `product_id`, `quantity` (>= 1), `cost_total_jpy` (total paid for the lot, incl. what I choose to include like shipping)
+- `user_id` (owner), `product_id`, `quantity` (>= 1), `cost_total_jpy` (total paid for the lot, incl. what I choose to include like shipping)
 - `acquired_at`, `acquired_from` (free text with suggestions: Yodobashi, Mercari, ...), `acquisition_type`: purchase | pull | gift | trade
 - `parent_holding_id` (nullable): set for pulls, pointing to the sealed product they came from
 - `condition`: Mercari scale: new_unused | like_new | no_noticeable_damage | minor_damage | damaged | poor
@@ -148,7 +176,7 @@ Lot rules:
 - `excluded` (bool) + `excluded_reason` (outlier | manual | mismatch)
 
 ### manual_prices
-- `product_id`, `bucket`, `price_jpy`, `set_at`, `note`. Always wins over computed values.
+- `user_id`, `product_id`, `bucket`, `price_jpy`, `set_at`, `note`. Always wins over computed values (for that user).
 
 ### valuation_snapshots (daily, for portfolio-over-time chart)
 - `date`, `holding_id`, `value_jpy`, `method`, `source`, `sample_size`, `confidence`
@@ -160,15 +188,15 @@ Lot rules:
 - `source`, `started_at`, `finished_at`, `status` (ok | partial | failed | blocked), `requests`, `observations_added`, `error`
 
 ### login_attempts (auth lockout)
-- `ip_hash`, `attempted_at`, `success`. Old rows may be pruned (not domain data; excluded from export).
+- `ip_hash`, `username_hash`, `attempted_at`, `success`. Old rows may be pruned (not domain data; excluded from export).
 
 ## 6. Valuation rules
 
 **Buckets** (the condition dimension prices are compared on):
 - Raw cards: `raw:S`, `raw:A`, `raw:B`, `raw:C`, `raw:D`
 - Graded cards: `graded:<GRADER>:<grade>` e.g. `graded:PSA:10`
-- Sealed TCG: by packaging_state, e.g. `sealed:shrink`, `sealed:no_shrink`, `sealed:box_opened_contents_sealed`
-- Other items: `cond:new` (new_unused), `cond:like_new`, `cond:good` (no_noticeable_damage), `cond:fair` (minor_damage, damaged, poor)
+- Sealed (TCG sealed kinds): by packaging_state, e.g. `sealed:shrink`, `sealed:no_shrink`, `sealed:box_opened_contents_sealed`
+- Items (everything else): `cond:new` (new_unused), `cond:like_new`, `cond:good` (no_noticeable_damage), `cond:fair` (minor_damage, damaged, poor)
 - Each collector maps its source's condition labels to these buckets (mapping table in the collector, unit-tested).
 
 **Value of a holding** = value of one unit in its bucket x quantity:
@@ -229,6 +257,21 @@ Build:
 Acceptance:
 - Scenarios 1-6 from section 2 can be entered on the phone.
 - Event history visible per holding; cost basis updates correctly after grading fee and after splits.
+
+## S2b: Accounts, 2FA, taxonomy, TCG catalog
+
+Build:
+- users / user_devices tables, per-user holdings and manual prices; existing holdings move to a placeholder account that the first created account claims.
+- Login: username + password, then TOTP or backup code; 2-device limit; device list with revoke in Settings; sign out revokes the device. CLI: `pnpm user create | reset-password | reset-2fa | devices | revoke | disable`.
+- Products: category / kind / franchise / region / platform / variant, single name; migration maps old types.
+- TCG set catalog for Pokemon, One Piece, Yu-Gi-Oh! (Japanese) and Magic: fetch script, JSON in repo, sync command.
+- Add flow: TCG or Game first; TCG -> franchise -> region -> kind -> set picker (release date shown) or manual entry; Game -> kind -> name, platform, region.
+- Portfolio header shows total spent (market value comes in S5).
+
+Acceptance:
+- Logging in on a 3rd device is refused until one is revoked; every new device asks for the authenticator code.
+- A second user cannot see the first user's holdings.
+- A Pokemon booster box from a recent set can be registered by picking the set; its release date comes from the catalog.
 
 ## S3: Collector framework + SNKRDUNK + catalog search
 
@@ -300,4 +343,3 @@ Acceptance:
 - JAN barcode scan when registering
 - Realized gains report per year (tax)
 - Price alerts
-- Multi-user

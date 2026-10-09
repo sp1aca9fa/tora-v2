@@ -1,8 +1,8 @@
 'use client';
 
-import { type Locale, RAW_GRADES, displayName } from '@tora/core';
+import { RAW_GRADES } from '@tora/core';
 import { X } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import type { ProductSummary } from '@/app/(app)/add/actions';
 import { Field } from '@/components/field';
@@ -25,7 +25,6 @@ export function PullLogger({
   today: string;
 }) {
   const t = useTranslations();
-  const locale = useLocale() as Locale;
   const [existing, setExisting] = useState<ProductSummary | null>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: PullState, formData: FormData) => {
@@ -82,7 +81,7 @@ export function PullLogger({
         </div>
       ) : existing ? (
         <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          <span>{displayName(existing, locale)}</span>
+          <span>{existing.name}</span>
           <Button
             type="button"
             variant="ghost"
@@ -94,7 +93,7 @@ export function PullLogger({
           </Button>
         </div>
       ) : (
-        <ProductPicker types={['card_single']} onSelect={setExisting} autoFocus />
+        <ProductPicker category="tcg" kinds={['single']} onSelect={setExisting} autoFocus />
       )}
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  hasJapanese,
-  holdingFieldsFor,
-  isConsumedAfterOpening,
-  openedStatesFor,
-  pendingGrading,
-  unitCost,
-} from './holding-state';
+import { isConsumedAfterOpening, openedStatesFor, pendingGrading, unitCost } from './holding-state';
+import { hasJapanese } from './text';
 
 describe('pendingGrading', () => {
   it('is set after a submission and cleared by the return', () => {
@@ -28,14 +22,14 @@ describe('pendingGrading', () => {
 
 describe('opening', () => {
   it('offers box-opened state only for sealed TCG', () => {
-    expect(openedStatesFor('sealed_tcg')).toContain('box_opened_contents_sealed');
-    expect(openedStatesFor('amiibo')).not.toContain('box_opened_contents_sealed');
+    expect(openedStatesFor('sealed')).toContain('box_opened_contents_sealed');
+    expect(openedStatesFor('item')).not.toContain('box_opened_contents_sealed');
   });
 
   it('consumes sealed TCG once packs are opened', () => {
-    expect(isConsumedAfterOpening('sealed_tcg', 'opened')).toBe(true);
-    expect(isConsumedAfterOpening('sealed_tcg', 'box_opened_contents_sealed')).toBe(false);
-    expect(isConsumedAfterOpening('game_ce', 'opened')).toBe(false);
+    expect(isConsumedAfterOpening('sealed', 'opened')).toBe(true);
+    expect(isConsumedAfterOpening('sealed', 'box_opened_contents_sealed')).toBe(false);
+    expect(isConsumedAfterOpening('item', 'opened')).toBe(false);
   });
 });
 
@@ -50,30 +44,5 @@ describe('helpers', () => {
   it('computes unit cost', () => {
     expect(unitCost(10_000, 3)).toBe(3333);
     expect(unitCost(0, 2)).toBe(0);
-  });
-});
-
-describe('holdingFieldsFor', () => {
-  it('maps types to condition dimensions', () => {
-    expect(holdingFieldsFor('card_single')).toEqual({
-      condition: false,
-      packaging: false,
-      grading: true,
-    });
-    expect(holdingFieldsFor('sealed_tcg')).toEqual({
-      condition: false,
-      packaging: true,
-      grading: false,
-    });
-    expect(holdingFieldsFor('amiibo')).toEqual({
-      condition: true,
-      packaging: true,
-      grading: false,
-    });
-    expect(holdingFieldsFor('other')).toEqual({
-      condition: true,
-      packaging: false,
-      grading: false,
-    });
   });
 });

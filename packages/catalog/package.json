@@ -1,0 +1,14 @@
+{
+  "name": "@tora/catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p .",
+    "fetch": "tsx src/fetch.ts"
+  },
+  "dependencies": {
+    "@tora/core": "workspace:*"
+  }
+}

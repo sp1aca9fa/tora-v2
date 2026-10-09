@@ -6,11 +6,10 @@ import {
   GRADERS,
   PACKAGING_STATES,
   RAW_GRADES,
-  hasJapanese,
   tokyoDateToIso,
 } from '@tora/core';
 import {
-  type ProductRef,
+  type Db,
   addNote,
   addPull,
   changeCondition,
@@ -26,7 +25,7 @@ import {
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { authedDb } from '@/lib/auth/guard';
+import { type Session, authed } from '@/lib/auth/guard';
 import {
   type FormState,
   dateText,
@@ -43,27 +42,27 @@ import {
 import { productInputFrom, productSchema } from '@/lib/schemas';
 
 const holdingPath = (id: string) => `/holdings/${id}`;
+const at = (date: string) => tokyoDateToIso(date);
 
-/** Parse, run the mutation, then go back to the holding page (or `to`). */
+/** Parse, run the mutation as the signed-in user, then go back to the holding page (or `to`). */
 async function handle<S extends z.ZodType, T>(
   formData: FormData,
   schema: S,
-  run: (data: z.infer<S>) => Promise<T>,
+  run: (data: z.infer<S>, ctx: { db: Db; userId: string; session: Session }) => Promise<T>,
   to: (value: T) => string,
 ): Promise<FormState> {
-  await authedDb();
+  const session = await authed();
   const parsed = parseForm(schema, formData);
   if ('state' in parsed) return parsed.state;
-  const result = await runDomain(() => run(parsed.data));
+  const result = await runDomain(() =>
+    run(parsed.data, { db: session.db, userId: session.user.id, session }),
+  );
   if (!result.ok) return result.state;
   revalidatePath('/', 'layout');
   redirect(to(result.value));
 }
 
-const at = (date: string) => tokyoDateToIso(date);
-
 export async function editAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({
@@ -75,8 +74,8 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
       certNumber: optText,
       notes: optText,
     }),
-    (d) =>
-      editHolding(db, id, {
+    (d, { db, userId }) =>
+      editHolding(db, userId, id, {
         ...d,
         // Keep the original time of day when the date did not change.
         acquiredAt: d.acquiredAt === formData.get('originalDate') ? undefined : at(d.acquiredAt),
@@ -89,22 +88,20 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function splitAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({ quantity: qty, date: dateText }),
-    (d) => splitOff(db, id, d.quantity, at(d.date)),
+    (d, { db, userId }) => splitOff(db, userId, id, d.quantity, at(d.date)),
     (split) => holdingPath(split.id),
   );
 }
 
 export async function openAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({ quantity: qty, packagingState: reqEnum(PACKAGING_STATES), date: dateText }),
-    (d) =>
-      markOpened(db, id, {
+    (d, { db, userId }) =>
+      markOpened(db, userId, id, {
         quantity: d.quantity,
         packagingState: d.packagingState,
         occurredAt: at(d.date),
@@ -114,7 +111,6 @@ export async function openAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function gradeSubmitAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({
@@ -124,8 +120,8 @@ export async function gradeSubmitAction(id: string, _prev: FormState, formData: 
       service: optText,
       date: dateText,
     }),
-    (d) =>
-      submitGrading(db, id, {
+    (d, { db, userId }) =>
+      submitGrading(db, userId, id, {
         quantity: d.quantity,
         grader: d.grader,
         feeJpy: d.feeJpy,
@@ -137,7 +133,6 @@ export async function gradeSubmitAction(id: string, _prev: FormState, formData: 
 }
 
 export async function gradeReturnAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({
@@ -147,8 +142,8 @@ export async function gradeReturnAction(id: string, _prev: FormState, formData: 
       extraFeeJpy: optYen,
       date: dateText,
     }),
-    (d) =>
-      returnGrading(db, id, {
+    (d, { db, userId }) =>
+      returnGrading(db, userId, id, {
         grader: d.grader,
         grade: d.grade,
         certNumber: d.certNumber,
@@ -160,7 +155,6 @@ export async function gradeReturnAction(id: string, _prev: FormState, formData: 
 }
 
 export async function sellAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({
@@ -170,8 +164,8 @@ export async function sellAction(id: string, _prev: FormState, formData: FormDat
       platform: optText,
       date: dateText,
     }),
-    (d) =>
-      sellHolding(db, id, {
+    (d, { db, userId }) =>
+      sellHolding(db, userId, id, {
         quantity: d.quantity,
         priceJpy: d.priceJpy,
         feesJpy: d.feesJpy ?? 0,
@@ -183,7 +177,6 @@ export async function sellAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function conditionAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({
@@ -193,27 +186,25 @@ export async function conditionAction(id: string, _prev: FormState, formData: Fo
       packagingState: optEnum(PACKAGING_STATES),
       date: dateText,
     }),
-    (d) => changeCondition(db, id, { ...d, occurredAt: at(d.date) }),
+    (d, { db, userId }) => changeCondition(db, userId, id, { ...d, occurredAt: at(d.date) }),
     (h) => holdingPath(h.id),
   );
 }
 
 export async function noteAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({ text: reqText, date: dateText }),
-    (d) => addNote(db, id, { text: d.text, occurredAt: at(d.date) }),
+    (d, { db, userId }) => addNote(db, userId, id, { text: d.text, occurredAt: at(d.date) }),
     () => holdingPath(id),
   );
 }
 
 export async function deleteAction(id: string, _prev: FormState, formData: FormData) {
-  const db = await authedDb();
   return handle(
     formData,
     z.object({ confirm: z.literal('on') }),
-    () => deleteHolding(db, id),
+    (_d, { db, userId }) => deleteHolding(db, userId, id),
     () => '/',
   );
 }
@@ -224,14 +215,14 @@ export async function editProductAction(
   _prev: FormState,
   formData: FormData,
 ) {
-  const db = await authedDb();
   const parsed = parseForm(productSchema, formData);
   if ('state' in parsed) return parsed.state;
-  if (!parsed.data.nameJa && !parsed.data.nameEn) return { error: 'check', fields: ['nameEn'] };
+  const input = productInputFrom(parsed.data);
+  if (!input) return { error: 'check', fields: ['name'] };
   return handle(
     formData,
     z.object({}),
-    () => updateProduct(db, productId, productInputFrom(parsed.data)),
+    (_d, { db, session }) => updateProduct(db, session.user, productId, input),
     () => (backTo.startsWith('/holdings/') ? backTo : '/'),
   );
 }
@@ -244,7 +235,7 @@ export async function addPullAction(
   prev: PullState,
   formData: FormData,
 ): Promise<PullState> {
-  const db = await authedDb();
+  const { db, user } = await authed();
   const parsed = parseForm(
     z.object({
       productId: optText,
@@ -259,23 +250,15 @@ export async function addPullAction(
   );
   if ('state' in parsed) return parsed.state;
   const d = parsed.data;
-
-  let ref: ProductRef;
-  if (d.productId) ref = { productId: d.productId };
-  else if (d.name) {
-    ref = {
-      product: {
-        type: 'card_single',
-        // One name box for speed: Japanese text goes to name_ja, anything else to name_en.
-        ...(hasJapanese(d.name) ? { nameJa: d.name } : { nameEn: d.name }),
-        cardNumber: d.cardNumber ?? null,
-        rarity: d.rarity ?? null,
-      },
-    };
-  } else return { error: 'check', fields: ['name'] };
+  const ref = d.productId
+    ? { productId: d.productId }
+    : d.name
+      ? { card: { name: d.name, cardNumber: d.cardNumber ?? null, rarity: d.rarity ?? null } }
+      : null;
+  if (!ref) return { error: 'check', fields: ['name'] };
 
   const result = await runDomain(() =>
-    addPull(db, boxId, ref, {
+    addPull(db, user.id, boxId, ref, {
       quantity: d.quantity,
       rawGrade: d.rawGrade,
       acquiredAt: at(d.date),

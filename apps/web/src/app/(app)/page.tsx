@@ -1,19 +1,21 @@
 import {
+  CATEGORIES,
+  type Category,
   HOLDING_STATUSES,
   type HoldingStatus,
-  type Locale,
-  PRODUCT_TYPES,
-  type ProductType,
-  displayName,
+  type ProductKind,
+  kindsFor,
+  productClass,
 } from '@tora/core';
-import { listInventory } from '@tora/db';
+import { listInventory, ownedTotals } from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getLocale, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { authedDb } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
+import { franchiseLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { InventoryFilters } from './inventory-filters';
 
@@ -23,40 +25,60 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type SearchParams = Promise<{ q?: string; type?: string; status?: string }>;
 
+/** `type` is a category (`tcg`) or category:kind (`tcg:booster_box`). */
+function parseType(type: string | undefined): { category?: Category; kind?: ProductKind } {
+  const [c, k] = (type ?? '').split(':');
+  if (!CATEGORIES.includes(c as Category)) return {};
+  const category = c as Category;
+  return kindsFor(category).includes(k as ProductKind)
+    ? { category, kind: k as ProductKind }
+    : { category };
+}
+
 export default async function PortfolioPage({ searchParams }: { searchParams: SearchParams }) {
-  const db = await authedDb();
+  const { db, user } = await authed();
   const sp = await searchParams;
-  const type = PRODUCT_TYPES.includes(sp.type as ProductType)
-    ? (sp.type as ProductType)
-    : undefined;
+  const { category, kind } = parseType(sp.type);
   const status =
     sp.status === 'all' || HOLDING_STATUSES.includes(sp.status as HoldingStatus)
       ? (sp.status as HoldingStatus | 'all')
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, t, locale] = await Promise.all([
-    listInventory(db, { type, status, q }),
+  const [rows, totals, t] = await Promise.all([
+    listInventory(db, user.id, { category, kind, status, q }),
+    ownedTotals(db, user.id),
     getTranslations(),
-    getLocale() as Promise<Locale>,
   ]);
-  const filtered = Boolean(type || q || status !== 'owned');
+  const filtered = Boolean(category || q || status !== 'owned');
 
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('portfolio.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t('portfolio.count', { count: rows.length })}
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('portfolio.title')}</h1>
         <Button asChild size="sm" className="hidden md:inline-flex">
           <Link href="/add">
             <Plus /> {t('nav.add')}
           </Link>
         </Button>
       </header>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
+          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
+        </div>
+        <div className="rounded-xl border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">{t('portfolio.items')}</p>
+          <p className="text-xl font-semibold tabular-nums">
+            {t('portfolio.itemsValue', { units: totals.units, lots: totals.lots })}
+          </p>
+        </div>
+        <div className="col-span-2 rounded-xl border border-dashed px-4 py-3 sm:col-span-1">
+          <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
+          <p className="text-sm text-muted-foreground">{t('portfolio.marketValueSoon')}</p>
+        </div>
+      </section>
 
       <Suspense>
         <InventoryFilters />
@@ -77,9 +99,11 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         <ul className="divide-y rounded-xl border bg-card">
           {rows.map(({ holding, product, parentProduct }) => {
             const details = [
-              t(`productType.${product.type}`),
+              t(`kind.${product.kind}`),
+              franchiseLabel(product.franchise, t),
+              product.region && product.region !== 'jp' && t(`region.${product.region}`),
               holding.condition && t(`condition.${holding.condition}`),
-              product.type === 'sealed_tcg' &&
+              productClass(product) === 'sealed' &&
                 holding.packagingState &&
                 t(`packaging.${holding.packagingState}`),
               holding.grading === 'raw' && holding.rawGrade && `Raw ${holding.rawGrade}`,
@@ -93,13 +117,13 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50"
                 >
                   <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="truncate font-medium">{displayName(product, locale)}</p>
+                    <p className="truncate font-medium">{product.name}</p>
                     <p className="truncate text-sm text-muted-foreground">{details.join(' · ')}</p>
-                    {parentProduct?.nameEn || parentProduct?.nameJa ? (
+                    {parentProduct?.name && (
                       <p className="truncate text-xs text-muted-foreground">
-                        {t('portfolio.pulledFrom', { name: displayName(parentProduct, locale) })}
+                        {t('portfolio.pulledFrom', { name: parentProduct.name })}
                       </p>
-                    ) : null}
+                    )}
                   </div>
                   <div className="shrink-0 text-right text-sm">
                     <p className="tabular-nums">{formatJpy(holding.costTotalJpy)}</p>

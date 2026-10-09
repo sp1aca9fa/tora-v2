@@ -1,34 +1,45 @@
 // Write operations on the collection. Every holding change records a holding_event in the same
 // transaction; actions on part of a lot split it first (requirements section 5, lot rules).
+// Holdings are per user: every holding operation takes the acting user's id and only touches
+// that user's holdings. Products and the TCG set catalog are shared.
 import {
   type AcquisitionType,
   type Condition,
   type Grader,
   type Grading,
   type PackagingState,
+  type ProductKind,
   type RawGrade,
+  type Region,
+  catalogProductName,
   isConsumedAfterOpening,
+  kindsFor,
+  kindsForSetType,
   openedStatesFor,
   pendingGrading,
+  productClass,
   splitHolding,
   toTokyoIso,
 } from '@tora/core';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import {
   type Holding,
   type NewHoldingEvent,
   type NewProduct,
   type Product,
+  type User,
   holdingEvents,
   holdings,
   products,
+  tcgSets,
   valuationSnapshots,
 } from './schema';
 
 export type DomainErrorCode =
   | 'not_found'
   | 'not_owned'
+  | 'forbidden'
   | 'invalid_quantity'
   | 'invalid_input'
   | 'not_a_card'
@@ -52,7 +63,7 @@ export class DomainError extends Error {
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
-export type ProductInput = Omit<NewProduct, 'id' | 'createdAt' | 'updatedAt'>;
+export type ProductInput = Omit<NewProduct, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
 
 export interface HoldingInput {
   quantity: number;
@@ -71,8 +82,18 @@ export interface HoldingInput {
   notes?: string | null;
 }
 
-/** Either an existing product or a new one to create. */
-export type ProductRef = { productId: string } | { product: ProductInput };
+/** A sealed product of a catalog set; created on first use. */
+export interface CatalogRef {
+  setId: string;
+  kind: ProductKind;
+  variant?: string | null;
+  /** Used when the set itself has no region (e.g. Magic sets are the same everywhere). */
+  region?: Region | null;
+}
+
+/** An existing product, a new one to create, or a catalog set's sealed product. */
+export type ProductRef =
+  { productId: string } | { product: ProductInput } | { catalog: CatalogRef };
 
 // ---------------------------------------------------------------------------------------------
 // helpers
@@ -88,15 +109,20 @@ function assertYen(amount: number): void {
 }
 
 function assertProductInput(input: ProductInput): void {
-  if (!input.nameJa?.trim() && !input.nameEn?.trim()) throw new DomainError('invalid_input');
+  if (!input.name?.trim()) throw new DomainError('invalid_input');
+  if (!kindsFor(input.category).includes(input.kind)) throw new DomainError('invalid_input');
 }
 
-async function loadHolding(tx: Tx, id: string): Promise<{ holding: Holding; product: Product }> {
+async function loadHolding(
+  tx: Tx,
+  userId: string,
+  id: string,
+): Promise<{ holding: Holding; product: Product }> {
   const [row] = await tx
     .select({ holding: holdings, product: products })
     .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
-    .where(eq(holdings.id, id));
+    .where(and(eq(holdings.id, id), eq(holdings.userId, userId)));
   if (!row) throw new DomainError('not_found');
   return row;
 }
@@ -135,18 +161,69 @@ async function takeUnits(
   return inserted!;
 }
 
-async function resolveProduct(tx: Tx, ref: ProductRef): Promise<Product> {
+/** Finds or creates the sealed product for a catalog set + kind + variant (+ region). */
+async function resolveCatalogProduct(tx: Tx, ref: CatalogRef): Promise<Product> {
+  const [set] = await tx.select().from(tcgSets).where(eq(tcgSets.id, ref.setId));
+  if (!set) throw new DomainError('not_found');
+  if (!kindsForSetType(set.setType).includes(ref.kind)) throw new DomainError('invalid_input');
+  const variant = ref.variant?.trim() || null;
+  const region = set.region ?? ref.region ?? null;
+
+  const [existing] = await tx
+    .select()
+    .from(products)
+    .where(
+      and(
+        eq(products.setId, set.id),
+        eq(products.kind, ref.kind),
+        variant ? eq(products.variant, variant) : isNull(products.variant),
+        region ? eq(products.region, region) : isNull(products.region),
+        isNull(products.createdBy),
+      ),
+    );
+  if (existing) return existing;
+
+  const [product] = await tx
+    .insert(products)
+    .values({
+      category: 'tcg',
+      kind: ref.kind,
+      name: catalogProductName(set.name, ref.kind, variant),
+      nameAlias: set.nameAlias ? catalogProductName(set.nameAlias, ref.kind, variant) : null,
+      franchise: set.franchise,
+      region,
+      setId: set.id,
+      setName: set.name,
+      setCode: set.code,
+      variant,
+      releaseDate: set.releaseDate,
+      createdBy: null,
+    })
+    .returning();
+  return product!;
+}
+
+async function resolveProduct(tx: Tx, userId: string, ref: ProductRef): Promise<Product> {
+  if ('catalog' in ref) return resolveCatalogProduct(tx, ref.catalog);
   if ('productId' in ref) {
     const [product] = await tx.select().from(products).where(eq(products.id, ref.productId));
     if (!product) throw new DomainError('not_found');
     return product;
   }
   assertProductInput(ref.product);
-  const [product] = await tx.insert(products).values(ref.product).returning();
+  const [product] = await tx
+    .insert(products)
+    .values({ ...ref.product, createdBy: userId })
+    .returning();
   return product!;
 }
 
-async function insertHolding(tx: Tx, productId: string, input: HoldingInput): Promise<Holding> {
+async function insertHolding(
+  tx: Tx,
+  userId: string,
+  productId: string,
+  input: HoldingInput,
+): Promise<Holding> {
   assertQuantity(input.quantity);
   assertYen(input.costTotalJpy);
   if ((input.acquisitionType === 'pull') !== Boolean(input.parentHoldingId)) {
@@ -154,7 +231,7 @@ async function insertHolding(tx: Tx, productId: string, input: HoldingInput): Pr
   }
   const [holding] = await tx
     .insert(holdings)
-    .values({ ...input, productId })
+    .values({ ...input, userId, productId })
     .returning();
   await insertEvent(tx, {
     holdingId: holding!.id,
@@ -178,17 +255,36 @@ async function insertHolding(tx: Tx, productId: string, input: HoldingInput): Pr
 // ---------------------------------------------------------------------------------------------
 // products
 
-export async function createProduct(db: Db, input: ProductInput): Promise<Product> {
+export async function createProduct(db: Db, userId: string, input: ProductInput): Promise<Product> {
   assertProductInput(input);
-  const [product] = await db.insert(products).values(input).returning();
+  const [product] = await db
+    .insert(products)
+    .values({ ...input, createdBy: userId })
+    .returning();
   return product!;
 }
 
-export async function updateProduct(db: Db, id: string, input: ProductInput): Promise<Product> {
+/** Products are shared: only their creator or an admin may edit them. */
+export async function updateProduct(
+  db: Db,
+  actor: Pick<User, 'id' | 'role'>,
+  id: string,
+  input: ProductInput,
+): Promise<Product> {
   assertProductInput(input);
-  const [product] = await db.update(products).set(input).where(eq(products.id, id)).returning();
-  if (!product) throw new DomainError('not_found');
-  return product;
+  return db.transaction(async (tx) => {
+    const [current] = await tx.select().from(products).where(eq(products.id, id));
+    if (!current) throw new DomainError('not_found');
+    if (actor.role !== 'admin' && current.createdBy !== actor.id) {
+      throw new DomainError('forbidden');
+    }
+    const [product] = await tx.update(products).set(input).where(eq(products.id, id)).returning();
+    return product!;
+  });
+}
+
+export function canEditProduct(actor: Pick<User, 'id' | 'role'>, product: Product): boolean {
+  return actor.role === 'admin' || product.createdBy === actor.id;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -197,48 +293,54 @@ export async function updateProduct(db: Db, id: string, input: ProductInput): Pr
 /** Registers a lot (creating its product first when needed) with its `acquired` event. */
 export async function createHolding(
   db: Db,
+  userId: string,
   ref: ProductRef,
   input: HoldingInput,
 ): Promise<{ holding: Holding; product: Product }> {
   return db.transaction(async (tx) => {
-    const product = await resolveProduct(tx, ref);
+    const product = await resolveProduct(tx, userId, ref);
     if (input.parentHoldingId) {
-      const parent = await loadHolding(tx, input.parentHoldingId);
-      if (parent.product.type !== 'sealed_tcg') throw new DomainError('not_sealed');
+      const parent = await loadHolding(tx, userId, input.parentHoldingId);
+      if (productClass(parent.product) !== 'sealed') throw new DomainError('not_sealed');
     }
-    return { product, holding: await insertHolding(tx, product.id, input) };
+    return { product, holding: await insertHolding(tx, userId, product.id, input) };
   });
 }
 
 /**
- * Logs a card pulled from a sealed product. Cost is 0 (the box keeps its cost); a new product
- * inherits set, franchise and language from the box.
+ * Logs a card pulled from a sealed product. Cost is 0 (the box keeps its cost); a new card
+ * inherits franchise, region and set from the box.
  */
 export async function addPull(
   db: Db,
+  userId: string,
   parentHoldingId: string,
-  ref: ProductRef,
+  ref: { productId: string } | { card: Pick<ProductInput, 'name' | 'cardNumber' | 'rarity'> },
   input: { quantity: number; rawGrade: RawGrade; acquiredAt: string },
 ): Promise<{ holding: Holding; product: Product }> {
   return db.transaction(async (tx) => {
-    const parent = await loadHolding(tx, parentHoldingId);
-    if (parent.product.type !== 'sealed_tcg') throw new DomainError('not_sealed');
+    const parent = await loadHolding(tx, userId, parentHoldingId);
+    if (productClass(parent.product) !== 'sealed') throw new DomainError('not_sealed');
     const box = parent.product;
     const product = await resolveProduct(
       tx,
+      userId,
       'productId' in ref
         ? ref
         : {
             product: {
+              category: 'tcg',
+              kind: 'single',
+              franchise: box.franchise,
+              region: box.region,
+              setId: box.setId,
               setName: box.setName,
               setCode: box.setCode,
-              franchise: box.franchise,
-              language: box.language,
-              ...ref.product,
+              ...ref.card,
             },
           },
     );
-    const holding = await insertHolding(tx, product.id, {
+    const holding = await insertHolding(tx, userId, product.id, {
       quantity: input.quantity,
       costTotalJpy: 0,
       acquiredAt: input.acquiredAt,
@@ -268,12 +370,13 @@ export type HoldingEdit = Partial<
 /** Corrects recorded facts. Logged as a `note` event with `kind: 'edit'` and before/after. */
 export async function editHolding(
   db: Db,
+  userId: string,
   id: string,
   edit: HoldingEdit,
   occurredAt: string = toTokyoIso(),
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding } = await loadHolding(tx, id);
+    const { holding } = await loadHolding(tx, userId, id);
     if (edit.quantity !== undefined) assertQuantity(edit.quantity);
     if (edit.costTotalJpy !== undefined) assertYen(edit.costTotalJpy);
     const nextType = edit.acquisitionType ?? holding.acquisitionType;
@@ -302,12 +405,13 @@ export async function editHolding(
 /** Splits `quantity` units into a new holding; returns the new holding. */
 export async function splitOff(
   db: Db,
+  userId: string,
   id: string,
   quantity: number,
   occurredAt: string = toTokyoIso(),
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding } = await loadHolding(tx, id);
+    const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
     if (quantity >= holding.quantity) throw new DomainError('invalid_quantity');
     return takeUnits(tx, holding, quantity, occurredAt);
@@ -316,19 +420,20 @@ export async function splitOff(
 
 export async function markOpened(
   db: Db,
+  userId: string,
   id: string,
   input: { quantity: number; packagingState: PackagingState; occurredAt: string },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding, product } = await loadHolding(tx, id);
+    const { holding, product } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    if (!openedStatesFor(product.type).includes(input.packagingState)) {
+    if (!openedStatesFor(productClass(product)).includes(input.packagingState)) {
       throw new DomainError('invalid_input');
     }
     if (holding.packagingState === input.packagingState) throw new DomainError('no_change');
 
     const target = await takeUnits(tx, holding, input.quantity, input.occurredAt);
-    const status = isConsumedAfterOpening(product.type, input.packagingState)
+    const status = isConsumedAfterOpening(productClass(product), input.packagingState)
       ? 'consumed'
       : target.status;
     const [updated] = await tx
@@ -353,14 +458,15 @@ export async function markOpened(
 /** Sends cards to a grader. The fee is added to the cost basis. */
 export async function submitGrading(
   db: Db,
+  userId: string,
   id: string,
   input: { quantity: number; grader: Grader; feeJpy: number; service?: string; occurredAt: string },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding, product } = await loadHolding(tx, id);
+    const { holding, product } = await loadHolding(tx, userId, id);
     assertOwned(holding);
     assertYen(input.feeJpy);
-    if (product.type !== 'card_single') throw new DomainError('not_a_card');
+    if (productClass(product) !== 'card') throw new DomainError('not_a_card');
     const events = await tx.select().from(holdingEvents).where(eq(holdingEvents.holdingId, id));
     if (pendingGrading(events)) throw new DomainError('already_at_grader');
 
@@ -391,6 +497,7 @@ export async function submitGrading(
 /** Records the grade received. An optional extra fee (upcharge, shipping) adds to cost. */
 export async function returnGrading(
   db: Db,
+  userId: string,
   id: string,
   input: {
     grader: Grader;
@@ -401,7 +508,7 @@ export async function returnGrading(
   },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding } = await loadHolding(tx, id);
+    const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
     const extraFee = input.extraFeeJpy ?? 0;
     assertYen(extraFee);
@@ -440,6 +547,7 @@ export async function returnGrading(
 
 export async function sellHolding(
   db: Db,
+  userId: string,
   id: string,
   input: {
     quantity: number;
@@ -450,7 +558,7 @@ export async function sellHolding(
   },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding } = await loadHolding(tx, id);
+    const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
     assertYen(input.priceJpy);
     assertYen(input.feesJpy);
@@ -478,6 +586,7 @@ export async function sellHolding(
 
 export async function changeCondition(
   db: Db,
+  userId: string,
   id: string,
   input: {
     quantity: number;
@@ -488,7 +597,7 @@ export async function changeCondition(
   },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
-    const { holding } = await loadHolding(tx, id);
+    const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
     const patch: Partial<Pick<Holding, 'condition' | 'rawGrade' | 'packagingState'>> = {};
     const before: Record<string, unknown> = {};
@@ -518,13 +627,14 @@ export async function changeCondition(
 
 export async function addNote(
   db: Db,
+  userId: string,
   id: string,
   input: { text: string; occurredAt: string },
 ): Promise<void> {
   const text = input.text.trim();
   if (!text) throw new DomainError('invalid_input');
   await db.transaction(async (tx) => {
-    await loadHolding(tx, id);
+    await loadHolding(tx, userId, id);
     await insertEvent(tx, {
       holdingId: id,
       type: 'note',
@@ -538,9 +648,9 @@ export async function addNote(
  * Removes a holding registered by mistake. Refused once other records depend on it
  * (pulls logged from it, or a split to/from it), so history stays consistent.
  */
-export async function deleteHolding(db: Db, id: string): Promise<void> {
+export async function deleteHolding(db: Db, userId: string, id: string): Promise<void> {
   await db.transaction(async (tx) => {
-    await loadHolding(tx, id);
+    await loadHolding(tx, userId, id);
     const [children] = await tx
       .select({ n: count() })
       .from(holdings)

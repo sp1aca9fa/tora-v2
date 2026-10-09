@@ -1,10 +1,9 @@
 import {
   CONDITIONS,
   GRADERS,
-  type Locale,
   PACKAGING_STATES,
   RAW_GRADES,
-  displayName,
+  productClass,
   holdingFieldsFor,
   openedStatesFor,
   pendingGrading,
@@ -12,13 +11,13 @@ import {
 } from '@tora/core';
 import { getHoldingDetail } from '@tora/db';
 import { notFound } from 'next/navigation';
-import { getLocale, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 import { ActionForm } from '@/components/action-form';
 import { Field } from '@/components/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { authedDb } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
 import {
   conditionAction,
   deleteAction,
@@ -62,12 +61,14 @@ export default async function HoldingActionPage({
   const { id, action } = await params;
   if (!(action in ACTIONS)) notFound();
   const key = action as ActionKey;
-  const detail = await getHoldingDetail(await authedDb(), id);
+  const { db, user } = await authed();
+  const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events } = detail;
-  const [t, locale] = await Promise.all([getTranslations(), getLocale() as Promise<Locale>]);
+  const t = await getTranslations();
   const today = tokyoDate();
-  const fields = holdingFieldsFor(product.type);
+  const cls = productClass(product);
+  const fields = holdingFieldsFor(cls);
   const back = `/holdings/${id}`;
 
   const dateField = (
@@ -201,14 +202,14 @@ export default async function HoldingActionPage({
       );
       break;
     case 'open': {
-      const states = openedStatesFor(product.type);
+      const states = openedStatesFor(cls);
       body = (
         <>
           {quantityField()}
           <Field
             label={t('fields.packagingState')}
             htmlFor="packagingState"
-            hint={product.type === 'sealed_tcg' ? t('actions.openSealedHint') : undefined}
+            hint={cls === 'sealed' ? t('actions.openSealedHint') : undefined}
           >
             <NativeSelect
               id="packagingState"
@@ -347,9 +348,7 @@ export default async function HoldingActionPage({
                 >
                   <option value="">{t('common.notSet')}</option>
                   {PACKAGING_STATES.filter(
-                    (p) =>
-                      p !== 'n/a' &&
-                      (product.type === 'sealed_tcg' || p !== 'box_opened_contents_sealed'),
+                    (p) => p !== 'n/a' && (cls === 'sealed' || p !== 'box_opened_contents_sealed'),
                   ).map((p) => (
                     <option key={p} value={p}>
                       {t(`packaging.${p}`)}
@@ -386,7 +385,7 @@ export default async function HoldingActionPage({
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <p className="text-sm text-muted-foreground">{displayName(product, locale)}</p>
+        <p className="text-sm text-muted-foreground">{product.name}</p>
         <h1 className="text-2xl font-semibold tracking-tight">{t(`holding.actions.${key}`)}</h1>
         {t.has(`actions.intro.${key}`) && (
           <p className="text-sm text-muted-foreground">{t(`actions.intro.${key}`)}</p>

@@ -1,16 +1,27 @@
-import { deriveBucket } from '@tora/core';
+import { totpCode } from '@tora/auth';
 import { count, eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { loadCatalogFiles, syncCatalog } from './catalog';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
-import { listHoldingsWithProducts } from './queries';
-import { holdingEvents, holdings, priceObservations, products } from './schema';
-import { seed } from './seed';
+import { listInventory } from './queries';
+import { holdings, priceObservations, products, tcgSets } from './schema';
+import { DEMO_TOTP_SECRET, seedCollection, seedDemoUser } from './seed';
+import {
+  MAX_ACTIVE_DEVICES,
+  createUser,
+  listDevices,
+  markTotpStepUsed,
+  registerDevice,
+  revokeDevice,
+  updateCredentials,
+} from './users';
 
 let db: Db;
+const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
 
 beforeEach(async () => {
   // A temp file rather than :memory:, since libSQL transactions open a separate connection.
@@ -20,78 +31,91 @@ beforeEach(async () => {
   return () => rm(dir, { recursive: true, force: true });
 });
 
-describe('migrations + seed', () => {
-  it('seeds the scenario data', async () => {
-    const rows = await seed(db);
-    const [p] = await db.select({ n: count() }).from(products);
-    const [h] = await db.select({ n: count() }).from(holdings);
-    const [e] = await db.select({ n: count() }).from(holdingEvents);
-    expect(p?.n).toBe(rows.products.length);
-    expect(h?.n).toBe(rows.holdings.length);
-    expect(e?.n).toBe(rows.holdingEvents.length);
+describe('seed', () => {
+  it('creates the demo account and scenario data, using the catalog', async () => {
+    const entries = await loadCatalogFiles();
+    expect(entries.length).toBeGreaterThan(1000);
+    await syncCatalog(db, entries);
+    await syncCatalog(db, entries); // idempotent
+    const [sets] = await db.select({ n: count() }).from(tcgSets);
+    expect(sets?.n).toBe(entries.length);
 
-    const list = await listHoldingsWithProducts(db);
-    expect(list).toHaveLength(rows.holdings.length);
+    const { user, backupCodes } = await seedDemoUser(db, 'a'.repeat(32));
+    expect(backupCodes).toHaveLength(8);
+    expect(totpCode(DEMO_TOTP_SECRET)).toMatch(/^\d{6}$/);
+    await seedCollection(db, user.id);
+
+    const rows = await listInventory(db, user.id, { status: 'all' });
+    expect(rows.length).toBe(7);
+    const boxRow = rows.find((r) => r.product.kind === 'booster_box');
+    expect(boxRow?.product).toMatchObject({
+      setCode: 'SV9',
+      releaseDate: '2025-01-24',
+      createdBy: null,
+    });
+    expect(boxRow?.holding.status).toBe('consumed');
+    expect(rows.filter((r) => r.holding.parentHoldingId === boxRow?.holding.id)).toHaveLength(3);
+  });
+});
+
+describe('accounts and devices', () => {
+  it('first account is admin; limits active devices to 2; revoking frees a slot', async () => {
+    const { user } = await createUser(db, 'alice', creds);
+    expect(user.role).toBe('admin');
+    expect((await createUser(db, 'bob', creds)).user.role).toBe('member');
+
+    const first = await registerDevice(db, user.id, 'iPhone');
+    const second = await registerDevice(db, user.id, 'PC');
+    expect(first && second).toBeTruthy();
+    expect(MAX_ACTIVE_DEVICES).toBe(2);
+    expect(await registerDevice(db, user.id, 'third')).toBeNull();
+    expect(await revokeDevice(db, user.id, first!.id)).toBe(true);
+    expect(await revokeDevice(db, user.id, first!.id)).toBe(false);
+    expect(await registerDevice(db, user.id, 'third')).not.toBeNull();
+
+    await updateCredentials(db, user.id, { passwordHash: 'new' });
+    expect(await listDevices(db, user.id)).toHaveLength(0);
   });
 
-  it('has an amiibo lot of 3 identical units (scenario 2)', async () => {
-    await seed(db);
-    const lots = await db
-      .select({ quantity: holdings.quantity, cost: holdings.costTotalJpy })
-      .from(holdings)
-      .innerJoin(products, eq(products.id, holdings.productId))
-      .where(eq(products.type, 'amiibo'));
-    expect(lots).toContainEqual({ quantity: 3, cost: 9_900 });
-  });
-
-  it('links pulls to the box and keeps the box state as received (scenarios 4-5)', async () => {
-    await seed(db);
-    const [box] = await db
-      .select({ holding: holdings })
-      .from(holdings)
-      .innerJoin(products, eq(products.id, holdings.productId))
-      .where(eq(products.type, 'sealed_tcg'));
-    expect(box).toBeDefined();
-    const pulls = await db
-      .select()
-      .from(holdings)
-      .where(eq(holdings.parentHoldingId, box!.holding.id));
-    expect(pulls.length).toBe(3);
-    for (const pull of pulls) {
-      expect(pull.costTotalJpy).toBe(0);
-      expect(pull.acquisitionType).toBe('pull');
-      expect(deriveBucket({ productType: 'card_single', ...pull })).toBe('raw:A');
-    }
-
-    const [acquired] = await db
-      .select()
-      .from(holdingEvents)
-      .where(eq(holdingEvents.holdingId, box!.holding.id))
-      .orderBy(holdingEvents.occurredAt);
-    expect(acquired?.type).toBe('acquired');
-    expect(acquired?.payload).toMatchObject({ packagingState: 'box_opened_contents_sealed' });
+  it('accepts each TOTP step once', async () => {
+    const { user } = await createUser(db, 'alice', creds);
+    expect(await markTotpStepUsed(db, user.id, 100)).toBe(true);
+    expect(await markTotpStepUsed(db, user.id, 100)).toBe(false);
+    expect(await markTotpStepUsed(db, user.id, 99)).toBe(false);
+    expect(await markTotpStepUsed(db, user.id, 101)).toBe(true);
   });
 });
 
 describe('constraints', () => {
-  it('rejects invalid enum values and quantities', async () => {
+  it('rejects invalid enum values, quantities and empty names', async () => {
+    const { user } = await createUser(db, 'alice', creds);
     const [product] = await db
       .insert(products)
-      .values({ type: 'amiibo', nameEn: 'Test' })
+      .values({ category: 'game', kind: 'amiibo', name: 'Test' })
       .returning();
-    const base = { productId: product!.id, acquiredAt: '2026-10-09T00:00:00.000+09:00' };
+    const base = {
+      userId: user.id,
+      productId: product!.id,
+      acquiredAt: '2026-10-09T00:00:00.000+09:00',
+    };
     await expect(db.insert(holdings).values({ ...base, quantity: 0 })).rejects.toThrow();
     await expect(
       // @ts-expect-error invalid enum on purpose
       db.insert(holdings).values({ ...base, condition: 'mint' }),
     ).rejects.toThrow();
-    await expect(db.insert(products).values({ type: 'amiibo' })).rejects.toThrow();
+    await expect(
+      db.insert(products).values({ category: 'game', kind: 'amiibo', name: ' ' }),
+    ).rejects.toThrow();
+    await expect(
+      // @ts-expect-error invalid enum on purpose
+      db.insert(products).values({ category: 'cards', kind: 'amiibo', name: 'x' }),
+    ).rejects.toThrow();
   });
 
   it('dedupes observations by source + external_ref', async () => {
     const [product] = await db
       .insert(products)
-      .values({ type: 'amiibo', nameEn: 'Test' })
+      .values({ category: 'game', kind: 'amiibo', name: 'Test' })
       .returning();
     const obs = {
       productId: product!.id,
@@ -105,5 +129,10 @@ describe('constraints', () => {
     await db.insert(priceObservations).values(obs);
     await expect(db.insert(priceObservations).values(obs)).rejects.toThrow();
     await db.insert(priceObservations).values({ ...obs, source: 'snkrdunk' });
+    const rows = await db
+      .select()
+      .from(priceObservations)
+      .where(eq(priceObservations.externalRef, 'm123'));
+    expect(rows).toHaveLength(2);
   });
 });

@@ -1,6 +1,13 @@
 {
-  "app": { "name": "Tora", "description": "Personal collectibles tracker" },
-  "nav": { "portfolio": "Portfolio", "add": "Add", "settings": "Settings" },
+  "app": {
+    "name": "Tora",
+    "description": "Personal collectibles tracker"
+  },
+  "nav": {
+    "portfolio": "Portfolio",
+    "add": "Add",
+    "settings": "Settings"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -14,41 +21,74 @@
     "title": "Sign in",
     "password": "Password",
     "submit": "Sign in",
-    "invalid": "Wrong password.",
-    "locked": "Too many attempts. Try again in a few minutes.",
-    "notConfigured": "Login is not configured. Set AUTH_PASSWORD_HASH and AUTH_SECRET (see README)."
+    "username": "Username",
+    "continue": "Continue",
+    "codeTitle": "Authenticator code",
+    "code": "6-digit code",
+    "codeHint": "From your authenticator app. Lost it? Enter one of your backup codes instead.",
+    "startOver": "Start over",
+    "errors": {
+      "invalid": "That did not match. Try again.",
+      "locked": "Too many attempts. Try again later.",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing, see README).",
+      "deviceLimit": "This account is already signed in on 2 devices. Sign out or revoke one in Settings on another device (or run `pnpm user revoke` on the home PC).",
+      "notEnrolled": "This account has no authenticator yet. Run `pnpm user reset-2fa` on the home PC.",
+      "expired": "The sign-in took too long. Start over."
+    }
   },
   "portfolio": {
     "title": "Portfolio",
     "empty": "Nothing registered yet.",
-    "count": "{count, plural, one {# entry} other {# entries}}",
     "qty": "Qty {qty}",
-    "pulledFrom": "Pulled from {name}"
+    "pulledFrom": "Pulled from {name}",
+    "spent": "Total spent",
+    "items": "Items owned",
+    "itemsValue": "{units} ({lots} entries)",
+    "marketValue": "Market value",
+    "marketValueSoon": "Comes once price tracking starts."
   },
   "inventory": {
     "search": "Search name, set, card number",
     "allTypes": "All types",
     "allStatuses": "All statuses",
     "emptyFiltered": "No entries match these filters.",
-    "addFirst": "Add your first item"
+    "addFirst": "Add your first item",
+    "allOf": "All {category}"
   },
   "add": {
     "title": "Add",
-    "steps": { "what": "Item", "how": "Purchase", "details": "Condition" },
-    "mode": { "new": "New item", "existing": "Existing", "source": "From sites" },
+    "steps": {
+      "what": "Item",
+      "how": "Purchase",
+      "details": "Condition"
+    },
+    "mode": {
+      "new": "New item",
+      "existing": "Existing",
+      "source": "From sites"
+    },
     "sourceSearchSoon": "Searching SNKRDUNK and other sites comes in a later update.",
     "searchPlaceholder": "Search items you already registered",
     "noResults": "No match. Use \"New item\" to create it.",
     "change": "Change",
-    "nameHint": "English or Japanese name; at least one is required.",
     "costHint": "Total paid for all units, including anything you want to count (e.g. shipping).",
     "rawGradeHint": "S: mint, A: near mint, B: light wear, C: wear, D: damaged.",
     "submit": "Register",
     "errors": {
       "pickProduct": "Pick an item from the search results.",
-      "pickType": "Choose what kind of item it is.",
-      "nameRequired": "Enter an English or Japanese name."
-    }
+      "pickCategory": "Choose TCG or Game.",
+      "pickFranchise": "Choose the franchise.",
+      "pickKind": "Choose what kind of item it is.",
+      "pickSet": "Pick the set, or enter it manually."
+    },
+    "category": "Category",
+    "otherFranchise": "Franchise name",
+    "set": "Set",
+    "setSearchPlaceholder": "Search by set name or code",
+    "noSets": "No matching set. Use \"Not in the list\" below.",
+    "released": "Released {date}",
+    "notInList": "Not in the list? Enter it manually",
+    "variantPlaceholder": "e.g. Collector"
   },
   "holding": {
     "costBasis": "Cost basis",
@@ -93,9 +133,12 @@
     }
   },
   "pulls": {
-    "mode": { "new": "New card", "existing": "Registered card" },
+    "mode": {
+      "new": "New card",
+      "existing": "Registered card"
+    },
     "name": "Card name",
-    "nameHint": "Japanese or English. Set and language come from the box.",
+    "nameHint": "Set, franchise and region come from the box.",
     "add": "Add pull",
     "done": "Done"
   },
@@ -124,13 +167,17 @@
     "collectorsInfo": "Collectors run on your home PC (pnpm collect) and write to the database. Private collectors live in an optional submodule.",
     "noRuns": "No collector runs recorded yet.",
     "account": "Account",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "signedInAs": "Signed in as {username}",
+    "devices": "Devices ({count}/{max})",
+    "devicesInfo": "Each account can be signed in on up to 2 devices. Signing out or revoking frees a slot; a new device needs the password and an authenticator code.",
+    "thisDevice": "This device",
+    "deviceDates": "Since {since} · last used {seen}",
+    "revoke": "Revoke"
   },
   "fields": {
     "type": "Type",
     "status": "Status",
-    "nameEn": "Name (English)",
-    "nameJa": "Name (Japanese)",
     "name": "Name",
     "franchise": "Franchise",
     "setName": "Set",
@@ -161,7 +208,12 @@
     "feesJpy": "Fees",
     "platform": "Platform",
     "text": "Note",
-    "confirm": "Confirmation"
+    "confirm": "Confirmation",
+    "region": "Region",
+    "kind": "Kind",
+    "category": "Category",
+    "variant": "Variant",
+    "username": "Username"
   },
   "errors": {
     "check": "Please check",
@@ -176,21 +228,19 @@
     "already_at_grader": "This card is already at a grader.",
     "not_at_grader": "This card is not at a grader.",
     "no_change": "Nothing changed.",
-    "has_dependents": "Other entries depend on this one (pulls or splits), so it cannot be deleted."
+    "has_dependents": "Other entries depend on this one (pulls or splits), so it cannot be deleted.",
+    "forbidden": "Only the person who created this item can change it."
   },
-  "productType": {
-    "card_single": "Card",
-    "sealed_tcg": "Sealed TCG",
-    "game_ce": "Collector's edition",
-    "game": "Game",
-    "amiibo": "amiibo",
-    "controller": "Controller",
-    "figure": "Figure",
-    "other": "Other"
+  "acquisitionType": {
+    "purchase": "Purchase",
+    "pull": "Pull",
+    "gift": "Gift",
+    "trade": "Trade"
   },
-  "acquisitionType": { "purchase": "Purchase", "pull": "Pull", "gift": "Gift", "trade": "Trade" },
-  "grading": { "raw": "Raw", "graded": "Graded" },
-  "language": { "JP": "Japanese", "EN": "English", "other": "Other" },
+  "grading": {
+    "raw": "Raw",
+    "graded": "Graded"
+  },
   "condition": {
     "new_unused": "New, unused",
     "like_new": "Like new",
@@ -207,12 +257,56 @@
     "empty": "Empty",
     "n/a": "N/A"
   },
-  "status": { "owned": "Owned", "sold": "Sold", "consumed": "Consumed", "lost": "Lost" },
+  "status": {
+    "owned": "Owned",
+    "sold": "Sold",
+    "consumed": "Consumed",
+    "lost": "Lost"
+  },
   "runStatus": {
     "running": "Running",
     "ok": "OK",
     "partial": "Partial",
     "failed": "Failed",
     "blocked": "Blocked"
+  },
+  "category": {
+    "tcg": "Trading cards",
+    "game": "Games & merch"
+  },
+  "kind": {
+    "single": "Single card",
+    "booster_box": "Booster box",
+    "booster_pack": "Booster pack",
+    "deck": "Deck",
+    "special_set": "Special set",
+    "supply": "Supplies",
+    "software": "Game",
+    "collectors_edition": "Collector's edition",
+    "amiibo": "amiibo",
+    "controller": "Controller",
+    "figure": "Figure",
+    "console": "Console",
+    "other": "Other"
+  },
+  "franchise": {
+    "pokemon": "Pokémon",
+    "one_piece": "One Piece",
+    "yugioh": "Yu-Gi-Oh!",
+    "mtg": "Magic",
+    "other": "Other"
+  },
+  "region": {
+    "jp": "Japan",
+    "en": "English",
+    "na": "North America",
+    "eu": "Europe",
+    "asia": "Asia",
+    "kr": "Korea",
+    "zh_cn": "Chinese (Simplified)",
+    "zh_tw": "Chinese (Traditional)",
+    "th": "Thai",
+    "id": "Indonesian",
+    "other": "Other"
   }
 }

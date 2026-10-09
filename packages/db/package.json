@@ -8,7 +8,8 @@
     "./schema": "./src/schema.ts",
     "./env": "./src/env.ts",
     "./migrate": "./src/migrate.ts",
-    "./seed": "./src/seed.ts"
+    "./seed": "./src/seed.ts",
+    "./catalog": "./src/catalog.ts"
   },
   "scripts": {
     "build": "tsc -p .",
@@ -16,14 +17,19 @@
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts",
-    "studio": "drizzle-kit studio"
+    "studio": "drizzle-kit studio",
+    "user": "tsx src/scripts/user.ts",
+    "catalog:sync": "tsx src/scripts/catalog-sync.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
     "@tora/core": "workspace:*",
-    "drizzle-orm": "^0.45.4"
+    "drizzle-orm": "^0.45.4",
+    "@tora/auth": "workspace:*",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.11"
+    "drizzle-kit": "^0.31.11",
+    "@types/qrcode": "^1.5.6"
   }
 }

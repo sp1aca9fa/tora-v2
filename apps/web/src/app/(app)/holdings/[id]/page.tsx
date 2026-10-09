@@ -1,47 +1,39 @@
-import {
-  type Locale,
-  deriveBucket,
-  displayName,
-  holdingFieldsFor,
-  pendingGrading,
-  unitCost,
-} from '@tora/core';
-import { getHoldingDetail } from '@tora/db';
+import { deriveBucket, holdingFieldsFor, pendingGrading, productClass, unitCost } from '@tora/core';
+import { canEditProduct, getHoldingDetail } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
+import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { authedDb } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
+import { productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { EventList } from './event-list';
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const detail = await getHoldingDetail(await authedDb(), (await params).id);
-  if (!detail) return {};
-  return { title: displayName(detail.product, (await getLocale()) as Locale) };
+  const { db, user } = await authed();
+  const detail = await getHoldingDetail(db, user.id, (await params).id);
+  return detail ? { title: detail.product.name } : {};
 }
 
 export default async function HoldingPage({ params }: Params) {
   const { id } = await params;
-  const detail = await getHoldingDetail(await authedDb(), id);
+  const { db, user } = await authed();
+  const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events, children, parent } = detail;
-  const [t, format, locale] = await Promise.all([
-    getTranslations(),
-    getFormatter(),
-    getLocale() as Promise<Locale>,
-  ]);
+  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
 
   const owned = holding.status === 'owned';
-  const fields = holdingFieldsFor(product.type);
+  const cls = productClass(product);
+  const fields = holdingFieldsFor(cls);
   const atGrader = pendingGrading(events);
-  const bucket = deriveBucket({ productType: product.type, ...holding });
-  const isBox = product.type === 'sealed_tcg';
+  const bucket = deriveBucket({ productClass: cls, ...holding });
+  const isBox = cls === 'sealed';
 
   const actions = [
     { key: 'edit', show: true },
@@ -112,31 +104,21 @@ export default async function HoldingPage({ params }: Params) {
             {t('nav.portfolio')}
           </Link>
         </p>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight">
-          {displayName(product, locale)}
-        </h1>
-        {locale === 'en' && product.nameJa && product.nameEn && (
-          <p lang="ja" className="text-sm text-muted-foreground">
-            {product.nameJa}
-          </p>
-        )}
+        <h1 className="text-2xl leading-tight font-semibold tracking-tight">{product.name}</h1>
         <p className="text-sm text-muted-foreground">
-          {[
-            t(`productType.${product.type}`),
-            product.franchise,
-            product.setName,
-            product.cardNumber,
-            product.rarity,
-          ]
-            .filter(Boolean)
-            .join(' · ')}{' '}
-          ·{' '}
-          <Link
-            href={`/products/${product.id}/edit?from=/holdings/${holding.id}`}
-            className="underline"
-          >
-            {t('holding.editProduct')}
-          </Link>
+          {productMeta(product, t)}
+          {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
+          {canEditProduct(user, product) && (
+            <>
+              {' · '}
+              <Link
+                href={`/products/${product.id}/edit?from=/holdings/${holding.id}`}
+                className="underline"
+              >
+                {t('holding.editProduct')}
+              </Link>
+            </>
+          )}
         </p>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-muted px-2.5 py-1">{t(`status.${holding.status}`)}</span>
@@ -156,7 +138,7 @@ export default async function HoldingPage({ params }: Params) {
           href={`/holdings/${parent.holding.id}`}
           className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
         >
-          <span>{t('portfolio.pulledFrom', { name: displayName(parent.product, locale) })}</span>
+          <span>{t('portfolio.pulledFrom', { name: parent.product.name })}</span>
           <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
       )}
@@ -206,7 +188,7 @@ export default async function HoldingPage({ params }: Params) {
                       className="flex justify-between gap-3 py-2 hover:underline"
                     >
                       <span>
-                        {displayName(c.product, locale)}
+                        {c.product.name}
                         {c.product.rarity && (
                           <span className="text-muted-foreground"> {c.product.rarity}</span>
                         )}

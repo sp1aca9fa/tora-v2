@@ -1,8 +1,8 @@
 import { Nav } from '@/components/nav';
-import { requireSession } from '@/lib/auth/guard';
+import { authed } from '@/lib/auth/guard';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await requireSession();
+  await authed();
   return (
     <>
       <Nav />
