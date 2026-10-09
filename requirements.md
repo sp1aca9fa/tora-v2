@@ -55,6 +55,7 @@
 - 2026-10-09: S3 matching runs on the home PC, not in the add flow (SNKRDUNK must not be queried from Vercel). Candidates are confirmed on the item page or a SNKRDUNK link is pasted. Owned and opened (consumed) products are matched: opened boxes still need a value "as received".
 - 2026-10-09: SNKRDUNK sales history has no transaction ids and shows the last ~3 days as relative times. Trades are saved per finished day (older than 5 days) with refs `<listing>|<day>|<price>|<lot>|<condition>|<label>#n`; the history sweep only saves a day once all its entries are seen and resumes across runs (60 pages per item per run). Lot trades ("10個") are stored per unit with the original lot price kept.
 - 2026-10-09: SNKRDUNK lists no-shrink boxes as separate products, so a product may have several active listings per source; the no-shrink listing's trades go to `sealed:no_shrink`, other sealed trades to `sealed:shrink`.
+- 2026-10-10: `collectors/` is not a pnpm workspace member: Vercel cannot fetch the private submodule and a frozen install failed when the lockfile listed it. The root links `@tora/collector-sdk`, `@tora/core` and `@tora/db` so the private code resolves them; `pnpm typecheck` checks it when present.
 - 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
 
 ---
