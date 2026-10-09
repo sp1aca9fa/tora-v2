@@ -12,8 +12,8 @@
 
 | Session | Topic | Status |
 |---|---|---|
-| S1 | Foundation: monorepo, schema, i18n, access | built; awaiting user check on phone via Vercel |
-| S2 | Registration UI (products, lots, pulls, events) | todo |
+| S1 | Foundation: monorepo, schema, i18n, access | done |
+| S2 | Registration UI (products, lots, pulls, events) | built; awaiting user check on phone |
 | S3 | Collector framework + SNKRDUNK + catalog search | todo |
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | todo |
@@ -34,6 +34,15 @@
 - 2026-10-09: The `acquired` event payload snapshots the state as received (packaging, condition, grade); the box view's "value as received" bucket comes from it.
 - 2026-10-09: Migrations run from the home PC (`pnpm db:migrate` against Turso), not during Vercel builds. Seed refuses remote DBs.
 - 2026-10-09: App display name "Tora" (from the repo name); easy to change in messages/*.json and manifest.ts.
+- 2026-10-09: S1 accepted (login works on the phone via Vercel).
+- 2026-10-09: English is the default locale regardless of browser language; an EN/JP toggle is always visible (mobile header, desktop sidebar, login page). Reason: user is the main reader; visitors can switch.
+- 2026-10-09: Edits to recorded facts are logged as `note` events with `payload.kind = 'edit'` and before/after values (no new event type).
+- 2026-10-09: Add flow offers purchase / gift / trade only; pulls are entered through "Log pulls" on a sealed TCG holding. A new pull product inherits set, franchise and language from the box; the pull inherits `acquired_from`.
+- 2026-10-09: Pull entry uses one name box; Japanese text goes to `name_ja`, anything else to `name_en`.
+- 2026-10-09: Marking a sealed TCG holding opened/empty sets status `consumed`; other types keep their status and only change packaging.
+- 2026-10-09: Grading return accepts an optional extra fee (upcharge, return shipping), added to the cost basis like the submission fee.
+- 2026-10-09: "Delete entry" exists for mistakes only: refused once pulls or splits depend on the holding; removes its events.
+- 2026-10-09: Product details are edited separately (applies to every holding of that product).
 
 ---
 

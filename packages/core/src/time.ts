@@ -20,3 +20,12 @@ export function tokyoDate(date: Date = new Date()): string {
 export function newId(): string {
   return ulid();
 }
+
+/**
+ * Timestamp for a `YYYY-MM-DD` date picked in the UI: the current time when it is today,
+ * else the start of that day in Tokyo (keeps same-day events in entry order).
+ */
+export function tokyoDateToIso(date: string, now: Date = new Date()): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new RangeError(`invalid date: ${date}`);
+  return date === tokyoDate(now) ? toTokyoIso(now) : `${date}T00:00:00.000+09:00`;
+}

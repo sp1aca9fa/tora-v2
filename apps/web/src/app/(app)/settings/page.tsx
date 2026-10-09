@@ -1,13 +1,10 @@
 import { listRecentCollectorRuns } from '@tora/db';
 import type { Metadata } from 'next';
-import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
-import { logout, setLocale } from '@/app/actions';
+import { getFormatter, getTranslations } from 'next-intl/server';
+import { logout } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LOCALES } from '@/i18n/locale';
 import { authedDb } from '@/lib/auth/guard';
-
-const LOCALE_LABELS = { en: 'English', ja: '日本語' } as const;
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
@@ -15,37 +12,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SettingsPage() {
   const db = await authedDb();
-  const [runs, t, locale, format] = await Promise.all([
+  const [runs, t, format] = await Promise.all([
     listRecentCollectorRuns(db, 10),
     getTranslations(),
-    getLocale(),
     getFormatter(),
   ]);
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('settings.language')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={setLocale} className="flex gap-2">
-            {LOCALES.map((l) => (
-              <Button
-                key={l}
-                name="locale"
-                value={l}
-                variant={l === locale ? 'default' : 'outline'}
-                aria-pressed={l === locale}
-              >
-                {LOCALE_LABELS[l]}
-              </Button>
-            ))}
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>

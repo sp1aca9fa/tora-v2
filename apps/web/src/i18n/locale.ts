@@ -7,8 +7,9 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
-/** Cookie choice first, then the browser's Accept-Language, then English. */
-export function resolveLocale(cookie: string | undefined, acceptLanguage: string | null): Locale {
-  if (isLocale(cookie)) return cookie;
-  return acceptLanguage?.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+export const DEFAULT_LOCALE: Locale = 'en';
+
+/** The cookie choice, else English (the browser language is deliberately ignored). */
+export function resolveLocale(cookie: string | undefined): Locale {
+  return isLocale(cookie) ? cookie : DEFAULT_LOCALE;
 }

@@ -4,6 +4,7 @@ import { LayoutGrid, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { LocaleToggle } from '@/components/locale-toggle';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -24,7 +25,12 @@ export function Nav() {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 hidden w-56 flex-col border-r bg-card px-3 py-6 md:flex">
-        <div className="px-3 pb-6 text-lg font-semibold tracking-tight">{t('app.name')}</div>
+        <div className="flex items-center justify-between gap-2 px-3 pb-6">
+          <Link href="/" className="text-lg font-semibold tracking-tight">
+            {t('app.name')}
+          </Link>
+          <LocaleToggle />
+        </div>
         <nav className="flex flex-col gap-1">
           {ITEMS.map(({ href, key, icon: Icon }) => (
             <Link
@@ -42,6 +48,13 @@ export function Nav() {
           ))}
         </nav>
       </aside>
+
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
+        <Link href="/" className="py-3 font-semibold tracking-tight">
+          {t('app.name')}
+        </Link>
+        <LocaleToggle />
+      </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <div className="grid grid-cols-3">
