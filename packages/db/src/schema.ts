@@ -177,6 +177,8 @@ export const productSources = sqliteTable(
     state: text('state', { mode: 'json' }).$type<unknown>(),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     lastSuccessAt: text('last_success_at'),
+    /** When the product's details were rewritten from this listing (once per link). */
+    detailsSyncedAt: text('details_synced_at'),
     ...timestamps,
   },
   (t) => [

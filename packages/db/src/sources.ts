@@ -391,6 +391,43 @@ export async function insertObservations(db: Db, rows: NewPriceObservation[]): P
   return added;
 }
 
+/**
+ * Applies details read from a linked listing to its product, once per link. Catalog products
+ * keep their catalog set (id, name, code); only empty or listing-specific fields change there.
+ */
+export async function syncProductDetails(
+  db: Db,
+  link: Pick<ProductSource, 'id' | 'productId'>,
+  details: Partial<
+    Pick<Product, 'name' | 'rarity' | 'setName' | 'setCode' | 'cardNumber' | 'variant' | 'imageUrl'>
+  > | null,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    let changed = false;
+    if (details) {
+      const [product] = await tx.select().from(products).where(eq(products.id, link.productId));
+      if (product) {
+        const patch = Object.fromEntries(
+          Object.entries(details).filter(([key, value]) => {
+            if (value === undefined || value === null || value === '') return false;
+            if (product.setId && (key === 'setName' || key === 'setCode')) return false;
+            return product[key as keyof Product] !== value;
+          }),
+        );
+        if (Object.keys(patch).length) {
+          await tx.update(products).set(patch).where(eq(products.id, product.id));
+          changed = true;
+        }
+      }
+    }
+    await tx
+      .update(productSources)
+      .set({ detailsSyncedAt: toTokyoIso() })
+      .where(eq(productSources.id, link.id));
+    return changed;
+  });
+}
+
 export async function updateSourceProgress(
   db: Db,
   sourceId: string,

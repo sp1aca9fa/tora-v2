@@ -7,6 +7,7 @@ import {
   productsToMatch,
   saveCandidates,
   startRun,
+  syncProductDetails,
   updateSourceProgress,
 } from '@tora/db';
 import { BlockedError, PoliteHttp, type PoliteHttpOptions, RequestCapError } from './http';
@@ -96,6 +97,15 @@ export async function runCollector(
             title: result.title,
             url: result.url,
           });
+          const title = result.title ?? link.title;
+          if (!link.detailsSyncedAt && title && collector.productDetails) {
+            const changed = await syncProductDetails(
+              db,
+              link,
+              collector.productDetails(title, product),
+            );
+            if (changed) log(`details of "${product.name}" updated from the linked listing`);
+          }
           log(
             `collect "${product.name}": +${added - before} observations${result.complete ? '' : ' (continues next run)'}`,
           );

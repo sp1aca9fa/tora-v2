@@ -29,7 +29,16 @@ export interface Collector {
   findCandidates(product: Product, ctx: CollectorContext): Promise<CandidateInput[]>;
   /** Fetches new observations for a linked listing and saves them through `ctx.save`. */
   collect(link: ProductSource, product: Product, ctx: CollectorContext): Promise<CollectResult>;
+  /**
+   * Product details read from a confirmed listing's title, applied once per link (the linked
+   * listing is the source of truth). Null when the title says nothing reliable (e.g. a variant).
+   */
+  productDetails?(title: string, product: Product): ProductDetails | null;
 }
+
+export type ProductDetails = Partial<
+  Pick<Product, 'name' | 'rarity' | 'setName' | 'setCode' | 'cardNumber' | 'variant' | 'imageUrl'>
+>;
 
 /** Shape every collectors package (public or private) exports from its entry point. */
 export interface CollectorModule {

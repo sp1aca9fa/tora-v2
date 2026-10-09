@@ -13,6 +13,7 @@ import {
   schema,
 } from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
+import { eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -91,7 +92,9 @@ it('matches, waits for confirmation, then collects idempotently', async () => {
       condition: 'new_unused',
     },
   );
-  const collector = fakeCollector();
+  const collector = fakeCollector({
+    productDetails: (title) => ({ name: `${title} (synced)`, setCode: 'ZZ' }),
+  });
 
   const first = await runCollector(db, collector, quiet);
   expect(first).toMatchObject({ status: 'ok', candidates: 2, observationsAdded: 0 });
@@ -107,6 +110,19 @@ it('matches, waits for confirmation, then collects idempotently', async () => {
   expect(await listPendingCandidates(db, product.id)).toHaveLength(0);
 
   const collected = await runCollector(db, collector, quiet);
+  // Details come from the linked listing once; later edits are not overwritten.
+  const [synced] = await db
+    .select()
+    .from(schema.products)
+    .where(eq(schema.products.id, product.id));
+  expect(synced).toMatchObject({ name: 'Box (synced)', setCode: 'ZZ' });
+  await db
+    .update(schema.products)
+    .set({ name: 'My edit' })
+    .where(eq(schema.products.id, product.id));
+  await runCollector(db, collector, quiet);
+  const [kept] = await db.select().from(schema.products).where(eq(schema.products.id, product.id));
+  expect(kept?.name).toBe('My edit');
   expect(collected).toMatchObject({ status: 'ok', candidates: 0, observationsAdded: 3 });
   expect((await runCollector(db, collector, quiet)).observationsAdded).toBe(0);
 

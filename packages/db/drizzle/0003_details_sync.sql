@@ -1,0 +1,1 @@
+ALTER TABLE `product_sources` ADD `details_synced_at` text;

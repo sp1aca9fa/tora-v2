@@ -14,5 +14,8 @@
   "dependencies": {
     "@tora/core": "workspace:*",
     "@tora/db": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.45.4"
   }
 }
