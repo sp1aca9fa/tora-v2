@@ -1,0 +1,35 @@
+{
+  "name": "tora",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @tora/web dev",
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @tora/db generate",
+    "db:migrate": "pnpm --filter @tora/db migrate",
+    "db:seed": "pnpm --filter @tora/db seed",
+    "collect": "pnpm --filter @tora/collector-sdk collect",
+    "hash-password": "tsx apps/web/scripts/hash-password.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^24.19.1",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "app": { "name": "Tora", "description": "Personal collectibles tracker" },
+  "nav": { "portfolio": "Portfolio", "add": "Add", "settings": "Settings" },
+  "login": {
+    "title": "Sign in",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid": "Wrong password.",
+    "locked": "Too many attempts. Try again in a few minutes.",
+    "notConfigured": "Login is not configured. Set AUTH_PASSWORD_HASH and AUTH_SECRET (see README)."
+  },
+  "portfolio": {
+    "title": "Portfolio",
+    "empty": "Nothing registered yet.",
+    "count": "{count, plural, one {# item} other {# items}}",
+    "qty": "Qty {qty}",
+    "cost": "Cost",
+    "pulledFrom": "Pulled from {name}",
+    "acquired": "Acquired {date}"
+  },
+  "add": { "title": "Add", "comingSoon": "The add flow is coming next." },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "collectors": "Collectors",
+    "collectorsInfo": "Collectors run on your home PC (pnpm collect) and write to the database. Private collectors live in an optional submodule.",
+    "noRuns": "No collector runs recorded yet.",
+    "account": "Account",
+    "logout": "Sign out"
+  },
+  "productType": {
+    "card_single": "Card",
+    "sealed_tcg": "Sealed TCG",
+    "game_ce": "Collector's edition",
+    "game": "Game",
+    "amiibo": "amiibo",
+    "controller": "Controller",
+    "figure": "Figure",
+    "other": "Other"
+  },
+  "condition": {
+    "new_unused": "New, unused",
+    "like_new": "Like new",
+    "no_noticeable_damage": "No noticeable damage",
+    "minor_damage": "Minor damage",
+    "damaged": "Damaged",
+    "poor": "Poor"
+  },
+  "packaging": {
+    "sealed_shrink": "Sealed (shrink)",
+    "sealed_no_shrink": "Sealed (no shrink)",
+    "box_opened_contents_sealed": "Box opened, contents sealed",
+    "opened": "Opened",
+    "empty": "Empty",
+    "n/a": "N/A"
+  },
+  "status": { "owned": "Owned", "sold": "Sold", "consumed": "Consumed", "lost": "Lost" },
+  "runStatus": {
+    "running": "Running",
+    "ok": "OK",
+    "partial": "Partial",
+    "failed": "Failed",
+    "blocked": "Blocked"
+  }
+}

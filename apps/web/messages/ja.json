@@ -1,0 +1,65 @@
+{
+  "app": { "name": "Tora", "description": "コレクション管理" },
+  "nav": { "portfolio": "ポートフォリオ", "add": "登録", "settings": "設定" },
+  "login": {
+    "title": "ログイン",
+    "password": "パスワード",
+    "submit": "ログイン",
+    "invalid": "パスワードが違います。",
+    "locked": "試行回数が多すぎます。数分後にもう一度お試しください。",
+    "notConfigured": "ログインが未設定です。AUTH_PASSWORD_HASH と AUTH_SECRET を設定してください（README参照）。"
+  },
+  "portfolio": {
+    "title": "ポートフォリオ",
+    "empty": "まだ登録がありません。",
+    "count": "{count}件",
+    "qty": "数量 {qty}",
+    "cost": "取得額",
+    "pulledFrom": "{name} から開封",
+    "acquired": "取得日 {date}"
+  },
+  "add": { "title": "登録", "comingSoon": "登録フローは次のステップで追加されます。" },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "collectors": "価格収集",
+    "collectorsInfo": "価格収集は自宅PC上で実行され（pnpm collect）、データベースに書き込みます。非公開のコレクターは任意のサブモジュールです。",
+    "noRuns": "収集の実行履歴はまだありません。",
+    "account": "アカウント",
+    "logout": "ログアウト"
+  },
+  "productType": {
+    "card_single": "カード",
+    "sealed_tcg": "未開封BOX・パック",
+    "game_ce": "限定版",
+    "game": "ゲーム",
+    "amiibo": "amiibo",
+    "controller": "コントローラー",
+    "figure": "フィギュア",
+    "other": "その他"
+  },
+  "condition": {
+    "new_unused": "新品、未使用",
+    "like_new": "未使用に近い",
+    "no_noticeable_damage": "目立った傷や汚れなし",
+    "minor_damage": "やや傷や汚れあり",
+    "damaged": "傷や汚れあり",
+    "poor": "全体的に状態が悪い"
+  },
+  "packaging": {
+    "sealed_shrink": "未開封（シュリンク付き）",
+    "sealed_no_shrink": "未開封（シュリンクなし）",
+    "box_opened_contents_sealed": "BOX開封済み・パック未開封",
+    "opened": "開封済み",
+    "empty": "空箱",
+    "n/a": "該当なし"
+  },
+  "status": { "owned": "所有中", "sold": "売却済み", "consumed": "開封・消費済み", "lost": "紛失" },
+  "runStatus": {
+    "running": "実行中",
+    "ok": "正常",
+    "partial": "一部失敗",
+    "failed": "失敗",
+    "blocked": "ブロック"
+  }
+}

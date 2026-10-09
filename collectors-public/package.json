@@ -1,0 +1,16 @@
+{
+  "name": "@tora/collectors-public",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@tora/collector-sdk": "workspace:*"
+  }
+}
