@@ -42,10 +42,18 @@
     "qty": "Qty {qty}",
     "pulledFrom": "Pulled from {name}",
     "spent": "Total spent",
-    "items": "Items owned",
-    "itemsValue": "{units} ({lots} entries)",
+    "itemsValue": "{units} items · {lots} entries",
     "marketValue": "Market value",
-    "marketValueSoon": "Comes once price tracking starts."
+    "valuedOf": "{valued} of {total} entries valued",
+    "unrealized": "Unrealized P/L",
+    "vsCost": "{pct}% vs cost {cost}",
+    "overTime": "Value over time",
+    "chartValue": "Market value",
+    "chartCost": "Cost",
+    "chartLabel": "Market value and cost of valued holdings per day",
+    "breakdown": "By kind",
+    "breakdownHint": "Bars: market value. Right: value / cost.",
+    "cost": "cost {cost}"
   },
   "inventory": {
     "search": "Search name, set, card number",
@@ -342,5 +350,55 @@
     "noMatches": "Nothing to confirm.",
     "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm",
     "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}}), e.g. the no-shrink box"
+  },
+  "valuation": {
+    "title": "Market value",
+    "perUnit": "{amount} each × {qty}",
+    "pl": "vs cost",
+    "bucket": "Valued as",
+    "noDataHint": "No market data for this condition yet. Link a price source, wait for trades, or set a manual price.",
+    "buylist": "Instant sell floor (buylist): {price} at {source}, {date}",
+    "manualTitle": "Manual price",
+    "manualActive": "A manual price is set and overrides market data.",
+    "clearManual": "Remove manual price",
+    "setManual": "Set",
+    "manualPrice": "Price per unit",
+    "manualNote": "Note (optional)",
+    "manualHint": "Per unit, for this condition only. Always wins over market data.",
+    "manual": "Manual price",
+    "retail": "Retail price (no trades)",
+    "noData": "No market data",
+    "samples": "{count, plural, one {# sale} other {# sales}} / {days}d",
+    "age": "newest {days}d ago",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "confidenceHint": {
+      "high": "5+ sales in the last 30 days",
+      "medium": "3+ sales in the last 180 days",
+      "low": "Few or old sales, or retail price"
+    },
+    "short": {
+      "median": "Market",
+      "manual": "Manual",
+      "retail": "Retail",
+      "none": "No data"
+    },
+    "history": "Price history",
+    "noHistory": "No trades collected yet.",
+    "yours": "yours",
+    "daysWithTrades": "{count, plural, one {# day} other {# days}} with trades",
+    "chartLabel": "Daily median sale price per source for the selected condition"
+  },
+  "box": {
+    "paid": "Paid",
+    "asReceived": "Box as received",
+    "pulls": "Pulls value",
+    "pullsValued": "{valued} of {total} valued",
+    "net": "Net (pulls − paid)",
+    "asReceivedHint": "No market data for the box in the state you received it. Set its price here (per box) to value it.",
+    "manualTitle": "Price of the box as received"
   }
 }

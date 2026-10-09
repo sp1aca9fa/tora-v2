@@ -10,12 +10,14 @@
     "typecheck": "next typegen && tsc -p ."
   },
   "dependencies": {
+    "@tora/auth": "workspace:*",
     "@tora/core": "workspace:*",
     "@tora/db": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
     "jose": "^6.2.12",
+    "lightweight-charts": "5.2.1",
     "lucide-react": "1.48.0",
     "next": "16.4.0",
     "next-intl": "^4.14.9",
@@ -24,8 +26,7 @@
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.7.0",
-    "zod": "^4.6.5",
-    "@tora/auth": "workspace:*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

@@ -140,6 +140,7 @@ pnpm collect --source snkrdunk       # one collector
 pnpm collect --match-only            # only look for listings of unlinked items
 pnpm collect --collect-only          # only fetch trades for linked listings
 pnpm collect --product <product-id>  # one product
+pnpm valuate                         # only refresh valuation snapshots (collect does this too)
 ```
 
 ### How items get prices (SNKRDUNK)

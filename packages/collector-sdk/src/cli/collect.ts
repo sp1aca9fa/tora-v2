@@ -1,7 +1,7 @@
 // `pnpm collect [--source x] [--product id] [--match-only] [--collect-only]`
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
-import { createDb } from '@tora/db';
+import { createDb, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { parseArgs } from 'node:util';
 import { loadCollectors } from '../registry';
@@ -26,14 +26,10 @@ const config = dbConfigFromEnv();
 const { collectors, missing } = await loadCollectors();
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const selected = collectors.filter((c) => !values.source || c.source === values.source);
-if (selected.length === 0) {
-  console.log('No collectors registered. Nothing to do.');
-  process.exit(0);
-}
-
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 let exitCode = 0;
+if (selected.length === 0) console.log('No collectors registered.');
 for (const collector of selected) {
   const s = await runCollector(db, collector, {
     productId: values.product,
@@ -45,4 +41,7 @@ for (const collector of selected) {
   );
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
 }
+// Valuation snapshots for the portfolio chart (requirements S5: runs after collectors).
+const snap = await runSnapshots(db);
+console.log(`snapshots: ${snap.days} day(s), ${snap.rows} rows`);
 process.exit(exitCode);

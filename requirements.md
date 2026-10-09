@@ -17,7 +17,7 @@
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
 | S4 | Mercari sold collector | todo |
-| S5 | Valuation engine, Portfolio, Item detail, charts | todo |
+| S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 
@@ -59,6 +59,10 @@
 - 2026-10-10: Once an item has an active listing, its remaining suggestions and the paste-link box collapse under "Add another listing" (kept for the no-shrink variant) and it no longer counts as "to confirm".
 - 2026-10-10: Collection is event-triggered (logon + daily catch-up) with a once-per-day guard instead of a fixed 04:00 cron, since the PC is often off.
 - 2026-10-10: A confirmed (or pasted) listing is the source of truth for product details: on the next run its title rewrites the product once (cards: name, rarity, set, set code, number; sealed: name, set). Variant listings (【シュリンクなし】) do not rewrite; catalog products keep their catalog set; later user edits are kept (`product_sources.details_synced_at`).
+- 2026-10-10: S5 valuation: per-source fallback picks the first source with any sold sample in the 180-day window (in order SNKRDUNK, Mercari, 駿河屋, others), then retail price. Confidence counts samples of that source. Manual prices are per user and per product + bucket. Unrealized P/L compares value with the cost of valued holdings only (unvalued ones are listed as "N of M valued").
+- 2026-10-10: Snapshots run at the end of `pnpm collect` (also `pnpm valuate`): today, the last 7 days (trades arrive late) and any missing day of the last 90, so the chart has history immediately. A holding counts on a day from its acquisition until its sold / consumed event; it is valued with its current condition.
+- 2026-10-10: An opened (consumed) box has no current value card; its value "as received" (bucket from the acquired event) is in the box view, with its own manual price since such boxes rarely have market data.
+- 2026-10-10: Charts use the validated reference palette slots 1-3 (light and dark steps); every chart has a legend with values on hover, and the item page keeps a table of medians per source + bucket as the table view.
 - 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
 
 ---

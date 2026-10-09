@@ -186,6 +186,9 @@ export async function PriceSources({
                       className={cn(s.bucket === bucket && 'font-medium')}
                     >
                       <td className="py-1">
+                        <span className="mr-1.5 text-xs text-muted-foreground">
+                          {sourceLabel(s.source)}
+                        </span>
                         <code className="text-xs">{s.bucket ?? t('sources.unmapped')}</code>
                         {s.bucket === bucket && (
                           <span className="ml-1 text-xs text-muted-foreground">

@@ -19,7 +19,8 @@
     "seed": "tsx src/scripts/seed.ts",
     "studio": "drizzle-kit studio",
     "user": "tsx src/scripts/user.ts",
-    "catalog:sync": "tsx src/scripts/catalog-sync.ts"
+    "catalog:sync": "tsx src/scripts/catalog-sync.ts",
+    "valuate": "tsx src/scripts/valuate.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

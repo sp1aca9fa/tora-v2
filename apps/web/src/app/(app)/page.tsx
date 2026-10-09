@@ -7,13 +7,20 @@ import {
   kindsFor,
   productClass,
 } from '@tora/core';
-import { listInventory, ownedTotals, pendingMatchesForUser } from '@tora/db';
+import {
+  listInventory,
+  pendingMatchesForUser,
+  portfolioSeries,
+  portfolioValuation,
+} from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
+import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { Button } from '@/components/ui/button';
+import { ConfidenceBadge } from '@/components/valuation-meta';
 import { authed } from '@/lib/auth/guard';
 import { franchiseLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
@@ -45,12 +52,25 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, totals, matches, t] = await Promise.all([
+  const [rows, portfolio, series, matches, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
-    ownedTotals(db, user.id),
+    portfolioValuation(db, user.id),
+    portfolioSeries(db, user.id, 365),
     pendingMatchesForUser(db, user.id),
     getTranslations(),
   ]);
+  const { totals } = portfolio;
+  const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
+  const pl = totals.unrealizedJpy;
+  const chartPoints = series.map((s) => ({
+    date: s.date,
+    valueJpy: Number(s.valueJpy),
+    costJpy: Number(s.valuedCostJpy),
+  }));
+  const maxBreakdown = Math.max(
+    1,
+    ...portfolio.breakdown.map((b) => Math.max(b.valueJpy, b.costJpy)),
+  );
   const filtered = Boolean(category || q || status !== 'owned');
 
   return (
@@ -66,20 +86,72 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
-          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
-        </div>
-        <div className="rounded-xl border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">{t('portfolio.items')}</p>
-          <p className="text-xl font-semibold tabular-nums">
-            {t('portfolio.itemsValue', { units: totals.units, lots: totals.lots })}
+          <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
+          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.valueJpy)}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('portfolio.valuedOf', { valued: totals.valued, total: totals.total })}
           </p>
         </div>
-        <div className="col-span-2 rounded-xl border border-dashed px-4 py-3 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
-          <p className="text-sm text-muted-foreground">{t('portfolio.marketValueSoon')}</p>
+        <div className="rounded-xl border bg-card px-4 py-3">
+          <p className="text-xs text-muted-foreground">{t('portfolio.unrealized')}</p>
+          <p className="text-xl font-semibold tabular-nums">
+            {pl > 0 ? '▲ +' : pl < 0 ? '▼ ' : ''}
+            {formatJpy(pl)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {totals.valuedCostJpy > 0
+              ? t('portfolio.vsCost', {
+                  pct: Math.round((pl / totals.valuedCostJpy) * 1000) / 10,
+                  cost: formatJpy(totals.valuedCostJpy),
+                })
+              : '-'}
+          </p>
+        </div>
+        <div className="col-span-2 rounded-xl border bg-card px-4 py-3 sm:col-span-1">
+          <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
+          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('portfolio.itemsValue', { units: totals.units, lots: totals.total })}
+          </p>
         </div>
       </section>
+
+      {chartPoints.length >= 2 && (
+        <section className="space-y-2 rounded-xl border bg-card px-4 py-3">
+          <h2 className="text-sm font-medium">{t('portfolio.overTime')}</h2>
+          <PortfolioChart points={chartPoints} />
+        </section>
+      )}
+
+      {portfolio.breakdown.length > 1 && (
+        <details className="rounded-xl border bg-card px-4 py-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            {t('portfolio.breakdown')}
+          </summary>
+          <ul className="mt-3 space-y-2 text-sm">
+            {portfolio.breakdown.map((b) => (
+              <li key={`${b.category}:${b.kind}`} className="space-y-1">
+                <div className="flex justify-between gap-3">
+                  <span>
+                    {t(`kind.${b.kind}`)} <span className="text-muted-foreground">× {b.count}</span>
+                  </span>
+                  <span className="tabular-nums">
+                    {formatJpy(b.valueJpy)}{' '}
+                    <span className="text-xs text-muted-foreground">/ {formatJpy(b.costJpy)}</span>
+                  </span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-muted" aria-hidden>
+                  <div
+                    className="h-1.5 rounded-full bg-[#2a78d6] dark:bg-[#3987e5]"
+                    style={{ width: `${(b.valueJpy / maxBreakdown) * 100}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">{t('portfolio.breakdownHint')}</p>
+        </details>
+      )}
 
       {matches.length > 0 && (
         <Link
@@ -109,6 +181,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
           {rows.map(({ holding, product, parentProduct }) => {
+            const valuation = valuations.get(holding.id);
             const details = [
               t(`kind.${product.kind}`),
               franchiseLabel(product.franchise, t),
@@ -137,12 +210,35 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
                     )}
                   </div>
                   <div className="shrink-0 text-right text-sm">
-                    <p className="tabular-nums">{formatJpy(holding.costTotalJpy)}</p>
-                    <p className="text-muted-foreground">
-                      {holding.status !== 'owned'
-                        ? t(`status.${holding.status}`)
-                        : t('portfolio.qty', { qty: holding.quantity })}
-                    </p>
+                    {valuation?.valueJpy != null ? (
+                      <>
+                        <p className="font-medium tabular-nums">{formatJpy(valuation.valueJpy)}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {t('portfolio.cost', { cost: formatJpy(holding.costTotalJpy) })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {valuation.method === 'median' ? (
+                            <ConfidenceBadge confidence={valuation.confidence} />
+                          ) : (
+                            t(`valuation.short.${valuation.method}`)
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="tabular-nums">{formatJpy(holding.costTotalJpy)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {holding.status !== 'owned'
+                            ? t(`status.${holding.status}`)
+                            : t('valuation.short.none')}
+                        </p>
+                      </>
+                    )}
+                    {holding.quantity > 1 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('portfolio.qty', { qty: holding.quantity })}
+                      </p>
+                    )}
                   </div>
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                 </Link>

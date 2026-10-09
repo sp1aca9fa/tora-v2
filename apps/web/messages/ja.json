@@ -42,10 +42,18 @@
     "qty": "数量 {qty}",
     "pulledFrom": "{name} から開封",
     "spent": "合計取得額",
-    "items": "所有数",
-    "itemsValue": "{units}点（{lots}件）",
+    "itemsValue": "{units}点 · {lots}件",
     "marketValue": "時価",
-    "marketValueSoon": "価格の収集が始まると表示されます。"
+    "valuedOf": "{total}件中{valued}件を評価",
+    "unrealized": "含み損益",
+    "vsCost": "取得額 {cost} 比 {pct}%",
+    "overTime": "評価額の推移",
+    "chartValue": "時価",
+    "chartCost": "取得額",
+    "chartLabel": "評価済み商品の日別の時価と取得額",
+    "breakdown": "種類別",
+    "breakdownHint": "バー: 時価。右: 時価 / 取得額。",
+    "cost": "取得 {cost}"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
@@ -342,5 +350,55 @@
     "noMatches": "確認待ちはありません。",
     "banner": "{count}件の商品に確認待ちの価格ソースがあります",
     "addAnother": "別のリスティングを追加（{count, plural, =0 {リンクを貼り付け} other {候補#件}}）例: シュリンクなしBOX"
+  },
+  "valuation": {
+    "title": "時価",
+    "perUnit": "1点 {amount} × {qty}",
+    "pl": "取得額比",
+    "bucket": "評価区分",
+    "noDataHint": "この状態の相場データはまだありません。価格ソースをリンクして取引を待つか、手動価格を設定してください。",
+    "buylist": "即売り下限（買取）: {source} {price}（{date}）",
+    "manualTitle": "手動価格",
+    "manualActive": "手動価格が設定されており、相場データより優先されます。",
+    "clearManual": "手動価格を削除",
+    "setManual": "設定",
+    "manualPrice": "1点あたりの価格",
+    "manualNote": "メモ（任意）",
+    "manualHint": "1点あたり、この状態のみ。常に相場データより優先されます。",
+    "manual": "手動価格",
+    "retail": "定価（取引なし）",
+    "noData": "相場データなし",
+    "samples": "{days}日間で{count}件",
+    "age": "最新 {days}日前",
+    "confidence": {
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "confidenceHint": {
+      "high": "直近30日に5件以上",
+      "medium": "直近180日に3件以上",
+      "low": "取引が少ない・古い、または定価"
+    },
+    "short": {
+      "median": "相場",
+      "manual": "手動",
+      "retail": "定価",
+      "none": "データなし"
+    },
+    "history": "価格推移",
+    "noHistory": "まだ取引が収集されていません。",
+    "yours": "あなたの区分",
+    "daysWithTrades": "取引のあった日: {count}日",
+    "chartLabel": "選択した状態の、ソース別の日別中央値"
+  },
+  "box": {
+    "paid": "購入額",
+    "asReceived": "受取時のBOX",
+    "pulls": "開封結果の時価",
+    "pullsValued": "{total}件中{valued}件を評価",
+    "net": "損益（開封結果 − 購入額）",
+    "asReceivedHint": "受け取った状態のBOXの相場データがありません。ここで価格（1BOXあたり）を設定すると評価できます。",
+    "manualTitle": "受取時のBOXの価格"
   }
 }

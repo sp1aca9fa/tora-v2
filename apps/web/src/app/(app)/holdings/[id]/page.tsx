@@ -1,5 +1,5 @@
 import { deriveBucket, holdingFieldsFor, pendingGrading, productClass, unitCost } from '@tora/core';
-import { canEditProduct, getHoldingDetail } from '@tora/db';
+import { canEditProduct, getHoldingDetail, priceHistory } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -10,7 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
+import { PriceChart } from '@/components/charts/price-chart';
+import { sourceLabel } from '@/lib/product-display';
+import { BoxCard } from './box-card';
 import { EventList } from './event-list';
+import { ValuationCard } from './valuation-card';
 import { PriceSources } from './price-sources';
 
 type Params = { params: Promise<{ id: string }> };
@@ -26,8 +30,12 @@ export default async function HoldingPage({ params }: Params) {
   const { db, user } = await authed();
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
-  const { holding, product, events, children, parent } = detail;
-  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+  const { holding, product, events, parent } = detail;
+  const [t, format, history] = await Promise.all([
+    getTranslations(),
+    getFormatter(),
+    priceHistory(db, product.id, 365),
+  ]);
 
   const owned = holding.status === 'owned';
   const cls = productClass(product);
@@ -158,6 +166,17 @@ export default async function HoldingPage({ params }: Params) {
         </CardContent>
       </Card>
 
+      {/* Current value only for what is still owned; an opened box is valued "as received" below. */}
+      {holding.status === 'owned' && (
+        <ValuationCard
+          db={db}
+          userId={user.id}
+          holding={holding}
+          product={product}
+          bucket={bucket}
+        />
+      )}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {actions.map((a) => (
           <Button key={a.key} asChild variant="outline" size="sm">
@@ -169,45 +188,20 @@ export default async function HoldingPage({ params }: Params) {
         </Button>
       </div>
 
-      {isBox && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t('holding.pulls', { count: children.length })}</CardTitle>
-            <Button asChild size="sm">
-              <Link href={`/holdings/${holding.id}/pulls`}>{t('holding.logPulls')}</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {children.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('holding.noPulls')}</p>
-            ) : (
-              <ul className="divide-y text-sm">
-                {children.map((c) => (
-                  <li key={c.holding.id}>
-                    <Link
-                      href={`/holdings/${c.holding.id}`}
-                      className="flex justify-between gap-3 py-2 hover:underline"
-                    >
-                      <span>
-                        {c.product.name}
-                        {c.product.rarity && (
-                          <span className="text-muted-foreground"> {c.product.rarity}</span>
-                        )}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {c.holding.grading === 'graded'
-                          ? `${c.holding.grader} ${c.holding.grade}`
-                          : `Raw ${c.holding.rawGrade ?? '-'}`}{' '}
-                        × {c.holding.quantity}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('valuation.history')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PriceChart
+            points={history}
+            defaultBucket={bucket}
+            sourceLabels={Object.fromEntries(history.map((p) => [p.source, sourceLabel(p.source)]))}
+          />
+        </CardContent>
+      </Card>
 
       <PriceSources db={db} product={product} holdingId={holding.id} bucket={bucket} />
 
