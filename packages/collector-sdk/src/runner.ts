@@ -3,7 +3,6 @@ import {
   type Db,
   activeSources,
   heldBuckets,
-  setProductImageUrlIfMissing,
   finishRun,
   insertObservations,
   productsToMatch,
@@ -98,15 +97,13 @@ export async function runCollector(
             ctx,
             await heldBuckets(db, product.id),
           );
-          if (result.imageUrl && !product.imageUrl) {
-            await setProductImageUrlIfMissing(db, product.id, result.imageUrl);
-          }
           await updateSourceProgress(db, link.id, {
             state: result.state,
             success: true,
             title: result.title,
             url: result.url,
             recentSales: result.recentSales,
+            imageUrl: result.imageUrl,
           });
           const title = result.title ?? link.title;
           if (!link.detailsSyncedAt && title && collector.productDetails) {

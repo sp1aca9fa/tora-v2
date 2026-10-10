@@ -27,7 +27,7 @@ export interface CollectResult {
   url?: string | null;
   /** Newest trades as seen now (may have approximate times); shown as "last sale". */
   recentSales?: RecentSale[];
-  /** The listing's picture; becomes the product's image when it has none. */
+  /** The listing's picture (stored on the listing; the product shows its first listing's). */
   imageUrl?: string | null;
 }
 

@@ -53,6 +53,19 @@ export async function PriceSources({
           <ul className="space-y-2">
             {candidates.map((c) => (
               <li key={c.id} className="flex items-center gap-3 rounded-md border p-2">
+                {/* The listing's own picture, loaded from the site: it is how near-identical
+                    listings are told apart. The only external image in the app; the product's
+                    stored thumbnail comes from the listing confirmed here. */}
+                {c.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.imageUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    className="size-14 shrink-0 rounded object-contain"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <a
                     href={c.url ?? '#'}

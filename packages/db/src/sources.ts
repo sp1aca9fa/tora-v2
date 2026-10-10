@@ -95,10 +95,14 @@ export async function linkSource(
   return db.transaction(async (tx) => {
     const [row] = await tx
       .insert(productSources)
-      .values({ productId, ...link, active: true })
+      .values({ productId, ...link, imageUrl: imageUrl ?? null, active: true })
       .onConflictDoUpdate({
         target: [productSources.productId, productSources.source, productSources.externalId],
-        set: { active: true, ...(link.title ? { title: link.title } : {}) },
+        set: {
+          active: true,
+          ...(link.title ? { title: link.title } : {}),
+          ...(imageUrl ? { imageUrl } : {}),
+        },
       })
       .returning();
     const pending = await tx
@@ -122,12 +126,6 @@ export async function linkSource(
           drop.map((c) => c.id),
         ),
       );
-    }
-    if (imageUrl) {
-      await tx
-        .update(products)
-        .set({ imageUrl })
-        .where(and(eq(products.id, productId), isNull(products.imageUrl)));
     }
     return row!;
   });
@@ -440,6 +438,7 @@ export async function updateSourceProgress(
     title?: string | null;
     url?: string | null;
     recentSales?: RecentSale[];
+    imageUrl?: string | null;
   },
 ): Promise<void> {
   await db
@@ -450,6 +449,7 @@ export async function updateSourceProgress(
       ...(patch.title ? { title: patch.title } : {}),
       ...(patch.url ? { url: patch.url } : {}),
       ...(patch.recentSales ? { recentSales: patch.recentSales } : {}),
+      ...(patch.imageUrl ? { imageUrl: patch.imageUrl } : {}),
     })
     .where(eq(productSources.id, sourceId));
 }

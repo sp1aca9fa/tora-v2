@@ -1,4 +1,13 @@
-import { type Db, createDb, createProduct, createUser, getProductImage, schema } from '@tora/db';
+import {
+  type Db,
+  createDb,
+  createProduct,
+  createUser,
+  getProductImage,
+  linkSource,
+  schema,
+  unlinkSource,
+} from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -55,4 +64,39 @@ it('stores a WebP thumbnail once per image URL', async () => {
     .where(eq(schema.products.id, product.id));
   expect(await downloadProductImages(db, http())).toEqual({ saved: 1, failed: 0 });
   expect(requested).toEqual(['https://cdn.example/a.png', 'https://cdn.example/b.png']);
+});
+
+it('takes the picture from the linked listing, and follows a relink', async () => {
+  const png = await sharp({ create: { width: 50, height: 50, channels: 3, background: '#000' } })
+    .png()
+    .toBuffer();
+  const fetchImpl = (async () =>
+    new Response(png, { headers: { 'content-type': 'image/png' } })) as unknown as typeof fetch;
+  const http = () =>
+    new PoliteHttp({ minDelayMs: 0, maxDelayMs: 0, sleep: async () => {}, fetchImpl });
+  // A product image URL is only the fallback; the confirmed listing's picture wins.
+  const product = await createProduct(db, uid, {
+    category: 'tcg',
+    kind: 'single',
+    name: 'ピカチュウ',
+    imageUrl: 'https://cdn.example/own.png',
+  });
+  const wrong = await linkSource(
+    db,
+    product.id,
+    { source: 'snkrdunk', externalId: '1' },
+    'https://cdn.example/wrong.png',
+  );
+  await downloadProductImages(db, http());
+  expect((await getProductImage(db, product.id))?.sourceUrl).toBe('https://cdn.example/wrong.png');
+
+  await unlinkSource(db, wrong.id);
+  await linkSource(
+    db,
+    product.id,
+    { source: 'snkrdunk', externalId: '2' },
+    'https://cdn.example/right.png',
+  );
+  expect(await downloadProductImages(db, http())).toEqual({ saved: 1, failed: 0 });
+  expect((await getProductImage(db, product.id))?.sourceUrl).toBe('https://cdn.example/right.png');
 });

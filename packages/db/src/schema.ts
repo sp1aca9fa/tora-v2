@@ -199,6 +199,8 @@ export const productSources = sqliteTable(
     query: text('query', { mode: 'json' }).$type<SourceQuery>(),
     title: text('title'),
     url: text('url'),
+    /** The listing's picture; the product's stored thumbnail comes from its first active listing. */
+    imageUrl: text('image_url'),
     /** Collector progress (e.g. history backfill cursor). Opaque to everything but the collector. */
     state: text('state', { mode: 'json' }).$type<unknown>(),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),

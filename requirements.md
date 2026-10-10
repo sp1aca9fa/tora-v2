@@ -363,10 +363,11 @@ Added at the user's request (2026-10-10).
 Build:
 - The portfolio is a summary, not a transaction list: one row per product owned, all of its lots combined (units, total spent, market value, P/L), with the totals at the top as now. Tapping a row opens the product page: image, details, valuation and charts, and every lot registered (cost, date, where from, order ID, condition / grade, status), each linking to the lot page (events, actions). Sold / consumed lots and event history live on the product and lot pages, not on the portfolio.
 - Product images, stored once as small thumbnails so the app never loads images from external sites:
-  - The home PC (collector run) downloads the image of a product's linked listing once, resizes it to about 400 px WebP (roughly 20-40 KB) and stores it in a `product_images` table (product, bytes, content type, source URL, fetched at). Products that already have an image URL get theirs on the next collect.
+  - The home PC (collector run) downloads the picture of a product's linked listing once, resizes it to about 400 px WebP (roughly 20-40 KB) and stores it in a `product_images` table (product, bytes, content type, source URL, fetched at). Products that already have an image URL get theirs on the next collect.
   - The web serves them from its own image route (`/img/products/{id}?v=…`, behind sign-in) with long-lived private cache headers, so each browser fetches an image once. Nothing on Vercel fetches external images.
   - The picture comes from the listing's main product image (SNKRDUNK `primaryMedia`, not the generated share card), read from the product page the collector fetches once per listing.
-  - Match suggestions no longer show the listing's picture (it would be loaded from the site); the title links to the listing instead.
+  - Each listing keeps its own picture (`product_sources.image_url`: the suggestion's picture when confirmed, else the listing page's main image); the product's thumbnail is its first active listing's picture, else the product's own image URL. Relinking a product to another listing therefore replaces the thumbnail on the next collect.
+  - Exception to "no external images": match suggestions show the listing's picture straight from the site, because that is how near-identical listings are told apart.
   - Size: images are per product, not per sale, so a few MB per hundred products, far inside the Turso free tier. If that ever changes, the bytes move to object storage (e.g. Vercel Blob or Cloudflare R2) without UI changes.
   - Products without a stored image show a placeholder; the user can paste or upload one later (optional).
 
