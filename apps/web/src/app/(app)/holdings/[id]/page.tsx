@@ -1,21 +1,18 @@
 import { deriveBucket, holdingFieldsFor, pendingGrading, productClass, unitCost } from '@tora/core';
-import { canEditProduct, getHoldingDetail, priceHistory } from '@tora/db';
+import { canEditProduct, getHoldingDetail } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
-import { PriceChart } from '@/components/charts/price-chart';
-import { sourceLabel } from '@/lib/product-display';
 import { BoxCard } from './box-card';
 import { EventList } from './event-list';
 import { ValuationCard } from './valuation-card';
-import { PriceSources } from './price-sources';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -31,11 +28,7 @@ export default async function HoldingPage({ params }: Params) {
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events, parent } = detail;
-  const [t, format, history] = await Promise.all([
-    getTranslations(),
-    getFormatter(),
-    priceHistory(db, product.id, 365),
-  ]);
+  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
 
   const owned = holding.status === 'owned';
   const cls = productClass(product);
@@ -111,6 +104,10 @@ export default async function HoldingPage({ params }: Params) {
         <p className="text-sm text-muted-foreground">
           <Link href="/" className="hover:underline">
             {t('nav.portfolio')}
+          </Link>
+          {' › '}
+          <Link href={`/products/${product.id}`} className="hover:underline">
+            {t('holding.allLots')}
           </Link>
         </p>
         <h1 className="text-2xl leading-tight font-semibold tracking-tight">{product.name}</h1>
@@ -190,20 +187,13 @@ export default async function HoldingPage({ params }: Params) {
 
       {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('valuation.history')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PriceChart
-            points={history}
-            defaultBucket={bucket}
-            sourceLabels={Object.fromEntries(history.map((p) => [p.source, sourceLabel(p.source)]))}
-          />
-        </CardContent>
-      </Card>
-
-      <PriceSources db={db} product={product} holdingId={holding.id} bucket={bucket} />
+      <Link
+        href={`/products/${product.id}#sources`}
+        className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
+      >
+        <span>{t('holding.marketData')}</span>
+        <ChevronRight className="size-4 text-muted-foreground" />
+      </Link>
 
       <section className="space-y-3">
         <h2 className="font-semibold">{t('holding.history')}</h2>

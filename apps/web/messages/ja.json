@@ -57,7 +57,10 @@
     "last": "直近 {price}",
     "chartAtCost": "うち {amount} は取得額で計上（相場なし）",
     "chartEstimated": "うち {amount} は推定数量に基づく",
-    "chartEstimatedNote": "{date}までの評価額の一部は、数量を推定した取引に基づいています（当時は数量が公開されていませんでした）。"
+    "chartEstimatedNote": "{date}までの評価額の一部は、数量を推定した取引に基づいています（当時は数量が公開されていませんでした）。",
+    "lotsUnits": "{lots}件・{units}点",
+    "spentShort": "取得額 {amount}",
+    "lotsValued": "{total}件中{valued}件を評価"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
@@ -123,7 +126,9 @@
       "condition": "状態変更",
       "note": "メモを追加",
       "delete": "登録を削除"
-    }
+    },
+    "allLots": "この商品の全取引",
+    "marketData": "相場・チャート・価格ソース"
   },
   "actions": {
     "partialHint": "{total}点所有。少ない数を選ぶと、先に別の登録に分割されます。",
@@ -438,5 +443,11 @@
     "confirmAll": "グレードなしで{count}枚を確定",
     "done": "{count}件を確定しました",
     "banner": "確認待ちのインポート購入が{count}件あります"
+  },
+  "product": {
+    "unitsOwned": "所有数",
+    "lots": "登録した取引",
+    "toReview": "確認待ち",
+    "cost": "取得額"
   }
 }

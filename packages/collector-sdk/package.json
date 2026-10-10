@@ -15,7 +15,8 @@
   "dependencies": {
     "@tora/core": "workspace:*",
     "@tora/db": "workspace:*",
-    "mailparser": "3.9.28"
+    "mailparser": "3.9.28",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@types/mailparser": "^3.9.0",

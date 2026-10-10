@@ -570,3 +570,59 @@ export async function priceHistory(
     }))
     .sort((a, b) => a.day.localeCompare(b.day));
 }
+
+export interface ProductSummary<R extends { holding: Holding; product: Product }> {
+  product: Product;
+  /** The product's lots in the list, newest first. */
+  lots: R[];
+  units: number;
+  spentJpy: number;
+  /** Market value of the lots that have one. */
+  valueJpy: number;
+  valuedLots: number;
+  /** Cost of the valued lots (the base for P/L). */
+  valuedCostJpy: number;
+  /** Value minus cost of the valued lots; null when none is valued. */
+  unrealizedJpy: number | null;
+}
+
+/** Portfolio rows combined per product (requirements S5c), highest value (else cost) first. */
+export function summarizeByProduct<R extends { holding: Holding; product: Product }>(
+  rows: R[],
+  valuations: Map<string, Pick<HoldingValuation, 'valueJpy'>>,
+): ProductSummary<R>[] {
+  const byProduct = new Map<string, ProductSummary<R>>();
+  for (const row of rows) {
+    const { holding, product } = row;
+    let s = byProduct.get(product.id);
+    if (!s) {
+      s = {
+        product,
+        lots: [],
+        units: 0,
+        spentJpy: 0,
+        valueJpy: 0,
+        valuedLots: 0,
+        valuedCostJpy: 0,
+        unrealizedJpy: null,
+      };
+      byProduct.set(product.id, s);
+    }
+    s.lots.push(row);
+    s.units += holding.quantity;
+    s.spentJpy += holding.costTotalJpy;
+    const value = valuations.get(holding.id)?.valueJpy;
+    if (value != null) {
+      s.valueJpy += value;
+      s.valuedLots++;
+      s.valuedCostJpy += holding.costTotalJpy;
+    }
+  }
+  const list = [...byProduct.values()];
+  for (const s of list) s.unrealizedJpy = s.valuedLots ? s.valueJpy - s.valuedCostJpy : null;
+  return list.sort(
+    (a, b) =>
+      (b.valuedLots ? b.valueJpy : b.spentJpy) - (a.valuedLots ? a.valueJpy : a.spentJpy) ||
+      a.product.name.localeCompare(b.product.name),
+  );
+}

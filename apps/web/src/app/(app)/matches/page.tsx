@@ -23,10 +23,10 @@ export default async function MatchesPage() {
         <p className="text-sm text-muted-foreground">{t('sources.noMatches')}</p>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {rows.map(({ product, holdingId }) => (
+          {rows.map(({ product }) => (
             <li key={product.id}>
               <Link
-                href={`/holdings/${holdingId}#sources`}
+                href={`/products/${product.id}#sources`}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50"
               >
                 <div className="min-w-0 flex-1">

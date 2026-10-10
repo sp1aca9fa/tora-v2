@@ -27,6 +27,8 @@ export interface CollectResult {
   url?: string | null;
   /** Newest trades as seen now (may have approximate times); shown as "last sale". */
   recentSales?: RecentSale[];
+  /** The listing's picture; becomes the product's image when it has none. */
+  imageUrl?: string | null;
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

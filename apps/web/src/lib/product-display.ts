@@ -1,5 +1,5 @@
-import { TCG_FRANCHISES } from '@tora/core';
-import type { Product } from '@tora/db';
+import { TCG_FRANCHISES, productClass } from '@tora/core';
+import type { Holding, Product } from '@tora/db';
 
 type T = (key: string) => string;
 
@@ -43,4 +43,25 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? source;
+}
+
+/** A lot's condition in a few words: "PSA 10", "Raw A", "Shrink-wrapped", "No grade". */
+export function lotConditionLabel(
+  holding: Pick<
+    Holding,
+    'grading' | 'grader' | 'grade' | 'rawGrade' | 'packagingState' | 'condition'
+  >,
+  product: Pick<Product, 'category' | 'kind'>,
+  t: T,
+): string | null {
+  const cls = productClass(product);
+  if (cls === 'card') {
+    if (holding.grading === 'graded') {
+      return `${holding.grader === 'other' ? t('common.other') : holding.grader} ${holding.grade}`;
+    }
+    return holding.rawGrade ? `Raw ${holding.rawGrade}` : t('grades.noGrade');
+  }
+  if (cls === 'sealed')
+    return holding.packagingState ? t(`packaging.${holding.packagingState}`) : null;
+  return holding.condition ? t(`condition.${holding.condition}`) : null;
 }

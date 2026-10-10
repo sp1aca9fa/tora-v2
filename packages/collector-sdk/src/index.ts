@@ -5,4 +5,5 @@ export * from './sweep';
 export * from './match';
 export * from './runner';
 export * from './mbox';
+export * from './images';
 export * from './purchases';

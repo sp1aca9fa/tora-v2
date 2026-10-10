@@ -5,15 +5,16 @@ import {
   type HoldingStatus,
   type ProductKind,
   kindsFor,
-  productClass,
 } from '@tora/core';
 import {
   cardGradeCounts,
+  imageVersions,
   importReviewCount,
   listInventory,
   pendingMatchesForUser,
   portfolioSeries,
   portfolioValuation,
+  summarizeByProduct,
 } from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -21,11 +22,10 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 import { PortfolioChart } from '@/components/charts/portfolio-chart';
+import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
-import { Trend } from '@/components/trend';
-import { ConfidenceBadge } from '@/components/valuation-meta';
 import { authed } from '@/lib/auth/guard';
-import { franchiseLabel } from '@/lib/product-display';
+import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { InventoryFilters } from './inventory-filters';
 
@@ -66,6 +66,11 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
   ]);
   const { totals } = portfolio;
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
+  const summaries = summarizeByProduct(rows, valuations);
+  const images = await imageVersions(
+    db,
+    summaries.map((s) => s.product.id),
+  );
   const pl = totals.unrealizedJpy;
   const chartPoints = series.map((s) => ({
     date: s.date,
@@ -194,7 +199,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         <InventoryFilters />
       </Suspense>
 
-      {rows.length === 0 ? (
+      {summaries.length === 0 ? (
         <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           {filtered ? t('inventory.emptyFiltered') : t('portfolio.empty')}
           {!filtered && (
@@ -207,67 +212,78 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         </div>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {rows.map(({ holding, product, parentProduct }) => {
-            const valuation = valuations.get(holding.id);
+          {summaries.map((s) => {
+            const { product } = s;
             const details = [
               t(`kind.${product.kind}`),
               franchiseLabel(product.franchise, t),
               product.region && product.region !== 'jp' && t(`region.${product.region}`),
-              holding.condition && t(`condition.${holding.condition}`),
-              productClass(product) === 'sealed' &&
-                holding.packagingState &&
-                t(`packaging.${holding.packagingState}`),
-              holding.grading === 'raw' && holding.rawGrade && `Raw ${holding.rawGrade}`,
-              holding.grading === 'graded' && `${holding.grader} ${holding.grade}`,
             ].filter(Boolean);
-
+            // Units per condition, e.g. "PSA 10 ×2 · Raw A ×5".
+            const conditions = new Map<string, number>();
+            for (const { holding } of s.lots) {
+              const label = lotConditionLabel(holding, product, t);
+              if (label) conditions.set(label, (conditions.get(label) ?? 0) + holding.quantity);
+            }
+            const lotsLine = [
+              t('portfolio.lotsUnits', { lots: s.lots.length, units: s.units }),
+              ...[...conditions].map(([label, n]) => (n > 1 ? `${label} ×${n}` : label)),
+            ].join(' · ');
+            const statuses = [...new Set(s.lots.map((l) => l.holding.status))];
+            const pl = s.unrealizedJpy;
             return (
-              <li key={holding.id}>
+              <li key={product.id}>
                 <Link
-                  href={`/holdings/${holding.id}`}
+                  href={`/products/${product.id}`}
                   className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50"
                 >
+                  <ProductImage
+                    product={product}
+                    version={images.get(product.id)}
+                    className="size-12"
+                  />
                   <div className="min-w-0 flex-1 space-y-0.5">
                     <p className="truncate font-medium">{product.name}</p>
                     <p className="truncate text-sm text-muted-foreground">{details.join(' · ')}</p>
-                    {parentProduct?.name && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {t('portfolio.pulledFrom', { name: parentProduct.name })}
-                      </p>
-                    )}
+                    <p className="truncate text-xs text-muted-foreground">{lotsLine}</p>
                   </div>
                   <div className="shrink-0 text-right text-sm">
-                    {valuation?.valueJpy != null ? (
+                    {s.valuedLots > 0 ? (
                       <>
-                        <p className="font-medium tabular-nums">{formatJpy(valuation.valueJpy)}</p>
-                        {valuation.last && (
-                          <p className="text-xs text-muted-foreground tabular-nums">
-                            {t('portfolio.last', { price: formatJpy(valuation.last.priceJpy) })}{' '}
-                            <Trend pct={valuation.trendPct} />
+                        <p className="font-medium tabular-nums">{formatJpy(s.valueJpy)}</p>
+                        {pl !== null && (
+                          <p className="text-xs tabular-nums">
+                            {pl > 0 ? '▲ +' : pl < 0 ? '▼ ' : ''}
+                            {formatJpy(pl)}
+                            {s.valuedCostJpy > 0 && (
+                              <span className="text-muted-foreground">
+                                {' '}
+                                ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
+                              </span>
+                            )}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          {valuation.method === 'median' ? (
-                            <ConfidenceBadge confidence={valuation.confidence} />
-                          ) : (
-                            t(`valuation.short.${valuation.method}`)
-                          )}
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {t('portfolio.spentShort', { amount: formatJpy(s.spentJpy) })}
                         </p>
+                        {s.valuedLots < s.lots.length && (
+                          <p className="text-xs text-muted-foreground">
+                            {t('portfolio.lotsValued', {
+                              valued: s.valuedLots,
+                              total: s.lots.length,
+                            })}
+                          </p>
+                        )}
                       </>
                     ) : (
                       <>
-                        <p className="tabular-nums">{formatJpy(holding.costTotalJpy)}</p>
+                        <p className="tabular-nums">{formatJpy(s.spentJpy)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {holding.status !== 'owned'
-                            ? t(`status.${holding.status}`)
+                          {statuses.length === 1 && statuses[0] !== 'owned'
+                            ? t(`status.${statuses[0]}`)
                             : t('valuation.short.none')}
                         </p>
                       </>
-                    )}
-                    {holding.quantity > 1 && (
-                      <p className="text-xs text-muted-foreground">
-                        {t('portfolio.qty', { qty: holding.quantity })}
-                      </p>
                     )}
                   </div>
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />

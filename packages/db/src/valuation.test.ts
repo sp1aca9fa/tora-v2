@@ -15,6 +15,7 @@ import {
   portfolioValuation,
   priceHistory,
   runSnapshots,
+  summarizeByProduct,
   setManualPrice,
 } from './valuation';
 
@@ -173,6 +174,25 @@ describe('portfolio (scenario 7)', () => {
     const again = await runSnapshots(db, now);
     expect(again.removed).toBe(20);
     expect(again.rows).toBe(0);
+  });
+
+  it('combines lots per product for the portfolio summary', async () => {
+    const { mew } = await scenario();
+    const second = await createHolding(
+      db,
+      uid,
+      { productId: mew.product.id },
+      { quantity: 1, costTotalJpy: 1_000, acquiredAt: ago(3), grading: 'raw', rawGrade: 'A' },
+    );
+    const p = await portfolioValuation(db, uid, now);
+    const valuations = new Map(p.rows.map((r) => [r.holding.id, r.valuation]));
+    const summary = summarizeByProduct(p.rows, valuations);
+    const m = summary.find((s) => s.product.id === mew.product.id)!;
+    expect(m.lots.map((l) => l.holding.id)).toContain(second.holding.id);
+    expect(m).toMatchObject({ units: 3, spentJpy: 1_000, valuedLots: 2, valueJpy: 925 * 3 });
+    expect(m.unrealizedJpy).toBe(925 * 3 - 1_000);
+    // Highest value first.
+    expect(summary[0]!.valueJpy).toBeGreaterThanOrEqual(summary.at(-1)!.valueJpy);
   });
 
   it('builds daily medians for the price chart', async () => {

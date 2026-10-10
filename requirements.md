@@ -19,7 +19,7 @@
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
-| S5c | Portfolio as a per-product summary + product images | todo (next) |
+| S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 | S8 | Visual redesign + wide-screen layout | todo |
@@ -364,9 +364,13 @@ Build:
 - The portfolio is a summary, not a transaction list: one row per product owned, all of its lots combined (units, total spent, market value, P/L), with the totals at the top as now. Tapping a row opens the product page: image, details, valuation and charts, and every lot registered (cost, date, where from, order ID, condition / grade, status), each linking to the lot page (events, actions). Sold / consumed lots and event history live on the product and lot pages, not on the portfolio.
 - Product images, stored once as small thumbnails so the app never loads images from external sites:
   - The home PC (collector run) downloads the image of a product's linked listing once, resizes it to about 400 px WebP (roughly 20-40 KB) and stores it in a `product_images` table (product, bytes, content type, source URL, fetched at). Products that already have an image URL get theirs on the next collect.
-  - The web serves them from an image route with long-lived cache headers, so the CDN answers repeats and the database is read about once per image. Nothing on Vercel fetches external images.
+  - The web serves them from its own image route (`/img/products/{id}?v=…`, behind sign-in) with long-lived private cache headers, so each browser fetches an image once. Nothing on Vercel fetches external images.
+  - The picture comes from the listing's main product image (SNKRDUNK `primaryMedia`, not the generated share card), read from the product page the collector fetches once per listing.
+  - Match suggestions no longer show the listing's picture (it would be loaded from the site); the title links to the listing instead.
   - Size: images are per product, not per sale, so a few MB per hundred products, far inside the Turso free tier. If that ever changes, the bytes move to object storage (e.g. Vercel Blob or Cloudflare R2) without UI changes.
   - Products without a stored image show a placeholder; the user can paste or upload one later (optional).
+
+Built: portfolio rows per product (thumbnail, lots and units, units per condition, value, P/L, spent); product page `/products/{id}` (image, units / spent / value / P/L, every lot with condition, date, shop, order ID, value, status, review flag; price chart starting on the condition most units are in; price sources moved here from the lot page); the lot page keeps its own value, actions and history and links to the product.
 
 Acceptance:
 - The portfolio shows one row per product with units, spent, value; the product page lists each lot with its own cost and condition.

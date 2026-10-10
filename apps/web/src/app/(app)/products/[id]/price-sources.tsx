@@ -26,12 +26,11 @@ import {
 export async function PriceSources({
   db,
   product,
-  holdingId,
   bucket,
 }: {
   db: Db;
   product: Product;
-  holdingId: string;
+  /** The bucket most of the user's lots are in (highlighted). */
   bucket: string | null;
 }) {
   const [t, format, sources, candidates, stats, recent] = await Promise.all([
@@ -54,15 +53,6 @@ export async function PriceSources({
           <ul className="space-y-2">
             {candidates.map((c) => (
               <li key={c.id} className="flex items-center gap-3 rounded-md border p-2">
-                {c.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={c.imageUrl}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    className="size-14 shrink-0 rounded object-contain"
-                  />
-                )}
                 <div className="min-w-0 flex-1">
                   <a
                     href={c.url ?? '#'}
@@ -79,12 +69,12 @@ export async function PriceSources({
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1">
-                  <form action={confirmCandidateAction.bind(null, c.id, holdingId)}>
+                  <form action={confirmCandidateAction.bind(null, c.id)}>
                     <Button size="sm" className="w-full">
                       {t('sources.confirm')}
                     </Button>
                   </form>
-                  <form action={rejectCandidateAction.bind(null, c.id, holdingId)}>
+                  <form action={rejectCandidateAction.bind(null, c.id)}>
                     <Button size="sm" variant="ghost" className="w-full">
                       {t('sources.reject')}
                     </Button>
@@ -105,7 +95,7 @@ export async function PriceSources({
       {canUseSnkrdunk && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{t('sources.pasteUrl')}</p>
-          <LinkUrlForm action={linkUrlAction.bind(null, product.id, holdingId)} />
+          <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
         </div>
       )}
     </>
@@ -146,7 +136,7 @@ export async function PriceSources({
                       : t('sources.waiting')}
                   </p>
                 </div>
-                <form action={unlinkSourceAction.bind(null, s.id, holdingId)}>
+                <form action={unlinkSourceAction.bind(null, s.id)}>
                   <Button variant="ghost" size="sm">
                     {t('sources.unlink')}
                   </Button>

@@ -20,32 +20,29 @@ async function allowed(productId: string) {
   return (await userHoldsProduct(db, user.id, productId)) ? db : null;
 }
 
-export async function confirmCandidateAction(candidateId: string, holdingId: string) {
+export async function confirmCandidateAction(candidateId: string) {
   const { db } = await authed();
   const c = await getCandidate(db, candidateId);
   if (c && (await allowed(c.productId))) await confirmCandidate(db, candidateId);
-  revalidatePath(`/holdings/${holdingId}`);
   revalidatePath('/', 'layout');
 }
 
-export async function rejectCandidateAction(candidateId: string, holdingId: string) {
+export async function rejectCandidateAction(candidateId: string) {
   const { db } = await authed();
   const c = await getCandidate(db, candidateId);
   if (c && (await allowed(c.productId))) await rejectCandidate(db, candidateId);
-  revalidatePath(`/holdings/${holdingId}`);
   revalidatePath('/', 'layout');
 }
 
-export async function unlinkSourceAction(sourceId: string, holdingId: string) {
+export async function unlinkSourceAction(sourceId: string) {
   const { db } = await authed();
   const s = await getProductSource(db, sourceId);
   if (s && (await allowed(s.productId))) await unlinkSource(db, sourceId);
-  revalidatePath(`/holdings/${holdingId}`);
+  revalidatePath(`/products/${s?.productId}`);
 }
 
 export async function linkUrlAction(
   productId: string,
-  holdingId: string,
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
@@ -54,6 +51,6 @@ export async function linkUrlAction(
   const parsed = parseSourceUrl(String(formData.get('url') ?? ''));
   if (!parsed) return { error: 'badSourceUrl' };
   await linkSource(db, productId, parsed);
-  revalidatePath(`/holdings/${holdingId}`);
+  revalidatePath(`/products/${productId}`);
   return {};
 }

@@ -81,6 +81,15 @@ export class PoliteHttp {
     }
   }
 
+  /** A binary file (e.g. an image) with its content type. */
+  async bytes(url: string): Promise<{ data: Buffer; contentType: string | null }> {
+    const res = await this.request(url, { Accept: 'image/*,*/*;q=0.8' });
+    return {
+      data: Buffer.from(await res.arrayBuffer()),
+      contentType: res.headers.get('content-type'),
+    };
+  }
+
   private async request(url: string, headers: Record<string, string>): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       if (this.requests >= this.o.maxRequests) throw new RequestCapError();

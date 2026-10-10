@@ -270,3 +270,13 @@ export async function importReviewCount(db: Db, userId: string): Promise<number>
     .where(and(eq(holdings.userId, userId), eq(holdings.reviewPending, true)));
   return row?.n ?? 0;
 }
+
+/** The user's lots of one product (any status): owned first, then newest first. */
+export async function productLots(db: Db, userId: string, productId: string) {
+  const rows = await db
+    .select()
+    .from(holdings)
+    .where(and(eq(holdings.userId, userId), eq(holdings.productId, productId)))
+    .orderBy(desc(holdings.acquiredAt), desc(holdings.createdAt));
+  return rows.sort((a, b) => Number(b.status === 'owned') - Number(a.status === 'owned'));
+}

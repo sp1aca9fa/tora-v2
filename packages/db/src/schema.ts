@@ -24,6 +24,7 @@ import {
 import { type SQL, sql } from 'drizzle-orm';
 import {
   type AnySQLiteColumn,
+  blob,
   check,
   index,
   integer,
@@ -168,6 +169,23 @@ export const products = sqliteTable(
     index('products_set_idx').on(t.setId, t.kind),
   ],
 );
+
+/**
+ * A product's picture, stored as a small WebP thumbnail (downloaded once by the home PC from the
+ * linked listing), so the app never loads images from other sites.
+ */
+export const productImages = sqliteTable('product_images', {
+  productId: text('product_id')
+    .primaryKey()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  bytes: blob('bytes', { mode: 'buffer' }).notNull(),
+  contentType: text('content_type').notNull(),
+  width: integer('width'),
+  height: integer('height'),
+  /** Where it was downloaded from (a changed product image URL triggers a new download). */
+  sourceUrl: text('source_url'),
+  ...timestamps,
+});
 
 export const productSources = sqliteTable(
   'product_sources',

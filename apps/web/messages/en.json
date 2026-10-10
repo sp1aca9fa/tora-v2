@@ -57,7 +57,10 @@
     "last": "last {price}",
     "chartAtCost": "incl. {amount} at cost (no market price yet)",
     "chartEstimated": "incl. {amount} from estimated lot sizes",
-    "chartEstimatedNote": "Values up to {date} partly rely on sales whose lot size was estimated (the source did not report quantities then)."
+    "chartEstimatedNote": "Values up to {date} partly rely on sales whose lot size was estimated (the source did not report quantities then).",
+    "lotsUnits": "{lots, plural, one {# lot} other {# lots}}, {units, plural, one {# unit} other {# units}}",
+    "spentShort": "spent {amount}",
+    "lotsValued": "{valued} of {total} lots valued"
   },
   "inventory": {
     "search": "Search name, set, card number",
@@ -123,7 +126,9 @@
       "condition": "Change condition",
       "note": "Add note",
       "delete": "Delete entry"
-    }
+    },
+    "allLots": "All lots of this product",
+    "marketData": "Market prices, chart and price sources"
   },
   "actions": {
     "partialHint": "You have {total}. Choosing fewer moves them into a separate entry first.",
@@ -438,5 +443,11 @@
     "confirmAll": "{count, plural, one {Confirm # card without grade} other {Confirm # cards without grade}}",
     "done": "{count, plural, one {Confirmed # item} other {Confirmed # items}}",
     "banner": "{count, plural, one {# imported purchase to review} other {# imported purchases to review}}"
+  },
+  "product": {
+    "unitsOwned": "Units owned",
+    "lots": "Your lots",
+    "toReview": "to review",
+    "cost": "cost"
   }
 }

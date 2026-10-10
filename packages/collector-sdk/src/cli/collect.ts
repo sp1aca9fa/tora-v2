@@ -5,6 +5,8 @@ import { createDb, inferLotSizes, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
+import { PoliteHttp } from '../http';
+import { downloadProductImages } from '../images';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
 
@@ -42,6 +44,15 @@ for (const collector of selected) {
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
+}
+// Product pictures not stored yet (separate polite client: the collectors' cap is spent).
+try {
+  const images = await downloadProductImages(db, new PoliteHttp({ maxRequests: 40 }), {
+    log: (m) => console.log(`[images] ${m}`),
+  });
+  console.log(`images: ${images.saved} saved, ${images.failed} failed`);
+} catch (error) {
+  console.log(`images: stopped (${String(error)})`);
 }
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);

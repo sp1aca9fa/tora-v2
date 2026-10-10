@@ -57,6 +57,13 @@
       "when": 1791619662172,
       "tag": "0007_inferred_quantities",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791620847870,
+      "tag": "0008_product_images",
+      "breakpoints": true
     }
   ]
 }
