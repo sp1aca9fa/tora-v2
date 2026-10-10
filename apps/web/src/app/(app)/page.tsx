@@ -72,6 +72,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
     valueJpy: Number(s.valueJpy),
     costJpy: Number(s.costJpy),
     atCostJpy: Number(s.atCostJpy),
+    estimatedJpy: Number(s.estimatedJpy),
   }));
   const maxBreakdown = Math.max(
     1,

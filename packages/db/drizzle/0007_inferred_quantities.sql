@@ -1,0 +1,2 @@
+ALTER TABLE `price_observations` ADD `quantity_inferred` integer DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE `valuation_snapshots` ADD `quantity_inferred` integer DEFAULT false NOT NULL;

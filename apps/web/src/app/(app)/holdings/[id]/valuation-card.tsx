@@ -81,6 +81,11 @@ export async function ValuationCard({
           </p>
         )}
         <ValuationMeta v={v} />
+        {v.method === 'median' && v.estimatedSamples > 0 && (
+          <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            {t('estimatedSamples', { count: v.estimatedSamples, total: v.sampleSize })}
+          </p>
+        )}
         {v.sources.length > 0 && (
           <div className="grid gap-2 sm:grid-cols-2">
             {v.sources.map((src) => (

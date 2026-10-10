@@ -18,6 +18,8 @@ export interface PriceChartPoint {
   bucket: string | null;
   medianJpy: number;
   count: number;
+  /** Trades that day whose lot size was estimated (the source did not report it). */
+  estimated: number;
 }
 
 /**
@@ -107,6 +109,8 @@ export function PriceChart({
   }, [points, bucket, hidden, theme, sources]);
 
   if (points.length === 0) return <p className="text-sm text-muted-foreground">{t('noHistory')}</p>;
+  const estimatedDays = new Set(visible.filter((p) => p.estimated > 0).map((p) => p.day));
+  const lastEstimated = [...estimatedDays].sort().at(-1);
 
   return (
     <div className="space-y-3">
@@ -161,8 +165,16 @@ export function PriceChart({
           {hover
             ? hover.day
             : t('daysWithTrades', { count: new Set(visible.map((p) => p.day)).size })}
+          {hover && estimatedDays.has(hover.day) && (
+            <span className="text-amber-700 dark:text-amber-400"> · {t('estimatedDay')}</span>
+          )}
         </span>
       </div>
+      {lastEstimated && (
+        <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          {t('estimatedNote', { date: lastEstimated })}
+        </p>
+      )}
       <div ref={el} className="h-56 w-full" role="img" aria-label={t('chartLabel')} />
     </div>
   );

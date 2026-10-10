@@ -8,6 +8,8 @@ export interface ValuationObservation {
   observedAt: string;
   observationType: 'sold' | 'listing' | 'buylist' | 'retail';
   excluded?: boolean | null;
+  /** The lot size was estimated (the source did not report it), so the unit price may be off. */
+  quantityInferred?: boolean | null;
 }
 
 export interface ManualPriceInput {
@@ -31,6 +33,8 @@ export interface Valuation {
   newestAt: string | null;
   ageDays: number | null;
   confidence: Confidence | null;
+  /** Samples whose lot size was estimated (0 when none, or not a median). */
+  estimatedSamples: number;
 }
 
 /** Market sources in fallback order; sources not listed come after these. */
@@ -94,6 +98,7 @@ export function valueUnit(input: {
     newestAt: null,
     ageDays: null,
     confidence: null,
+    estimatedSamples: 0,
   };
 
   const manual = input.manualPrices
@@ -140,6 +145,7 @@ export function valueUnit(input: {
         newestAt,
         ageDays: ageDays(newestAt, now),
         confidence: recent >= 5 ? 'high' : within(180).length >= 3 ? 'medium' : 'low',
+        estimatedSamples: samples.filter((o) => o.quantityInferred).length,
       };
     }
   }

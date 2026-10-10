@@ -38,8 +38,17 @@ export interface Collector {
   supports(product: Product): boolean;
   /** Searches the site for listings that may be this product, best first, with a 0-1 score. */
   findCandidates(product: Product, ctx: CollectorContext): Promise<CandidateInput[]>;
-  /** Fetches new observations for a linked listing and saves them through `ctx.save`. */
-  collect(link: ProductSource, product: Product, ctx: CollectorContext): Promise<CollectResult>;
+  /**
+   * Fetches new observations for a linked listing and saves them through `ctx.save`.
+   * `heldBuckets`: the conditions users own of this product (e.g. `graded:PSA:10`), for sources
+   * that only show a few trades per condition.
+   */
+  collect(
+    link: ProductSource,
+    product: Product,
+    ctx: CollectorContext,
+    heldBuckets?: string[],
+  ): Promise<CollectResult>;
   /**
    * Product details read from a confirmed listing's title, applied once per link (the linked
    * listing is the source of truth). Null when the title says nothing reliable (e.g. a variant).

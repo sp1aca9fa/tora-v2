@@ -55,7 +55,9 @@
     "breakdownHint": "バー: 時価。右: 時価 / 取得額。",
     "cost": "取得 {cost}",
     "last": "直近 {price}",
-    "chartAtCost": "うち {amount} は取得額で計上（相場なし）"
+    "chartAtCost": "うち {amount} は取得額で計上（相場なし）",
+    "chartEstimated": "うち {amount} は推定数量に基づく",
+    "chartEstimatedNote": "{date}までの評価額の一部は、数量を推定した取引に基づいています（当時は数量が公開されていませんでした）。"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
@@ -401,7 +403,10 @@
     "lastSale": "直近の取引",
     "vsMedian": "中央値比",
     "medianOf": "{days}日間 {count}件の中央値",
-    "noMedian": "この状態の取引なし"
+    "noMedian": "この状態の取引なし",
+    "estimatedDay": "推定数量を含む",
+    "estimatedNote": "{date}までは、取引の数量（例：1件で10枚）が公開されていなかったため、相場から推定しています。この期間の価格はずれる可能性があります。",
+    "estimatedSamples": "この中央値の{total}件のうち{count}件は数量が推定です（出典が数量を公開していませんでした）。"
   },
   "box": {
     "paid": "購入額",

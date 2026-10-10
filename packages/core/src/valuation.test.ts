@@ -31,6 +31,15 @@ describe('withoutOutliers', () => {
 });
 
 describe('valueUnit', () => {
+  it('counts samples whose lot size was estimated', () => {
+    const obs = [10_000, 10_200, 9_800].map((p, i) => ({
+      ...sold('snkrdunk', p, i + 1),
+      quantityInferred: i < 2,
+    }));
+    const v = valueUnit({ bucket: 'sealed:shrink', observations: obs, now });
+    expect(v).toMatchObject({ method: 'median', sampleSize: 3, estimatedSamples: 2 });
+  });
+
   it('uses the 30-day median with high confidence when there are 5+ recent sales', () => {
     const obs = [10_000, 10_200, 9_800, 10_100, 9_900, 50_000].map((p, i) =>
       sold('snkrdunk', p, i + 1),

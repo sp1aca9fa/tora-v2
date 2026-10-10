@@ -2,6 +2,7 @@ import type { CollectorRunStatus } from '@tora/core';
 import {
   type Db,
   activeSources,
+  heldBuckets,
   finishRun,
   insertObservations,
   productsToMatch,
@@ -90,7 +91,12 @@ export async function runCollector(
       })) {
         try {
           const before = added;
-          const result = await collector.collect(link, product, ctx);
+          const result = await collector.collect(
+            link,
+            product,
+            ctx,
+            await heldBuckets(db, product.id),
+          );
           await updateSourceProgress(db, link.id, {
             state: result.state,
             success: true,

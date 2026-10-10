@@ -55,7 +55,9 @@
     "breakdownHint": "Bars: market value. Right: value / cost.",
     "cost": "cost {cost}",
     "last": "last {price}",
-    "chartAtCost": "incl. {amount} at cost (no market price yet)"
+    "chartAtCost": "incl. {amount} at cost (no market price yet)",
+    "chartEstimated": "incl. {amount} from estimated lot sizes",
+    "chartEstimatedNote": "Values up to {date} partly rely on sales whose lot size was estimated (the source did not report quantities then)."
   },
   "inventory": {
     "search": "Search name, set, card number",
@@ -401,7 +403,10 @@
     "lastSale": "Last sale",
     "vsMedian": "vs median",
     "medianOf": "Median of {count} / {days}d",
-    "noMedian": "No sales in this condition"
+    "noMedian": "No sales in this condition",
+    "estimatedDay": "includes estimated lot sizes",
+    "estimatedNote": "Up to {date}, some trades did not say how many units they covered (e.g. 10 cards in one sale); their lot sizes are estimated from the going price, so those days may be off.",
+    "estimatedSamples": "{count} of the {total} sales in this median have an estimated lot size (the source did not report how many units they covered)."
   },
   "box": {
     "paid": "Paid",

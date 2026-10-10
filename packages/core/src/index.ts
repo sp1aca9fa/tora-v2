@@ -8,3 +8,4 @@ export * from './taxonomy';
 export * from './text';
 export * from './market';
 export * from './valuation';
+export * from './lot-size';

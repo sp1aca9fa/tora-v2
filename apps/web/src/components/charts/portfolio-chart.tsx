@@ -19,6 +19,8 @@ export interface PortfolioPoint {
   costJpy: number;
   /** Part of the value counted at cost (holdings without a market price that day). */
   atCostJpy: number;
+  /** Part of the value based on sales whose lot size was estimated. */
+  estimatedJpy: number;
 }
 
 /**
@@ -33,6 +35,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
   const latest = points.at(-1);
   const [hover, setHover] = useState<PortfolioPoint | null>(null);
   const shown = hover ?? latest;
+  const lastEstimated = points.findLast((p) => p.estimatedJpy > 0)?.date;
 
   useEffect(() => {
     if (!el.current) return;
@@ -93,12 +96,22 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
             </span>
           </span>
         ))}
+        {shown && shown.estimatedJpy > 0 && (
+          <span className="text-amber-700 dark:text-amber-400">
+            {t('chartEstimated', { amount: formatYen(shown.estimatedJpy) })}
+          </span>
+        )}
         {shown && shown.atCostJpy > 0 && (
           <span className="text-muted-foreground">
             {t('chartAtCost', { amount: formatYen(shown.atCostJpy) })}
           </span>
         )}
       </div>
+      {lastEstimated && (
+        <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          {t('chartEstimatedNote', { date: lastEstimated })}
+        </p>
+      )}
       <div ref={el} className="h-48 w-full" role="img" aria-label={t('chartLabel')} />
     </div>
   );

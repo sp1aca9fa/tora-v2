@@ -322,6 +322,11 @@ export const priceObservations = sqliteTable(
     raw: text('raw', { mode: 'json' }).$type<unknown>(),
     excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
     excludedReason: text('excluded_reason', { enum: EXCLUDED_REASONS }),
+    /**
+     * The source did not report how many units the trade covered: `price_jpy` is
+     * `price_original` divided by an estimated lot size (see `inferLotSizes`).
+     */
+    quantityInferred: integer('quantity_inferred', { mode: 'boolean' }).notNull().default(false),
     ...timestamps,
   },
   (t) => [
@@ -364,6 +369,8 @@ export const valuationSnapshots = sqliteTable(
     source: text('source'),
     sampleSize: integer('sample_size').notNull().default(0),
     confidence: text('confidence', { enum: VALUATION_CONFIDENCES }),
+    /** The value used sales whose lot size was estimated. */
+    quantityInferred: integer('quantity_inferred', { mode: 'boolean' }).notNull().default(false),
     ...timestamps,
   },
   (t) => [

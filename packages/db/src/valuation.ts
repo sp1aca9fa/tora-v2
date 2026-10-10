@@ -78,6 +78,7 @@ export async function loadMarketData(
         observedAt: priceObservations.observedAt,
         observationType: priceObservations.observationType,
         excluded: priceObservations.excluded,
+        quantityInferred: priceObservations.quantityInferred,
       })
       .from(priceObservations)
       .where(
@@ -112,6 +113,17 @@ export async function loadMarketData(
     }
   }
   return { observations, recent, manual };
+}
+
+/** Valuation buckets of a product's owned holdings, across users (what collectors should cover). */
+export async function heldBuckets(db: Db, productId: string): Promise<string[]> {
+  const rows = await db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(and(eq(holdings.productId, productId), eq(holdings.status, 'owned')));
+  const buckets = rows.map((r) => holdingBucket(r.holding, r.product));
+  return [...new Set(buckets.filter((b): b is string => b !== null))];
 }
 
 export function holdingBucket(holding: Holding, product: Product): string | null {
@@ -419,6 +431,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
         source: v.source,
         sampleSize: v.sampleSize,
         confidence: v.confidence,
+        quantityInferred: v.estimatedSamples > 0,
       });
     }
   }
@@ -435,7 +448,8 @@ export async function runSnapshots(db: Db, now = new Date()) {
       w.method === e.method &&
       w.source === e.source &&
       w.sampleSize === e.sampleSize &&
-      w.confidence === e.confidence
+      w.confidence === e.confidence &&
+      w.quantityInferred === e.quantityInferred
     ) {
       unchanged.add(key);
     }
@@ -453,6 +467,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
           source: sql`excluded.source`,
           sampleSize: sql`excluded.sample_size`,
           confidence: sql`excluded.confidence`,
+          quantityInferred: sql`excluded.quantity_inferred`,
           updatedAt: sql`excluded.updated_at`,
         },
       });
@@ -482,6 +497,7 @@ export async function portfolioSeries(
       valueJpy: sql<number>`coalesce(sum(coalesce(${valuationSnapshots.valueJpy}, ${holdings.costTotalJpy})), 0)`,
       costJpy: sql<number>`coalesce(sum(${holdings.costTotalJpy}), 0)`,
       atCostJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.valueJpy} is null then ${holdings.costTotalJpy} end), 0)`,
+      estimatedJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueJpy} end), 0)`,
     })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
@@ -496,6 +512,8 @@ export interface PricePoint {
   bucket: string | null;
   medianJpy: number;
   count: number;
+  /** Trades of that day whose lot size was estimated. */
+  estimated: number;
 }
 
 /** Daily sold medians per source + bucket for a product's price chart. */
@@ -512,6 +530,7 @@ export async function priceHistory(
       source: priceObservations.source,
       bucket: priceObservations.bucket,
       priceJpy: priceObservations.priceJpy,
+      quantityInferred: priceObservations.quantityInferred,
     })
     .from(priceObservations)
     .where(
@@ -524,13 +543,20 @@ export async function priceHistory(
     );
   const groups = new Map<
     string,
-    { day: string; source: string; bucket: string | null; prices: number[] }
+    { day: string; source: string; bucket: string | null; prices: number[]; estimated: number }
   >();
   for (const r of rows) {
     const day = r.observedAt.slice(0, 10);
     const key = `${day}\u0000${r.source}\u0000${r.bucket ?? ''}`;
-    const g = groups.get(key) ?? { day, source: r.source, bucket: r.bucket, prices: [] };
+    const g = groups.get(key) ?? {
+      day,
+      source: r.source,
+      bucket: r.bucket,
+      prices: [],
+      estimated: 0,
+    };
     g.prices.push(r.priceJpy);
+    if (r.quantityInferred) g.estimated++;
     groups.set(key, g);
   }
   return [...groups.values()]
@@ -540,6 +566,7 @@ export async function priceHistory(
       bucket: g.bucket,
       medianJpy: Math.round(median(g.prices)!),
       count: g.prices.length,
+      estimated: g.estimated,
     }))
     .sort((a, b) => a.day.localeCompare(b.day));
 }
