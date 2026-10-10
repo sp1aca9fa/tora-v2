@@ -6,6 +6,7 @@ import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { addPull, createHolding, createProduct, mergeProducts } from './mutations';
 import { collectorRuns, holdings, productSources, products } from './schema';
+import { linkedListingImages, saveProductImage } from './images';
 import { cardNumberKey, suggestFromKnownProducts } from './similar';
 import { linkSource, listPendingCandidates, rejectCandidate, startRun } from './sources';
 import { createUser } from './users';
@@ -147,4 +148,21 @@ it('merges a duplicate into an existing product', async () => {
   // Different kinds cannot be merged.
   const box = await createProduct(db, uid, { category: 'tcg', kind: 'booster_box', name: 'Box' });
   await expect(mergeProducts(db, user, box.id, real.id)).rejects.toThrow('invalid_input');
+});
+
+it('finds the stored picture of the product already linked to a listing', async () => {
+  const linked = await single('インフルエンサーの紹介', { setCode: 'MP1', cardNumber: '019/23' });
+  await linkSource(db, linked.id, { source: 'snkrdunk', externalId: '777' });
+  await saveProductImage(db, {
+    productId: linked.id,
+    bytes: Buffer.from('x'),
+    contentType: 'image/webp',
+    sourceUrl: null,
+  });
+  const images = await linkedListingImages(db, [
+    { source: 'snkrdunk', externalId: '777' },
+    { source: 'snkrdunk', externalId: '999' },
+  ]);
+  expect([...images.keys()]).toEqual(['snkrdunk|777']);
+  expect(images.get('snkrdunk|777')?.productId).toBe(linked.id);
 });

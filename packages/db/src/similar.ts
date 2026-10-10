@@ -113,7 +113,7 @@ export async function suggestFromKnownProducts(
       externalId: listing.externalId,
       title: listing.title ?? other.name,
       url: listing.url,
-      imageUrl: listing.imageUrl,
+      imageUrl: listing.imageUrl ?? other.imageUrl,
       score: 0.95,
     });
     bySource.set(listing.source, list);

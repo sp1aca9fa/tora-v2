@@ -1,12 +1,14 @@
 import {
   bucketStats,
   type Db,
+  linkedListingImages,
   listPendingCandidates,
   listProductSources,
   recentObservations,
 } from '@tora/db';
 import type { Product } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { sourceLabel } from '@/lib/product-display';
@@ -41,6 +43,14 @@ export async function PriceSources({
     bucketStats(db, product.id, 30),
     recentObservations(db, product.id, 10),
   ]);
+  // Suggestions without a picture of their own (e.g. from a linked look-alike): show the stored
+  // thumbnail of the product already linked to that listing.
+  const known = await linkedListingImages(
+    db,
+    candidates
+      .filter((c) => !c.imageUrl)
+      .map((c) => ({ source: c.source, externalId: c.externalId })),
+  );
   const active = sources.filter((s) => s.active);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const canUseSnkrdunk = product.category === 'tcg';
@@ -56,10 +66,16 @@ export async function PriceSources({
                 {/* The listing's own picture, loaded from the site: it is how near-identical
                     listings are told apart. The only external image in the app; the product's
                     stored thumbnail comes from the listing confirmed here. */}
-                {c.imageUrl && (
+                {(c.imageUrl || known.has(`${c.source}|${c.externalId}`)) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={c.imageUrl}
+                    src={
+                      c.imageUrl ??
+                      productImageUrl(
+                        known.get(`${c.source}|${c.externalId}`)!.productId,
+                        known.get(`${c.source}|${c.externalId}`)!.version,
+                      )!
+                    }
                     alt=""
                     referrerPolicy="no-referrer"
                     loading="lazy"

@@ -83,3 +83,41 @@ export async function imageVersions(db: Db, productIds: string[]): Promise<Map<s
   }
   return map;
 }
+
+/**
+ * Stored thumbnails of the products already linked to these listings (`source|externalId` ->
+ * product id + image version): a suggestion without its own picture can show the linked
+ * product's.
+ */
+export async function linkedListingImages(
+  db: Db,
+  listings: { source: string; externalId: string }[],
+): Promise<Map<string, { productId: string; version: string }>> {
+  if (listings.length === 0) return new Map();
+  const rows = await db
+    .select({
+      source: productSources.source,
+      externalId: productSources.externalId,
+      productId: productImages.productId,
+      version: productImages.updatedAt,
+    })
+    .from(productSources)
+    .innerJoin(productImages, eq(productImages.productId, productSources.productId))
+    .where(
+      and(
+        eq(productSources.active, true),
+        inArray(
+          productSources.externalId,
+          listings.map((l) => l.externalId),
+        ),
+      ),
+    );
+  const map = new Map<string, { productId: string; version: string }>();
+  for (const r of rows) {
+    const key = `${r.source}|${r.externalId}`;
+    if (listings.some((l) => `${l.source}|${l.externalId}` === key) && !map.has(key)) {
+      map.set(key, { productId: r.productId, version: r.version });
+    }
+  }
+  return map;
+}
