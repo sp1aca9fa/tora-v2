@@ -173,9 +173,18 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
     .select({ holding: holdings, product: products })
     .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
-    .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')));
-  const market = await loadMarketData(db, userId, [...new Set(rows.map((r) => r.product.id))], now);
-  const valued: PortfolioRow[] = rows.map((r) => ({
+    .where(and(eq(holdings.userId, userId), inArray(holdings.status, ['owned', 'consumed'])));
+  // Opened (consumed) items keep their cost in the totals at no market value: their value now
+  // lives in the pulls logged from them, which carry no cost of their own.
+  const opened = rows.filter((r) => r.holding.status === 'consumed');
+  const ownedRows = rows.filter((r) => r.holding.status === 'owned');
+  const market = await loadMarketData(
+    db,
+    userId,
+    [...new Set(ownedRows.map((r) => r.product.id))],
+    now,
+  );
+  const valued: PortfolioRow[] = ownedRows.map((r) => ({
     ...r,
     valuation: valueHolding(r.holding, r.product, market, now),
   }));
@@ -187,19 +196,14 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
     valued: 0,
     total: valued.length,
     units: 0,
+    /** Cost of opened items, included in `spentJpy` and the P/L base. */
+    openedCostJpy: 0,
   };
   const breakdown = new Map<
     string,
     { category: string; kind: string; costJpy: number; valueJpy: number; count: number }
   >();
-  for (const { holding, product, valuation } of valued) {
-    totals.spentJpy += holding.costTotalJpy;
-    totals.units += holding.quantity;
-    if (valuation.valueJpy !== null) {
-      totals.valueJpy += valuation.valueJpy;
-      totals.valuedCostJpy += holding.costTotalJpy;
-      totals.valued++;
-    }
+  const addToBreakdown = (product: Product, costJpy: number, valueJpy: number, count: number) => {
     const key = `${product.category}:${product.kind}`;
     const b = breakdown.get(key) ?? {
       category: product.category,
@@ -208,10 +212,26 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
       valueJpy: 0,
       count: 0,
     };
-    b.costJpy += holding.costTotalJpy;
-    b.valueJpy += valuation.valueJpy ?? 0;
-    b.count += holding.quantity;
+    b.costJpy += costJpy;
+    b.valueJpy += valueJpy;
+    b.count += count;
     breakdown.set(key, b);
+  };
+  for (const { holding, product, valuation } of valued) {
+    totals.spentJpy += holding.costTotalJpy;
+    totals.units += holding.quantity;
+    if (valuation.valueJpy !== null) {
+      totals.valueJpy += valuation.valueJpy;
+      totals.valuedCostJpy += holding.costTotalJpy;
+      totals.valued++;
+    }
+    addToBreakdown(product, holding.costTotalJpy, valuation.valueJpy ?? 0, holding.quantity);
+  }
+  for (const { holding, product } of opened) {
+    totals.spentJpy += holding.costTotalJpy;
+    totals.valuedCostJpy += holding.costTotalJpy;
+    totals.openedCostJpy += holding.costTotalJpy;
+    addToBreakdown(product, holding.costTotalJpy, 0, 0);
   }
   return {
     rows: valued,
@@ -311,6 +331,16 @@ export async function clearManualPrice(db: Db, userId: string, productId: string
 const endOfDay = (day: string) => new Date(`${day}T23:59:59.999+09:00`);
 
 /** Whether a holding was held on `day`: acquired by then, not yet sold or used up. */
+/** Day the holding was opened and used up (its value moved to the pulls), if it was. */
+function openedOn(events: HoldingEvent[]): string | null {
+  const e = events.find(
+    (x) =>
+      x.type === 'opened' &&
+      (x.payload as { after?: { status?: string } } | null)?.after?.status === 'consumed',
+  );
+  return e ? e.occurredAt.slice(0, 10) : null;
+}
+
 export function heldOn(holding: Holding, events: HoldingEvent[], day: string): boolean {
   if (holding.acquiredAt.slice(0, 10) > day) return false;
   const ended = events.find(
@@ -420,8 +450,24 @@ export async function runSnapshots(db: Db, now = new Date()) {
   for (const { holding, product } of rows) {
     const events = eventsBy.get(holding.id) ?? [];
     const bucket = holdingBucket(holding, product);
+    const openedDay = openedOn(events);
     for (const day of days) {
-      if (!heldOn(holding, events, day)) continue;
+      if (!heldOn(holding, events, day)) {
+        // Opened (consumed): the cost stays in the chart, the value moved to the pulls.
+        if (openedDay && openedDay <= day) {
+          wanted.set(`${day}|${holding.id}`, {
+            date: day,
+            holdingId: holding.id,
+            valueJpy: 0,
+            method: 'opened',
+            source: null,
+            sampleSize: 0,
+            confidence: null,
+            quantityInferred: false,
+          });
+        }
+        continue;
+      }
       const v = unitOn(holding.userId, product, bucket, day);
       wanted.set(`${day}|${holding.id}`, {
         date: day,
@@ -624,5 +670,42 @@ export function summarizeByProduct<R extends { holding: Holding; product: Produc
     (a, b) =>
       (b.valuedLots ? b.valueJpy : b.spentJpy) - (a.valuedLots ? a.valueJpy : a.spentJpy) ||
       a.product.name.localeCompare(b.product.name),
+  );
+}
+
+/**
+ * Reference only, never counted in totals: the opened item's cost split across all pulls logged
+ * from it, by market value (pulls without one count at the median known unit value, or equally
+ * when none is known). Pulls themselves cost nothing; the opened item keeps its cost.
+ */
+export async function estimatedPullCosts(
+  db: Db,
+  userId: string,
+  parentHoldingId: string,
+  now = new Date(),
+): Promise<Map<string, number>> {
+  const [parent] = await db
+    .select()
+    .from(holdings)
+    .where(and(eq(holdings.id, parentHoldingId), eq(holdings.userId, userId)));
+  if (!parent) return new Map();
+  const pulls = await db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(and(eq(holdings.userId, userId), eq(holdings.parentHoldingId, parentHoldingId)));
+  if (pulls.length === 0) return new Map();
+  const market = await loadMarketData(
+    db,
+    userId,
+    [...new Set(pulls.map((p) => p.product.id))],
+    now,
+  );
+  const units = pulls.map((p) => valueHolding(p.holding, p.product, market, now).unitJpy);
+  const fallback = median(units.filter((u): u is number => u !== null)) ?? 1;
+  const weights = pulls.map((p, i) => (units[i] ?? fallback) * p.holding.quantity);
+  const total = weights.reduce((a, b) => a + b, 0) || 1;
+  return new Map(
+    pulls.map((p, i) => [p.holding.id, Math.round((parent.costTotalJpy * weights[i]!) / total)]),
   );
 }

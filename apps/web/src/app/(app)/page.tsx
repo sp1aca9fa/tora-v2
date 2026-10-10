@@ -125,6 +125,11 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
           <p className="text-xs text-muted-foreground">
             {t('portfolio.itemsValue', { units: totals.units, lots: totals.total })}
           </p>
+          {totals.openedCostJpy > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {t('portfolio.inclOpened', { amount: formatJpy(totals.openedCostJpy) })}
+            </p>
+          )}
         </div>
       </section>
 

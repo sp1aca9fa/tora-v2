@@ -60,7 +60,8 @@
     "chartEstimatedNote": "{date}までの評価額の一部は、数量を推定した取引に基づいています（当時は数量が公開されていませんでした）。",
     "lotsUnits": "{lots}件・{units}点",
     "spentShort": "取得額 {amount}",
-    "lotsValued": "{total}件中{valued}件を評価"
+    "lotsValued": "{total}件中{valued}件を評価",
+    "inclOpened": "うち開封済み {amount}"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
@@ -131,7 +132,10 @@
       "cancel-order": "取引キャンセル"
     },
     "allLots": "この商品の全取引",
-    "marketData": "相場・チャート・価格ソース"
+    "marketData": "相場・チャート・価格ソース",
+    "estimatedCost": "推定取得額",
+    "referenceOnly": "参考値",
+    "estimatedCostNote": "「{name}」から開封。取得額は開封元に残り、この推定値は記録した{count}件の開封分に相場の比率で按分したものです。合計には含まれません。"
   },
   "actions": {
     "partialHint": "{total}点所有。少ない数を選ぶと、先に別の登録に分割されます。",

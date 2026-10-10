@@ -47,11 +47,15 @@ export default async function ProductPage({ params }: Params) {
   const owned = lots.filter((h) => h.status === 'owned');
   const values = new Map(owned.map((h) => [h.id, valueHolding(h, product, market).valueJpy]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
-  const spent = owned.reduce((n, h) => n + h.costTotalJpy, 0);
+  // Opened items keep their cost (their value moved to the pulls logged from them).
+  const openedCost = lots
+    .filter((h) => h.status === 'consumed')
+    .reduce((n, h) => n + h.costTotalJpy, 0);
+  const spent = owned.reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
   const valued = owned.filter((h) => values.get(h.id) != null);
   const value = valued.reduce((n, h) => n + values.get(h.id)!, 0);
-  const valuedCost = valued.reduce((n, h) => n + h.costTotalJpy, 0);
-  const pl = valued.length ? value - valuedCost : null;
+  const valuedCost = valued.reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
+  const pl = valued.length || openedCost ? value - valuedCost : null;
   // The chart starts on the condition most of the owned units are in.
   const unitsByBucket = new Map<string, number>();
   for (const h of owned) {
@@ -95,7 +99,7 @@ export default async function ProductPage({ params }: Params) {
         {[
           [t('product.unitsOwned'), String(units)],
           [t('portfolio.spent'), formatJpy(spent)],
-          [t('portfolio.marketValue'), valued.length ? formatJpy(value) : '-'],
+          [t('portfolio.marketValue'), valued.length || openedCost ? formatJpy(value) : '-'],
           [t('portfolio.unrealized'), pl === null ? '-' : signed(pl)],
         ].map(([label, v]) => (
           <div key={label} className="rounded-xl border bg-card px-4 py-3">

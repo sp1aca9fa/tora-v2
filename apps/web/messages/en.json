@@ -60,7 +60,8 @@
     "chartEstimatedNote": "Values up to {date} partly rely on sales whose lot size was estimated (the source did not report quantities then).",
     "lotsUnits": "{lots, plural, one {# lot} other {# lots}}, {units, plural, one {# unit} other {# units}}",
     "spentShort": "spent {amount}",
-    "lotsValued": "{valued} of {total} lots valued"
+    "lotsValued": "{valued} of {total} lots valued",
+    "inclOpened": "incl. {amount} in opened items"
   },
   "inventory": {
     "search": "Search name, set, card number",
@@ -131,7 +132,10 @@
       "cancel-order": "Order cancelled"
     },
     "allLots": "All lots of this product",
-    "marketData": "Market prices, chart and price sources"
+    "marketData": "Market prices, chart and price sources",
+    "estimatedCost": "Estimated cost",
+    "referenceOnly": "reference only",
+    "estimatedCostNote": "Pulled from \"{name}\". That item keeps its cost; this estimate splits it across the {count, plural, one {# pull} other {# pulls}} logged from it by market value. It is not counted in any total."
   },
   "actions": {
     "partialHint": "You have {total}. Choosing fewer moves them into a separate entry first.",

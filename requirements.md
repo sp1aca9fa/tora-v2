@@ -82,6 +82,7 @@
 - 2026-10-10: Collector runs still `running` after 3 hours are closed as failed (interrupted) when the next run of that source starts.
 - 2026-10-10: Registering a new item or a pull suggests matching items already registered while typing (name, set code, card number; linked ones first, marked "linked"). Picking one registers the purchase or pull under that item instead of creating a duplicate (user request: search-first, like asset tools).
 - 2026-10-10: Duplicate products can be merged: the product edit page suggests registered look-alikes; picking one opens a confirmation, and merging moves the duplicate's lots, sales data, manual prices and listings to the kept product and deletes the duplicate (same category and kind only).
+- 2026-10-10: Cost basis of pulls (user decision): an opened (consumed) item keeps its full cost in the totals, the P/L base and the value-over-time cost line, at no market value; the pulls logged from it cost nothing and carry the market value. Unlogged cards are thus not guessed at. Each pull shows an estimated cost for reference only (the opened item's cost split across all its logged pulls by market value, equal shares where unknown), never counted in totals. Previously an opened item's cost dropped out of the totals, which overstated P/L.
 
 ---
 

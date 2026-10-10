@@ -1,5 +1,5 @@
 import { deriveBucket, holdingFieldsFor, pendingGrading, productClass, unitCost } from '@tora/core';
-import { canEditProduct, getHoldingDetail } from '@tora/db';
+import { canEditProduct, estimatedPullCosts, getHoldingDetail } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -28,7 +28,14 @@ export default async function HoldingPage({ params }: Params) {
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events, parent } = detail;
-  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+  const [t, format, pullCosts] = await Promise.all([
+    getTranslations(),
+    getFormatter(),
+    holding.parentHoldingId
+      ? estimatedPullCosts(db, user.id, holding.parentHoldingId)
+      : Promise.resolve(null),
+  ]);
+  const estimatedCost = pullCosts?.get(holding.id) ?? null;
 
   const owned = holding.status === 'owned';
   const cls = productClass(product);
@@ -70,6 +77,16 @@ export default async function HoldingPage({ params }: Params) {
         )}
       </>,
     ],
+    ...(estimatedCost !== null
+      ? [
+          [
+            t('holding.estimatedCost'),
+            <span key="est" className="text-muted-foreground">
+              {formatJpy(estimatedCost)} ({t('holding.referenceOnly')})
+            </span>,
+          ] as [string, React.ReactNode],
+        ]
+      : []),
     [
       t('fields.acquiredAt'),
       format.dateTime(new Date(holding.acquiredAt), { dateStyle: 'medium' }),
@@ -159,6 +176,14 @@ export default async function HoldingPage({ params }: Params) {
               </div>
             ))}
           </dl>
+          {estimatedCost !== null && parent && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t('holding.estimatedCostNote', {
+                name: parent.product.name,
+                count: pullCosts?.size ?? 0,
+              })}
+            </p>
+          )}
           {holding.notes && <p className="mt-4 text-sm whitespace-pre-line">{holding.notes}</p>}
         </CardContent>
       </Card>

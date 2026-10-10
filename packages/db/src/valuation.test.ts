@@ -10,6 +10,7 @@ import { insertObservations } from './sources';
 import { createUser } from './users';
 import {
   boxView,
+  estimatedPullCosts,
   clearManualPrice,
   portfolioSeries,
   portfolioValuation,
@@ -126,13 +127,19 @@ describe('portfolio (scenario 7)', () => {
   it('totals spent, value and unrealized P/L over owned holdings', async () => {
     const { amiibo } = await scenario();
     const p = await portfolioValuation(db, uid, now);
-    // Owned: 2 pull lots + amiibo (retail fallback 3,300 x 3); the box is consumed.
-    expect(p.totals).toMatchObject({ total: 3, valued: 3, spentJpy: 9_900 });
+    // Owned: 2 pull lots + amiibo (retail fallback 3,300 x 3). The opened box keeps its cost
+    // (5,400) in the totals at no value: its value lives in the pulls, which cost nothing.
+    expect(p.totals).toMatchObject({
+      total: 3,
+      valued: 3,
+      spentJpy: 9_900 + 5_400,
+      openedCostJpy: 5_400,
+    });
     expect(p.totals.valueJpy).toBe(3_100 + 925 * 2 + 9_900);
-    expect(p.totals.unrealizedJpy).toBe(p.totals.valueJpy - 9_900);
+    expect(p.totals.unrealizedJpy).toBe(p.totals.valueJpy - 9_900 - 5_400);
     const row = p.rows.find((r) => r.holding.id === amiibo.holding.id);
     expect(row?.valuation).toMatchObject({ method: 'retail', confidence: 'low' });
-    expect(p.breakdown.map((b) => b.kind).sort()).toEqual(['amiibo', 'single']);
+    expect(p.breakdown.map((b) => b.kind).sort()).toEqual(['amiibo', 'booster_box', 'single']);
 
     await sellHolding(db, uid, amiibo.holding.id, {
       quantity: 3,
@@ -161,8 +168,8 @@ describe('portfolio (scenario 7)', () => {
     expect(series[0]?.date).toBe(ago(60).slice(0, 10));
     expect(on(0)).toMatchObject({
       valueJpy: 3_100 + 925 * 2 + 9_900 + 700,
-      // The box was opened (consumed): its cost is no longer held.
-      costJpy: 9_900 + 700,
+      // The opened box stays in the cost line (its value moved to the pulls).
+      costJpy: 9_900 + 700 + 5_400,
       atCostJpy: 700,
     });
     // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
@@ -174,6 +181,15 @@ describe('portfolio (scenario 7)', () => {
     const again = await runSnapshots(db, now);
     expect(again.removed).toBe(20);
     expect(again.rows).toBe(0);
+  });
+
+  it('estimates pull costs from the opened box, for reference', async () => {
+    const { box, pika, mew } = await scenario();
+    const costs = await estimatedPullCosts(db, uid, box.holding.id, now);
+    // Box 5,400 split by market value: ピカチュウ 3,100 x1 vs ミュウ 925 x2.
+    const total = 3_100 + 925 * 2;
+    expect(costs.get(pika.holding.id)).toBe(Math.round((5_400 * 3_100) / total));
+    expect(costs.get(mew.holding.id)).toBe(Math.round((5_400 * 925 * 2) / total));
   });
 
   it('combines lots per product for the portfolio summary', async () => {
