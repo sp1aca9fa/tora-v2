@@ -6,7 +6,8 @@ import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { MIGRATIONS_FOLDER } from './migrate';
+import { createDb } from './client';
+import { MIGRATIONS_FOLDER, migrateDb, pendingMigrations } from './migrate';
 
 it('maps old products and assigns old holdings to the placeholder owner', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tora-mig-'));
@@ -75,6 +76,23 @@ it('creates no placeholder on an empty database', async () => {
     const client = createClient({ url: `file:${join(dir, 'db.sqlite')}` });
     await migrate(drizzle(client), { migrationsFolder: MIGRATIONS_FOLDER });
     expect((await client.execute('SELECT count(*) n FROM users')).rows[0]?.n).toBe(0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+it('lists migrations the database has not applied', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tora-mig-'));
+  try {
+    const db = createDb({ url: `file:${join(dir, 'db.sqlite')}` });
+    const all = (
+      JSON.parse(await readFile(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8')) as {
+        entries: { tag: string }[];
+      }
+    ).entries.map((e) => e.tag);
+    expect(await pendingMigrations(db)).toEqual(all);
+    await migrateDb(db);
+    expect(await pendingMigrations(db)).toEqual([]);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

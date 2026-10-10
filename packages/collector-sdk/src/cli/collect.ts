@@ -3,6 +3,7 @@
 // scripts/collect-cron.sh.
 import { createDb, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
+import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
@@ -28,6 +29,7 @@ for (const dir of missing) console.log(`Collector package not present: ${dir}/ (
 const selected = collectors.filter((c) => !values.source || c.source === values.source);
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
+await exitIfUnmigrated(db);
 let exitCode = 0;
 if (selected.length === 0) console.log('No collectors registered.');
 for (const collector of selected) {

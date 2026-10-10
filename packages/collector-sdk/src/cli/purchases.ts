@@ -5,6 +5,7 @@
 import { tokyoDate } from '@tora/core';
 import { createDb, getUserByUsername } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
+import { exitIfUnmigrated } from '@tora/db/migrate';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
@@ -32,6 +33,7 @@ if (!file || !values.user) {
 loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
+await exitIfUnmigrated(db);
 const user = await getUserByUsername(db, values.user.trim().toLowerCase());
 if (!user) {
   console.error(`No user "${values.user}".`);
