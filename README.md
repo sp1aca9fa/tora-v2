@@ -9,8 +9,18 @@ their own collection, while the product catalog and market data are shared.
   code, limited to 2 devices per account.
 - **Database**: Turso (hosted libSQL / SQLite) via Drizzle ORM. Local dev uses a SQLite file.
 - **Collectors**: run only on a home PC in WSL2 (residential IP) and write straight to Turso.
-  Private scrapers live in an optional git submodule (`collectors/`); the public repo installs,
-  builds and tests without it.
+  The public repo ships the app and the collector framework, **not** scrapers for any site.
+
+### Bring your own sources
+
+Prices and purchase imports come from **source plug-ins** that you choose and write for the shops
+and marketplaces you use. A plug-in implements the `Collector` interface (find listings for a
+product, fetch its sold prices) and/or the `PurchaseImporter` interface (read order emails into
+purchases), see `packages/collector-sdk/src/types.ts`. Plug-in packages are loaded by path from
+`collectors-public/` (publishable ones) and `collectors/` (an optional private package, e.g. a git
+submodule), so the app, build and tests work without any of them. The framework enforces a polite
+pace (2-5 s between requests, a request cap per run, stop on 403/429/captcha) and refuses to run on
+Vercel/CI, but whether a site may be collected from is up to you: check its terms of use first.
 
 ```
 apps/web                 Next.js app (UI, server actions, auth)
@@ -19,8 +29,8 @@ packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
 packages/collector-sdk   Collector interface, registry, `pnpm collect`
-collectors-public/       Collectors safe to publish (TCGCSV, FX)
-collectors/              PRIVATE submodule (optional)
+collectors-public/       Publishable plug-ins (public APIs, e.g. TCGCSV and FX rates, planned)
+collectors/              Optional private plug-ins (git submodule; not in this repo)
 ```
 
 ## Local setup (WSL2)
@@ -136,31 +146,45 @@ Vercel or CI (the CLI refuses when `VERCEL` or `CI` is set).
 
 ```bash
 pnpm collect                         # all collectors: match, then collect
-pnpm collect --source snkrdunk       # one collector
+pnpm collect --source <source>       # one collector
 pnpm collect --match-only            # only look for listings of unlinked items
 pnpm collect --collect-only          # only fetch trades for linked listings
 pnpm collect --product <product-id>  # one product
 pnpm valuate                         # only refresh valuation snapshots (collect does this too)
 ```
 
-### How items get prices (SNKRDUNK)
+### How items get prices
 
 1. Register an item in the app as usual.
-2. On the next run, the collector searches SNKRDUNK for owned (or opened) TCG items without a
+2. On the next run, each collector searches its site for owned (or opened) items without a
    listing and stores the best candidates.
 3. In the app, the item page shows them under **Price sources** (and Portfolio shows a banner):
-   confirm the right one, or paste a SNKRDUNK product link instead. Boxes can have two listings
-   (with and without shrink wrap); each feeds its own price bucket.
-4. The next runs backfill the full sales history (up to 60 pages per item per run, resuming where
-   they stopped), then add new days. Trades are saved per finished day; SNKRDUNK shows the last
-   few days with relative times, so prices lag about 5 days.
+   confirm the right one, or paste the listing's link instead. A product can have several listings
+   (e.g. a box with and without shrink wrap); each feeds its own price bucket.
+4. The next runs backfill the listing's sales history (a page budget per run, resuming where they
+   stopped), then add new sales.
 
 Settings shows each source's last run, items waiting for confirmation, listings not collected for
 3+ days and big median moves.
 
-### Private submodule
+### Purchase import
 
-The private collectors live in `collectors/` (git submodule, `sp1aca9fa/tora-collectors`).
+Importer plug-ins turn a shop's order emails into purchases. Export the emails with Google Takeout
+(Gmail filter + label, then Mail limited to that label) and run, on the home PC:
+
+```bash
+pnpm purchases <export.mbox> --user <username> [--source <source>]
+```
+
+The app never gets access to Gmail. Purchases are matched by transaction ID: ones already
+registered with the same data are skipped, different data or likely duplicates are asked about,
+cancelled orders are left out, and nothing is written before you confirm. Imported items then
+appear under **Review import** in the app to set each one's grade, cert number or packaging.
+
+### Private plug-ins (submodule)
+
+The author's own plug-ins live in a private repo mounted at `collectors/` (git submodule). Use the
+same layout for yours: `collectors/src/index.ts` exporting `collectors` and `importers`.
 
 ```bash
 git clone --recurse-submodules git@github.com:sp1aca9fa/tora-v2.git
@@ -200,3 +224,10 @@ crontab -e
 
 Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`
 to go through the scheduled path.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md): free for personal, hobby, research, educational and
+other noncommercial use, including changing and sharing it under the same terms; commercial use
+is not permitted. This makes the project source-available rather than open source. Third-party
+dependencies keep their own licenses.

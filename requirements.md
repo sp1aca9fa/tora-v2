@@ -73,6 +73,9 @@
 - 2026-10-10: Product images are stored as small WebP thumbnails in the database (downloaded once by the home PC, served with long-lived cache), not hot-linked: the app should not depend on external image URLs, and per-product thumbnails are small. Object storage is the fallback if it grows.
 - 2026-10-10: New phases at the user's request: S5c (portfolio as a per-product summary + images) next, before S4; S8 (visual redesign + wide-screen layout) after S7.
 - 2026-10-10: CLI scripts (collect, purchases, valuate) check for pending migrations at startup, after `pnpm collect` failed mid-run on a missing column (migration 0006 not applied yet).
+- 2026-10-10: Positioning: "bring your own sources". The public repo ships the app and the plug-in framework, not scrapers for any site; plug-ins live in `collectors-public/` (publishable) or a private package. A setting to switch on a built-in scraper would not change much, since publishing the code is what matters, so shop-specific code stays private. Validated later by a second shop (Mercari purchase importer, S4).
+- 2026-10-10: The SNKRDUNK email reader stays private; the in-app import (S6) takes a generic purchases file that the private plug-in produces locally.
+- 2026-10-10: License: PolyForm Noncommercial 1.0.0 for the public repo (source-available; noncommercial use only). The private plug-in repo stays all rights reserved.
 
 ---
 
@@ -320,6 +323,7 @@ Build:
 Acceptance:
 - Scenario items 1-3 (CE, amiibo, controllers) get Mercari sold observations with sensible buckets.
 - Data gate repeated for 3 non-card items.
+- Mercari purchase importer (private plug-in): import the user's Mercari collectible purchases through the same `PurchaseImporter` interface and import flow as SNKRDUNK. This proves the "bring your own sources" design works for more than one shop (without it, that claim does not hold). Can come after the user's own SNKRDUNK flow is settled.
 
 ## S5: Valuation, Portfolio, Item detail
 
@@ -374,6 +378,7 @@ Build:
 - **JSON import** into an empty DB.
 - Round-trip test: seed -> export -> import into empty DB -> identical computed totals and row counts.
 - Scheduled local backup of the Turso DB to the home PC (dated SQL dump or JSON export, keep last 30).
+- **Purchase file import in the app**: upload a generic purchases file (CSV/JSON: shop, order ID, date, item title, quantity, amount paid, optional item price / listing link / cancelled flag) and go through the S5b flow in the browser: summary (new, already registered, cancelled, unclassified), choices for conflicts and likely duplicates, confirm, then Review import. Shop-specific email reading stays in private plug-ins: `pnpm purchases <export.mbox> --out purchases.json` writes this file on the home PC; anyone can also make it by hand or from another shop's export. The 11 MB+ mail export never leaves the PC.
 - Automatic purchase import: the daily job on the home PC checks Gmail for new SNKRDUNK receipts (and cancellations) and imports them with the S5b rules, asking about conflicts in the app. Gmail access is read-only, its token stored only on the home PC (never on Vercel or in the database).
 
 Acceptance:
@@ -401,6 +406,7 @@ Build:
 - Rework screens once the features have settled: fewer unrelated panels per screen. Crowded screens (e.g. the item page with valuation, sources, matching, events and actions) are split into tabs, sub-pages or collapsible sections, each with one purpose.
 - A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
 - A consistent visual language across screens (spacing, typography, cards, badges, charts).
+- Source names out of the public code ("bring your own sources"): each plug-in declares its label, color, priority, listing-link pattern and order-source aliases; collectors save that metadata to the database on each run, and the app reads it from there (the web cannot load private plug-ins). Built-in lists naming specific shops (source priority, chart colors, "paste a SNKRDUNK link" copy, スニダン aliases) go away; the raw grade scale becomes plug-in-provided too.
 
 Acceptance:
 - User review on phone and on a wide desktop screen.

@@ -4,3 +4,6 @@ node_modules/
 packages/db/drizzle/
 requirements.md
 collectors/
+
+# Official license text, kept verbatim
+LICENSE.md
