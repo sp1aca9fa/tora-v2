@@ -19,8 +19,10 @@
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
+| S5c | Portfolio as a per-product summary + product images | todo (next) |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
+| S8 | Visual redesign + wide-screen layout | todo |
 
 ### Decision log
 
@@ -68,6 +70,9 @@
 - 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
 - 2026-10-10: S5b purchase import reads a Google Takeout mbox on the home PC instead of connecting the app to Gmail (no Gmail credentials anywhere online). Accepted SNKRDUNK offers count as purchases. Receipts have no listing link, so products are matched by listing title. Order IDs are normalized per marketplace (`order_source`) and unique per user only for one-item-per-transaction marketplaces (SNKRDUNK, Mercari, Yahoo); Amazon orders can hold several items.
 - 2026-10-10: The import command is `pnpm purchases` because `pnpm import` is a pnpm built-in.
+- 2026-10-10: Product images are stored as small WebP thumbnails in the database (downloaded once by the home PC, served with long-lived cache), not hot-linked: the app should not depend on external image URLs, and per-product thumbnails are small. Object storage is the fallback if it grows.
+- 2026-10-10: New phases at the user's request: S5c (portfolio as a per-product summary + images) next, before S4; S8 (visual redesign + wide-screen layout) after S7.
+- 2026-10-10: CLI scripts (collect, purchases, valuate) check for pending migrations at startup, after `pnpm collect` failed mid-run on a missing column (migration 0006 not applied yet).
 
 ---
 
@@ -345,6 +350,22 @@ Build:
 Acceptance:
 - Re-running the import on the same file adds nothing; cancelled purchases are not imported; conflicts are asked, not guessed.
 
+## S5c: Portfolio by product + product images
+
+Added at the user's request (2026-10-10).
+
+Build:
+- The portfolio is a summary, not a transaction list: one row per product owned, all of its lots combined (units, total spent, market value, P/L), with the totals at the top as now. Tapping a row opens the product page: image, details, valuation and charts, and every lot registered (cost, date, where from, order ID, condition / grade, status), each linking to the lot page (events, actions). Sold / consumed lots and event history live on the product and lot pages, not on the portfolio.
+- Product images, stored once as small thumbnails so the app never loads images from external sites:
+  - The home PC (collector run) downloads the image of a product's linked listing once, resizes it to about 400 px WebP (roughly 20-40 KB) and stores it in a `product_images` table (product, bytes, content type, source URL, fetched at). Products that already have an image URL get theirs on the next collect.
+  - The web serves them from an image route with long-lived cache headers, so the CDN answers repeats and the database is read about once per image. Nothing on Vercel fetches external images.
+  - Size: images are per product, not per sale, so a few MB per hundred products, far inside the Turso free tier. If that ever changes, the bytes move to object storage (e.g. Vercel Blob or Cloudflare R2) without UI changes.
+  - Products without a stored image show a placeholder; the user can paste or upload one later (optional).
+
+Acceptance:
+- The portfolio shows one row per product with units, spent, value; the product page lists each lot with its own cost and condition.
+- Images appear on the portfolio and product page without the browser requesting SNKRDUNK (or other external) URLs.
+
 ## S6: Export / import
 
 Build:
@@ -357,6 +378,18 @@ Build:
 
 Acceptance:
 - Scenario 8; round-trip test passes in CI-like `pnpm test`.
+
+## S8: Visual redesign + wide-screen layout
+
+Added at the user's request (2026-10-10). Until now the focus is on making things work; this phase makes them pleasant.
+
+Build:
+- Rework screens once the features have settled: fewer unrelated panels per screen. Crowded screens (e.g. the item page with valuation, sources, matching, events and actions) are split into tabs, sub-pages or collapsible sections, each with one purpose.
+- A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
+- A consistent visual language across screens (spacing, typography, cards, badges, charts).
+
+Acceptance:
+- User review on phone and on a wide desktop screen.
 
 ## S7: US data, 駿河屋, FX, JP vs US spread
 
