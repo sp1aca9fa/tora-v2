@@ -258,6 +258,8 @@ export const holdings = sqliteTable(
     /** Where the order was placed (normalized, e.g. `snkrdunk`) and its transaction / order ID. */
     orderSource: text('order_source'),
     orderId: text('order_id'),
+    /** Imported and not yet checked in the app's import review (grade, cert, packaging). */
+    reviewPending: integer('review_pending', { mode: 'boolean' }).notNull().default(false),
     ...timestamps,
   },
   (t) => [

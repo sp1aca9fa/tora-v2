@@ -18,6 +18,7 @@ import {
   markOpened,
   returnGrading,
   sellHolding,
+  confirmImportReview,
   setCardGrade,
   splitOff,
   submitGrading,
@@ -515,6 +516,71 @@ describe('setCardGrade', () => {
     await expectDomainError(setCardGrade(db, uid, [box.holding.id], grade), 'not_a_card');
     const bob = (await createUser(db, 'bob', creds)).user.id;
     await expectDomainError(setCardGrade(db, bob, [a.holding.id], grade), 'not_found');
+  });
+});
+
+describe('confirmImportReview', () => {
+  it('applies grades, cert and packaging, then clears the review flag', async () => {
+    const input = { quantity: 1, costTotalJpy: 500, acquiredAt: day('09-01'), reviewPending: true };
+    const card = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'single', name: 'ピカチュウ' } },
+      input,
+    );
+    const blank = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'single', name: 'ミュウ' } },
+      input,
+    );
+    const box = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+      {
+        ...input,
+        packagingState: 'sealed_shrink',
+      },
+    );
+    const n = await confirmImportReview(db, uid, [
+      {
+        id: card.holding.id,
+        grade: { grading: 'graded', grader: 'PSA', grade: '10' },
+        certNumber: ' 123 ',
+      },
+      { id: blank.holding.id, grade: null },
+      { id: box.holding.id, packagingState: 'sealed_no_shrink' },
+    ]);
+    expect(n).toBe(3);
+    const get = async (id: string) => (await getHoldingDetail(db, uid, id))!;
+    expect((await get(card.holding.id)).holding).toMatchObject({
+      grading: 'graded',
+      grader: 'PSA',
+      grade: '10',
+      certNumber: '123',
+      reviewPending: false,
+    });
+    expect((await get(blank.holding.id)).holding).toMatchObject({
+      grading: null,
+      reviewPending: false,
+    });
+    expect((await get(box.holding.id)).holding.packagingState).toBe('sealed_no_shrink');
+    expect(await confirmImportReview(db, uid, [{ id: card.holding.id }])).toBe(0);
+
+    const again = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+      {
+        ...input,
+        packagingState: 'sealed_shrink',
+      },
+    );
+    await expectDomainError(
+      confirmImportReview(db, uid, [{ id: again.holding.id, packagingState: 'opened' }]),
+      'invalid_input',
+    );
   });
 });
 

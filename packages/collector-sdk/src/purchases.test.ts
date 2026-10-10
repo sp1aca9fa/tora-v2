@@ -200,6 +200,7 @@ describe('purchase import', () => {
       acquiredFrom: 'SNKRDUNK',
       orderSource: 'snkrdunk',
       packagingState: 'sealed_shrink',
+      reviewPending: true,
     });
     expect((await listProductSources(db, created105.productId)).map((s) => s.externalId)).toEqual([
       'L105',

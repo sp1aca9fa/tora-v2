@@ -86,6 +86,8 @@ export interface HoldingInput {
   notes?: string | null;
   /** Transaction / order ID at the place of purchase (e.g. a SNKRDUNK 取引ID). */
   orderId?: string | null;
+  /** Set by imports: the holding waits for the import review in the app. */
+  reviewPending?: boolean;
 }
 
 /** A sealed product of a catalog set; created on first use. */
@@ -508,6 +510,81 @@ export async function setCardGrade(
       changed++;
     }
     return changed;
+  });
+}
+
+/** One reviewed import row: the card's grade (and cert), or a sealed product's packaging. */
+export interface ImportReview {
+  id: string;
+  grade?: CardGrade | null;
+  certNumber?: string | null;
+  packagingState?: PackagingState | null;
+}
+
+/**
+ * Confirms imported holdings (import review in the app): applies what the user filled in and
+ * clears `review_pending`. Changes are logged as `note` edit events. A card left without a grade
+ * is still confirmed (it shows up under card grades). Returns how many rows were confirmed.
+ */
+export async function confirmImportReview(
+  db: Db,
+  userId: string,
+  rows: ImportReview[],
+  occurredAt: string = toTokyoIso(),
+): Promise<number> {
+  return db.transaction(async (tx) => {
+    let confirmed = 0;
+    for (const row of rows) {
+      const { holding, product } = await loadHolding(tx, userId, row.id);
+      if (!holding.reviewPending) continue;
+      const cls = productClass(product);
+      const patch: Partial<Holding> = {};
+      if (cls === 'card' && row.grade) {
+        Object.assign(
+          patch,
+          row.grade.grading === 'raw'
+            ? {
+                grading: 'raw',
+                rawGrade: row.grade.rawGrade,
+                grader: null,
+                grade: null,
+                certNumber: null,
+              }
+            : {
+                grading: 'graded',
+                rawGrade: null,
+                grader: row.grade.grader,
+                grade: row.grade.grade,
+                certNumber: row.certNumber?.trim() || null,
+              },
+        );
+      }
+      if (cls === 'sealed' && row.packagingState) {
+        // As received: still sealed, with or without shrink (opening is its own action).
+        if (!['sealed_shrink', 'sealed_no_shrink'].includes(row.packagingState)) {
+          throw new DomainError('invalid_input');
+        }
+        patch.packagingState = row.packagingState;
+      }
+      const changes: Record<string, { before: unknown; after: unknown }> = {};
+      for (const [key, after] of Object.entries(patch) as [keyof Holding, unknown][]) {
+        if (holding[key] !== after) changes[key] = { before: holding[key], after };
+      }
+      await tx
+        .update(holdings)
+        .set({ ...patch, reviewPending: false })
+        .where(eq(holdings.id, row.id));
+      if (Object.keys(changes).length > 0) {
+        await insertEvent(tx, {
+          holdingId: row.id,
+          type: 'note',
+          occurredAt,
+          payload: { kind: 'edit', changes },
+        });
+      }
+      confirmed++;
+    }
+    return confirmed;
   });
 }
 

@@ -249,7 +249,8 @@
     "forbidden": "Only the person who created this item can change it.",
     "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…).",
     "duplicate_order": "This transaction ID is already registered (each SNKRDUNK / Mercari transaction is one item).",
-    "noneSelected": "Select at least one card"
+    "noneSelected": "Select at least one card",
+    "noneGraded": "Pick a grade for at least one card"
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -421,5 +422,15 @@
     "noGrade": "No grade",
     "banner": "{count, plural, one {# card has} other {# cards have}} no grade yet",
     "link": "Set card grades"
+  },
+  "imports": {
+    "title": "Review import",
+    "intro": "Imported purchases, one row per transaction. Cards: pick the grade (and the cert number for slabs). Sealed items: shrink or not. Save confirms the rows that are filled in; cards without a grade wait here until you set one or confirm them without.",
+    "none": "Nothing to review.",
+    "noGrade": "Grade?",
+    "save": "Save",
+    "confirmAll": "{count, plural, one {Confirm # card without grade} other {Confirm # cards without grade}}",
+    "done": "{count, plural, one {Confirmed # item} other {Confirmed # items}}",
+    "banner": "{count, plural, one {# imported purchase to review} other {# imported purchases to review}}"
   }
 }

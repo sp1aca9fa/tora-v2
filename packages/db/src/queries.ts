@@ -252,3 +252,21 @@ export async function cardGradeCounts(db: Db, userId: string) {
     );
   return { cards: row?.cards ?? 0, ungraded: Number(row?.ungraded ?? 0) };
 }
+
+/** Imported holdings waiting for the import review, by order date. */
+export async function pendingImportReview(db: Db, userId: string) {
+  return db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(and(eq(holdings.userId, userId), eq(holdings.reviewPending, true)))
+    .orderBy(desc(holdings.acquiredAt));
+}
+
+export async function importReviewCount(db: Db, userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(holdings)
+    .where(and(eq(holdings.userId, userId), eq(holdings.reviewPending, true)));
+  return row?.n ?? 0;
+}

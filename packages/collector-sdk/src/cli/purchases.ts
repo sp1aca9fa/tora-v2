@@ -2,8 +2,7 @@
 // Imports marketplace purchases from a Google Takeout mail export (requirements S5b). Runs on
 // the home PC; the app never gets Gmail access. Nothing is written before the summary is
 // confirmed, and existing entries are never removed.
-import { type CardGrade, parseGrade, productClass, tokyoDate } from '@tora/core';
-import type { HoldingInput } from '@tora/db';
+import { tokyoDate } from '@tora/core';
 import { createDb, getUserByUsername } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { resolve } from 'node:path';
@@ -15,7 +14,6 @@ import {
   type PlanEntry,
   applyImport,
   gatherReceipts,
-  importedProduct,
   planImport,
 } from '../purchases';
 import { loadCollectors } from '../registry';
@@ -150,56 +148,6 @@ for (const importer of selected) {
     console.log('');
   }
 
-  // Receipts do not say a card's grade; without one a card is not valued. Asked once per card.
-  const extra = new Map<string, Partial<HoldingInput>>();
-  const cards = new Map<string, PlanEntry[]>();
-  for (const e of plan) {
-    const product = importedProduct(e);
-    const imported = e.type === 'new' || decisions.get(e.receipt.orderId) === 'different';
-    if (!product || !imported || productClass(product) !== 'card') continue;
-    cards.set(e.receipt.title, [...(cards.get(e.receipt.title) ?? []), e]);
-  }
-  const gradeFields = (g: CardGrade): Partial<HoldingInput> =>
-    g.grading === 'raw' ? { grading: 'raw', rawGrade: g.rawGrade } : g;
-  const askGrade = async (question: string): Promise<CardGrade | 'each' | null> => {
-    for (;;) {
-      process.stdout.write(`${question} `);
-      const next = await answers.next();
-      if (next.done) {
-        console.log('\nNo answer; nothing written.');
-        process.exit(1);
-      }
-      const text = next.value.trim();
-      if (text === '') return null;
-      if (text.toLowerCase() === 'each') return 'each';
-      const grade = parseGrade(text);
-      if (grade) return grade;
-      console.log('    Not a grade. Examples: PSA10, BGS9.5, A (raw), Enter to leave blank.');
-    }
-  };
-  if (cards.size > 0) {
-    console.log('Card grades (receipts do not say; ungraded cards get no market value).');
-    console.log(
-      'Type e.g. PSA10, BGS9.5, A (raw S-D); Enter leaves it blank (set later in the app).\n',
-    );
-  }
-  for (const [title, entries] of cards) {
-    const units = entries.reduce((n, e) => n + e.receipt.quantity, 0);
-    const several = entries.length > 1;
-    const grade = await askGrade(
-      `  ${title} (${entries.length} purchase(s), ${units} card(s))${several ? ', or "each"' : ''}:`,
-    );
-    if (grade === 'each') {
-      for (const e of entries) {
-        const g = await askGrade(`    ${line(e.receipt).trim()}:`);
-        if (g && g !== 'each') extra.set(e.receipt.orderId, gradeFields(g));
-      }
-    } else if (grade) {
-      for (const e of entries) extra.set(e.receipt.orderId, gradeFields(grade));
-    }
-  }
-  if (cards.size > 0) console.log('');
-
   const decided = [...decisions.values()];
   const creates = of('new').length + decided.filter((d) => d === 'different').length;
   const updates = decided.filter((d) => d === 'imported').length;
@@ -216,7 +164,7 @@ for (const importer of selected) {
     console.log('Nothing written.\n');
     continue;
   }
-  const outcome = await applyImport(db, user.id, importer, plan, decisions, extra);
+  const outcome = await applyImport(db, user.id, importer, plan, decisions);
   console.log(
     `Done: ${outcome.created} created, ${outcome.updated} corrected, ${outcome.attached} order ID(s) added.`,
   );

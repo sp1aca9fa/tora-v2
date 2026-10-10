@@ -6,7 +6,6 @@ import { orderSourceOf, tokyoDate } from '@tora/core';
 import {
   type Db,
   type Holding,
-  type HoldingInput,
   type Product,
   type ProductInput,
   createHolding,
@@ -206,15 +205,6 @@ export async function planImport(
  */
 export type Decision = 'keep' | 'imported' | 'same' | 'different' | 'skip';
 
-/** The product a receipt will be registered under when imported as new (null otherwise). */
-export function importedProduct(
-  entry: PlanEntry,
-): Pick<Product, 'category' | 'kind' | 'name'> | null {
-  if (entry.type !== 'new' && entry.type !== 'likely') return null;
-  if (!entry.ref) return null;
-  return 'existing' in entry.ref ? entry.ref.existing : entry.ref.create;
-}
-
 export interface ImportOutcome {
   created: number;
   updated: number;
@@ -228,8 +218,6 @@ export async function applyImport(
   importer: PurchaseImporter,
   plan: PlanEntry[],
   decisions: Map<string, Decision>,
-  /** Per transaction ID: fields the user gave while importing (e.g. a card's grade). */
-  extra: Map<string, Partial<HoldingInput>> = new Map(),
 ): Promise<ImportOutcome> {
   const outcome: ImportOutcome = { created: 0, updated: 0, attached: 0, failed: [] };
 
@@ -253,7 +241,8 @@ export async function applyImport(
         acquisitionType: 'purchase',
         orderId: receipt.orderId,
         ...importer.holdingFor?.(receipt, shape),
-        ...extra.get(receipt.orderId),
+        // Grade, cert and packaging are checked in the app's import review.
+        reviewPending: true,
       },
     );
     if ('create' in ref) createdProducts.set(productKey(ref.create), product);
