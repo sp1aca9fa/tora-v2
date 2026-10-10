@@ -104,7 +104,9 @@
     "released": "Released {date}",
     "notInList": "Not in the list? Enter it manually",
     "variantPlaceholder": "e.g. Collector",
-    "orderIdHint": "Optional. e.g. SNKRDUNK 取引ID or Mercari transaction ID; used to catch duplicates and imports."
+    "orderIdHint": "Optional. e.g. SNKRDUNK 取引ID or Mercari transaction ID; used to catch duplicates and imports.",
+    "existingHint": "Already registered? Pick it to add this under the same item:",
+    "linked": "linked"
   },
   "holding": {
     "costBasis": "Cost basis",

@@ -104,7 +104,9 @@
     "released": "{date}発売",
     "notInList": "一覧にない場合は手入力",
     "variantPlaceholder": "例: Collector",
-    "orderIdHint": "任意。スニダンの取引IDやメルカリの取引IDなど。重複登録やインポートの照合に使います。"
+    "orderIdHint": "任意。スニダンの取引IDやメルカリの取引IDなど。重複登録やインポートの照合に使います。",
+    "existingHint": "登録済みの商品ですか？選ぶと同じ商品として登録されます：",
+    "linked": "連携済み"
   },
   "holding": {
     "costBasis": "取得原価",

@@ -7,6 +7,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import type { ProductSummary } from '@/app/(app)/add/actions';
 import { Field } from '@/components/field';
 import { FormError } from '@/components/form-error';
+import { ExistingSuggestions } from '@/components/existing-suggestions';
 import { ProductPicker } from '@/components/product-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,10 +27,15 @@ export function PullLogger({
 }) {
   const t = useTranslations();
   const [existing, setExisting] = useState<ProductSummary | null>(null);
+  // What is being typed, to suggest cards already registered.
+  const [typed, setTyped] = useState({ name: '', number: '' });
   const [state, formAction, pending] = useActionState(
     async (prev: PullState, formData: FormData) => {
       const next = await action(prev, formData);
-      if (next.added !== prev.added) setExisting(null);
+      if (next.added !== prev.added) {
+        setExisting(null);
+        setTyped({ name: '', number: '' });
+      }
       return next;
     },
     {},
@@ -70,14 +76,39 @@ export function PullLogger({
       {mode === 'new' ? (
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
           <Field label={t('pulls.name')} htmlFor="pull-name" hint={t('pulls.nameHint')}>
-            <Input id="pull-name" ref={nameRef} name="name" required autoFocus autoComplete="off" />
+            <Input
+              id="pull-name"
+              ref={nameRef}
+              name="name"
+              required
+              autoFocus
+              autoComplete="off"
+              onChange={(e) => setTyped((v) => ({ ...v, name: e.target.value }))}
+            />
           </Field>
           <Field label={t('fields.cardNumber')} htmlFor="pull-number">
-            <Input id="pull-number" name="cardNumber" autoComplete="off" placeholder="123/100" />
+            <Input
+              id="pull-number"
+              name="cardNumber"
+              autoComplete="off"
+              placeholder="123/100"
+              onChange={(e) => setTyped((v) => ({ ...v, number: e.target.value }))}
+            />
           </Field>
           <Field label={t('fields.rarity')} htmlFor="pull-rarity">
             <Input id="pull-rarity" name="rarity" autoComplete="off" placeholder="SAR" />
           </Field>
+          <div className="sm:col-span-3">
+            <ExistingSuggestions
+              query={`${typed.name} ${typed.number}`}
+              category="tcg"
+              kinds={['single']}
+              onSelect={(p) => {
+                setExisting(p);
+                setMode('existing');
+              }}
+            />
+          </div>
         </div>
       ) : existing ? (
         <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">

@@ -19,6 +19,7 @@ import {
   createHolding,
   getProduct,
   getSet,
+  linkedProductIds,
   searchProducts,
   searchSets,
   suggestFromKnownProducts,
@@ -52,8 +53,12 @@ export interface ProductSummary {
   name: string;
   region: Region | null;
   setName: string | null;
+  setCode: string | null;
   cardNumber: string | null;
+  rarity: string | null;
   platform: string | null;
+  /** Has an active price source (a listing). */
+  linked: boolean;
 }
 
 export interface SetSummary {
@@ -75,15 +80,22 @@ export async function searchProductsAction(
     kinds: filter.kinds?.filter((k) => PRODUCT_KINDS.includes(k)),
     limit: 15,
   });
-  return rows.map(({ id, category, kind, name, region, setName, cardNumber, platform }) => ({
-    id,
-    category,
-    kind,
-    name,
-    region,
-    setName,
-    cardNumber,
-    platform,
+  const linked = await linkedProductIds(
+    db,
+    rows.map((r) => r.id),
+  );
+  return rows.map((p) => ({
+    id: p.id,
+    category: p.category,
+    kind: p.kind,
+    name: p.name,
+    region: p.region,
+    setName: p.setName,
+    setCode: p.setCode,
+    cardNumber: p.cardNumber,
+    rarity: p.rarity,
+    platform: p.platform,
+    linked: linked.has(p.id),
   }));
 }
 

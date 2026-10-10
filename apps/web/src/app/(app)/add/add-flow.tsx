@@ -21,6 +21,7 @@ import { ConditionFields } from '@/components/condition-fields';
 import { Field } from '@/components/field';
 import { FormError } from '@/components/form-error';
 import { ProductFields } from '@/components/product-fields';
+import { ExistingSuggestions } from '@/components/existing-suggestions';
 import { ProductPicker } from '@/components/product-picker';
 import { SetPicker } from '@/components/set-picker';
 import { Button } from '@/components/ui/button';
@@ -82,6 +83,8 @@ export function AddFlow({
   const [step, setStep] = useState(initialProduct ? 1 : 0);
   const [mode, setMode] = useState<'existing' | 'new'>(initialProduct ? 'existing' : 'new');
   const [selected, setSelected] = useState<ProductSummary | null>(initialProduct);
+  // What is being typed for a new item, to suggest items already registered.
+  const [typed, setTyped] = useState({ name: '', setCode: '', cardNumber: '' });
   const [category, setCategory] = useState<Category | null>(null);
   const [franchise, setFranchise] = useState<TcgFranchise | 'other' | null>(null);
   const [region, setRegion] = useState<Region>('jp');
@@ -382,6 +385,7 @@ export function AddFlow({
 
             {category && kind && !catalogMode && (
               <ProductFields
+                onTyped={(field, value) => setTyped((v) => ({ ...v, [field]: value }))}
                 key={`${category}-${kind}`}
                 category={category}
                 kind={kind}
@@ -389,6 +393,17 @@ export function AddFlow({
                 franchiseInput={category === 'game'}
                 showRegion={category === 'game'}
                 franchiseSuggestions={franchiseSuggestions}
+              />
+            )}
+            {category && kind && !catalogMode && (
+              <ExistingSuggestions
+                query={`${typed.name} ${typed.setCode} ${typed.cardNumber}`}
+                category={category}
+                kinds={[kind]}
+                onSelect={(p) => {
+                  setSelected(p);
+                  setMode('existing');
+                }}
               />
             )}
           </>

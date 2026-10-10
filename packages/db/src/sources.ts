@@ -609,3 +609,13 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
   }
   return out;
 }
+
+/** Which of these products have an active listing at any source. */
+export async function linkedProductIds(db: Db, productIds: string[]): Promise<Set<string>> {
+  if (productIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ productId: productSources.productId })
+    .from(productSources)
+    .where(and(inArray(productSources.productId, productIds), eq(productSources.active, true)));
+  return new Set(rows.map((r) => r.productId));
+}

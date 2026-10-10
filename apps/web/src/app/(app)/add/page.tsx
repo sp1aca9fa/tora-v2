@@ -41,8 +41,11 @@ export default async function AddPage({
             name: product.name,
             region: product.region,
             setName: product.setName,
+            setCode: product.setCode,
             cardNumber: product.cardNumber,
+            rarity: product.rarity,
             platform: product.platform,
+            linked: false,
           }
         }
       />

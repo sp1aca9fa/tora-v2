@@ -27,6 +27,7 @@ export function ProductFields({
   franchiseSuggestions = [],
   showSetFields = true,
   showRegion = true,
+  onTyped,
 }: {
   category: Category;
   kind: ProductKind;
@@ -35,6 +36,8 @@ export function ProductFields({
   franchiseSuggestions?: string[];
   showSetFields?: boolean;
   showRegion?: boolean;
+  /** Reports what is typed in the identifying fields (name, set code, card number). */
+  onTyped?: (field: 'name' | 'setCode' | 'cardNumber', value: string) => void;
 }) {
   const t = useTranslations();
   const shown = new Set(productFieldsFor(category, kind));
@@ -51,6 +54,11 @@ export function ProductFields({
         name={name}
         defaultValue={value(name)}
         autoComplete="off"
+        onChange={
+          onTyped && (name === 'setCode' || name === 'cardNumber')
+            ? (e) => onTyped(name, e.target.value)
+            : undefined
+        }
         {...props}
       />
     </Field>
@@ -59,7 +67,14 @@ export function ProductFields({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label={t('fields.name')} htmlFor="p-name" className="sm:col-span-2">
-        <Input id="p-name" name="name" required defaultValue={value('name')} autoComplete="off" />
+        <Input
+          id="p-name"
+          name="name"
+          required
+          defaultValue={value('name')}
+          autoComplete="off"
+          onChange={onTyped && ((e) => onTyped('name', e.target.value))}
+        />
       </Field>
       {showRegion && (
         <Field label={t('fields.region')} htmlFor="p-region">
