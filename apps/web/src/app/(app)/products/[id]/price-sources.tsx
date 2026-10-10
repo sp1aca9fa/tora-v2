@@ -4,6 +4,7 @@ import {
   linkedListingImages,
   listPendingCandidates,
   listProductSources,
+  QUERY_SOURCE_ID,
   recentObservations,
 } from '@tora/db';
 import type { Product } from '@tora/db';
@@ -14,9 +15,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { sourceLabel } from '@/lib/product-display';
 import { cn, formatJpy } from '@/lib/utils';
 import { LinkUrlForm } from './link-url-form';
+import { SearchSource } from './search-source';
 import {
   confirmCandidateAction,
   linkUrlAction,
+  reactivateSourceAction,
   rejectCandidateAction,
   unlinkSourceAction,
 } from './source-actions';
@@ -51,7 +54,9 @@ export async function PriceSources({
       .filter((c) => !c.imageUrl)
       .map((c) => ({ source: c.source, externalId: c.externalId })),
   );
-  const active = sources.filter((s) => s.active);
+  // Search-based sources (a saved query, e.g. Mercari) are shown with their own editor.
+  const searches = sources.filter((s) => s.externalId === QUERY_SOURCE_ID);
+  const active = sources.filter((s) => s.active && s.externalId !== QUERY_SOURCE_ID);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const canUseSnkrdunk = product.category === 'tcg';
 
@@ -137,6 +142,23 @@ export async function PriceSources({
         <CardDescription>{t('sources.info')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {searches.map((s) =>
+          s.active ? (
+            <SearchSource key={s.id} db={db} link={s} />
+          ) : (
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
+            >
+              <span>{t('sources.search.off', { source: sourceLabel(s.source) })}</span>
+              <form action={reactivateSourceAction.bind(null, s.id)}>
+                <Button variant="ghost" size="sm">
+                  {t('sources.search.turnOn')}
+                </Button>
+              </form>
+            </div>
+          ),
+        )}
         {active.length > 0 && (
           <ul className="divide-y text-sm">
             {active.map((s) => (

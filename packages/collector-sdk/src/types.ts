@@ -6,6 +6,7 @@ import type {
   ProductInput,
   ProductSource,
   RecentSale,
+  SourceQuery,
 } from '@tora/db';
 import type { PoliteHttp } from './http';
 import type { Email } from './mbox';
@@ -40,6 +41,12 @@ export interface Collector {
   supports(product: Product): boolean;
   /** Searches the site for listings that may be this product, best first, with a 0-1 score. */
   findCandidates(product: Product, ctx: CollectorContext): Promise<CandidateInput[]>;
+  /**
+   * Search-based sources (no listing per product, e.g. a flea market): the query a product starts
+   * with. When defined, every supported product gets an active source with this query at once
+   * (no candidates to confirm); the user tunes or unlinks it in the app.
+   */
+  defaultQuery?(product: Product): SourceQuery | null;
   /**
    * Fetches new observations for a linked listing and saves them through `ctx.save`.
    * `heldBuckets`: the conditions users own of this product (e.g. `graded:PSA:10`), for sources

@@ -2,7 +2,12 @@
 
 import { parseSourceUrl } from '@tora/core';
 import {
+  type SourceQuery,
   confirmCandidate,
+  getObservation,
+  reactivateSource,
+  setObservationExcluded,
+  updateSourceQuery,
   getCandidate,
   getProductSource,
   linkSource,
@@ -53,4 +58,61 @@ export async function linkUrlAction(
   await linkSource(db, productId, parsed);
   revalidatePath(`/products/${productId}`);
   return {};
+}
+
+const words = (v: FormDataEntryValue | null) =>
+  String(v ?? '')
+    .normalize('NFKC')
+    .split(/[\s,、]+/)
+    .map((w) => w.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+const yenOrUndefined = (v: FormDataEntryValue | null) => {
+  const n = Number(String(v ?? '').replace(/[^\d]/g, ''));
+  return String(v ?? '').trim() && Number.isSafeInteger(n) && n > 0 ? n : undefined;
+};
+
+export type QueryFormState = FormState & { saved?: boolean };
+
+/** Saves an edited search (keywords, excluded words, price range); the next collect refetches. */
+export async function updateQueryAction(
+  sourceId: string,
+  _prev: QueryFormState,
+  formData: FormData,
+): Promise<QueryFormState> {
+  const { db } = await authed();
+  const link = await getProductSource(db, sourceId);
+  if (!link || !(await allowed(link.productId))) return { error: 'not_found' };
+  const keywords = String(formData.get('keywords') ?? '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
+  if (!keywords) return { error: 'check', fields: ['keywords'] };
+  const query: SourceQuery = {
+    ...link.query,
+    keywords: [keywords],
+    excludeKeywords: words(formData.get('excludeKeywords')),
+    priceMin: yenOrUndefined(formData.get('priceMin')),
+    priceMax: yenOrUndefined(formData.get('priceMax')),
+  };
+  await updateSourceQuery(db, sourceId, query);
+  revalidatePath(`/products/${link.productId}`);
+  return { saved: true };
+}
+
+export async function reactivateSourceAction(sourceId: string) {
+  const { db } = await authed();
+  const link = await getProductSource(db, sourceId);
+  if (link && (await allowed(link.productId))) await reactivateSource(db, sourceId);
+  revalidatePath(`/products/${link?.productId}`);
+}
+
+/** Excludes one collected sale by hand (or includes it again). */
+export async function excludeObservationAction(observationId: string, excluded: boolean) {
+  const { db } = await authed();
+  const obs = await getObservation(db, observationId);
+  if (obs && (await allowed(obs.productId)))
+    await setObservationExcluded(db, observationId, excluded);
+  revalidatePath(`/products/${obs?.productId}`);
 }

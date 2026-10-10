@@ -81,6 +81,23 @@ export class PoliteHttp {
     }
   }
 
+  /** POSTs a JSON body and parses the JSON answer (e.g. a search API). */
+  async postJson<T>(url: string, body: unknown, headers: Record<string, string> = {}): Promise<T> {
+    const res = await this.request(
+      url,
+      { Accept: 'application/json', 'Content-Type': 'application/json', ...headers },
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      if (CAPTCHA_MARKERS.some((m) => m.test(text)))
+        throw new BlockedError(`challenge page at ${url}`);
+      throw new Error(`invalid JSON from ${url}`);
+    }
+  }
+
   /** A binary file (e.g. an image) with its content type. */
   async bytes(url: string): Promise<{ data: Buffer; contentType: string | null }> {
     const res = await this.request(url, { Accept: 'image/*,*/*;q=0.8' });
@@ -90,12 +107,19 @@ export class PoliteHttp {
     };
   }
 
-  private async request(url: string, headers: Record<string, string>): Promise<Response> {
+  private async request(
+    url: string,
+    headers: Record<string, string>,
+    init: { method?: string; body?: string } = {},
+  ): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
       if (this.requests >= this.o.maxRequests) throw new RequestCapError();
       await this.pace();
       this.requests++;
-      const res = await this.o.fetchImpl(url, { headers: { ...BROWSER_HEADERS, ...headers } });
+      const res = await this.o.fetchImpl(url, {
+        ...init,
+        headers: { ...BROWSER_HEADERS, ...headers },
+      });
       if (res.status === 403 || res.status === 429) {
         throw new BlockedError(`HTTP ${res.status} for ${url}`);
       }

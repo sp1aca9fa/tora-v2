@@ -2,10 +2,12 @@ import type { CollectorRunStatus } from '@tora/core';
 import {
   type Db,
   activeSources,
+  createQuerySource,
   heldBuckets,
   finishRun,
   insertObservations,
   productsToMatch,
+  productsWithoutSource,
   saveCandidates,
   suggestFromKnownProducts,
   startRun,
@@ -70,7 +72,20 @@ export async function runCollector(
   };
 
   try {
-    if (!options.collectOnly) {
+    if (!options.collectOnly && collector.defaultQuery) {
+      // Search-based source: every supported product starts with its default query, once (an
+      // unlinked source stays off).
+      for (const product of await productsWithoutSource(db, collector.source, {
+        productId: options.productId,
+      })) {
+        if (!collector.supports(product)) continue;
+        const query = collector.defaultQuery(product);
+        if (!query) continue;
+        await createQuerySource(db, product.id, collector.source, query);
+        summary.candidates++;
+        log(`search set up for "${product.name}": ${(query.keywords ?? []).join(' ')}`);
+      }
+    } else if (!options.collectOnly) {
       const toMatch = (
         await productsToMatch(db, collector.source, { productId: options.productId })
       ).filter((p) => collector.supports(p));

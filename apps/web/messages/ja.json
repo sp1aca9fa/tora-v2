@@ -372,7 +372,29 @@
     "matchesInfo": "収集処理がスニダンの候補を見つけました。開いて正しい商品を確認してください。",
     "noMatches": "確認待ちはありません。",
     "banner": "{count}件の商品に確認待ちの価格ソースがあります",
-    "addAnother": "別のリスティングを追加（{count, plural, =0 {リンクを貼り付け} other {候補#件}}）例: シュリンクなしBOX"
+    "addAnother": "別のリスティングを追加（{count, plural, =0 {リンクを貼り付け} other {候補#件}}）例: シュリンクなしBOX",
+    "search": {
+      "title": "検索",
+      "without": "除外: {words}",
+      "found": "直近の売り切れ{total}件のうち{kept}件を採用",
+      "turnOff": "オフにする",
+      "turnOn": "オンにする",
+      "off": "この商品の{source}検索はオフです",
+      "edit": "検索を編集",
+      "latest": "見つかった売り切れ（直近{count}件）",
+      "byYou": "手動で除外",
+      "left": "除外: {why}",
+      "include": "含める",
+      "exclude": "除外",
+      "keywords": "検索ワード",
+      "keywordsHint": "タイトルにすべて含まれるものが対象です。",
+      "excludeHint": "いずれかの語を含むタイトルは除外されます。",
+      "priceMin": "最低価格",
+      "priceMax": "最高価格",
+      "save": "検索を保存",
+      "saved": "保存しました。次回の収集で新しい検索を使います。",
+      "excludeWords": "除外ワード"
+    }
   },
   "valuation": {
     "title": "時価（中央値）",

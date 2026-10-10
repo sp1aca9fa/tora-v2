@@ -16,7 +16,7 @@
 | S2 | Registration UI (products, lots, pulls, events) | done (reworked by S2b) |
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
-| S4 | Mercari sold collector | todo |
+| S4 | Mercari sold collector | collector + query editor built; awaiting user check (purchase importer pending) |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
@@ -83,6 +83,7 @@
 - 2026-10-10: Registering a new item or a pull suggests matching items already registered while typing (name, set code, card number; linked ones first, marked "linked"). Picking one registers the purchase or pull under that item instead of creating a duplicate (user request: search-first, like asset tools).
 - 2026-10-10: Duplicate products can be merged: the product edit page suggests registered look-alikes; picking one opens a confirmation, and merging moves the duplicate's lots, sales data, manual prices and listings to the kept product and deletes the duplicate (same category and kind only).
 - 2026-10-10: Cost basis of pulls (user decision): an opened (consumed) item keeps its full cost in the totals, the P/L base and the value-over-time cost line, at no market value; the pulls logged from it cost nothing and carry the market value. Unlogged cards are thus not guessed at. Each pull shows an estimated cost for reference only (the opened item's cost split across all its logged pulls by market value, equal shares where unknown), never counted in totals. Previously an opened item's cost dropped out of the totals, which overstated P/L.
+- 2026-10-10: Mercari is searched for every product (user: try everything, maybe turn cards off later). No public project filters Mercari bundles or parts; hosted scrapers stop at sold-only + dedupe + median/percentiles, and Japanese price sites mostly use partner store prices (e.g. ポケカチ with Card Rush). So filtering is rule-based and transparent: every rejected item is kept with its reason and can be included by hand.
 
 ---
 
@@ -326,6 +327,11 @@ Build:
 - Mercari JP collector (private submodule) using the same search API as jp.mercari.com (no login). Port the request token (DPoP-style ES256 JWT) generation from the open-source `mercari` PyPI package as a reference; verify current behavior by inspecting the site's network requests.
 - Search with `status=sold_out` using each product's saved query (keywords, exclude keywords, category, price band). Map `item_condition_id` to buckets. Use the item's last-updated time as the sale-time proxy.
 - Product source editor in UI: edit query, preview the latest matched results, exclude mismatches (sets `excluded` + reason). This is where matching quality is tuned.
+
+Built (2026-10-10):
+- Search-based sources in the framework: a collector may define `defaultQuery(product)`; every supported product then gets an active source with that query at once (`product_sources.external_id = 'search'`), created once (an unlinked search stays off). The product page shows the query with an editor (search words, excluded words, price range), the latest sold items found (kept and left out, with the reason) and Exclude / Include per item. Saving a query drops what the old one collected (except manual exclusions); the next collect searches again.
+- Mercari (private): on for every product for now (the user will judge whether cards are worth it). Default query: franchise word + identifying words (card name + number; set name + BOX / パック / デッキ; the item's name) and default excluded words per class. Each sold item is checked: excluded words, bundles (まとめ, "3点", "×2"), parts of a sealed product sold alone (サプライ, ディスプレイ, …のみ), accessories / junk, other regions, a card's own number (not a denominator) and set, the box / pack / deck word and single-card titles for sealed products, and coverage of the product's words; prices outside 0.3x-3.5x of the batch median of their bucket are outliers. Every item is stored (rejected ones excluded, reason in `raw.filter`). Buckets: Mercari condition 1-6 on the item scale; cards: PSA/BGS/CGC/ARS grade from the title, else conditions 1-2 raw A, 3 B, 4 C, 5-6 D (approximate); sealed: シュリンクなし / シュリンク付・未開封 or new condition. Sale time = the item's last update. First run reads 3 pages (up to 360 items), then the newest page per run.
+- Live check (4 products, one page each): FUTURISTIC BOX 47 of 104 kept (shrink median ¥59,800; 32 supply-only listings dropped), amiibo 81 of 112 kept (median ¥2,500 used / ¥2,980 new).
 
 Acceptance:
 - Scenario items 1-3 (CE, amiibo, controllers) get Mercari sold observations with sensible buckets.

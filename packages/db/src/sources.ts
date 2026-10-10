@@ -13,6 +13,7 @@ import {
   isNull,
   lt,
   max,
+  ne,
   not,
   or,
   sql,
@@ -24,6 +25,7 @@ import {
   type ProductSource,
   type RecentSale,
   type SourceCandidate,
+  type SourceQuery,
   collectorRuns,
   holdings,
   priceObservations,
@@ -618,4 +620,128 @@ export async function linkedProductIds(db: Db, productIds: string[]): Promise<Se
     .from(productSources)
     .where(and(inArray(productSources.productId, productIds), eq(productSources.active, true)));
   return new Set(rows.map((r) => r.productId));
+}
+
+// ---------------------------------------------------------------------------------------------
+// search-based sources (a saved query per product instead of a listing, e.g. a flea market)
+
+/** Listing id used for a product's search-based source (one query per product and source). */
+export const QUERY_SOURCE_ID = 'search';
+
+/** Owned (or opened) products with no source row at all for `source` (an unlinked one counts). */
+export async function productsWithoutSource(
+  db: Db,
+  source: string,
+  filter: { productId?: string; limit?: number } = {},
+): Promise<Product[]> {
+  return db
+    .select()
+    .from(products)
+    .where(
+      and(
+        filter.productId ? eq(products.id, filter.productId) : undefined,
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(holdings)
+            .where(
+              and(
+                eq(holdings.productId, products.id),
+                inArray(holdings.status, ['owned', 'consumed']),
+              ),
+            ),
+        ),
+        not(
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(productSources)
+              .where(
+                and(eq(productSources.productId, products.id), eq(productSources.source, source)),
+              ),
+          ),
+        ),
+      ),
+    )
+    .orderBy(asc(products.createdAt))
+    .limit(filter.limit ?? 500);
+}
+
+/** Starts a product's search-based source with a query (active at once). */
+export async function createQuerySource(
+  db: Db,
+  productId: string,
+  source: string,
+  query: SourceQuery,
+): Promise<void> {
+  await db
+    .insert(productSources)
+    .values({ productId, source, externalId: QUERY_SOURCE_ID, query, active: true })
+    .onConflictDoNothing();
+}
+
+/**
+ * Saves an edited query. Sales collected under the old query are dropped (the next run fetches
+ * again under the new one), except the ones the user excluded by hand.
+ */
+export async function updateSourceQuery(
+  db: Db,
+  sourceId: string,
+  query: SourceQuery,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [link] = await tx.select().from(productSources).where(eq(productSources.id, sourceId));
+    if (!link) return;
+    await tx
+      .update(productSources)
+      .set({ query, state: null, active: true })
+      .where(eq(productSources.id, sourceId));
+    await tx
+      .delete(priceObservations)
+      .where(
+        and(
+          eq(priceObservations.productId, link.productId),
+          eq(priceObservations.source, link.source),
+          or(
+            isNull(priceObservations.excludedReason),
+            ne(priceObservations.excludedReason, 'manual'),
+          ),
+        ),
+      );
+  });
+}
+
+/** Latest collected sales of a product from one source, excluded ones included (for review). */
+export async function sourceObservations(db: Db, productId: string, source: string, limit = 30) {
+  return db
+    .select()
+    .from(priceObservations)
+    .where(and(eq(priceObservations.productId, productId), eq(priceObservations.source, source)))
+    .orderBy(desc(priceObservations.observedAt))
+    .limit(limit);
+}
+
+/** Excludes a sale by hand (or includes it again). */
+export async function setObservationExcluded(
+  db: Db,
+  observationId: string,
+  excluded: boolean,
+): Promise<{ productId: string } | null> {
+  const [row] = await db
+    .update(priceObservations)
+    .set({ excluded, excludedReason: excluded ? 'manual' : null })
+    .where(eq(priceObservations.id, observationId))
+    .returning({ productId: priceObservations.productId });
+  return row ?? null;
+}
+
+/** Turns a source back on (e.g. a search the user had switched off). */
+export async function reactivateSource(db: Db, sourceId: string): Promise<void> {
+  await db.update(productSources).set({ active: true }).where(eq(productSources.id, sourceId));
+}
+
+/** One collected observation (to check who may change it). */
+export async function getObservation(db: Db, id: string) {
+  const [row] = await db.select().from(priceObservations).where(eq(priceObservations.id, id));
+  return row ?? null;
 }

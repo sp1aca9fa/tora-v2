@@ -12,6 +12,7 @@ import {
   pendingMatchesForUser,
   rejectCandidate,
   schema,
+  unlinkSource,
 } from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { eq } from 'drizzle-orm';
@@ -201,4 +202,25 @@ it('offers a linked look-alike instead of searching the site', async () => {
   expect((await listPendingCandidates(db, second.product.id)).map((c) => c.externalId)).toEqual([
     'L9',
   ]);
+});
+
+it('search-based sources: every product gets its query once, and an unlinked one stays off', async () => {
+  const { product } = await box();
+  const queries: unknown[] = [];
+  const collector = fakeCollector({
+    defaultQuery: (p) => ({ keywords: [p.name] }),
+    collect: async (link) => {
+      queries.push(link.query);
+      return { state: { mode: 'incremental' }, complete: true };
+    },
+  });
+  await runCollector(db, collector, quiet);
+  expect(queries).toEqual([{ keywords: ['BP BOX'] }]);
+  const [source] = await listProductSources(db, product.id);
+  expect(source).toMatchObject({ source: 'fake', externalId: 'search', active: true });
+
+  await unlinkSource(db, source!.id);
+  await runCollector(db, collector, quiet);
+  expect((await listProductSources(db, product.id)).filter((s) => s.active)).toEqual([]);
+  expect(queries).toHaveLength(1);
 });
