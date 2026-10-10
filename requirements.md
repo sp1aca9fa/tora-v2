@@ -353,6 +353,10 @@ Build:
 - Receipts do not state a card's grade or cert. Imported holdings are flagged `review_pending` (migration 0006); "Review import" in the app (`/imports`, portfolio banner) lists them one row per transaction: cards get a grade (raw S-D or grader + grade) and an optional cert number, sealed items shrink / no shrink. Save confirms filled-in rows; cards without a grade stay until graded or confirmed without one. "Card grades" (`/holdings/grades`) sets one grade on many ticked cards at once. Changes are logged as edits.
 - Email parsing and sample emails live in the private collectors repo.
 
+- Cancellations by the buyer send no email (found on 5 FUTURISTIC BOX orders), and SNKRDUNK's progress mails (shipped, authenticated, delivered) name the item but not the order. So:
+  - Orders can be marked cancelled in the app ("Order cancelled" on a lot with an order ID, or the checkbox in Review import): all lots of that order are removed and the ID is kept in `cancelled_orders`, so imports skip it.
+  - The import flags lots for review with a reason (`holdings.review_reason`): `deadline_missed` (a 「発送期限切れ…キャンセルが可能です」 mail for that order) and `no_delivery` (an item with fewer delivery mails than older purchases; purchases from the 21 days before the export's newest mail may still be on the way). Every older purchase of such an item is flagged, since the mails do not say which order arrived. Lots already in the app are flagged too; a reason the user already confirmed does not flag the lot again.
+
 Acceptance:
 - Re-running the import on the same file adds nothing; cancelled purchases are not imported; conflicts are asked, not guessed.
 

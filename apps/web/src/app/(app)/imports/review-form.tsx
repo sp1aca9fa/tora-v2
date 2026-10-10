@@ -20,15 +20,29 @@ export interface ReviewItem {
   costJpy: number;
   quantity: number;
   packagingState: string | null;
+  /** Why it was flagged (e.g. `deadline_missed`, `no_delivery`). */
+  reasons: string[];
+  /** What is already recorded (a lot flagged again keeps its grade). */
+  grading: string | null;
+  rawGrade: string | null;
+  grader: string | null;
+  grade: string | null;
+  certNumber: string | null;
 }
 
 const initialRow = (item: ReviewItem): ReviewRow => ({
   id: item.id,
   cls: item.cls,
-  gradeType: '',
-  rawGrade: 'A',
-  grade: '10',
-  certNumber: '',
+  gradeType:
+    item.grading === 'graded' && item.grader
+      ? (item.grader as ReviewRow['gradeType'])
+      : item.grading === 'raw' && item.rawGrade
+        ? 'raw'
+        : '',
+  rawGrade: (item.rawGrade as ReviewRow['rawGrade']) ?? 'A',
+  grade: item.grade ?? '10',
+  certNumber: item.certNumber ?? '',
+  cancelled: false,
   packagingState:
     item.cls === 'sealed'
       ? item.packagingState === 'sealed_no_shrink'
@@ -49,7 +63,9 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
     setRows((m) => new Map(m).set(id, { ...m.get(id)!, ...patch }));
   // Rows confirmed by the last save disappear from `items` after revalidation.
   const payload = JSON.stringify(items.map((i) => rows.get(i.id) ?? initialRow(i)));
-  const ungraded = items.filter((i) => i.cls === 'card' && !rows.get(i.id)?.gradeType).length;
+  const ungraded = items.filter(
+    (i) => i.cls === 'card' && !rows.get(i.id)?.gradeType && !rows.get(i.id)?.cancelled,
+  ).length;
 
   return (
     <form action={formAction} className="space-y-4">
@@ -73,7 +89,28 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                     .join(' · ')}
                 </p>
               </div>
-              {item.cls === 'card' ? (
+              {item.reasons.map((r) => (
+                <p
+                  key={r}
+                  className="rounded-md bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300"
+                >
+                  {t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r}
+                </p>
+              ))}
+              {item.orderId && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={row.cancelled ?? false}
+                    onChange={(e) => update(item.id, { cancelled: e.target.checked })}
+                    className="size-4"
+                  />
+                  <span className={row.cancelled ? 'text-destructive' : 'text-muted-foreground'}>
+                    {t('imports.cancelled')}
+                  </span>
+                </label>
+              )}
+              {row.cancelled ? null : item.cls === 'card' ? (
                 <div className="flex flex-wrap gap-2">
                   <NativeSelect
                     aria-label={t('fields.grading')}
@@ -163,6 +200,9 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
           {state.done !== undefined && (
             <p role="status" className="text-sm text-muted-foreground">
               {t('imports.done', { count: state.done })}
+              {state.cancelled
+                ? ` · ${t('imports.doneCancelled', { count: state.cancelled })}`
+                : ''}
             </p>
           )}
           <FormError state={state} />

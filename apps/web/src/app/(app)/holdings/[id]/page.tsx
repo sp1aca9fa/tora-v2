@@ -200,7 +200,15 @@ export default async function HoldingPage({ params }: Params) {
         <EventList events={events} />
       </section>
 
-      <div className="pt-2">
+      <div className="flex flex-wrap gap-x-5 gap-y-2 pt-2">
+        {holding.orderId && (
+          <Link
+            href={`/holdings/${holding.id}/cancel-order`}
+            className="text-sm text-destructive hover:underline"
+          >
+            {t('holding.actions.cancel-order')}
+          </Link>
+        )}
         <Link
           href={`/holdings/${holding.id}/delete`}
           className="text-sm text-destructive hover:underline"

@@ -1,13 +1,13 @@
 'use server';
 
 import { type CardGrade, GRADERS, RAW_GRADES, parseGrade } from '@tora/core';
-import { type ImportReview, confirmImportReview } from '@tora/db';
+import { DomainError, type ImportReview, confirmImportReview, markOrderCancelled } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
 import { type FormState, runDomain } from '@/lib/form';
 
-export type ReviewState = FormState & { done?: number };
+export type ReviewState = FormState & { done?: number; cancelled?: number };
 
 const rowSchema = z.object({
   id: z.string().min(1).max(64),
@@ -17,6 +17,8 @@ const rowSchema = z.object({
   grade: z.string().max(10).optional(),
   certNumber: z.string().max(40).optional(),
   packagingState: z.enum(['sealed_shrink', 'sealed_no_shrink']).optional(),
+  /** The order was cancelled: remove its lots instead of confirming. */
+  cancelled: z.boolean().optional(),
 });
 export type ReviewRow = z.infer<typeof rowSchema>;
 const payloadSchema = z.array(rowSchema).max(1000);
@@ -55,7 +57,12 @@ export async function confirmReviewAction(
   }
   const all = formData.get('mode') === 'all';
   const reviews: ImportReview[] = [];
+  const cancelled: string[] = [];
   for (const row of rows) {
+    if (row.cancelled) {
+      cancelled.push(row.id);
+      continue;
+    }
     let grade: CardGrade | null;
     try {
       grade = gradeOf(row);
@@ -70,9 +77,21 @@ export async function confirmReviewAction(
       packagingState: row.cls === 'sealed' ? (row.packagingState ?? null) : null,
     });
   }
-  if (reviews.length === 0) return { error: 'noneGraded' };
-  const result = await runDomain(() => confirmImportReview(db, user.id, reviews));
+  if (reviews.length === 0 && cancelled.length === 0) return { error: 'noneGraded' };
+  const result = await runDomain(async () => {
+    // A cancelled order removes all its lots (several rows may share it): skip ones already gone.
+    let removed = 0;
+    for (const id of cancelled) {
+      try {
+        await markOrderCancelled(db, user.id, id);
+        removed++;
+      } catch (e) {
+        if (!(e instanceof DomainError && e.code === 'not_found')) throw e;
+      }
+    }
+    return { done: await confirmImportReview(db, user.id, reviews), cancelled: removed };
+  });
   if (!result.ok) return result.state;
   revalidatePath('/', 'layout');
-  return { done: result.value };
+  return result.value;
 }

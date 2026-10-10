@@ -18,7 +18,10 @@ import {
   markOpened,
   returnGrading,
   sellHolding,
+  cancelledOrderIds,
   confirmImportReview,
+  flagForReview,
+  markOrderCancelled,
   setCardGrade,
   splitOff,
   submitGrading,
@@ -581,6 +584,46 @@ describe('confirmImportReview', () => {
       confirmImportReview(db, uid, [{ id: again.holding.id, packagingState: 'opened' }]),
       'invalid_input',
     );
+  });
+});
+
+describe('cancelled orders and review flags', () => {
+  const card = { product: { category: 'tcg' as const, kind: 'single' as const, name: 'ミュウ' } };
+  const input = (orderId: string) => ({
+    quantity: 3,
+    costTotalJpy: 3000,
+    acquiredAt: day('09-01'),
+    acquiredFrom: 'SNKRDUNK',
+    orderId,
+    grading: 'raw' as const,
+    rawGrade: 'A' as const,
+  });
+
+  it('removes every lot of a cancelled order and remembers it', async () => {
+    const lot = await createHolding(db, uid, card, input('900'));
+    const part = await splitOff(db, uid, lot.holding.id, 1, day('09-02'));
+    const other = await createHolding(db, uid, card, input('901'));
+    expect(await markOrderCancelled(db, uid, part.id)).toMatchObject({
+      orderId: '900',
+      removed: 2,
+    });
+    const left = await db.select().from(holdings);
+    expect(left.map((h) => h.id)).toEqual([other.holding.id]);
+    expect(await cancelledOrderIds(db, uid, 'snkrdunk')).toEqual(new Set(['900']));
+    // Lots without an order ID cannot be "cancelled orders".
+    const plain = await createHolding(db, uid, card, { ...input('x'), orderId: null });
+    await expectDomainError(markOrderCancelled(db, uid, plain.holding.id), 'invalid_input');
+  });
+
+  it('flags a lot once per reason, even after it was confirmed', async () => {
+    const { holding } = await createHolding(db, uid, card, input('902'));
+    const flag = (reason: string) => flagForReview(db, uid, [{ holdingId: holding.id, reason }]);
+    expect(await flag('no_delivery')).toBe(1);
+    await confirmImportReview(db, uid, [{ id: holding.id }]);
+    expect(await flag('no_delivery')).toBe(0);
+    expect(await flag('deadline_missed')).toBe(1);
+    const [h] = await db.select().from(holdings);
+    expect(h).toMatchObject({ reviewPending: true, reviewReason: 'no_delivery,deadline_missed' });
   });
 });
 

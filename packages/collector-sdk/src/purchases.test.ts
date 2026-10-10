@@ -4,6 +4,7 @@ import {
   createHolding,
   createUser,
   linkSource,
+  markOrderCancelled,
   listProductSources,
   schema,
 } from '@tora/db';
@@ -14,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readMbox } from './mbox';
-import { type Decision, applyImport, gatherReceipts, planImport } from './purchases';
+import { type Decision, applyImport, gatherReceipts, planImport, reviewFlags } from './purchases';
 import type { PurchaseImporter, PurchaseReceipt, ReceiptMail } from './types';
 
 let dir: string;
@@ -184,7 +185,7 @@ describe('purchase import', () => {
       ['102', 'same'],
     ]);
     const outcome = await applyImport(db, userId, importer, plan, decisions);
-    expect(outcome).toEqual({ created: 3, updated: 1, attached: 1, failed: [] });
+    expect(outcome).toEqual({ created: 3, updated: 1, attached: 1, flagged: 0, failed: [] });
 
     const rows = await db.select().from(schema.holdings).where(eq(schema.holdings.userId, userId));
     const byId = new Map(rows.map((h) => [h.id, h]));
@@ -243,5 +244,66 @@ describe('purchase import', () => {
       gatherReceipts([{ kind: 'purchase', receipt: receipt('200') }]),
     );
     expect(plan[0]).toMatchObject({ type: 'new', ref: { existing: { id: existing.product.id } } });
+  });
+});
+
+describe('review flags', () => {
+  const at = (day: string) => `2026-${day}T12:00:00.000+09:00`;
+  const box = (id: string, day: string) =>
+    ({
+      kind: 'purchase',
+      receipt: receipt(id, { title: 'Box', orderedAt: at(day), listing: null }),
+    }) as const;
+
+  it('flags deadline notices, and older purchases of items with missing deliveries', () => {
+    const gathered = gatherReceipts([
+      box('1', '08-01'),
+      box('2', '08-05'),
+      box('3', '08-10'),
+      box('4', '10-01'),
+      { kind: 'delivered', title: 'Box', quantity: 1, at: at('08-20') },
+      { kind: 'notice', orderId: '4', reason: 'deadline_missed' },
+    ]);
+    const { flags, gaps } = reviewFlags(gathered, new Set(), at('10-10'));
+    // Three older purchases, one delivery: all three flagged; the recent one may be on its way.
+    expect(gaps).toEqual([{ title: 'Box', purchases: 4, delivered: 1, recent: 1 }]);
+    expect([...flags]).toEqual([
+      ['4', ['deadline_missed']],
+      ['1', ['no_delivery']],
+      ['2', ['no_delivery']],
+      ['3', ['no_delivery']],
+    ]);
+  });
+
+  it('flags new and existing lots, and skips orders cancelled in the app', async () => {
+    const existing = await createHolding(
+      db,
+      userId,
+      { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+      holdingInput({ acquiredFrom: 'SNKRDUNK', orderId: '1', acquiredAt: at('08-01') }),
+    );
+    const gone = await createHolding(
+      db,
+      userId,
+      { productId: existing.product.id },
+      holdingInput({ acquiredFrom: 'SNKRDUNK', orderId: '3', acquiredAt: at('08-10') }),
+    );
+    await markOrderCancelled(db, userId, gone.holding.id);
+    const gathered = gatherReceipts([
+      box('1', '08-01'),
+      box('2', '08-05'),
+      box('3', '08-10'),
+      { kind: 'delivered', title: 'Box', quantity: 1, at: at('08-20') },
+    ]);
+    const plan = await planImport(db, userId, importer, gathered, { exportedAt: at('10-10') });
+    expect(plan.map((e) => [e.receipt.orderId, e.type, e.flags])).toEqual([
+      ['1', 'duplicate', ['no_delivery']],
+      ['2', 'new', ['no_delivery']],
+      ['3', 'cancelledInApp', undefined],
+    ]);
+    const outcome = await applyImport(db, userId, importer, plan, new Map());
+    expect(outcome).toMatchObject({ created: 1, flagged: 1 });
+    const rows = await db.select().from(schema.holdings);
+    expect(rows.every((h) => h.reviewPending && h.reviewReason === 'no_delivery')).toBe(true);
   });
 });

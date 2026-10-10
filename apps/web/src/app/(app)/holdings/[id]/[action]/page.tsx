@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { authed } from '@/lib/auth/guard';
 import {
   conditionAction,
+  cancelOrderAction,
   deleteAction,
   editAction,
   gradeReturnAction,
@@ -40,6 +41,7 @@ const ACTIONS = {
   condition: conditionAction,
   note: noteAction,
   delete: deleteAction,
+  'cancel-order': cancelOrderAction,
 } as const;
 type ActionKey = keyof typeof ACTIONS;
 
@@ -375,6 +377,19 @@ export default async function HoldingActionPage({
         </>
       );
       break;
+    case 'cancel-order':
+      body = (
+        <label className="flex items-start gap-3 rounded-md border border-destructive/40 p-3 text-sm">
+          <input type="checkbox" name="confirm" required className="mt-0.5 size-4" />
+          <span>
+            {t('actions.cancelOrderConfirm', {
+              order: holding.orderId ?? '-',
+              from: holding.acquiredFrom ?? '-',
+            })}
+          </span>
+        </label>
+      );
+      break;
     case 'delete':
       body = (
         <label className="flex items-start gap-3 rounded-md border border-destructive/40 p-3 text-sm">
@@ -398,7 +413,7 @@ export default async function HoldingActionPage({
         action={ACTIONS[key].bind(null, id)}
         submitLabel={t(`holding.actions.${key}`)}
         cancelHref={back}
-        destructive={key === 'delete'}
+        destructive={key === 'delete' || key === 'cancel-order'}
       >
         {body}
       </ActionForm>

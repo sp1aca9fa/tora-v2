@@ -85,7 +85,11 @@ export type ReceiptMail =
   | { kind: 'purchase'; receipt: PurchaseReceipt }
   | { kind: 'cancel'; orderId: string }
   /** Looked like a receipt but could not be read; reported, never guessed. */
-  | { kind: 'unreadable'; subject: string; reason: string };
+  | { kind: 'unreadable'; subject: string; reason: string }
+  /** An item arrived. Shops may not say which order (SNKRDUNK does not): matched per item. */
+  | { kind: 'delivered'; title: string; quantity: number; at: string }
+  /** Something about an order worth a look, e.g. `deadline_missed` (the buyer may cancel). */
+  | { kind: 'notice'; orderId: string; reason: string };
 
 /** Reads a marketplace's emails into purchases (requirements S5b). */
 export interface PurchaseImporter {

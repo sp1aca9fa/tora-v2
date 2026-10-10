@@ -280,6 +280,11 @@ export const holdings = sqliteTable(
     orderId: text('order_id'),
     /** Imported and not yet checked in the app's import review (grade, cert, packaging). */
     reviewPending: integer('review_pending', { mode: 'boolean' }).notNull().default(false),
+    /**
+     * Why it was flagged for review (`deadline_missed`, `no_delivery`, ...). Kept after the user
+     * confirms, so the same reason does not flag it again.
+     */
+    reviewReason: text('review_reason'),
     ...timestamps,
   },
   (t) => [
@@ -298,6 +303,24 @@ export const holdings = sqliteTable(
     index('holdings_status_idx').on(t.status),
     index('holdings_order_idx').on(t.userId, t.orderSource, t.orderId),
   ],
+);
+
+/**
+ * Orders the user marked as cancelled (their lots were removed): imports skip these IDs. Needed
+ * because a buyer's own cancellation sends no email.
+ */
+export const cancelledOrders = sqliteTable(
+  'cancelled_orders',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    orderSource: text('order_source').notNull(),
+    orderId: text('order_id').notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('cancelled_orders_uq').on(t.userId, t.orderSource, t.orderId)],
 );
 
 export const holdingEvents = sqliteTable(

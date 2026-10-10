@@ -16,6 +16,7 @@ import {
   applyImport,
   gatherReceipts,
   planImport,
+  reviewFlags,
 } from '../purchases';
 import { loadCollectors } from '../registry';
 import type { PurchaseReceipt, ReceiptMail } from '../types';
@@ -81,12 +82,16 @@ let exitCode = 0;
 for (const importer of selected) {
   console.log(`== ${importer.label} ==`);
   const mails: ReceiptMail[] = [];
+  let exportedAt: string | null = null;
   for await (const mail of readMbox(path, importer.matchesHeader)) {
+    if (mail.date && (!exportedAt || mail.date.toISOString() > exportedAt)) {
+      exportedAt = mail.date.toISOString();
+    }
     const parsed = importer.parse(mail);
     if (parsed) mails.push(parsed);
   }
   const gathered = gatherReceipts(mails);
-  const plan = await planImport(db, user.id, importer, gathered);
+  const plan = await planImport(db, user.id, importer, gathered, { exportedAt });
   const of = <T extends PlanEntry['type']>(type: T) =>
     plan.filter((e): e is Extract<PlanEntry, { type: T }> => e.type === type);
   console.log(
@@ -95,6 +100,7 @@ for (const importer of selected) {
 
   section('Already registered with the same data, not imported again', of('duplicate'));
   section('Cancelled, not imported', of('cancelled'));
+  section('Marked as cancelled in the app, not imported', of('cancelledInApp'));
   section(
     'Cancelled per the emails but registered (left as is; check them)',
     of('cancelledRegistered'),
@@ -108,6 +114,22 @@ for (const importer of selected) {
     for (const u of gathered.unreadable) console.log(`  ${u.subject} (${u.reason})`);
     console.log('');
   }
+  const { gaps } = reviewFlags(
+    gathered,
+    new Set(of('cancelledInApp').map((e) => e.receipt.orderId)),
+  );
+  if (gaps.length) {
+    console.log('Fewer delivery emails than purchases (some may have been cancelled by you,');
+    console.log('which sends no email). Their older purchases are flagged for review in the app:');
+    for (const g of gaps) {
+      console.log(
+        `  ${g.title}: ${g.purchases} purchase(s), ${g.delivered} delivered${g.recent ? `, ${g.recent} recent (may still be on the way)` : ''}`,
+      );
+    }
+    console.log('');
+  }
+  const deadline = plan.filter((e) => e.flags?.includes('deadline_missed'));
+  section('The seller missed the shipping deadline (flagged for review)', deadline);
   section('New', of('new'), (e) =>
     e.type === 'new' && 'create' in e.ref ? '  [new product]' : '',
   );
@@ -154,12 +176,16 @@ for (const importer of selected) {
   const creates = of('new').length + decided.filter((d) => d === 'different').length;
   const updates = decided.filter((d) => d === 'imported').length;
   const attaches = decided.filter((d) => d === 'same').length;
-  if (creates + updates + attaches === 0) {
+  // Lots already in the app with a review reason (flagged once per reason).
+  const toFlag = plan.filter(
+    (e) => e.flags?.length && (e.type === 'duplicate' || e.type === 'conflict'),
+  ).length;
+  if (creates + updates + attaches + toFlag === 0) {
     console.log('Nothing to write.\n');
     continue;
   }
   const ok = await choose(
-    `Write ${creates} new, ${updates} correction(s), ${attaches} order ID(s) added? [y/n]`,
+    `Write ${creates} new, ${updates} correction(s), ${attaches} order ID(s) added, review flags on up to ${toFlag} existing? [y/n]`,
     { y: true, n: false },
   );
   if (!ok) {
@@ -168,7 +194,7 @@ for (const importer of selected) {
   }
   const outcome = await applyImport(db, user.id, importer, plan, decisions);
   console.log(
-    `Done: ${outcome.created} created, ${outcome.updated} corrected, ${outcome.attached} order ID(s) added.`,
+    `Done: ${outcome.created} created, ${outcome.updated} corrected, ${outcome.attached} order ID(s) added, ${outcome.flagged} review flag(s) added.`,
   );
   for (const f of outcome.failed) console.log(`  failed #${f.orderId}: ${f.error}`);
   if (outcome.failed.length) exitCode = 1;

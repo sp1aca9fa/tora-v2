@@ -24,7 +24,7 @@ import {
   splitHolding,
   toTokyoIso,
 } from '@tora/core';
-import { and, count, eq, isNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import {
   type Holding,
@@ -32,6 +32,7 @@ import {
   type NewProduct,
   type Product,
   type User,
+  cancelledOrders,
   holdingEvents,
   holdings,
   products,
@@ -88,6 +89,8 @@ export interface HoldingInput {
   orderId?: string | null;
   /** Set by imports: the holding waits for the import review in the app. */
   reviewPending?: boolean;
+  /** Why it waits for review (comma-separated reasons, e.g. `deadline_missed`). */
+  reviewReason?: string | null;
 }
 
 /** A sealed product of a catalog set; created on first use. */
@@ -850,4 +853,83 @@ export async function deleteHolding(db: Db, userId: string, id: string): Promise
     await tx.delete(holdingEvents).where(eq(holdingEvents.holdingId, id));
     await tx.delete(holdings).where(eq(holdings.id, id));
   });
+}
+
+/**
+ * The order was cancelled (e.g. by the buyer, which sends no email): removes every lot of that
+ * order and remembers the ID so imports skip it. Refused when a lot has pulls logged from it.
+ */
+export async function markOrderCancelled(
+  db: Db,
+  userId: string,
+  holdingId: string,
+): Promise<{ orderId: string; removed: number; productId: string }> {
+  return db.transaction(async (tx) => {
+    const { holding } = await loadHolding(tx, userId, holdingId);
+    if (!holding.orderSource || !holding.orderId) throw new DomainError('invalid_input');
+    const lots = await tx
+      .select({ id: holdings.id })
+      .from(holdings)
+      .where(
+        and(
+          eq(holdings.userId, userId),
+          eq(holdings.orderSource, holding.orderSource),
+          eq(holdings.orderId, holding.orderId),
+        ),
+      );
+    const ids = lots.map((l) => l.id);
+    const [children] = await tx
+      .select({ n: count() })
+      .from(holdings)
+      .where(inArray(holdings.parentHoldingId, ids));
+    if ((children?.n ?? 0) > 0) throw new DomainError('has_dependents');
+    await tx.delete(valuationSnapshots).where(inArray(valuationSnapshots.holdingId, ids));
+    await tx.delete(holdingEvents).where(inArray(holdingEvents.holdingId, ids));
+    await tx.delete(holdings).where(inArray(holdings.id, ids));
+    await tx
+      .insert(cancelledOrders)
+      .values({ userId, orderSource: holding.orderSource, orderId: holding.orderId })
+      .onConflictDoNothing();
+    return { orderId: holding.orderId, removed: ids.length, productId: holding.productId };
+  });
+}
+
+/** Order IDs of one source the user marked as cancelled. */
+export async function cancelledOrderIds(
+  db: Db,
+  userId: string,
+  orderSource: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ orderId: cancelledOrders.orderId })
+    .from(cancelledOrders)
+    .where(and(eq(cancelledOrders.userId, userId), eq(cancelledOrders.orderSource, orderSource)));
+  return new Set(rows.map((r) => r.orderId));
+}
+
+/**
+ * Puts holdings up for review with a reason. A holding already flagged for that reason (even if
+ * the user has since confirmed it) is left alone. Returns how many were flagged.
+ */
+export async function flagForReview(
+  db: Db,
+  userId: string,
+  flags: { holdingId: string; reason: string }[],
+): Promise<number> {
+  let flagged = 0;
+  for (const { holdingId, reason } of flags) {
+    const [h] = await db
+      .select({ reviewReason: holdings.reviewReason })
+      .from(holdings)
+      .where(and(eq(holdings.id, holdingId), eq(holdings.userId, userId)));
+    if (!h) continue;
+    const reasons = (h.reviewReason ?? '').split(',').filter(Boolean);
+    if (reasons.includes(reason)) continue;
+    await db
+      .update(holdings)
+      .set({ reviewPending: true, reviewReason: [...reasons, reason].join(',') })
+      .where(eq(holdings.id, holdingId));
+    flagged++;
+  }
+  return flagged;
 }

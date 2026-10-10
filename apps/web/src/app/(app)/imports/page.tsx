@@ -26,6 +26,12 @@ export default async function ImportReviewPage() {
       costJpy: holding.costTotalJpy,
       quantity: holding.quantity,
       packagingState: holding.packagingState,
+      reasons: (holding.reviewReason ?? '').split(',').filter(Boolean),
+      grading: holding.grading,
+      rawGrade: holding.rawGrade,
+      grader: holding.grader,
+      grade: holding.grade,
+      certNumber: holding.certNumber,
     };
   });
 

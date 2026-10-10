@@ -15,7 +15,9 @@ import {
   changeCondition,
   deleteHolding,
   editHolding,
+  markOrderCancelled,
   markOpened,
+  productLots,
   returnGrading,
   sellHolding,
   splitOff,
@@ -208,6 +210,19 @@ export async function deleteAction(id: string, _prev: FormState, formData: FormD
     z.object({ confirm: z.literal('on') }),
     (_d, { db, userId }) => deleteHolding(db, userId, id),
     () => '/',
+  );
+}
+
+/** The whole order was cancelled: removes its lots and makes imports skip the order ID. */
+export async function cancelOrderAction(id: string, _prev: FormState, formData: FormData) {
+  return handle(
+    formData,
+    z.object({ confirm: z.literal('on') }),
+    async (_d, { db, userId }) => {
+      const { productId } = await markOrderCancelled(db, userId, id);
+      return (await productLots(db, userId, productId)).length ? `/products/${productId}` : '/';
+    },
+    (to) => to,
   );
 }
 
