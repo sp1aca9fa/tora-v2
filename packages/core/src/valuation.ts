@@ -36,6 +36,17 @@ export interface Valuation {
 /** Market sources in fallback order; sources not listed come after these. */
 export const SOURCE_PRIORITY = ['snkrdunk', 'mercari', 'surugaya'];
 export const WINDOWS = [30, 90, 180] as const;
+
+/** Parsed `observedAt` per observation object (snapshot rebuilds value thousands of days). */
+const parsedTimes = new WeakMap<object, number>();
+function timeOf(o: { observedAt: string }): number {
+  let t = parsedTimes.get(o);
+  if (t === undefined) {
+    t = Date.parse(o.observedAt);
+    parsedTimes.set(o, t);
+  }
+  return t;
+}
 const DAY = 86_400_000;
 
 /** Removes outliers outside 1.5 x IQR (only with 4+ samples, where quartiles mean something). */
@@ -105,12 +116,12 @@ export function valueUnit(input: {
         o.observationType === 'sold' &&
         !o.excluded &&
         o.bucket === input.bucket &&
-        Date.parse(o.observedAt) <= now.getTime(),
+        timeOf(o) <= now.getTime(),
     );
     for (const source of sourceOrder([...new Set(sold.map((o) => o.source))])) {
       const ofSource = sold.filter((o) => o.source === source);
       const within = (days: number) =>
-        ofSource.filter((o) => now.getTime() - Date.parse(o.observedAt) <= days * DAY);
+        ofSource.filter((o) => now.getTime() - timeOf(o) <= days * DAY);
       const window = WINDOWS.find((d) => within(d).length >= 3) ?? 180;
       const samples = within(window);
       if (samples.length === 0) continue;
@@ -157,7 +168,7 @@ export function buylistFloor(
         o.observationType === 'buylist' &&
         !o.excluded &&
         (o.bucket === bucket || o.bucket === null) &&
-        now.getTime() - Date.parse(o.observedAt) <= 30 * DAY,
+        now.getTime() - timeOf(o) <= 30 * DAY,
     )
     .toSorted((a, b) => b.observedAt.localeCompare(a.observedAt))[0];
   return latest

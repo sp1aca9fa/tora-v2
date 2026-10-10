@@ -17,10 +17,13 @@ export interface PortfolioPoint {
   date: string;
   valueJpy: number;
   costJpy: number;
+  /** Part of the value counted at cost (holdings without a market price that day). */
+  atCostJpy: number;
 }
 
 /**
- * Market value vs cost of the valued holdings, one shared yen axis. The legend above the plot
+ * Market value vs cost of everything held each day, one shared yen axis (holdings without a
+ * market price count at cost in the value line). The legend above the plot
  * names both series and shows their values at the hovered day (latest day otherwise).
  */
 export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
@@ -90,6 +93,11 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
             </span>
           </span>
         ))}
+        {shown && shown.atCostJpy > 0 && (
+          <span className="text-muted-foreground">
+            {t('chartAtCost', { amount: formatYen(shown.atCostJpy) })}
+          </span>
+        )}
       </div>
       <div ref={el} className="h-48 w-full" role="img" aria-label={t('chartLabel')} />
     </div>

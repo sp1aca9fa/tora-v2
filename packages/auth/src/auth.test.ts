@@ -61,7 +61,12 @@ describe('secrets at rest', () => {
     expect(enc).not.toContain('JBSWY3DPEHPK3PXP');
     expect(decryptSecret(enc, key)).toBe('JBSWY3DPEHPK3PXP');
     expect(() => decryptSecret(enc, 'x'.repeat(32))).toThrow();
-    expect(() => decryptSecret(enc.slice(0, -2) + 'AA', key)).toThrow();
+    // Flip one bit of the first ciphertext byte (always a real change, unlike overwriting text).
+    const [v, iv, tag, ct] = enc.split('.');
+    const bytes = Buffer.from(ct!, 'base64url');
+    bytes[0]! ^= 1;
+    const tampered = [v, iv, tag, bytes.toString('base64url')].join('.');
+    expect(() => decryptSecret(tampered, key)).toThrow();
   });
 });
 

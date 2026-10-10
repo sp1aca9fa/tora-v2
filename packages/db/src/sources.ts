@@ -254,7 +254,9 @@ export async function bucketStats(
   const groups = new Map<string, typeof rows>();
   for (const r of rows) {
     const key = `${r.source}\u0000${r.bucket ?? ''}`;
-    groups.set(key, [...(groups.get(key) ?? []), r]);
+    const list = groups.get(key);
+    if (list) list.push(r);
+    else groups.set(key, [r]);
   }
   return [...groups.values()]
     .map((g) => ({

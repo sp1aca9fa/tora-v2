@@ -60,12 +60,13 @@ export async function loadMarketData(
   userId: string,
   productIds: string[],
   now = new Date(),
+  /** Oldest observation to load (ISO); defaults to what valuing `now` needs. */
+  since: string = toTokyoIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY)),
 ): Promise<MarketData> {
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
   if (productIds.length === 0) return { observations, recent, manual };
-  const since = toTokyoIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY));
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
     const rows = await db
@@ -88,7 +89,9 @@ export async function loadMarketData(
         ),
       );
     for (const { productId, ...o } of rows) {
-      observations.set(productId, [...(observations.get(productId) ?? []), o]);
+      const list = observations.get(productId);
+      if (list) list.push(o);
+      else observations.set(productId, [o]);
     }
     const prices = await db
       .select()
@@ -308,89 +311,177 @@ export function heldOn(holding: Holding, events: HoldingEvent[], day: string): b
   return holding.status === 'owned' || holding.status === 'consumed' || holding.status === 'sold';
 }
 
+/** Longest valuation window: a day's value only looks at sales up to this far back. */
+const WINDOW_DAYS = 180;
+/** How far back the chart can go. */
+const MAX_HISTORY_DAYS = 3 * 366;
+
 /**
- * Daily job (after collectors): writes the snapshot of every user's holdings held on each day,
- * valued as of the end of that day. Covers today, the last week (trades arrive a few days late)
- * and any of the last `backfillDays` days without snapshots yet, so the chart has history.
+ * Daily job (after collectors): rebuilds the snapshot of every holding for every day it was held,
+ * from its acquisition date, valued with the sales known by the end of that day. Recomputing all
+ * days picks up sales history that arrived late and holdings added or edited afterwards; only rows
+ * whose numbers changed are written, and rows of days a holding was not held are removed.
  */
-export async function runSnapshots(db: Db, now = new Date(), backfillDays = 90) {
-  const existing = new Set(
-    (await db.selectDistinct({ date: valuationSnapshots.date }).from(valuationSnapshots)).map(
-      (r) => r.date,
-    ),
+export async function runSnapshots(db: Db, now = new Date()) {
+  const today = tokyoDate(now);
+  const rows = (
+    await db
+      .select({ holding: holdings, product: products })
+      .from(holdings)
+      .innerJoin(products, eq(products.id, holdings.productId))
+  ).filter((r) => r.holding.status !== 'lost');
+  const oldest = tokyoDate(new Date(now.getTime() - MAX_HISTORY_DAYS * DAY));
+  const first = rows.reduce(
+    (min, r) => (r.holding.acquiredAt.slice(0, 10) < min ? r.holding.acquiredAt.slice(0, 10) : min),
+    today,
   );
+  const start = first < oldest ? oldest : first;
   const days: string[] = [];
-  for (let i = backfillDays; i >= 0; i--) {
-    const day = tokyoDate(new Date(now.getTime() - i * DAY));
-    if (i <= 7 || !existing.has(day)) days.push(day);
+  for (let t = Date.parse(`${start}T12:00:00+09:00`); ; t += DAY) {
+    const day = tokyoDate(new Date(t));
+    if (day > today) break;
+    days.push(day);
   }
 
-  const rows = await db
-    .select({ holding: holdings, product: products })
-    .from(holdings)
-    .innerJoin(products, eq(products.id, holdings.productId));
   const eventsBy = new Map<string, HoldingEvent[]>();
   for (const e of await db.select().from(holdingEvents)) {
-    eventsBy.set(e.holdingId, [...(eventsBy.get(e.holdingId) ?? []), e]);
+    const list = eventsBy.get(e.holdingId);
+    if (list) list.push(e);
+    else eventsBy.set(e.holdingId, [e]);
   }
+  const since = toTokyoIso(new Date(Date.parse(`${start}T00:00:00+09:00`) - WINDOW_DAYS * DAY));
   const markets = new Map<string, MarketData>();
   for (const userId of new Set(rows.map((r) => r.holding.userId))) {
     const ids = [
       ...new Set(rows.filter((r) => r.holding.userId === userId).map((r) => r.product.id)),
     ];
-    markets.set(userId, await loadMarketData(db, userId, ids, now));
+    markets.set(userId, await loadMarketData(db, userId, ids, now, since));
   }
 
-  let written = 0;
-  for (const day of days) {
-    const at = endOfDay(day);
-    const values = rows
-      .filter(
-        ({ holding }) =>
-          holding.status !== 'lost' && heldOn(holding, eventsBy.get(holding.id) ?? [], day),
-      )
-      .map(({ holding, product }) => {
-        const v = valueHolding(holding, product, markets.get(holding.userId)!, at);
-        return {
-          date: day,
-          holdingId: holding.id,
-          valueJpy: v.valueJpy,
-          method: v.method,
-          source: v.source,
-          sampleSize: v.sampleSize,
-          confidence: v.confidence,
-        };
-      });
-    for (let i = 0; i < values.length; i += 100) {
-      await db
-        .insert(valuationSnapshots)
-        .values(values.slice(i, i + 100))
-        .onConflictDoUpdate({
-          target: [valuationSnapshots.date, valuationSnapshots.holdingId],
-          set: {
-            valueJpy: sql`excluded.value_jpy`,
-            method: sql`excluded.method`,
-            source: sql`excluded.source`,
-            sampleSize: sql`excluded.sample_size`,
-            confidence: sql`excluded.confidence`,
-            updatedAt: sql`excluded.updated_at`,
-          },
-        });
+  // Sales per user + product + bucket, oldest first, so each day only scans its window.
+  const series = new Map<string, { at: number[]; observations: ValuationObservation[] }>();
+  const seriesFor = (userId: string, productId: string, bucket: string | null) => {
+    const key = `${userId}|${productId}|${bucket}`;
+    let s = series.get(key);
+    if (!s) {
+      const observations = (markets.get(userId)!.observations.get(productId) ?? [])
+        .filter((o) => o.bucket === bucket)
+        .toSorted((a, b) => a.observedAt.localeCompare(b.observedAt));
+      s = { at: observations.map((o) => Date.parse(o.observedAt)), observations };
+      series.set(key, s);
     }
-    written += values.length;
+    return s;
+  };
+  const lowerBound = (xs: number[], x: number) => {
+    let lo = 0;
+    let hi = xs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (xs[mid]! < x) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const unitCache = new Map<string, Valuation>();
+  const unitOn = (userId: string, product: Product, bucket: string | null, day: string) => {
+    const key = `${userId}|${product.id}|${bucket}|${day}`;
+    let v = unitCache.get(key);
+    if (!v) {
+      const at = endOfDay(day);
+      const s = seriesFor(userId, product.id, bucket);
+      const from = lowerBound(s.at, at.getTime() - WINDOW_DAYS * DAY);
+      const to = lowerBound(s.at, at.getTime() + 1);
+      v = valueUnit({
+        bucket,
+        observations: s.observations.slice(from, to),
+        manualPrices: markets.get(userId)!.manual.get(product.id),
+        retailPriceJpy: product.retailPriceJpy,
+        now: at,
+      });
+      unitCache.set(key, v);
+    }
+    return v;
+  };
+
+  type Row = typeof valuationSnapshots.$inferInsert;
+  const wanted = new Map<string, Row>();
+  for (const { holding, product } of rows) {
+    const events = eventsBy.get(holding.id) ?? [];
+    const bucket = holdingBucket(holding, product);
+    for (const day of days) {
+      if (!heldOn(holding, events, day)) continue;
+      const v = unitOn(holding.userId, product, bucket, day);
+      wanted.set(`${day}|${holding.id}`, {
+        date: day,
+        holdingId: holding.id,
+        valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
+        method: v.method,
+        source: v.source,
+        sampleSize: v.sampleSize,
+        confidence: v.confidence,
+      });
+    }
   }
-  return { days: days.length, rows: written };
+
+  const existing = await db.select().from(valuationSnapshots);
+  const stale: string[] = [];
+  const unchanged = new Set<string>();
+  for (const e of existing) {
+    const key = `${e.date}|${e.holdingId}`;
+    const w = wanted.get(key);
+    if (!w) stale.push(e.id);
+    else if (
+      w.valueJpy === e.valueJpy &&
+      w.method === e.method &&
+      w.source === e.source &&
+      w.sampleSize === e.sampleSize &&
+      w.confidence === e.confidence
+    ) {
+      unchanged.add(key);
+    }
+  }
+  const changed = [...wanted.entries()].filter(([k]) => !unchanged.has(k)).map(([, r]) => r);
+  for (let i = 0; i < changed.length; i += 100) {
+    await db
+      .insert(valuationSnapshots)
+      .values(changed.slice(i, i + 100))
+      .onConflictDoUpdate({
+        target: [valuationSnapshots.date, valuationSnapshots.holdingId],
+        set: {
+          valueJpy: sql`excluded.value_jpy`,
+          method: sql`excluded.method`,
+          source: sql`excluded.source`,
+          sampleSize: sql`excluded.sample_size`,
+          confidence: sql`excluded.confidence`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+  }
+  for (let i = 0; i < stale.length; i += 500) {
+    await db
+      .delete(valuationSnapshots)
+      .where(inArray(valuationSnapshots.id, stale.slice(i, i + 500)));
+  }
+  return { days: days.length, rows: changed.length, removed: stale.length };
 }
 
-/** Value and cost per day for the user's chart (cost counts only valued holdings separately). */
-export async function portfolioSeries(db: Db, userId: string, days = 365, now = new Date()) {
+/**
+ * Value and cost per day for the user's chart. Cost is everything held that day; value is the
+ * market value, with holdings that have no market value yet counted at cost (`atCostJpy`).
+ */
+export async function portfolioSeries(
+  db: Db,
+  userId: string,
+  days = MAX_HISTORY_DAYS,
+  now = new Date(),
+) {
   const since = tokyoDate(new Date(now.getTime() - days * DAY));
   return db
     .select({
       date: valuationSnapshots.date,
-      valueJpy: sql<number>`coalesce(sum(${valuationSnapshots.valueJpy}), 0)`,
-      costJpy: sql<number>`sum(${holdings.costTotalJpy})`,
-      valuedCostJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.valueJpy} is not null then ${holdings.costTotalJpy} end), 0)`,
+      valueJpy: sql<number>`coalesce(sum(coalesce(${valuationSnapshots.valueJpy}, ${holdings.costTotalJpy})), 0)`,
+      costJpy: sql<number>`coalesce(sum(${holdings.costTotalJpy}), 0)`,
+      atCostJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.valueJpy} is null then ${holdings.costTotalJpy} end), 0)`,
     })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))

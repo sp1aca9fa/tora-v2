@@ -58,7 +58,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
   const [rows, portfolio, series, matches, grades, toReview, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
     portfolioValuation(db, user.id),
-    portfolioSeries(db, user.id, 365),
+    portfolioSeries(db, user.id),
     pendingMatchesForUser(db, user.id),
     cardGradeCounts(db, user.id),
     importReviewCount(db, user.id),
@@ -70,7 +70,8 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
   const chartPoints = series.map((s) => ({
     date: s.date,
     valueJpy: Number(s.valueJpy),
-    costJpy: Number(s.valuedCostJpy),
+    costJpy: Number(s.costJpy),
+    atCostJpy: Number(s.atCostJpy),
   }));
   const maxBreakdown = Math.max(
     1,

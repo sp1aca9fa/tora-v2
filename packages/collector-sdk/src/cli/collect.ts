@@ -45,5 +45,5 @@ for (const collector of selected) {
 }
 // Valuation snapshots for the portfolio chart (requirements S5: runs after collectors).
 const snap = await runSnapshots(db);
-console.log(`snapshots: ${snap.days} day(s), ${snap.rows} rows`);
+console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
 process.exit(exitCode);

@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
-import { addPull, createHolding, markOpened, sellHolding } from './mutations';
+import { addPull, createHolding, editHolding, markOpened, sellHolding } from './mutations';
 import { insertObservations } from './sources';
 import { createUser } from './users';
 import {
@@ -142,20 +142,37 @@ describe('portfolio (scenario 7)', () => {
     expect((await portfolioValuation(db, uid, now)).totals.total).toBe(2);
   });
 
-  it('writes daily snapshots with backfill and builds the value-over-time series', async () => {
-    await scenario();
-    const run = await runSnapshots(db, now, 45);
-    expect(run.days).toBe(46);
-    const series = await portfolioSeries(db, uid, 60, now);
-    const today = series.find((s) => s.date === tokyoDate(now));
-    expect(today?.valueJpy).toBe(3_100 + 925 * 2 + 9_900);
-    // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
-    const early = series.find(
-      (s) => s.date === tokyoDate(new Date(now.getTime() - 39 * 86_400_000)),
+  it('rebuilds snapshots from the first acquisition and builds the value-over-time series', async () => {
+    const { amiibo } = await scenario();
+    // An ungraded card has no market value: it counts at cost in the value line.
+    await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'single', name: 'ミュウツー' } },
+      { quantity: 1, costTotalJpy: 700, acquiredAt: ago(5) },
     );
-    expect(early?.valueJpy).toBe(2_000);
-    // Re-running only recomputes the last week.
-    expect((await runSnapshots(db, now, 45)).days).toBe(8);
+    const run = await runSnapshots(db, now);
+    // The box was bought 60 days ago: every day since then, today included.
+    expect(run.days).toBe(61);
+    const series = await portfolioSeries(db, uid, 365, now);
+    const on = (daysAgo: number) =>
+      series.find((s) => s.date === tokyoDate(new Date(now.getTime() - daysAgo * 86_400_000)));
+    expect(series[0]?.date).toBe(ago(60).slice(0, 10));
+    expect(on(0)).toMatchObject({
+      valueJpy: 3_100 + 925 * 2 + 9_900 + 700,
+      // The box was opened (consumed): its cost is no longer held.
+      costJpy: 9_900 + 700,
+      atCostJpy: 700,
+    });
+    // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
+    expect(on(39)?.valueJpy).toBe(2_000);
+
+    // Re-running writes nothing new; moving a purchase date later removes the days before it.
+    expect(await runSnapshots(db, now)).toMatchObject({ rows: 0, removed: 0 });
+    await editHolding(db, uid, amiibo.holding.id, { acquiredAt: ago(10) });
+    const again = await runSnapshots(db, now);
+    expect(again.removed).toBe(20);
+    expect(again.rows).toBe(0);
   });
 
   it('builds daily medians for the price chart', async () => {

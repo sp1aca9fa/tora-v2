@@ -54,7 +54,8 @@
     "breakdown": "By kind",
     "breakdownHint": "Bars: market value. Right: value / cost.",
     "cost": "cost {cost}",
-    "last": "last {price}"
+    "last": "last {price}",
+    "chartAtCost": "incl. {amount} at cost (no market price yet)"
   },
   "inventory": {
     "search": "Search name, set, card number",

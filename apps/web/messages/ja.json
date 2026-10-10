@@ -54,7 +54,8 @@
     "breakdown": "種類別",
     "breakdownHint": "バー: 時価。右: 時価 / 取得額。",
     "cost": "取得 {cost}",
-    "last": "直近 {price}"
+    "last": "直近 {price}",
+    "chartAtCost": "うち {amount} は取得額で計上（相場なし）"
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
