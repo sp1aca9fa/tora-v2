@@ -379,18 +379,6 @@ Build:
 Acceptance:
 - Scenario 8; round-trip test passes in CI-like `pnpm test`.
 
-## S8: Visual redesign + wide-screen layout
-
-Added at the user's request (2026-10-10). Until now the focus is on making things work; this phase makes them pleasant.
-
-Build:
-- Rework screens once the features have settled: fewer unrelated panels per screen. Crowded screens (e.g. the item page with valuation, sources, matching, events and actions) are split into tabs, sub-pages or collapsible sections, each with one purpose.
-- A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
-- A consistent visual language across screens (spacing, typography, cards, badges, charts).
-
-Acceptance:
-- User review on phone and on a wide desktop screen.
-
 ## S7: US data, 駿河屋, FX, JP vs US spread
 
 Build:
@@ -404,6 +392,18 @@ Acceptance:
 - At least one card and one non-card item show JP vs US side by side.
 
 ---
+
+## S8: Visual redesign + wide-screen layout
+
+Added at the user's request (2026-10-10). Until now the focus is on making things work; this phase makes them pleasant.
+
+Build:
+- Rework screens once the features have settled: fewer unrelated panels per screen. Crowded screens (e.g. the item page with valuation, sources, matching, events and actions) are split into tabs, sub-pages or collapsible sections, each with one purpose.
+- A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
+- A consistent visual language across screens (spacing, typography, cards, badges, charts).
+
+Acceptance:
+- User review on phone and on a wide desktop screen.
 
 ## Out of scope for v1 (future ideas, do not build)
 
