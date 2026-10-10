@@ -26,6 +26,7 @@ import {
 } from '@tora/core';
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
+import { findSameCard } from './similar';
 import {
   type Holding,
   type NewHoldingEvent,
@@ -378,23 +379,31 @@ export async function addPull(
     const parent = await loadHolding(tx, userId, parentHoldingId);
     if (productClass(parent.product) !== 'sealed') throw new DomainError('not_sealed');
     const box = parent.product;
+    // A card typed with the same name and number as one already registered is that card (it
+    // keeps its price sources and portfolio row).
+    const same =
+      'card' in ref
+        ? await findSameCard(tx, { ...ref.card, franchise: box.franchise, region: box.region })
+        : null;
     const product = await resolveProduct(
       tx,
       userId,
-      'productId' in ref
-        ? ref
-        : {
-            product: {
-              category: 'tcg',
-              kind: 'single',
-              franchise: box.franchise,
-              region: box.region,
-              setId: box.setId,
-              setName: box.setName,
-              setCode: box.setCode,
-              ...ref.card,
+      same
+        ? { productId: same.id }
+        : 'productId' in ref
+          ? ref
+          : {
+              product: {
+                category: 'tcg',
+                kind: 'single',
+                franchise: box.franchise,
+                region: box.region,
+                setId: box.setId,
+                setName: box.setName,
+                setCode: box.setCode,
+                ...ref.card,
+              },
             },
-          },
     );
     const holding = await insertHolding(tx, userId, product.id, {
       quantity: input.quantity,

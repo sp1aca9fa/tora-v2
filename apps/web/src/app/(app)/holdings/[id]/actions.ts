@@ -22,6 +22,7 @@ import {
   sellHolding,
   splitOff,
   submitGrading,
+  suggestFromKnownProducts,
   updateProduct,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
@@ -282,6 +283,8 @@ export async function addPullAction(
     }),
   );
   if (!result.ok) return result.state;
+  // Offer a linked look-alike's listing right away (no need to wait for the collector).
+  await suggestFromKnownProducts(db, result.value.product.id);
   revalidatePath(holdingPath(boxId));
   revalidatePath('/');
   return { added: (prev.added ?? 0) + 1 };

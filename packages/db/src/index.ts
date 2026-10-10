@@ -7,5 +7,6 @@ export * from './valuation';
 export * from './purchases';
 export * from './lot-sizes';
 export * from './images';
+export * from './similar';
 export * as schema from './schema';
 export type * from './schema';

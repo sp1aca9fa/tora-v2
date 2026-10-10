@@ -21,6 +21,7 @@ import {
   getSet,
   searchProducts,
   searchSets,
+  suggestFromKnownProducts,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -185,6 +186,8 @@ export async function createHoldingAction(
     }),
   );
   if (!result.ok) return result.state;
+  // Offer a linked look-alike's listing right away (no need to wait for the collector).
+  await suggestFromKnownProducts(db, result.value.product.id);
   revalidatePath('/');
   redirect(`/holdings/${result.value.holding.id}`);
 }

@@ -6,6 +6,7 @@ import {
   createDb,
   createHolding,
   createUser,
+  linkSource,
   listPendingCandidates,
   listProductSources,
   pendingMatchesForUser,
@@ -167,4 +168,37 @@ it('keeps going after one product fails (partial)', async () => {
   );
   expect(run.status).toBe('partial');
   expect(run.errors[0]).toContain('parse error');
+});
+
+it('offers a linked look-alike instead of searching the site', async () => {
+  const first = await box();
+  await linkSource(db, first.product.id, {
+    source: 'fake',
+    externalId: 'L9',
+    title: 'BP BOX listing',
+  });
+  // Same name and kind, registered separately.
+  const second = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'BP  BOX' } },
+    {
+      quantity: 1,
+      costTotalJpy: 5000,
+      acquiredAt: '2026-10-01T12:00:00.000+09:00',
+      packagingState: 'sealed_shrink',
+    },
+  );
+  let searched = 0;
+  const collector = fakeCollector({
+    findCandidates: async () => {
+      searched++;
+      return [];
+    },
+  });
+  await runCollector(db, collector, { ...quiet, matchOnly: true });
+  expect(searched).toBe(0);
+  expect((await listPendingCandidates(db, second.product.id)).map((c) => c.externalId)).toEqual([
+    'L9',
+  ]);
 });

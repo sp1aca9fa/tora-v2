@@ -7,6 +7,7 @@ import {
   insertObservations,
   productsToMatch,
   saveCandidates,
+  suggestFromKnownProducts,
   startRun,
   syncProductDetails,
   updateSourceProgress,
@@ -75,6 +76,14 @@ export async function runCollector(
       ).filter((p) => collector.supports(p));
       for (const product of toMatch) {
         try {
+          // A linked look-alike (same card or item) is offered first, without searching the site;
+          // the search runs on a later run if the user dismisses it.
+          const known = await suggestFromKnownProducts(db, product.id, collector.source);
+          if (known > 0) {
+            summary.candidates += known;
+            log(`match "${product.name}": ${known} suggested from a linked look-alike`);
+            continue;
+          }
           const found = await collector.findCandidates(product, ctx);
           const n = await saveCandidates(db, product.id, collector.source, found.slice(0, 8));
           summary.candidates += n;

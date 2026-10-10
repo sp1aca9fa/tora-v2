@@ -16,6 +16,7 @@ import {
   holdingsWithProducts,
   linkSource,
   listingsOf,
+  suggestFromKnownProducts,
 } from '@tora/db';
 import { termCoverage } from './match';
 import type { PurchaseImporter, PurchaseReceipt, ReceiptMail } from './types';
@@ -343,7 +344,10 @@ export async function applyImport(
         reviewReason: flags.length ? flags.join(',') : null,
       },
     );
-    if ('create' in ref) createdProducts.set(productKey(ref.create), product);
+    if ('create' in ref) {
+      createdProducts.set(productKey(ref.create), product);
+      if (!receipt.listing) await suggestFromKnownProducts(db, product.id);
+    }
     if (receipt.listing && !linked) {
       await linkSource(db, product.id, {
         source: importer.source,

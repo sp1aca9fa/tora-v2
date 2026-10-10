@@ -454,7 +454,21 @@ export async function updateSourceProgress(
     .where(eq(productSources.id, sourceId));
 }
 
+/** A run still "running" after this long was interrupted (runs take about half an hour). */
+const STALE_RUN_MS = 3 * 60 * 60 * 1000;
+
 export async function startRun(db: Db, source: string): Promise<string> {
+  // Close out runs of this source that never finished (crash, PC shut down mid-run).
+  await db
+    .update(collectorRuns)
+    .set({ status: 'failed', finishedAt: toTokyoIso(), error: 'interrupted (never finished)' })
+    .where(
+      and(
+        eq(collectorRuns.source, source),
+        eq(collectorRuns.status, 'running'),
+        lt(collectorRuns.startedAt, toTokyoIso(new Date(Date.now() - STALE_RUN_MS))),
+      ),
+    );
   const [run] = await db
     .insert(collectorRuns)
     .values({ source, startedAt: toTokyoIso(), status: 'running' })
