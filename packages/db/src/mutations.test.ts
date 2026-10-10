@@ -18,6 +18,7 @@ import {
   markOpened,
   returnGrading,
   sellHolding,
+  setCardGrade,
   splitOff,
   submitGrading,
   updateProduct,
@@ -479,5 +480,81 @@ describe('search', () => {
     expect(await searchProducts(db, 'link', { kinds: ['booster_box'] })).toHaveLength(0);
     expect(await listInventory(db, uid, { q: 'link', kind: 'amiibo' })).toHaveLength(1);
     expect(await listInventory(db, uid, { category: 'tcg' })).toHaveLength(1);
+  });
+});
+
+describe('setCardGrade', () => {
+  it('grades several cards at once and logs each change', async () => {
+    const card = {
+      product: { category: 'tcg' as const, kind: 'single' as const, name: 'ピカチュウ' },
+    };
+    const input = { quantity: 1, costTotalJpy: 500, acquiredAt: day('09-01') };
+    const a = await createHolding(db, uid, card, input);
+    const b = await createHolding(db, uid, card, { ...input, grading: 'raw', rawGrade: 'B' });
+    const grade = { grading: 'graded', grader: 'PSA', grade: '10' } as const;
+    expect(await setCardGrade(db, uid, [a.holding.id, b.holding.id], grade)).toBe(2);
+    expect(await setCardGrade(db, uid, [a.holding.id], grade)).toBe(0);
+    const detail = await getHoldingDetail(db, uid, b.holding.id);
+    expect(detail?.holding).toMatchObject({
+      grading: 'graded',
+      grader: 'PSA',
+      grade: '10',
+      rawGrade: null,
+    });
+    expect(detail?.events.some((e) => e.type === 'note')).toBe(true);
+
+    const box = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+      {
+        ...input,
+        packagingState: 'sealed_shrink',
+      },
+    );
+    await expectDomainError(setCardGrade(db, uid, [box.holding.id], grade), 'not_a_card');
+    const bob = (await createUser(db, 'bob', creds)).user.id;
+    await expectDomainError(setCardGrade(db, bob, [a.holding.id], grade), 'not_found');
+  });
+});
+
+describe('order IDs', () => {
+  const card = { product: { category: 'tcg' as const, kind: 'single' as const, name: 'ミュウ' } };
+  const h = (orderId: string | null, acquiredFrom = 'SNKRDUNK') => ({
+    quantity: 1,
+    costTotalJpy: 1000,
+    acquiredAt: day('09-01'),
+    acquiredFrom,
+    orderId,
+    grading: 'raw' as const,
+    rawGrade: 'A' as const,
+  });
+
+  it('stores a normalized source and refuses a second single-item transaction', async () => {
+    const { holding } = await createHolding(db, uid, card, h(' 50015606 ', 'スニダン'));
+    expect(holding).toMatchObject({ orderSource: 'snkrdunk', orderId: '50015606' });
+    await expectDomainError(createHolding(db, uid, card, h('50015606')), 'duplicate_order');
+    // Other users, other marketplaces and multi-item orders (Amazon) are fine.
+    const bob = (await createUser(db, 'bob', creds)).user.id;
+    await createHolding(db, bob, card, h('50015606'));
+    await createHolding(db, uid, card, h('A-1', 'Amazon'));
+    await createHolding(db, uid, card, h('A-1', 'Amazon'));
+  });
+
+  it('keeps the ID on split lots and checks it on edit', async () => {
+    const lot = await createHolding(db, uid, card, {
+      ...h('111'),
+      quantity: 2,
+      costTotalJpy: 2000,
+    });
+    const split = await splitOff(db, uid, lot.holding.id, 1);
+    expect(split.orderId).toBe('111');
+    const other = await createHolding(db, uid, card, h('222'));
+    await expectDomainError(
+      editHolding(db, uid, other.holding.id, { orderId: '111' }),
+      'duplicate_order',
+    );
+    const edited = await editHolding(db, uid, other.holding.id, { orderId: '333' });
+    expect(edited).toMatchObject({ orderId: '333', orderSource: 'snkrdunk' });
   });
 });

@@ -215,3 +215,40 @@ export async function productValueSuggestions(
 export async function listRecentCollectorRuns(db: Db, limit = 20) {
   return db.select().from(collectorRuns).orderBy(desc(collectorRuns.startedAt)).limit(limit);
 }
+
+/** The user's owned cards, ungraded first (for setting grades in bulk). */
+export async function ownedCards(db: Db, userId: string) {
+  return db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.status, 'owned'),
+        eq(products.category, 'tcg'),
+        eq(products.kind, 'single'),
+      ),
+    )
+    .orderBy(sql`${holdings.grading} is not null`, products.name, holdings.acquiredAt);
+}
+
+/** Owned card lots, and how many have no grade (not valued until they do). */
+export async function cardGradeCounts(db: Db, userId: string) {
+  const [row] = await db
+    .select({
+      cards: count(),
+      ungraded: sql<number>`coalesce(sum(case when ${holdings.grading} is null or (${holdings.grading} = 'raw' and ${holdings.rawGrade} is null) then 1 else 0 end), 0)`,
+    })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.status, 'owned'),
+        eq(products.category, 'tcg'),
+        eq(products.kind, 'single'),
+      ),
+    );
+  return { cards: row?.cards ?? 0, ungraded: Number(row?.ungraded ?? 0) };
+}

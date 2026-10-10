@@ -97,7 +97,8 @@
     "noSets": "該当するセットがありません。下の「一覧にない場合」から入力してください。",
     "released": "{date}発売",
     "notInList": "一覧にない場合は手入力",
-    "variantPlaceholder": "例: Collector"
+    "variantPlaceholder": "例: Collector",
+    "orderIdHint": "任意。スニダンの取引IDやメルカリの取引IDなど。重複登録やインポートの照合に使います。"
   },
   "holding": {
     "costBasis": "取得原価",
@@ -228,7 +229,8 @@
     "kind": "種類",
     "category": "カテゴリー",
     "variant": "バリエーション",
-    "username": "ユーザー名"
+    "username": "ユーザー名",
+    "orderId": "注文番号・取引ID"
   },
   "errors": {
     "check": "入力内容を確認してください",
@@ -245,7 +247,9 @@
     "no_change": "変更がありません。",
     "has_dependents": "他の登録（開封結果や分割）が関連しているため削除できません。",
     "forbidden": "このアイテムを作成した人だけが変更できます。",
-    "badSourceUrl": "スニダンの商品リンク（https://snkrdunk.com/apparels/…）ではありません。"
+    "badSourceUrl": "スニダンの商品リンク（https://snkrdunk.com/apparels/…）ではありません。",
+    "duplicate_order": "この取引IDはすでに登録されています（スニダン・メルカリは1取引1点です）。",
+    "noneSelected": "カードを1枚以上選んでください"
   },
   "acquisitionType": {
     "purchase": "購入",
@@ -405,5 +409,17 @@
     "net": "損益（開封結果 − 購入額）",
     "asReceivedHint": "受け取った状態のBOXの相場データがありません。ここで価格（1BOXあたり）を設定すると評価できます。",
     "manualTitle": "受取時のBOXの価格"
+  },
+  "grades": {
+    "title": "カードのグレード",
+    "intro": "カードを選んで、まとめてグレードを設定します（例：PSA10でまとめて購入）。グレードのないカードは評価額が出ません。",
+    "none": "コレクションにカードがありません。",
+    "apply": "{count, plural, =0 {グレードを設定} other {#枚にグレードを設定}}",
+    "done": "{count, plural, =0 {変更なし} other {#件を更新しました}}",
+    "selectAll": "表示中をすべて選択",
+    "ungradedOnly": "グレード未設定のみ",
+    "noGrade": "未設定",
+    "banner": "{count}件のカードにグレードが未設定です",
+    "link": "カードのグレードを設定"
   }
 }

@@ -9,13 +9,16 @@
   "scripts": {
     "build": "tsc -p .",
     "typecheck": "tsc -p .",
-    "collect": "tsx src/cli/collect.ts"
+    "collect": "tsx src/cli/collect.ts",
+    "purchases": "tsx src/cli/purchases.ts"
   },
   "dependencies": {
     "@tora/core": "workspace:*",
-    "@tora/db": "workspace:*"
+    "@tora/db": "workspace:*",
+    "mailparser": "3.9.28"
   },
   "devDependencies": {
+    "@types/mailparser": "^3.9.0",
     "drizzle-orm": "^0.45.4"
   }
 }

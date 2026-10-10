@@ -19,6 +19,7 @@
     "db:migrate": "pnpm --filter @tora/db migrate",
     "db:seed": "pnpm --filter @tora/db seed",
     "collect": "pnpm --filter @tora/collector-sdk collect",
+    "purchases": "pnpm --silent --filter @tora/collector-sdk purchases",
     "user": "pnpm --silent --filter @tora/db user",
     "catalog:fetch": "pnpm --filter @tora/catalog run fetch",
     "catalog:sync": "pnpm --filter @tora/db catalog:sync",

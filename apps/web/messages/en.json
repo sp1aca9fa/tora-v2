@@ -97,7 +97,8 @@
     "noSets": "No matching set. Use \"Not in the list\" below.",
     "released": "Released {date}",
     "notInList": "Not in the list? Enter it manually",
-    "variantPlaceholder": "e.g. Collector"
+    "variantPlaceholder": "e.g. Collector",
+    "orderIdHint": "Optional. e.g. SNKRDUNK 取引ID or Mercari transaction ID; used to catch duplicates and imports."
   },
   "holding": {
     "costBasis": "Cost basis",
@@ -228,7 +229,8 @@
     "kind": "Kind",
     "category": "Category",
     "variant": "Variant",
-    "username": "Username"
+    "username": "Username",
+    "orderId": "Order / transaction ID"
   },
   "errors": {
     "check": "Please check",
@@ -245,7 +247,9 @@
     "no_change": "Nothing changed.",
     "has_dependents": "Other entries depend on this one (pulls or splits), so it cannot be deleted.",
     "forbidden": "Only the person who created this item can change it.",
-    "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…)."
+    "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…).",
+    "duplicate_order": "This transaction ID is already registered (each SNKRDUNK / Mercari transaction is one item).",
+    "noneSelected": "Select at least one card"
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -405,5 +409,17 @@
     "net": "Net (pulls − paid)",
     "asReceivedHint": "No market data for the box in the state you received it. Set its price here (per box) to value it.",
     "manualTitle": "Price of the box as received"
+  },
+  "grades": {
+    "title": "Card grades",
+    "intro": "Tick cards and set one grade for all of them (e.g. a batch bought as PSA 10). Cards without a grade get no market value.",
+    "none": "No cards in your collection.",
+    "apply": "{count, plural, =0 {Set grade} one {Set grade on # card} other {Set grade on # cards}}",
+    "done": "{count, plural, =0 {Nothing changed} one {Updated # card} other {Updated # cards}}",
+    "selectAll": "Select all shown",
+    "ungradedOnly": "Only without grade",
+    "noGrade": "No grade",
+    "banner": "{count, plural, one {# card has} other {# cards have}} no grade yet",
+    "link": "Set card grades"
   }
 }

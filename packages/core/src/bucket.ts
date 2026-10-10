@@ -1,4 +1,11 @@
-import type { Condition, Grader, Grading, PackagingState, RawGrade } from './domain';
+import {
+  type Condition,
+  GRADERS,
+  type Grader,
+  type Grading,
+  type PackagingState,
+  type RawGrade,
+} from './domain';
 import type { ProductClass } from './taxonomy';
 
 /** Valuation bucket (requirements section 6), e.g. `raw:A`, `graded:PSA:10`, `sealed:shrink`, `cond:new`. */
@@ -56,4 +63,20 @@ export function deriveBucket(input: BucketInput): Bucket | null {
     default:
       return input.condition ? CONDITION_BUCKETS[input.condition] : null;
   }
+}
+
+/** A card's grade: raw (SNKRDUNK S-D) or a slab. */
+export type CardGrade =
+  { grading: 'raw'; rawGrade: RawGrade } | { grading: 'graded'; grader: Grader; grade: string };
+
+/** Reads typed grades: "A", "raw B", "PSA10", "BGS 9.5", "cgc10". Null when unclear. */
+export function parseGrade(text: string): CardGrade | null {
+  const t = text.normalize('NFKC').trim().toUpperCase();
+  const raw = t.match(/^(?:RAW\s*)?([SABCD])$/);
+  if (raw) return { grading: 'raw', rawGrade: raw[1] as RawGrade };
+  const slab = t.match(/^([A-Z]+)\s*(\d{1,2}(?:\.\d)?)$/);
+  const grader = GRADERS.find((g) => g.toUpperCase() === slab?.[1]);
+  if (!slab || !grader || grader === 'other') return null;
+  const grade = slab[2]!.replace(/\.0$/, '');
+  return Number(grade) >= 1 && Number(grade) <= 10 ? { grading: 'graded', grader, grade } : null;
 }

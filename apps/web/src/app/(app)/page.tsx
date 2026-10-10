@@ -8,6 +8,7 @@ import {
   productClass,
 } from '@tora/core';
 import {
+  cardGradeCounts,
   listInventory,
   pendingMatchesForUser,
   portfolioSeries,
@@ -53,11 +54,12 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, series, matches, t] = await Promise.all([
+  const [rows, portfolio, series, matches, grades, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
     portfolioValuation(db, user.id),
     portfolioSeries(db, user.id, 365),
     pendingMatchesForUser(db, user.id),
+    cardGradeCounts(db, user.id),
     getTranslations(),
   ]);
   const { totals } = portfolio;
@@ -164,6 +166,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         </Link>
       )}
 
+      {grades.ungraded > 0 && (
+        <Link
+          href="/holdings/grades"
+          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <span>{t('grades.banner', { count: grades.ungraded })}</span>
+          <ChevronRight className="size-4" />
+        </Link>
+      )}
+
       <Suspense>
         <InventoryFilters />
       </Suspense>
@@ -250,6 +262,13 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
             );
           })}
         </ul>
+      )}
+      {grades.cards > 0 && grades.ungraded === 0 && (
+        <p className="text-right text-sm">
+          <Link href="/holdings/grades" className="text-muted-foreground hover:text-foreground">
+            {t('grades.link')}
+          </Link>
+        </p>
       )}
     </div>
   );

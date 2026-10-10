@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveBucket, gradedBucket } from './bucket';
+import { deriveBucket, gradedBucket, parseGrade } from './bucket';
 
 describe('deriveBucket', () => {
   it('raw cards use the raw grade', () => {
@@ -56,5 +56,19 @@ describe('gradedBucket', () => {
   it('normalizes grader case and trailing .0', () => {
     expect(gradedBucket('other', '10.0')).toBe('graded:OTHER:10');
     expect(gradedBucket('CGC', '9.5')).toBe('graded:CGC:9.5');
+  });
+});
+
+describe('parseGrade', () => {
+  it('reads raw grades and slabs', () => {
+    expect(parseGrade('a')).toEqual({ grading: 'raw', rawGrade: 'A' });
+    expect(parseGrade('raw S')).toEqual({ grading: 'raw', rawGrade: 'S' });
+    expect(parseGrade('PSA10')).toEqual({ grading: 'graded', grader: 'PSA', grade: '10' });
+    expect(parseGrade('ｂｇｓ ９.５')).toEqual({ grading: 'graded', grader: 'BGS', grade: '9.5' });
+    expect(parseGrade('cgc 10.0')).toEqual({ grading: 'graded', grader: 'CGC', grade: '10' });
+  });
+  it('refuses unclear input', () => {
+    for (const t of ['', 'E', 'PSA', 'PSA11', 'XYZ10', 'other 10'])
+      expect(parseGrade(t)).toBeNull();
   });
 });

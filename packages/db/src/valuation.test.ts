@@ -113,7 +113,8 @@ describe('box view (scenario 5)', () => {
     expect(view?.netJpy).toBe(3_100 + 925 * 2 - 5_400);
 
     await setManualPrice(db, uid, box.product.id, 'sealed:box_opened_contents_sealed', 9_000);
-    const withManual = await boxView(db, uid, box.holding.id, now);
+    // The manual price is set at the real current time, so value at the real time too.
+    const withManual = await boxView(db, uid, box.holding.id, new Date());
     expect(withManual?.asReceived).toMatchObject({ method: 'manual', valueJpy: 9_000 });
     await clearManualPrice(db, uid, box.product.id, 'sealed:box_opened_contents_sealed');
     expect((await boxView(db, uid, box.holding.id, now))?.asReceived.valueJpy).toBeNull();

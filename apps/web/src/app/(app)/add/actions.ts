@@ -124,6 +124,7 @@ const holdingSchema = z.object({
   acquiredAt: dateText,
   acquiredFrom: optText,
   acquisitionType: reqEnum(['purchase', 'gift', 'trade'] as const),
+  orderId: optText,
   quantity: qty,
   costTotalJpy: yen,
   notes: optText,
@@ -180,6 +181,7 @@ export async function createHoldingAction(
       acquiredAt: tokyoDateToIso(d.acquiredAt),
       acquiredFrom: d.acquiredFrom ?? null,
       notes: d.notes ?? null,
+      orderId: d.orderId ?? null,
     }),
   );
   if (!result.ok) return result.state;

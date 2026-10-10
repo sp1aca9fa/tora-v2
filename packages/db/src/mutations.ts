@@ -4,6 +4,7 @@
 // that user's holdings. Products and the TCG set catalog are shared.
 import {
   type AcquisitionType,
+  type CardGrade,
   type Condition,
   type Grader,
   type Grading,
@@ -13,8 +14,10 @@ import {
   type Region,
   catalogProductName,
   isConsumedAfterOpening,
+  SINGLE_ITEM_ORDER_SOURCES,
   kindsFor,
   kindsForSetType,
+  orderSourceOf,
   openedStatesFor,
   pendingGrading,
   productClass,
@@ -48,7 +51,8 @@ export type DomainErrorCode =
   | 'already_at_grader'
   | 'not_at_grader'
   | 'no_change'
-  | 'has_dependents';
+  | 'has_dependents'
+  | 'duplicate_order';
 
 /** Expected business-rule failure; actions map the code to a user-facing message. */
 export class DomainError extends Error {
@@ -80,6 +84,8 @@ export interface HoldingInput {
   grade?: string | null;
   certNumber?: string | null;
   notes?: string | null;
+  /** Transaction / order ID at the place of purchase (e.g. a SNKRDUNK 取引ID). */
+  orderId?: string | null;
 }
 
 /** A sealed product of a catalog set; created on first use. */
@@ -218,6 +224,50 @@ async function resolveProduct(tx: Tx, userId: string, ref: ProductRef): Promise<
   return product!;
 }
 
+/** The holding already registered with this transaction ID, if any. */
+export async function findHoldingByOrder(
+  db: Db | Tx,
+  userId: string,
+  orderSource: string,
+  orderId: string,
+): Promise<Holding | null> {
+  const [row] = await db
+    .select()
+    .from(holdings)
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.orderSource, orderSource),
+        eq(holdings.orderId, orderId),
+      ),
+    )
+    .orderBy(holdings.createdAt)
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Normalizes the order fields and refuses a second registration of a single-item transaction
+ * (SNKRDUNK / Mercari / Yahoo IDs are one item each). `exceptId` skips the holding being edited.
+ */
+async function checkOrder(
+  tx: Tx,
+  userId: string,
+  acquiredFrom: string | null | undefined,
+  orderId: string | null | undefined,
+  exceptId?: string,
+): Promise<{ orderSource: string | null; orderId: string | null }> {
+  const id = orderId?.normalize('NFKC').trim() || null;
+  const source = id ? orderSourceOf(acquiredFrom) : null;
+  if (id && source && SINGLE_ITEM_ORDER_SOURCES.includes(source)) {
+    const existing = await findHoldingByOrder(tx, userId, source, id);
+    if (existing && existing.id !== exceptId) {
+      throw new DomainError('duplicate_order', existing.id);
+    }
+  }
+  return { orderSource: source, orderId: id };
+}
+
 async function insertHolding(
   tx: Tx,
   userId: string,
@@ -229,9 +279,10 @@ async function insertHolding(
   if ((input.acquisitionType === 'pull') !== Boolean(input.parentHoldingId)) {
     throw new DomainError('invalid_input');
   }
+  const order = await checkOrder(tx, userId, input.acquiredFrom, input.orderId);
   const [holding] = await tx
     .insert(holdings)
-    .values({ ...input, userId, productId })
+    .values({ ...input, ...order, userId, productId })
     .returning();
   await insertEvent(tx, {
     holdingId: holding!.id,
@@ -364,6 +415,7 @@ export type HoldingEdit = Partial<
     | 'quantity'
     | 'certNumber'
     | 'notes'
+    | 'orderId'
   >
 >;
 
@@ -384,6 +436,23 @@ export async function editHolding(
       throw new DomainError('invalid_input');
     }
 
+    let patch: HoldingEdit & { orderSource?: string | null } = edit;
+    const orderChanged =
+      (edit.orderId !== undefined && (edit.orderId || null) !== holding.orderId) ||
+      (edit.acquiredFrom !== undefined &&
+        holding.orderId &&
+        edit.acquiredFrom !== holding.acquiredFrom);
+    if (orderChanged) {
+      const order = await checkOrder(
+        tx,
+        userId,
+        edit.acquiredFrom ?? holding.acquiredFrom,
+        edit.orderId !== undefined ? edit.orderId : holding.orderId,
+        id,
+      );
+      patch = { ...edit, ...order };
+    }
+
     const changes: Record<string, { before: unknown; after: unknown }> = {};
     for (const [key, after] of Object.entries(edit) as [keyof HoldingEdit, unknown][]) {
       if (after === undefined || holding[key] === after) continue;
@@ -391,7 +460,7 @@ export async function editHolding(
     }
     if (Object.keys(changes).length === 0) throw new DomainError('no_change');
 
-    const [updated] = await tx.update(holdings).set(edit).where(eq(holdings.id, id)).returning();
+    const [updated] = await tx.update(holdings).set(patch).where(eq(holdings.id, id)).returning();
     await insertEvent(tx, {
       holdingId: id,
       type: 'note',
@@ -399,6 +468,46 @@ export async function editHolding(
       payload: { kind: 'edit', changes },
     });
     return updated!;
+  });
+}
+
+/**
+ * Sets the grade of owned cards in one go (e.g. a batch bought as PSA 10). A correction of the
+ * recorded facts, logged per holding as a `note` event with `kind: 'edit'`. Returns how many
+ * holdings changed; non-cards and cards already at that grade are left alone.
+ */
+export async function setCardGrade(
+  db: Db,
+  userId: string,
+  ids: string[],
+  grade: CardGrade,
+  occurredAt: string = toTokyoIso(),
+): Promise<number> {
+  const next =
+    grade.grading === 'raw'
+      ? { grading: 'raw' as const, rawGrade: grade.rawGrade, grader: null, grade: null }
+      : { grading: 'graded' as const, rawGrade: null, grader: grade.grader, grade: grade.grade };
+  return db.transaction(async (tx) => {
+    let changed = 0;
+    for (const id of new Set(ids)) {
+      const { holding, product } = await loadHolding(tx, userId, id);
+      assertOwned(holding);
+      if (productClass(product) !== 'card') throw new DomainError('not_a_card');
+      const changes: Record<string, { before: unknown; after: unknown }> = {};
+      for (const [key, after] of Object.entries(next) as [keyof typeof next, unknown][]) {
+        if (holding[key] !== after) changes[key] = { before: holding[key], after };
+      }
+      if (Object.keys(changes).length === 0) continue;
+      await tx.update(holdings).set(next).where(eq(holdings.id, id));
+      await insertEvent(tx, {
+        holdingId: id,
+        type: 'note',
+        occurredAt,
+        payload: { kind: 'edit', changes },
+      });
+      changed++;
+    }
+    return changed;
   });
 }
 

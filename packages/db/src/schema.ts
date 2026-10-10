@@ -255,6 +255,9 @@ export const holdings = sqliteTable(
     certNumber: text('cert_number'),
     status: text('status', { enum: HOLDING_STATUSES }).notNull().default('owned'),
     notes: text('notes'),
+    /** Where the order was placed (normalized, e.g. `snkrdunk`) and its transaction / order ID. */
+    orderSource: text('order_source'),
+    orderId: text('order_id'),
     ...timestamps,
   },
   (t) => [
@@ -271,6 +274,7 @@ export const holdings = sqliteTable(
     index('holdings_product_idx').on(t.productId),
     index('holdings_parent_idx').on(t.parentHoldingId),
     index('holdings_status_idx').on(t.status),
+    index('holdings_order_idx').on(t.userId, t.orderSource, t.orderId),
   ],
 );
 

@@ -18,6 +18,7 @@
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
 | S4 | Mercari sold collector | todo |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
+| S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 
@@ -65,6 +66,8 @@
 - 2026-10-10: Charts use the validated reference palette slots 1-3 (light and dark steps); every chart has a legend with values on hover, and the item page keeps a table of medians per source + bucket as the table view.
 - 2026-10-10: User request: show the last real sale and per-source prices next to the median. The median stays the value used for totals and P/L; the last sale (with trend vs median) and per-source cards are shown on the item page, with the last sale in the portfolio list.
 - 2026-10-09: Health check for "median moved > 50 %" compares the last 7 days with the 30 before (day-over-day medians are too noisy at a few trades per day). The item page shows plain 30-day medians per bucket until S5 adds valuation.
+- 2026-10-10: S5b purchase import reads a Google Takeout mbox on the home PC instead of connecting the app to Gmail (no Gmail credentials anywhere online). Accepted SNKRDUNK offers count as purchases. Receipts have no listing link, so products are matched by listing title. Order IDs are normalized per marketplace (`order_source`) and unique per user only for one-item-per-transaction marketplaces (SNKRDUNK, Mercari, Yahoo); Amazon orders can hold several items.
+- 2026-10-10: The import command is `pnpm purchases` because `pnpm import` is a pnpm built-in.
 
 ---
 
@@ -325,6 +328,23 @@ Build:
 Acceptance:
 - Scenario 5 and 7 visible and correct; values show source, sample size, age and confidence.
 
+## S5b: SNKRDUNK purchase import (Gmail Takeout)
+
+Added at the user's request (88+ SNKRDUNK purchases to register).
+
+Build:
+- Holdings get `order_source` + `order_id` (e.g. snkrdunk / 取引ID). Optional when registering by hand (add flow, edit); required for imports. A SNKRDUNK 取引ID can only be registered once per user (one item per transaction); split lots keep the ID.
+- `pnpm purchases <file.mbox> --user <username> [--source snkrdunk]` on the home PC, reading a Google Takeout export of the SNKRDUNK emails (`pnpm import` is a pnpm built-in, hence the name). No app access to Gmail.
+  - Purchase emails: subject `【SNKRDUNK】ご購入ありがとうございます。(取引ID：N)`; accepted offers are purchases too (`【SNKRDUNK】オファーが成立しました。(取引ID：N)`). Cost = the amount paid (item + shipping + fees, after coupons). Cancellations: subject `【SNKRDUNK】取引がキャンセルとなりました。`, ID in the body (`取引ID:N`); cancelled IDs are never imported.
+  - Duplicates: same ID + same data -> reported, skipped. Same ID + different data (price, item, date) -> the user chooses which is correct (existing entries change only on request, logged as an edit). No ID but a likely match (same listing or name, same price, dates within 3 days) -> the user confirms; "same" attaches the ID.
+  - Summary and confirmation before writing. Existing entries are never removed (a cancelled ID that is registered is reported, not deleted).
+  - Receipts carry no listing link. A receipt's item title is the listing title, so it is matched to a product already linked to a listing with that title; otherwise a product is created from the title (cards read like listing titles; sealed kind from 拡張パック…ボックス / 構築デッキ / 特別セット…; sealed product as shrink-wrapped unless the title says シュリンクなし) and matched to its listing on the next collect (confirmed under Matches). A product bought several times is created once. Listings SNKRDUNK renamed (e.g. 30周年 セレブレーション -> 30th CELEBRATION) map to the current title.
+- Receipts do not state a card's grade, and a card without one is not valued: the import asks once per card (e.g. `PSA10`, `BGS9.5`, `A`; Enter leaves it blank; `each` asks per purchase). In the app, "Card grades" (`/holdings/grades`, linked from a portfolio banner while any owned card has no grade) sets one grade on many ticked cards at once, logged per holding as an edit.
+- Email parsing and sample emails live in the private collectors repo.
+
+Acceptance:
+- Re-running the import on the same file adds nothing; cancelled purchases are not imported; conflicts are asked, not guessed.
+
 ## S6: Export / import
 
 Build:
@@ -333,6 +353,7 @@ Build:
 - **JSON import** into an empty DB.
 - Round-trip test: seed -> export -> import into empty DB -> identical computed totals and row counts.
 - Scheduled local backup of the Turso DB to the home PC (dated SQL dump or JSON export, keep last 30).
+- Automatic purchase import: the daily job on the home PC checks Gmail for new SNKRDUNK receipts (and cancellations) and imports them with the S5b rules, asking about conflicts in the app. Gmail access is read-only, its token stored only on the home PC (never on Vercel or in the database).
 
 Acceptance:
 - Scenario 8; round-trip test passes in CI-like `pnpm test`.

@@ -172,6 +172,9 @@ export default async function HoldingActionPage({
               <Input id="certNumber" name="certNumber" defaultValue={holding.certNumber ?? ''} />
             </Field>
           )}
+          <Field label={t('fields.orderId')} htmlFor="orderId" hint={t('add.orderIdHint')}>
+            <Input id="orderId" name="orderId" defaultValue={holding.orderId ?? ''} />
+          </Field>
           <Field label={t('fields.notes')} htmlFor="notes" className="sm:col-span-2">
             <Textarea id="notes" name="notes" rows={3} defaultValue={holding.notes ?? ''} />
           </Field>

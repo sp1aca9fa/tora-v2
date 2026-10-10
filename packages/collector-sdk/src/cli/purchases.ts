@@ -1,0 +1,230 @@
+// `pnpm purchases <export.mbox> --user <username> [--source snkrdunk]`
+// Imports marketplace purchases from a Google Takeout mail export (requirements S5b). Runs on
+// the home PC; the app never gets Gmail access. Nothing is written before the summary is
+// confirmed, and existing entries are never removed.
+import { type CardGrade, parseGrade, productClass, tokyoDate } from '@tora/core';
+import type { HoldingInput } from '@tora/db';
+import { createDb, getUserByUsername } from '@tora/db';
+import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
+import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
+import { parseArgs } from 'node:util';
+import { readMbox } from '../mbox';
+import {
+  type Decision,
+  type PlanEntry,
+  applyImport,
+  gatherReceipts,
+  importedProduct,
+  planImport,
+} from '../purchases';
+import { loadCollectors } from '../registry';
+import type { PurchaseReceipt, ReceiptMail } from '../types';
+
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: { user: { type: 'string' }, source: { type: 'string' } },
+});
+const file = positionals[0];
+if (!file || !values.user) {
+  console.error('Usage: pnpm purchases <export.mbox> --user <username> [--source snkrdunk]');
+  process.exit(1);
+}
+
+loadRootEnv();
+const config = dbConfigFromEnv();
+const db = createDb(config);
+const user = await getUserByUsername(db, values.user.trim().toLowerCase());
+if (!user) {
+  console.error(`No user "${values.user}".`);
+  process.exit(1);
+}
+const { importers, missing } = await loadCollectors();
+for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
+const selected = importers.filter((i) => !values.source || i.source === values.source);
+if (selected.length === 0) {
+  console.error('No purchase importer available (they live in the private collectors package).');
+  process.exit(1);
+}
+// pnpm runs the script inside the package; paths are relative to where the command was typed.
+const path = resolve(process.env.INIT_CWD ?? process.cwd(), file);
+console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
+console.log(`User: ${user.username}\n`);
+
+// Line iterator (not rl.question): buffered, so answers can also be piped in.
+const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
+const answers = rl[Symbol.asyncIterator]();
+const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
+const day = (iso: string) => tokyoDate(new Date(iso));
+const line = (r: PurchaseReceipt) =>
+  `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.totalJpy)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
+async function choose<T>(question: string, options: Record<string, T>): Promise<T> {
+  for (;;) {
+    process.stdout.write(`${question} `);
+    const next = await answers.next();
+    if (next.done) {
+      console.log('\nNo answer; nothing written.');
+      process.exit(1);
+    }
+    const answer = next.value.trim().toLowerCase();
+    if (answer in options) return options[answer]!;
+  }
+}
+const section = (title: string, entries: PlanEntry[], extra?: (e: PlanEntry) => string) => {
+  if (entries.length === 0) return;
+  console.log(`${title} (${entries.length}):`);
+  for (const e of entries) console.log(line(e.receipt) + (extra ? extra(e) : ''));
+  console.log('');
+};
+
+let exitCode = 0;
+for (const importer of selected) {
+  console.log(`== ${importer.label} ==`);
+  const mails: ReceiptMail[] = [];
+  for await (const mail of readMbox(path, importer.matchesHeader)) {
+    const parsed = importer.parse(mail);
+    if (parsed) mails.push(parsed);
+  }
+  const gathered = gatherReceipts(mails);
+  const plan = await planImport(db, user.id, importer, gathered);
+  const of = <T extends PlanEntry['type']>(type: T) =>
+    plan.filter((e): e is Extract<PlanEntry, { type: T }> => e.type === type);
+  console.log(
+    `Read ${gathered.receipts.length} purchase(s), ${gathered.cancelled.size} cancellation(s).\n`,
+  );
+
+  section('Already registered with the same data, not imported again', of('duplicate'));
+  section('Cancelled, not imported', of('cancelled'));
+  section(
+    'Cancelled per the emails but registered (left as is; check them)',
+    of('cancelledRegistered'),
+  );
+  section(
+    'Could not tell what product this is (add by hand with its order ID)',
+    of('unclassified'),
+  );
+  if (gathered.unreadable.length) {
+    console.log(`Emails that could not be read (${gathered.unreadable.length}):`);
+    for (const u of gathered.unreadable) console.log(`  ${u.subject} (${u.reason})`);
+    console.log('');
+  }
+  section('New', of('new'), (e) =>
+    e.type === 'new' && 'create' in e.ref ? '  [new product]' : '',
+  );
+
+  const decisions = new Map<string, Decision>();
+  for (const e of of('conflict')) {
+    console.log(`Transaction #${e.receipt.orderId} is registered with different data:`);
+    console.log(line(e.receipt));
+    for (const d of e.diffs) {
+      const fmt = (v: string | number) => (d.field === 'cost' ? yen(Number(v)) : String(v));
+      console.log(`    ${d.field}: registered ${fmt(d.existing)}, email ${fmt(d.imported)}`);
+    }
+    if (e.existing.length > 1) {
+      console.log('    The lot was split; keeping the registered data (edit it in the app).\n');
+      decisions.set(e.receipt.orderId, 'keep');
+      continue;
+    }
+    decisions.set(
+      e.receipt.orderId,
+      await choose('    Which is correct? [r]egistered / [e]mail:', { r: 'keep', e: 'imported' }),
+    );
+    console.log('');
+  }
+  for (const e of of('likely')) {
+    const h = e.existing;
+    console.log(`Possibly already registered without its order ID:`);
+    console.log(line(e.receipt));
+    console.log(
+      `    registered: ${day(h.acquiredAt)}  ${yen(h.costTotalJpy)}  ${e.product.name}${h.acquiredFrom ? ` (${h.acquiredFrom})` : ''}`,
+    );
+    const options: Record<string, Decision> = { s: 'same', k: 'skip' };
+    if (e.ref) options.d = 'different';
+    decisions.set(
+      e.receipt.orderId,
+      await choose(
+        `    [s]ame purchase (add the order ID)${e.ref ? ' / [d]ifferent purchase (import)' : ''} / s[k]ip:`,
+        options,
+      ),
+    );
+    console.log('');
+  }
+
+  // Receipts do not say a card's grade; without one a card is not valued. Asked once per card.
+  const extra = new Map<string, Partial<HoldingInput>>();
+  const cards = new Map<string, PlanEntry[]>();
+  for (const e of plan) {
+    const product = importedProduct(e);
+    const imported = e.type === 'new' || decisions.get(e.receipt.orderId) === 'different';
+    if (!product || !imported || productClass(product) !== 'card') continue;
+    cards.set(e.receipt.title, [...(cards.get(e.receipt.title) ?? []), e]);
+  }
+  const gradeFields = (g: CardGrade): Partial<HoldingInput> =>
+    g.grading === 'raw' ? { grading: 'raw', rawGrade: g.rawGrade } : g;
+  const askGrade = async (question: string): Promise<CardGrade | 'each' | null> => {
+    for (;;) {
+      process.stdout.write(`${question} `);
+      const next = await answers.next();
+      if (next.done) {
+        console.log('\nNo answer; nothing written.');
+        process.exit(1);
+      }
+      const text = next.value.trim();
+      if (text === '') return null;
+      if (text.toLowerCase() === 'each') return 'each';
+      const grade = parseGrade(text);
+      if (grade) return grade;
+      console.log('    Not a grade. Examples: PSA10, BGS9.5, A (raw), Enter to leave blank.');
+    }
+  };
+  if (cards.size > 0) {
+    console.log('Card grades (receipts do not say; ungraded cards get no market value).');
+    console.log(
+      'Type e.g. PSA10, BGS9.5, A (raw S-D); Enter leaves it blank (set later in the app).\n',
+    );
+  }
+  for (const [title, entries] of cards) {
+    const units = entries.reduce((n, e) => n + e.receipt.quantity, 0);
+    const several = entries.length > 1;
+    const grade = await askGrade(
+      `  ${title} (${entries.length} purchase(s), ${units} card(s))${several ? ', or "each"' : ''}:`,
+    );
+    if (grade === 'each') {
+      for (const e of entries) {
+        const g = await askGrade(`    ${line(e.receipt).trim()}:`);
+        if (g && g !== 'each') extra.set(e.receipt.orderId, gradeFields(g));
+      }
+    } else if (grade) {
+      for (const e of entries) extra.set(e.receipt.orderId, gradeFields(grade));
+    }
+  }
+  if (cards.size > 0) console.log('');
+
+  const decided = [...decisions.values()];
+  const creates = of('new').length + decided.filter((d) => d === 'different').length;
+  const updates = decided.filter((d) => d === 'imported').length;
+  const attaches = decided.filter((d) => d === 'same').length;
+  if (creates + updates + attaches === 0) {
+    console.log('Nothing to write.\n');
+    continue;
+  }
+  const ok = await choose(
+    `Write ${creates} new, ${updates} correction(s), ${attaches} order ID(s) added? [y/n]`,
+    { y: true, n: false },
+  );
+  if (!ok) {
+    console.log('Nothing written.\n');
+    continue;
+  }
+  const outcome = await applyImport(db, user.id, importer, plan, decisions, extra);
+  console.log(
+    `Done: ${outcome.created} created, ${outcome.updated} corrected, ${outcome.attached} order ID(s) added.`,
+  );
+  for (const f of outcome.failed) console.log(`  failed #${f.orderId}: ${f.error}`);
+  if (outcome.failed.length) exitCode = 1;
+  console.log(
+    'Run `pnpm collect` to match new products to their listing (confirm under Matches).\n',
+  );
+}
+rl.close();
+process.exit(exitCode);

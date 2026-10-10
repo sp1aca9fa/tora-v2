@@ -1,11 +1,14 @@
 import type {
   CandidateInput,
+  HoldingInput,
   NewPriceObservation,
   Product,
+  ProductInput,
   ProductSource,
   RecentSale,
 } from '@tora/db';
 import type { PoliteHttp } from './http';
+import type { Email } from './mbox';
 
 export interface CollectorContext {
   http: PoliteHttp;
@@ -48,7 +51,52 @@ export type ProductDetails = Partial<
   Pick<Product, 'name' | 'rarity' | 'setName' | 'setCode' | 'cardNumber' | 'variant' | 'imageUrl'>
 >;
 
+/** One purchase read from an order confirmation email. */
+export interface PurchaseReceipt {
+  /** Transaction / order ID at the marketplace (e.g. a SNKRDUNK 取引ID). */
+  orderId: string;
+  /** Tokyo ISO timestamp of the order. */
+  orderedAt: string;
+  /** Item title as shown on the receipt (usually the listing title). */
+  title: string;
+  quantity: number;
+  /** Amount paid, fees and shipping included; becomes the holding's cost. */
+  totalJpy: number;
+  /** Item price alone, when the receipt shows it (manual entries may have used it). */
+  itemPriceJpy?: number | null;
+  /** Listing at the marketplace (the price source to link the product to). */
+  listing?: { externalId: string; url: string } | null;
+  /** Condition as the marketplace shows it (e.g. "A", "PSA10"). */
+  condition?: string | null;
+}
+
+export type ReceiptMail =
+  | { kind: 'purchase'; receipt: PurchaseReceipt }
+  | { kind: 'cancel'; orderId: string }
+  /** Looked like a receipt but could not be read; reported, never guessed. */
+  | { kind: 'unreadable'; subject: string; reason: string };
+
+/** Reads a marketplace's emails into purchases (requirements S5b). */
+export interface PurchaseImporter {
+  /** Order source key (`holdings.order_source`, `product_sources.source`). */
+  source: string;
+  /** Stored as the holding's "acquired from". */
+  label: string;
+  /** Cheap pre-filter on a raw header block (e.g. the sender domain). */
+  matchesHeader(rawHeader: string): boolean;
+  /** Null for mails that are not receipts or cancellations. */
+  parse(mail: Email): ReceiptMail | null;
+  /** Product to create when no product is linked to the listing yet; null when unclear. */
+  productFor(receipt: PurchaseReceipt): ProductInput | null;
+  /** Holding fields read from the receipt for that product (condition, grading, packaging). */
+  holdingFor?(
+    receipt: PurchaseReceipt,
+    product: Pick<Product, 'category' | 'kind'>,
+  ): Partial<HoldingInput>;
+}
+
 /** Shape every collectors package (public or private) exports from its entry point. */
 export interface CollectorModule {
   collectors: Collector[];
+  importers?: PurchaseImporter[];
 }

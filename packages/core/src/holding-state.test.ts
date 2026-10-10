@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isConsumedAfterOpening, openedStatesFor, pendingGrading, unitCost } from './holding-state';
-import { hasJapanese } from './text';
+import { hasJapanese, orderSourceOf } from './text';
 
 describe('pendingGrading', () => {
   it('is set after a submission and cleared by the return', () => {
@@ -44,5 +44,15 @@ describe('helpers', () => {
   it('computes unit cost', () => {
     expect(unitCost(10_000, 3)).toBe(3333);
     expect(unitCost(0, 2)).toBe(0);
+  });
+});
+
+describe('orderSourceOf', () => {
+  it('normalizes where an order was placed', () => {
+    expect(orderSourceOf('SNKRDUNK')).toBe('snkrdunk');
+    expect(orderSourceOf('スニダン')).toBe('snkrdunk');
+    expect(orderSourceOf('メルカリ')).toBe('mercari');
+    expect(orderSourceOf(' Yodobashi ')).toBe('yodobashi');
+    expect(orderSourceOf('')).toBeNull();
   });
 });

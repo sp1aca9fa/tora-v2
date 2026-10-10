@@ -72,6 +72,7 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
       quantity: qty,
       costTotalJpy: yen,
       certNumber: optText,
+      orderId: optText,
       notes: optText,
     }),
     (d, { db, userId }) =>
@@ -81,6 +82,7 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
         acquiredAt: d.acquiredAt === formData.get('originalDate') ? undefined : at(d.acquiredAt),
         acquiredFrom: d.acquiredFrom ?? null,
         certNumber: d.certNumber ?? null,
+        orderId: d.orderId ?? null,
         notes: d.notes ?? null,
       }),
     () => holdingPath(id),

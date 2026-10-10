@@ -471,6 +471,14 @@ export function AddFlow({
               onChange={(e) => setCost(e.target.value)}
             />
           </Field>
+          <Field
+            label={t('fields.orderId')}
+            htmlFor="orderId"
+            hint={t('add.orderIdHint')}
+            className="sm:col-span-2"
+          >
+            <Input id="orderId" name="orderId" autoComplete="off" inputMode="text" />
+          </Field>
         </div>
       </section>
 
