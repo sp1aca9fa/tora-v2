@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
-import { addPull, createHolding, createProduct } from './mutations';
-import { collectorRuns } from './schema';
+import { addPull, createHolding, createProduct, mergeProducts } from './mutations';
+import { collectorRuns, holdings, productSources, products } from './schema';
 import { cardNumberKey, suggestFromKnownProducts } from './similar';
 import { linkSource, listPendingCandidates, rejectCandidate, startRun } from './sources';
 import { createUser } from './users';
@@ -116,4 +116,35 @@ it('closes runs that never finished', async () => {
   const runs = await db.select().from(collectorRuns).orderBy(collectorRuns.startedAt);
   expect(runs.map((r) => r.status)).toEqual(['failed', 'running']);
   expect(runs[0]!.error).toContain('interrupted');
+});
+
+it('merges a duplicate into an existing product', async () => {
+  const user = { id: uid, role: 'member' as const };
+  const real = await single('インフルエンサーの紹介', { setCode: 'MP1', cardNumber: '019/23' });
+  const dup = await single('インフルエンサーの紹介', { cardNumber: '19/23' });
+  await linkSource(db, real.id, { source: 'snkrdunk', externalId: '777' });
+  await linkSource(db, dup.id, { source: 'snkrdunk', externalId: '777' });
+  await linkSource(db, dup.id, { source: 'mercari', externalId: 'm1' });
+  const lot = {
+    quantity: 1,
+    costTotalJpy: 500,
+    acquiredAt: at,
+    grading: 'raw' as const,
+    rawGrade: 'A' as const,
+  };
+  await createHolding(db, uid, { productId: real.id }, lot);
+  await createHolding(db, uid, { productId: dup.id }, lot);
+
+  await mergeProducts(db, user, dup.id, real.id);
+  const lots = await db.select().from(holdings);
+  expect(lots.every((h) => h.productId === real.id)).toBe(true);
+  const listings = await db.select().from(productSources);
+  expect(
+    listings.map((l) => `${l.productId === real.id}:${l.source}:${l.externalId}`).sort(),
+  ).toEqual(['true:mercari:m1', 'true:snkrdunk:777']);
+  expect((await db.select().from(products)).map((p) => p.id)).toEqual([real.id]);
+
+  // Different kinds cannot be merged.
+  const box = await createProduct(db, uid, { category: 'tcg', kind: 'booster_box', name: 'Box' });
+  await expect(mergeProducts(db, user, box.id, real.id)).rejects.toThrow('invalid_input');
 });

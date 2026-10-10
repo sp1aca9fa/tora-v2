@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { editProductAction } from '@/app/(app)/holdings/[id]/actions';
 import { ActionForm } from '@/components/action-form';
-import { ProductFields } from '@/components/product-fields';
 import { authed } from '@/lib/auth/guard';
 import { franchiseLabel } from '@/lib/product-display';
+import { EditProductFields } from './edit-fields';
 
 export default async function EditProductPage({
   params,
@@ -21,7 +21,7 @@ export default async function EditProductPage({
   // Products are shared: only the creator (or an admin) may edit one.
   if (!product || !canEditProduct(user, product)) notFound();
   const t = await getTranslations();
-  const back = from?.startsWith('/holdings/') ? from : '/';
+  const back = from?.startsWith('/holdings/') || from?.startsWith('/products/') ? from : '/';
   const isTcg = product.category === 'tcg';
 
   return (
@@ -44,7 +44,8 @@ export default async function EditProductPage({
         <input type="hidden" name="kind" value={product.kind} />
         {isTcg && <input type="hidden" name="franchise" value={product.franchise ?? ''} />}
         {product.setId && <input type="hidden" name="setId" value={product.setId} />}
-        <ProductFields
+        <EditProductFields
+          productId={product.id}
           category={product.category}
           kind={product.kind}
           franchiseInput={!isTcg}

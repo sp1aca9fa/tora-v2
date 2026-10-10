@@ -460,5 +460,14 @@
     "lots": "Your lots",
     "toReview": "to review",
     "cost": "cost"
+  },
+  "merge": {
+    "hint": "Is this the same item as one already registered? Pick it to merge this one into it:",
+    "title": "Merge duplicate",
+    "intro": "Everything recorded under the duplicate (lots, prices, listings) moves to the existing item, and the duplicate is deleted.",
+    "from": "Duplicate",
+    "into": "Keep",
+    "submit": "Merge",
+    "confirm": "Move {lots, plural, one {# lot} other {# lots}} (and its sales data and listings) to \"{name}\" and delete the duplicate."
   }
 }

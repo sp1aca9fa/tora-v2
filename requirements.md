@@ -81,6 +81,7 @@
 - 2026-10-10: Look-alike products: a pull typed with the same name and card number as a registered card (same franchise / region) is logged on that card, not a new product. A product without a price source is offered the listing of a linked look-alike right away (same card number plus same name or set code; same name and kind for sealed items), when it is created and at the start of each collector run; the site search waits while such a suggestion is pending and runs again once it is dismissed.
 - 2026-10-10: Collector runs still `running` after 3 hours are closed as failed (interrupted) when the next run of that source starts.
 - 2026-10-10: Registering a new item or a pull suggests matching items already registered while typing (name, set code, card number; linked ones first, marked "linked"). Picking one registers the purchase or pull under that item instead of creating a duplicate (user request: search-first, like asset tools).
+- 2026-10-10: Duplicate products can be merged: the product edit page suggests registered look-alikes; picking one opens a confirmation, and merging moves the duplicate's lots, sales data, manual prices and listings to the kept product and deletes the duplicate (same category and kind only).
 
 ---
 

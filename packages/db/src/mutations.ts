@@ -36,7 +36,12 @@ import {
   cancelledOrders,
   holdingEvents,
   holdings,
+  manualPrices,
+  priceObservations,
+  productImages,
+  productSources,
   products,
+  sourceCandidates,
   tcgSets,
   valuationSnapshots,
 } from './schema';
@@ -941,4 +946,59 @@ export async function flagForReview(
     flagged++;
   }
   return flagged;
+}
+
+/**
+ * Merges a duplicate product into another (same category and kind): its lots, sales data, manual
+ * prices and listings move over, then the duplicate is deleted. Listings the target already has,
+ * the duplicate's pending suggestions and its picture are dropped. Products are shared, so other
+ * users' lots of the duplicate move too (they are the same item).
+ */
+export async function mergeProducts(
+  db: Db,
+  actor: Pick<User, 'id' | 'role'>,
+  fromId: string,
+  intoId: string,
+): Promise<Product> {
+  if (fromId === intoId) throw new DomainError('invalid_input');
+  return db.transaction(async (tx) => {
+    const [from] = await tx.select().from(products).where(eq(products.id, fromId));
+    const [into] = await tx.select().from(products).where(eq(products.id, intoId));
+    if (!from || !into) throw new DomainError('not_found');
+    if (!canEditProduct(actor, from)) throw new DomainError('forbidden');
+    if (from.category !== into.category || from.kind !== into.kind) {
+      throw new DomainError('invalid_input');
+    }
+    await tx.update(holdings).set({ productId: intoId }).where(eq(holdings.productId, fromId));
+    await tx
+      .update(priceObservations)
+      .set({ productId: intoId })
+      .where(eq(priceObservations.productId, fromId));
+    await tx
+      .update(manualPrices)
+      .set({ productId: intoId })
+      .where(eq(manualPrices.productId, fromId));
+    const intoListings = await tx
+      .select({ source: productSources.source, externalId: productSources.externalId })
+      .from(productSources)
+      .where(eq(productSources.productId, intoId));
+    const has = new Set(intoListings.map((l) => `${l.source}|${l.externalId}`));
+    for (const l of await tx
+      .select()
+      .from(productSources)
+      .where(eq(productSources.productId, fromId))) {
+      if (has.has(`${l.source}|${l.externalId}`)) {
+        await tx.delete(productSources).where(eq(productSources.id, l.id));
+      } else {
+        await tx
+          .update(productSources)
+          .set({ productId: intoId })
+          .where(eq(productSources.id, l.id));
+      }
+    }
+    await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, fromId));
+    await tx.delete(productImages).where(eq(productImages.productId, fromId));
+    await tx.delete(products).where(eq(products.id, fromId));
+    return into;
+  });
 }

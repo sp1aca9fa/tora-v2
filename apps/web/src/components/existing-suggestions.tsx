@@ -15,11 +15,17 @@ export function ExistingSuggestions({
   category,
   kinds,
   onSelect,
+  excludeId,
+  hint,
 }: {
   query: string;
   category?: Category;
   kinds?: ProductKind[];
   onSelect: (product: ProductSummary) => void;
+  /** The product being edited (not a suggestion for itself). */
+  excludeId?: string;
+  /** Replaces the default "Already registered?" line. */
+  hint?: string;
 }) {
   const t = useTranslations();
   const [results, setResults] = useState<ProductSummary[]>([]);
@@ -37,16 +43,21 @@ export function ExistingSuggestions({
           kinds: k ? (k.split(',') as ProductKind[]) : undefined,
         });
         // Linked items first: they come with prices.
-        setResults(found.toSorted((a, b) => Number(b.linked) - Number(a.linked)).slice(0, 5));
+        setResults(
+          found
+            .filter((p) => p.id !== excludeId)
+            .toSorted((a, b) => Number(b.linked) - Number(a.linked))
+            .slice(0, 5),
+        );
       });
     }, 300);
     return () => clearTimeout(timer);
-  }, [q, filterKey]);
+  }, [q, filterKey, excludeId]);
 
   if (q.length < 2 || results.length === 0) return null;
   return (
     <div className="space-y-1.5 rounded-md border border-dashed p-2">
-      <p className="px-1 text-xs text-muted-foreground">{t('add.existingHint')}</p>
+      <p className="px-1 text-xs text-muted-foreground">{hint ?? t('add.existingHint')}</p>
       <ul className="space-y-1">
         {results.map((p) => (
           <li key={p.id}>
