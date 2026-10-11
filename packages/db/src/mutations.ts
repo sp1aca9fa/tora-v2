@@ -813,13 +813,20 @@ export async function changeCondition(
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    const patch: Partial<Pick<Holding, 'condition' | 'rawGrade' | 'packagingState'>> = {};
+    const patch: Partial<Pick<Holding, 'condition' | 'rawGrade' | 'packagingState' | 'grading'>> =
+      {};
     const before: Record<string, unknown> = {};
     for (const key of ['condition', 'rawGrade', 'packagingState'] as const) {
       const value = input[key];
       if (value === undefined || value === holding[key]) continue;
       Object.assign(patch, { [key]: value });
       before[key] = holding[key];
+    }
+    // A raw grade given to a card with no grading yet makes it a raw card (else it stays
+    // "ungraded" and gets no market value).
+    if (input.rawGrade && holding.grading === null) {
+      patch.grading = 'raw';
+      before.grading = null;
     }
     if (Object.keys(patch).length === 0) throw new DomainError('no_change');
 

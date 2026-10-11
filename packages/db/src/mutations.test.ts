@@ -384,6 +384,21 @@ describe('lot actions', () => {
     );
   });
 
+  it('a raw grade set on an ungraded card makes it a raw card', async () => {
+    const { holding } = await createHolding(
+      db,
+      uid,
+      { product: { category: 'tcg', kind: 'single', name: 'ピカチュウ 長場雄' } },
+      { quantity: 3, costTotalJpy: 7_050, acquiredAt: day('09-01') },
+    );
+    const changed = await changeCondition(db, uid, holding.id, {
+      quantity: 3,
+      rawGrade: 'A',
+      occurredAt: day('10-01'),
+    });
+    expect(changed).toMatchObject({ grading: 'raw', rawGrade: 'A', quantity: 3 });
+  });
+
   it('edits facts and logs before/after; adds notes', async () => {
     const { holding } = await amiiboLot();
     await editHolding(db, uid, holding.id, { costTotalJpy: 9_900, acquiredFrom: 'Amazon' });
