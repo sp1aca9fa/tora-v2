@@ -32,6 +32,7 @@ export function ValuationMeta({ v, className }: { v: HoldingValuation; className
   const parts: React.ReactNode[] = [];
   if (v.method === 'manual') parts.push(t('manual'));
   else if (v.method === 'retail') parts.push(t('retail'));
+  else if (v.method === 'store') parts.push(t('store', { source: sourceLabel(v.source ?? '') }));
   else if (v.method === 'none') parts.push(t('noData'));
   else {
     parts.push(sourceLabel(v.source ?? ''));

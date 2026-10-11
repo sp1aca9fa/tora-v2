@@ -12,6 +12,7 @@ import {
   importReviewCount,
   failedPurchaseLinkCount,
   listInventory,
+  missingPriceSources,
   pendingMatchesForUser,
   portfolioSeries,
   portfolioValuation,
@@ -56,16 +57,18 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, series, matches, grades, toReview, failedLinks, t] = await Promise.all([
-    listInventory(db, user.id, { category, kind, status, q }),
-    portfolioValuation(db, user.id),
-    portfolioSeries(db, user.id),
-    pendingMatchesForUser(db, user.id),
-    cardGradeCounts(db, user.id),
-    importReviewCount(db, user.id),
-    failedPurchaseLinkCount(db, user.id),
-    getTranslations(),
-  ]);
+  const [rows, portfolio, series, matches, grades, toReview, failedLinks, missing, t] =
+    await Promise.all([
+      listInventory(db, user.id, { category, kind, status, q }),
+      portfolioValuation(db, user.id),
+      portfolioSeries(db, user.id),
+      pendingMatchesForUser(db, user.id),
+      cardGradeCounts(db, user.id),
+      importReviewCount(db, user.id),
+      failedPurchaseLinkCount(db, user.id),
+      missingPriceSources(db, user.id),
+      getTranslations(),
+    ]);
   const { totals } = portfolio;
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
   const summaries = summarizeByProduct(rows, valuations);
@@ -198,6 +201,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
           className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
         >
           <span>{t('imports.links.banner', { count: failedLinks })}</span>
+          <ChevronRight className="size-4" />
+        </Link>
+      )}
+
+      {missing.length > 0 && (
+        <Link
+          href="/imports/sources"
+          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <span>{t('coverage.banner', { count: missing.length })}</span>
           <ChevronRight className="size-4" />
         </Link>
       )}

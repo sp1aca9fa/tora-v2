@@ -102,6 +102,7 @@
 - 2026-10-12: import-ai fixes after the user's first real run (39 Mercari screenshots, all listings first and then all transaction pages, so no pair shared a batch: 38 lots for 20 purchases; merged by Claude at the user's request with the new lot merge, failed links resolved): look-alike pairs of different batches are asked about as text only (Haiku, cached), joined when sure; a guessed date (a listing's age, 半年以上前) never counts against a pair and is not a purchase date; the folder's own cache file and other dotfiles are never inputs; rows whose order ID is already registered are not checked (no Sonnet re-reads on re-runs); the random Sonnet check is drawn once per file; an item made only for a merged-away lot is deleted.
 - 2026-10-12: Plan (user): cards not linked to SNKRDUNK get a warning; non-card items get a stable product-page source (駿河屋 product pages, not Mercari) with the same warning; both in S7. Mixed bundles in one listing noted as an undecided future idea.
 - 2026-10-12: Plan (user): S6 moved after S8. The user wants imports handled from the app rather than terminal commands; to revisit with S6 (in-app file upload, Gmail auto-import, where the model runs). Next: S7.
+- 2026-10-12: S7 scope (user): TCGCSV and eBay sold for US prices; 駿河屋 for non-card items only (games, consoles, controllers, supplies, boxes, decks; cards stay on SNKRDUNK + Mercari); the "not linked to 駿河屋" warning only for non-card items costing more than ¥3,000 (changeable later). eBay answered 403 to every request from the home PC (search, home and item pages, plain fetch and headless Chrome) and PriceCharting / 130point sit behind Cloudflare challenges, so eBay is deferred (user): S7 ships without it and PSA cards have no US price yet. US prices never feed the valuation (JP market value); they are shown side by side.
 
 ---
 
@@ -512,7 +513,7 @@ Acceptance:
 Build:
 - FX collector (public): daily USDJPY from a free source (e.g. Frankfurter) into `fx_rates`.
 - TCGCSV collector (public): daily TCGplayer prices incl. the Pokemon Japan category; map tcgplayer product IDs via source search.
-- eBay sold collector (private): sold/completed search results for the product's query; lower default confidence. Playwright only if plain fetch fails.
+- eBay sold collector (private): sold/completed search results for the product's query; lower default confidence. Playwright only if plain fetch fails. Deferred (2026-10-12): eBay blocks the home PC; retry later, e.g. a visible browser on Windows.
 - 駿河屋 collector (private): new/used store prices and 買取 (buylist) prices for mapped products.
 - Item detail: JP vs US comparison (JPY converted, with fx date), spread %.
 - Price source coverage (user, 2026-10-12): a warning (data check, Imports "Needs you" and the portfolio) for every card not linked to a SNKRDUNK listing: SNKRDUNK is the stable, product-level source for cards; Mercari searches are a plus. For non-card items the equivalent is a stable product page with store prices, which Mercari does not have (its item pages are single listings that disappear): 駿河屋 product pages (used / new store price and 買取 price) are the candidate, linked like SNKRDUNK listings (suggested, confirmed or pasted), with the same "not linked yet" warning. Open: whether every game needs one or only items worth more than a threshold.

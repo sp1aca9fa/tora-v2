@@ -118,6 +118,8 @@ export default async function ImportsPage() {
                 '/imports/suggestions',
                 t('suggestions.banner', { count: attention.suggestions }),
               )}
+            {attention.missingSources > 0 &&
+              tile('/imports/sources', t('coverage.banner', { count: attention.missingSources }))}
           </div>
         )}
         {failed.length > 0 && (

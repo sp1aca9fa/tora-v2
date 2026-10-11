@@ -166,6 +166,45 @@ describe('valueUnit', () => {
     });
   });
 
+  it("uses a shop's asking price only when no source has a sale, before the retail price", () => {
+    const store = (price: number, ago: number, bucket = 'cond:good'): ValuationObservation => ({
+      source: 'surugaya',
+      bucket,
+      priceJpy: price,
+      observedAt: daysAgo(ago),
+      observationType: 'listing',
+    });
+    const v = valueUnit({
+      bucket: 'cond:good',
+      observations: [store(4180, 1), store(3900, 9), store(9000, 0, 'cond:new'), store(100, 40)],
+      retailPriceJpy: 8778,
+      now,
+    });
+    expect(v).toMatchObject({
+      unitJpy: 4180,
+      method: 'store',
+      source: 'surugaya',
+      confidence: 'low',
+    });
+    // Any sale wins, however old.
+    expect(
+      valueUnit({
+        bucket: 'cond:good',
+        observations: [store(4180, 1), sold('mercari', 3000, 300, 'cond:good')],
+        now,
+      }),
+    ).toMatchObject({ unitJpy: 3000, method: 'median' });
+    // Too old: the retail price.
+    expect(
+      valueUnit({
+        bucket: 'cond:good',
+        observations: [store(4180, 31)],
+        retailPriceJpy: 8778,
+        now,
+      }),
+    ).toMatchObject({ method: 'retail' });
+  });
+
   it('a manual price always wins (latest one for the bucket)', () => {
     const v = valueUnit({
       bucket: 'sealed:box_opened_contents_sealed',

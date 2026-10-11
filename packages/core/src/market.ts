@@ -32,5 +32,23 @@ export function parseSourceUrl(input: string): ParsedSourceUrl | null {
       url: `https://snkrdunk.com/apparels/${snkrdunk[1]}`,
     };
   }
+  const surugaya =
+    host === 'suruga-ya.jp' && url.pathname.match(/^\/product\/(?:detail|other)\/([A-Za-z0-9]+)/);
+  if (surugaya) {
+    return {
+      source: 'surugaya',
+      externalId: surugaya[1]!,
+      url: `https://www.suruga-ya.jp/product/detail/${surugaya[1]}`,
+    };
+  }
+  // The set is read from the rest of the path, so the link is kept as pasted.
+  const tcgplayer = host === 'tcgplayer.com' && url.pathname.match(/^\/product\/(\d+)(\/[\w-]*)?/);
+  if (tcgplayer) {
+    return {
+      source: 'tcgcsv',
+      externalId: tcgplayer[1]!,
+      url: `https://www.tcgplayer.com/product/${tcgplayer[1]}${tcgplayer[2] ?? ''}`,
+    };
+  }
   return null;
 }

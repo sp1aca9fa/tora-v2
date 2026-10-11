@@ -22,7 +22,7 @@ export function LinkUrlForm({
           type="url"
           inputMode="url"
           required
-          placeholder="https://snkrdunk.com/apparels/…"
+          placeholder="https://…"
           aria-label={t('pasteUrl')}
         />
         <Button type="submit" variant="outline" disabled={pending}>

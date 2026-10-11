@@ -171,36 +171,41 @@ export async function unlinkSource(db: Db, sourceId: string): Promise<void> {
   await db.update(productSources).set({ active: false }).where(eq(productSources.id, sourceId));
 }
 
-/** Unlinked products the user holds that have matches waiting for confirmation, one holding each. */
+/**
+ * Products the user holds with matches waiting for confirmation from a source they are not linked
+ * to yet, one holding each. Leftover suggestions of a linked source (e.g. a no-shrink variant) are
+ * optional and not counted.
+ */
 export async function pendingMatchesForUser(db: Db, userId: string) {
   return db
     .select({ product: products, holdingId: sql<string>`min(${holdings.id})` })
     .from(products)
     .innerJoin(holdings, and(eq(holdings.productId, products.id), eq(holdings.userId, userId)))
     .where(
-      and(
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(sourceCandidates)
-            .where(
-              and(
-                eq(sourceCandidates.productId, products.id),
-                eq(sourceCandidates.status, 'pending'),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(sourceCandidates)
+          .where(
+            and(
+              eq(sourceCandidates.productId, products.id),
+              eq(sourceCandidates.status, 'pending'),
+              not(
+                exists(
+                  db
+                    .select({ one: sql`1` })
+                    .from(productSources)
+                    .where(
+                      and(
+                        eq(productSources.productId, products.id),
+                        eq(productSources.source, sourceCandidates.source),
+                        eq(productSources.active, true),
+                      ),
+                    ),
+                ),
               ),
             ),
-        ),
-        // Already linked: leftover suggestions (e.g. a no-shrink variant) are optional.
-        not(
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(productSources)
-              .where(
-                and(eq(productSources.productId, products.id), eq(productSources.active, true)),
-              ),
           ),
-        ),
       ),
     )
     .groupBy(products.id)
@@ -210,11 +215,17 @@ export async function pendingMatchesForUser(db: Db, userId: string) {
 // ---------------------------------------------------------------------------------------------
 // market data (web app)
 
+/** Latest trades (sales only: store, buylist and foreign market prices are shown elsewhere). */
 export async function recentObservations(db: Db, productId: string, limit = 20) {
   return db
     .select()
     .from(priceObservations)
-    .where(eq(priceObservations.productId, productId))
+    .where(
+      and(
+        eq(priceObservations.productId, productId),
+        eq(priceObservations.observationType, 'sold'),
+      ),
+    )
     .orderBy(desc(priceObservations.observedAt), desc(priceObservations.createdAt))
     .limit(limit);
 }
@@ -824,4 +835,74 @@ export async function addSourceReference(
     extra: { ...query.extra, references: [url] },
   });
   return true;
+}
+
+/** Non-card items costing more than this should be linked to a store page (user, 2026-10-12). */
+export const STORE_LINK_MIN_COST = 3000;
+
+export interface MissingSource {
+  product: Product;
+  /** The stable source this item should be linked to. */
+  source: 'snkrdunk' | 'surugaya';
+  /** What the user paid for the lots they own. */
+  costJpy: number;
+  /** Suggestions from that source waiting for confirmation. */
+  suggestions: number;
+}
+
+/**
+ * Owned items without their stable, product-level price source (requirements S7): cards not
+ * linked to SNKRDUNK (Mercari searches are a plus, not a replacement), and other items costing
+ * more than ¥3,000 not linked to a 駿河屋 page. Lots still in the import review are left out.
+ */
+export async function missingPriceSources(db: Db, userId: string): Promise<MissingSource[]> {
+  const owned = await db
+    .select({ product: products, cost: sql<number>`sum(${holdings.costTotalJpy})` })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.status, 'owned'),
+        eq(holdings.reviewPending, false),
+      ),
+    )
+    .groupBy(products.id);
+  const wanted = owned.flatMap(({ product, cost }) => {
+    const card = product.category === 'tcg' && product.kind === 'single';
+    if (!card && Number(cost) <= STORE_LINK_MIN_COST) return [];
+    return [
+      {
+        product,
+        costJpy: Number(cost),
+        source: card ? ('snkrdunk' as const) : ('surugaya' as const),
+      },
+    ];
+  });
+  if (wanted.length === 0) return [];
+  const ids = wanted.map((w) => w.product.id);
+  const [linked, pending] = await Promise.all([
+    db
+      .select({ productId: productSources.productId, source: productSources.source })
+      .from(productSources)
+      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true))),
+    db
+      .select({
+        productId: sourceCandidates.productId,
+        source: sourceCandidates.source,
+        n: count(),
+      })
+      .from(sourceCandidates)
+      .where(and(inArray(sourceCandidates.productId, ids), eq(sourceCandidates.status, 'pending')))
+      .groupBy(sourceCandidates.productId, sourceCandidates.source),
+  ]);
+  const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
+  return wanted
+    .filter((w) => !has.has(`${w.product.id}|${w.source}`))
+    .map((w) => ({
+      ...w,
+      suggestions:
+        pending.find((p) => p.productId === w.product.id && p.source === w.source)?.n ?? 0,
+    }))
+    .sort((a, b) => b.costJpy - a.costJpy);
 }

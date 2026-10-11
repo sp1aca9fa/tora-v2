@@ -367,9 +367,9 @@
     "confirm": "Yes, link",
     "reject": "No",
     "score": "{score}% match",
-    "noneYet": "Not linked yet. The next collector run will look for this item on SNKRDUNK, or paste its link below.",
-    "noneForGames": "Price sources for games and merch (Mercari) come in the next update.",
-    "pasteUrl": "Paste a SNKRDUNK product link",
+    "noneYet": "Not linked yet. The next collector run looks for this item (SNKRDUNK and TCGplayer for cards, 駿河屋 for other items), or paste its link below.",
+    "pasteUrl": "Paste a SNKRDUNK or TCGplayer product link",
+    "pasteUrlItem": "Paste a 駿河屋, SNKRDUNK or TCGplayer product link",
     "link": "Link",
     "last30": "Last 30 days",
     "median": "Median",
@@ -381,7 +381,7 @@
     "matchesInfo": "The collector found possible SNKRDUNK listings for these items. Open one to confirm the right match.",
     "noMatches": "Nothing to confirm.",
     "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm",
-    "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}}), e.g. the no-shrink box",
+    "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}})",
     "search": {
       "title": "search",
       "without": "without: {words}",
@@ -430,6 +430,7 @@
     "manualHint": "Per unit, for this condition only. Always wins over market data.",
     "manual": "Manual price",
     "retail": "Retail price (no trades)",
+    "store": "{source} store price (no trades)",
     "noData": "No market data",
     "samples": "{count, plural, one {# sale} other {# sales}} / {days}d",
     "age": "newest {days}d ago",
@@ -441,11 +442,12 @@
     "confidenceHint": {
       "high": "5+ sales in the last 30 days",
       "medium": "3+ sales in the last 180 days",
-      "low": "Few or old sales, or retail price"
+      "low": "Few or old sales, a store price, or the retail price"
     },
     "short": {
       "median": "Market",
       "manual": "Manual",
+      "store": "Store",
       "retail": "Retail",
       "none": "No data"
     },
@@ -625,5 +627,31 @@
       "accepted": "accepted",
       "dismissed": "dismissed"
     }
+  },
+  "compare": {
+    "title": "Japan vs US",
+    "info": "Same condition on both sides ({bucket}). US prices are shown for comparison only and never count in the value.",
+    "graded": "TCGplayer only prices ungraded cards, so your graded cards are compared at this condition.",
+    "japan": "Japan",
+    "us": "US",
+    "noJapan": "No Japanese price",
+    "spread": "{pct}% vs Japan",
+    "converted": "{price} at ¥{rate} per dollar ({date})"
+  },
+  "coverage": {
+    "title": "Price sources to link",
+    "intro": "Items without their stable price source. The home PC looks for matches on each collect; confirm one on the item page or paste a link.",
+    "banner": "{count, plural, one {# item has} other {# items have}} no stable price source linked",
+    "snkrdunk": {
+      "title": "Cards not linked to SNKRDUNK ({count})",
+      "intro": "SNKRDUNK is the stable, per-card source; Mercari searches are a plus."
+    },
+    "surugaya": {
+      "title": "Items not linked to 駿河屋 ({count})",
+      "intro": "Games, consoles, boxes and supplies that cost more than {amount}: a 駿河屋 page gives store and buy-back prices."
+    },
+    "suggestions": "{count, plural, one {# suggestion to confirm} other {# suggestions to confirm}}",
+    "noSuggestion": "No match found yet: paste a link",
+    "none": "Every item has its price source linked."
   }
 }

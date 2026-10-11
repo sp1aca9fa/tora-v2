@@ -11,6 +11,8 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@tora/collector-sdk": "workspace:*"
+    "@tora/collector-sdk": "workspace:*",
+    "@tora/core": "workspace:*",
+    "@tora/db": "workspace:*"
   }
 }

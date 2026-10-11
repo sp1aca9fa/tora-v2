@@ -58,81 +58,81 @@ export async function PriceSources({
   const searches = sources.filter((s) => s.externalId === QUERY_SOURCE_ID);
   const active = sources.filter((s) => s.active && s.externalId !== QUERY_SOURCE_ID);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
-  const canUseSnkrdunk = product.category === 'tcg';
+  // Suggestions from a source this product has no listing of yet are shown open; the rest
+  // (e.g. a no-shrink variant of a linked SNKRDUNK listing) wait under "Add another listing".
+  const linked = new Set(active.map((s) => s.source));
+  const open = candidates.filter((c) => !linked.has(c.source));
+  const more = candidates.filter((c) => linked.has(c.source));
 
-  const matching = (
-    <>
-      {candidates.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">{t('sources.confirmTitle')}</p>
-          <ul className="space-y-2">
-            {candidates.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 rounded-md border p-2">
-                {/* The listing's own picture, loaded from the site: it is how near-identical
+  const suggestions = (list: typeof candidates) =>
+    list.length > 0 && (
+      <div className="space-y-2">
+        <p className="text-sm font-medium">{t('sources.confirmTitle')}</p>
+        <ul className="space-y-2">
+          {list.map((c) => (
+            <li key={c.id} className="flex items-center gap-3 rounded-md border p-2">
+              {/* The listing's own picture, loaded from the site: it is how near-identical
                     listings are told apart. The only external image in the app; the product's
                     stored thumbnail comes from the listing confirmed here. */}
-                {(c.imageUrl || known.has(`${c.source}|${c.externalId}`)) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={
-                      c.imageUrl ??
-                      productImageUrl(
-                        known.get(`${c.source}|${c.externalId}`)!.productId,
-                        known.get(`${c.source}|${c.externalId}`)!.version,
-                      )!
-                    }
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    className="size-14 shrink-0 rounded object-contain"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={c.url ?? '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="line-clamp-2 text-sm hover:underline"
-                  >
-                    {c.title}
-                  </a>
-                  <p className="text-xs text-muted-foreground">
-                    {sourceLabel(c.source)}
-                    {c.priceJpy ? ` · ${formatJpy(c.priceJpy)}` : ''} ·{' '}
-                    {t('sources.score', { score: Math.round(c.score * 100) })}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col gap-1">
-                  <form action={confirmCandidateAction.bind(null, c.id)}>
-                    <Button size="sm" className="w-full">
-                      {t('sources.confirm')}
-                    </Button>
-                  </form>
-                  <form action={rejectCandidateAction.bind(null, c.id)}>
-                    <Button size="sm" variant="ghost" className="w-full">
-                      {t('sources.reject')}
-                    </Button>
-                  </form>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {active.length === 0 && candidates.length === 0 && (
-        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          {canUseSnkrdunk ? t('sources.noneYet') : t('sources.noneForGames')}
-        </p>
-      )}
-
-      {canUseSnkrdunk && (
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">{t('sources.pasteUrl')}</p>
-          <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
-        </div>
-      )}
-    </>
+              {(c.imageUrl || known.has(`${c.source}|${c.externalId}`)) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={
+                    c.imageUrl ??
+                    productImageUrl(
+                      known.get(`${c.source}|${c.externalId}`)!.productId,
+                      known.get(`${c.source}|${c.externalId}`)!.version,
+                    )!
+                  }
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  className="size-14 shrink-0 rounded object-contain"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <a
+                  href={c.url ?? '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="line-clamp-2 text-sm hover:underline"
+                >
+                  {c.title}
+                </a>
+                <p className="text-xs text-muted-foreground">
+                  {sourceLabel(c.source)}
+                  {c.priceJpy ? ` · ${formatJpy(c.priceJpy)}` : ''} ·{' '}
+                  {t('sources.score', { score: Math.round(c.score * 100) })}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1">
+                <form action={confirmCandidateAction.bind(null, c.id)}>
+                  <Button size="sm" className="w-full">
+                    {t('sources.confirm')}
+                  </Button>
+                </form>
+                <form action={rejectCandidateAction.bind(null, c.id)}>
+                  <Button size="sm" variant="ghost" className="w-full">
+                    {t('sources.reject')}
+                  </Button>
+                </form>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  const paste = (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">
+        {t(
+          product.category === 'tcg' && product.kind === 'single'
+            ? 'sources.pasteUrl'
+            : 'sources.pasteUrlItem',
+        )}
+      </p>
+      <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
+    </div>
   );
 
   return (
@@ -197,16 +197,25 @@ export async function PriceSources({
           </ul>
         )}
 
-        {active.length === 0
-          ? matching
-          : (candidates.length > 0 || canUseSnkrdunk) && (
-              <details className="text-sm">
-                <summary className="cursor-pointer text-muted-foreground">
-                  {t('sources.addAnother', { count: candidates.length })}
-                </summary>
-                <div className="mt-3 space-y-4">{matching}</div>
-              </details>
-            )}
+        {suggestions(open)}
+        {active.length === 0 && candidates.length === 0 && (
+          <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {t('sources.noneYet')}
+          </p>
+        )}
+        {active.length === 0 ? (
+          paste
+        ) : (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground">
+              {t('sources.addAnother', { count: more.length })}
+            </summary>
+            <div className="mt-3 space-y-4">
+              {suggestions(more)}
+              {paste}
+            </div>
+          </details>
+        )}
 
         {stats.length > 0 && (
           <div className="space-y-2">

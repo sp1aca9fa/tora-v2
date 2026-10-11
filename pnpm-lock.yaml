@@ -281,6 +281,12 @@ importers:
       '@tora/collector-sdk':
         specifier: workspace:*
         version: link:../packages/collector-sdk
+      '@tora/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@tora/db':
+        specifier: workspace:*
+        version: link:../packages/db
 
   packages/auth: {}
 

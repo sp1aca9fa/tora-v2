@@ -17,6 +17,13 @@ export interface CollectorContext {
   log: (message: string) => void;
   /** Stores observations as they are parsed (idempotent); returns how many were new. */
   save: (rows: NewPriceObservation[]) => Promise<number>;
+  /** Exchange rate in effect on a Tokyo date (e.g. `USDJPY`: yen per dollar); null when none. */
+  fx?: (pair: string, date: string) => Promise<{ date: string; rate: number } | null>;
+  /**
+   * The catalog set of a product (its own set code and release date first, else the catalog set
+   * it points to or is named after); null when unknown.
+   */
+  setOf?: (product: Product) => Promise<{ code: string | null; releaseDate: string | null } | null>;
 }
 
 export interface CollectResult {
@@ -150,8 +157,18 @@ export interface PurchaseImporter {
   ): Partial<HoldingInput>;
 }
 
+/** A daily exchange rate (e.g. USD/JPY), used to show foreign prices in yen. */
+export interface RateSource {
+  /** Stored as `fx_rates.pair`, e.g. `USDJPY` (yen per dollar). */
+  pair: string;
+  label: string;
+  /** Rates for the days between two dates (inclusive); days without a rate are left out. */
+  rates(http: PoliteHttp, from: string, to: string): Promise<{ date: string; rate: number }[]>;
+}
+
 /** Shape every collectors package (public or private) exports from its entry point. */
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
+  rates?: RateSource[];
 }

@@ -441,6 +441,7 @@ export const priceObservations = sqliteTable(
     observationType: text('observation_type', { enum: OBSERVATION_TYPES }).notNull(),
     bucket: text('bucket'),
     priceJpy: integer('price_jpy').notNull(),
+    /** Price as the source showed it, in the currency's smallest unit (yen; cents for dollars). */
     priceOriginal: integer('price_original'),
     currency: text('currency'),
     fxRate: real('fx_rate'),

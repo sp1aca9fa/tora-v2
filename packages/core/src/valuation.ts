@@ -20,7 +20,8 @@ export interface ManualPriceInput {
   setAt: string;
 }
 
-export type ValuationMethod = 'manual' | 'median' | 'retail' | 'none';
+/** `store`: a shop's asking price (e.g. 駿河屋), used only when no source has a sale. */
+export type ValuationMethod = 'manual' | 'median' | 'store' | 'retail' | 'none';
 export type Confidence = 'high' | 'medium' | 'low';
 
 export interface Valuation {
@@ -44,6 +45,8 @@ export interface Valuation {
 /** Market sources in fallback order; sources not listed come after these. */
 export const SOURCE_PRIORITY = ['snkrdunk', 'mercari', 'surugaya'];
 export const WINDOWS = [30, 90, 180] as const;
+/** A shop's asking price older than this is not used. */
+export const STORE_DAYS = 30;
 /** Fewer sales than this in a window: try a longer one, then similar conditions. */
 export const MIN_SAMPLES = 3;
 /** The longest look back, used only when the usual windows have too few sales. */
@@ -201,6 +204,31 @@ export function valueUnit(input: {
       fallback ??= valuation;
     }
     if (fallback) return fallback;
+
+    // No sale anywhere: a shop's current asking price in this exact condition (yen prices only;
+    // the newest, and a shop listed earlier in the source order wins on the same day).
+    const store = input.observations
+      .filter(
+        (o) =>
+          o.observationType === 'listing' &&
+          !o.excluded &&
+          o.bucket === input.bucket &&
+          timeOf(o) <= now.getTime() &&
+          now.getTime() - timeOf(o) <= STORE_DAYS * DAY,
+      )
+      .toSorted((a, b) => b.observedAt.localeCompare(a.observedAt))[0];
+    if (store) {
+      return {
+        ...none,
+        unitJpy: store.priceJpy,
+        method: 'store',
+        source: store.source,
+        sampleSize: 1,
+        newestAt: store.observedAt,
+        ageDays: ageDays(store.observedAt, now),
+        confidence: 'low',
+      };
+    }
   }
 
   if (input.retailPriceJpy) {

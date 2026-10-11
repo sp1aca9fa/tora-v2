@@ -18,7 +18,7 @@ import {
   trend,
   valueUnit,
 } from '@tora/core';
-import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import {
   type Holding,
@@ -88,7 +88,10 @@ export async function loadMarketData(
       .where(
         and(
           inArray(priceObservations.productId, ids),
-          inArray(priceObservations.observationType, ['sold', 'buylist']),
+          // Sales and buy prices, plus shops' asking prices (a fallback); prices in yen only:
+          // foreign markets (e.g. TCGplayer in dollars) are shown beside the value, never in it.
+          inArray(priceObservations.observationType, ['sold', 'buylist', 'listing']),
+          or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
           eq(priceObservations.excluded, false),
           gte(priceObservations.observedAt, since),
         ),

@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util';
 import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
+import { updateRates } from '../rates';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
 import { claudeJudge } from '../claude';
@@ -32,7 +33,7 @@ if (process.env.VERCEL || process.env.CI) {
 
 loadRootEnv();
 const config = dbConfigFromEnv();
-const { collectors, importers, missing } = await loadCollectors();
+const { collectors, importers, rates, missing } = await loadCollectors();
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const selected = collectors.filter((c) => !values.source || c.source === values.source);
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
@@ -40,9 +41,21 @@ const db = createDb(config);
 await exitIfUnmigrated(db);
 let exitCode = 0;
 const withLinks = !values.product && importers.some((i) => i.readLink);
-// Steps: purchase links, each collector, then pictures + lot sizes + snapshots.
-const progress = new Progress((withLinks ? 1 : 0) + selected.length + 1);
+const withRates = !values.product && !values.source && rates.length > 0;
+// Steps: exchange rates, purchase links, each collector, then pictures + lot sizes + snapshots.
+const progress = new Progress((withRates ? 1 : 0) + (withLinks ? 1 : 0) + selected.length + 1);
 const log = progress.log;
+// Exchange rates first: foreign prices collected in this run are converted with today's rate.
+if (withRates) {
+  progress.next('exchange rates');
+  try {
+    for (const r of await updateRates(db, rates, new PoliteHttp({ maxRequests: 10 }))) {
+      log(`exchange rates: ${r.pair} ${r.saved} day(s) saved, latest ${r.latest ?? 'none'}`);
+    }
+  } catch (error) {
+    log(`exchange rates: stopped (${errorText(error)})`);
+  }
+}
 // Purchase links pasted in the app go first, so new products get searched in this run.
 if (withLinks) {
   progress.next('purchase links');

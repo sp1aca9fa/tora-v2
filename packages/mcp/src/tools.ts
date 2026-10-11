@@ -18,6 +18,8 @@ import {
   reviewNotes,
   oddSales,
   pendingImportReview,
+  STORE_LINK_MIN_COST,
+  missingPriceSources,
   pendingMatchesForUser,
   portfolioSeries,
   portfolioValuation,
@@ -550,6 +552,20 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     openSuggestionCount(db, userId),
     reviewNotes(db, userId, SHOWN),
   ]);
+  findings.push(
+    finding(
+      'missing_price_sources',
+      'warn',
+      `Owned items without their stable price source: cards not linked to SNKRDUNK, other items costing more than ¥${STORE_LINK_MIN_COST} not linked to 駿河屋.`,
+      (await missingPriceSources(db, userId)).map((m) => ({
+        productId: m.product.id,
+        name: m.product.name,
+        needs: m.source,
+        costJpy: m.costJpy,
+        suggestions: m.suggestions,
+      })),
+    ),
+  );
   findings.push(
     finding(
       'review_notes',

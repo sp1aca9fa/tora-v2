@@ -1,5 +1,6 @@
 import {
   canEditProduct,
+  foreignPrices,
   getProduct,
   holdingBucket,
   imageVersions,
@@ -20,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel, productMeta, sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
+import { MarketCompare } from './market-compare';
 import { PriceSources } from './price-sources';
 
 type Params = { params: Promise<{ id: string }> };
@@ -36,12 +38,13 @@ export default async function ProductPage({ params }: Params) {
   const { db, user } = await authed();
   const [product, lots] = await Promise.all([getProduct(db, id), productLots(db, user.id, id)]);
   if (!product || lots.length === 0) notFound();
-  const [t, format, market, history, images] = await Promise.all([
+  const [t, format, market, history, images, foreign] = await Promise.all([
     getTranslations(),
     getFormatter(),
     loadMarketData(db, user.id, [product.id]),
     priceHistory(db, product.id, 365),
     imageVersions(db, [product.id]),
+    foreignPrices(db, product.id),
   ]);
 
   const owned = lots.filter((h) => h.status === 'owned');
@@ -186,6 +189,8 @@ export default async function ProductPage({ params }: Params) {
           />
         </CardContent>
       </Card>
+
+      <MarketCompare product={product} market={market} mainBucket={mainBucket} foreign={foreign} />
 
       <PriceSources db={db} product={product} bucket={mainBucket} />
     </div>

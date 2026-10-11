@@ -5,7 +5,9 @@ import {
   createQuerySource,
   heldBuckets,
   finishRun,
+  fxRateOn,
   insertObservations,
+  productSetInfo,
   productsToMatch,
   productsWithoutSource,
   QUERY_SOURCE_ID,
@@ -69,6 +71,8 @@ export async function runCollector(
       added += n;
       return n;
     },
+    fx: (pair, date) => fxRateOn(db, pair, date),
+    setOf: (product) => productSetInfo(db, product),
   };
   const runId = await startRun(db, collector.source);
   // Progress: items (products to match + listings to collect) done before the current one.
