@@ -795,3 +795,33 @@ export async function setSourceReferences(
   const query: SourceQuery = { ...link.query, extra: { ...link.query?.extra, references } };
   await db.update(productSources).set({ query }).where(eq(productSources.id, sourceId));
 }
+
+/**
+ * Adds a reference listing (a listing of this exact item) to the product's search for `source`,
+ * setting the search up with `query` when the product has none. False when the product is linked
+ * to a single listing there instead (nothing to add to) or no search could be made.
+ */
+export async function addSourceReference(
+  db: Db,
+  productId: string,
+  source: string,
+  url: string,
+  query: SourceQuery | null,
+): Promise<boolean> {
+  const rows = await db
+    .select()
+    .from(productSources)
+    .where(and(eq(productSources.productId, productId), eq(productSources.source, source)));
+  const search = rows.find((r) => r.externalId === QUERY_SOURCE_ID);
+  if (search) {
+    const refs = (search.query?.extra?.references as string[] | undefined) ?? [];
+    if (!refs.includes(url)) await setSourceReferences(db, search.id, [...refs, url]);
+    return true;
+  }
+  if (rows.length > 0 || !query) return false;
+  await createQuerySource(db, productId, source, {
+    ...query,
+    extra: { ...query.extra, references: [url] },
+  });
+  return true;
+}

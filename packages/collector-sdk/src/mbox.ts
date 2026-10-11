@@ -2,7 +2,6 @@
 // fit in memory. Only messages whose raw header block passes `filter` are parsed.
 import { simpleParser } from 'mailparser';
 import { createReadStream } from 'node:fs';
-import { createInterface } from 'node:readline';
 
 export interface Email {
   subject: string;
@@ -14,25 +13,29 @@ export interface Email {
 
 /** Raw messages of an mbox file (bytes kept as-is through latin1). */
 export async function* readMboxRaw(path: string): AsyncGenerator<Buffer> {
-  const lines = createInterface({
-    input: createReadStream(path, { encoding: 'latin1' }),
-    crlfDelay: Infinity,
-  });
   let message: string[] | null = null;
   let previousBlank = true;
-  for await (const line of lines) {
+  function* take(line: string): Generator<Buffer> {
     // A message starts at a "From " line after a blank line (or at the top of the file).
     if (previousBlank && line.startsWith('From ')) {
       if (message) yield Buffer.from(message.join('\n'), 'latin1');
       message = [];
       previousBlank = false;
-      continue;
+      return;
     }
     // mboxrd escapes body lines starting with "From " as ">From ".
     message?.push(line.replace(/^>(>*From )/, '$1'));
     previousBlank = line.trim() === '';
   }
-  if (message) yield Buffer.from(message.join('\n'), 'latin1');
+  // Lines split by hand: readline's iterator can close while the consumer is still parsing.
+  let rest = '';
+  for await (const chunk of createReadStream(path, { encoding: 'latin1' })) {
+    const lines = (rest + (chunk as string)).split('\n');
+    rest = lines.pop()!;
+    for (const line of lines) yield* take(line.endsWith('\r') ? line.slice(0, -1) : line);
+  }
+  if (rest) yield* take(rest);
+  if (message) yield Buffer.from((message as string[]).join('\n'), 'latin1');
 }
 
 /** Parsed messages of an mbox file; `filter` sees the raw header block (cheap pre-filter). */

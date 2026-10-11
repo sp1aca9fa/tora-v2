@@ -49,6 +49,7 @@ const initialRow = (item: ReviewItem): ReviewRow => ({
         ? 'sealed_no_shrink'
         : 'sealed_shrink'
       : undefined,
+  acquiredAt: item.reasons.includes('date_approx') ? item.acquiredAt : undefined,
 });
 
 /** One row per imported transaction: grade + cert for cards, shrink for sealed product. */
@@ -97,6 +98,17 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                   {t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r}
                 </p>
               ))}
+              {row.acquiredAt !== undefined && !row.cancelled && (
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">{t('imports.purchasedOn')}</span>
+                  <Input
+                    type="date"
+                    value={row.acquiredAt}
+                    onChange={(e) => update(item.id, { acquiredAt: e.target.value })}
+                    className="w-40"
+                  />
+                </label>
+              )}
               {item.orderId && (
                 <label className="flex items-center gap-2 text-sm">
                   <input

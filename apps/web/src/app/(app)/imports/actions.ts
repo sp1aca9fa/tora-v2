@@ -1,7 +1,16 @@
 'use server';
 
-import { type CardGrade, GRADERS, RAW_GRADES, parseGrade } from '@tora/core';
-import { DomainError, type ImportReview, confirmImportReview, markOrderCancelled } from '@tora/db';
+import { type CardGrade, GRADERS, RAW_GRADES, parseGrade, tokyoDateToIso } from '@tora/core';
+import {
+  DomainError,
+  type ImportReview,
+  addPurchaseLinks,
+  confirmImportReview,
+  linksIn,
+  markOrderCancelled,
+  removePurchaseLinks,
+  retryPurchaseLinks,
+} from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
@@ -17,6 +26,11 @@ const rowSchema = z.object({
   grade: z.string().max(10).optional(),
   certNumber: z.string().max(40).optional(),
   packagingState: z.enum(['sealed_shrink', 'sealed_no_shrink']).optional(),
+  /** Purchase date, when the import only knew it roughly (YYYY-MM-DD). */
+  acquiredAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   /** The order was cancelled: remove its lots instead of confirming. */
   cancelled: z.boolean().optional(),
 });
@@ -75,6 +89,7 @@ export async function confirmReviewAction(
       grade: row.cls === 'card' ? grade : null,
       certNumber: grade?.grading === 'graded' ? row.certNumber : null,
       packagingState: row.cls === 'sealed' ? (row.packagingState ?? null) : null,
+      acquiredAt: row.acquiredAt ? tokyoDateToIso(row.acquiredAt) : null,
     });
   }
   if (reviews.length === 0 && cancelled.length === 0) return { error: 'noneGraded' };
@@ -94,4 +109,31 @@ export async function confirmReviewAction(
   if (!result.ok) return result.state;
   revalidatePath('/', 'layout');
   return result.value;
+}
+
+export type LinksState = FormState & { added?: number; known?: number };
+
+/** Pasted purchase links (shops without receipt emails); the home PC reads them on the next collect. */
+export async function addLinksAction(_: LinksState, formData: FormData): Promise<LinksState> {
+  const { db, user } = await authed();
+  const links = linksIn(String(formData.get('links') ?? '').slice(0, 50_000)).filter(
+    (l) => l.length <= 300,
+  );
+  if (links.length === 0) return { error: 'noLinks' };
+  if (links.length > 200) return { error: 'tooManyLinks' };
+  const result = await addPurchaseLinks(db, user.id, links);
+  revalidatePath('/imports');
+  return result;
+}
+
+export async function removeLinkAction(id: string) {
+  const { db, user } = await authed();
+  await removePurchaseLinks(db, user.id, [id]);
+  revalidatePath('/imports');
+}
+
+export async function retryLinkAction(id: string) {
+  const { db, user } = await authed();
+  await retryPurchaseLinks(db, user.id, [id]);
+  revalidatePath('/imports');
 }

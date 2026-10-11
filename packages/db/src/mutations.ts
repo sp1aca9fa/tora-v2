@@ -536,6 +536,8 @@ export interface ImportReview {
   grade?: CardGrade | null;
   certNumber?: string | null;
   packagingState?: PackagingState | null;
+  /** Corrected purchase time (Tokyo ISO), e.g. when the import only knew it roughly. */
+  acquiredAt?: string | null;
 }
 
 /**
@@ -582,6 +584,9 @@ export async function confirmImportReview(
           throw new DomainError('invalid_input');
         }
         patch.packagingState = row.packagingState;
+      }
+      if (row.acquiredAt && row.acquiredAt.slice(0, 10) !== holding.acquiredAt.slice(0, 10)) {
+        patch.acquiredAt = row.acquiredAt;
       }
       const changes: Record<string, { before: unknown; after: unknown }> = {};
       for (const [key, after] of Object.entries(patch) as [keyof Holding, unknown][]) {

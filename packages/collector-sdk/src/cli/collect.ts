@@ -7,6 +7,7 @@ import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
 import { PoliteHttp } from '../http';
 import { downloadProductImages } from '../images';
+import { importPurchaseLinks } from '../links';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
 
@@ -26,13 +27,29 @@ if (process.env.VERCEL || process.env.CI) {
 
 loadRootEnv();
 const config = dbConfigFromEnv();
-const { collectors, missing } = await loadCollectors();
+const { collectors, importers, missing } = await loadCollectors();
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const selected = collectors.filter((c) => !values.source || c.source === values.source);
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 await exitIfUnmigrated(db);
 let exitCode = 0;
+// Purchase links pasted in the app go first, so new products get searched in this run.
+if (!values.product && importers.some((i) => i.readLink)) {
+  const links = await importPurchaseLinks(
+    db,
+    importers,
+    collectors,
+    new PoliteHttp({ maxRequests: 200 }),
+    (m) => console.log(`[purchase links] ${m}`),
+  );
+  const { imported, matched, duplicate, skipped, failed } = links.counts;
+  if (links.read + failed + links.left > 0) {
+    console.log(
+      `purchase links: ${imported} imported (see Review import), ${matched} matched, ${duplicate} already registered, ${skipped} skipped, ${failed} failed${links.left ? `, ${links.left} left for next time` : ''}`,
+    );
+  }
+}
 if (selected.length === 0) console.log('No collectors registered.');
 for (const collector of selected) {
   const s = await runCollector(db, collector, {

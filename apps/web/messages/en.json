@@ -111,7 +111,8 @@
     "onRelease": "Acquired on release day ({date})",
     "onReleaseUnknown": "Acquired on release day (enter a full release date first)",
     "unknownFrom": "Unknown",
-    "costFromRetail": "Left blank: the retail price x quantity ({amount}) is used."
+    "costFromRetail": "Left blank: the retail price x quantity ({amount}) is used.",
+    "fromLinks": "Bought on Mercari? Paste the links instead"
   },
   "holding": {
     "costBasis": "Cost basis",
@@ -271,7 +272,9 @@
     "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…).",
     "duplicate_order": "This transaction ID is already registered (each SNKRDUNK / Mercari transaction is one item).",
     "noneSelected": "Select at least one card",
-    "noneGraded": "Pick a grade for at least one card"
+    "noneGraded": "Pick a grade for at least one card",
+    "noLinks": "No links found.",
+    "tooManyLinks": "Up to 200 links at a time."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -492,7 +495,29 @@
     "doneCancelled": "{count, plural, one {# cancelled order removed} other {# cancelled orders removed}}",
     "reason": {
       "deadline_missed": "The seller missed the shipping deadline: if you cancelled this order, tick the box below.",
-      "no_delivery": "Some purchases of this item have no delivery email: if this was one you cancelled, tick the box below."
+      "no_delivery": "Some purchases of this item have no delivery email: if this was one you cancelled, tick the box below.",
+      "date_approx": "Date read from the listing (its last update, usually a few days after the purchase): correct it if you know the day.",
+      "new_product": "New item made from the listing title: check its name and details on its page."
+    },
+    "purchasedOn": "Purchased on",
+    "links": {
+      "title": "Add purchases by link",
+      "intro": "For shops that send no receipt email (Mercari): paste the links of things you bought, one per line (Mercari app: 購入した商品 > the item > share > copy link). The home PC reads them on the next collect; collectibles then show up above for review, other things are skipped.",
+      "label": "Purchase links",
+      "add": "Add links",
+      "added": "{count, plural, one {# link added} other {# links added}}",
+      "known": "{count, plural, one {# already added} other {# already added}}",
+      "open": "open",
+      "retry": "Try again",
+      "remove": "Remove",
+      "status": {
+        "pending": "Waiting for the next collect",
+        "imported": "Imported",
+        "matched": "Matched an existing entry",
+        "duplicate": "Already registered",
+        "skipped": "Skipped",
+        "failed": "Failed"
+      }
     }
   },
   "product": {

@@ -15,8 +15,8 @@ their own collection, while the product catalog and market data are shared.
 
 Prices and purchase imports come from **source plug-ins** that you choose and write for the shops
 and marketplaces you use. A plug-in implements the `Collector` interface (find listings for a
-product, fetch its sold prices) and/or the `PurchaseImporter` interface (read order emails into
-purchases), see `packages/collector-sdk/src/types.ts`. Plug-in packages are loaded by path from
+product, fetch its sold prices) and/or the `PurchaseImporter` interface (read order emails, or links
+you paste in the app, into purchases), see `packages/collector-sdk/src/types.ts`. Plug-in packages are loaded by path from
 `collectors-public/` (publishable ones) and `collectors/` (an optional private package, e.g. a git
 submodule), so the app, build and tests work without any of them. The framework enforces a polite
 pace (2-5 s between requests, a request cap per run, stop on 403/429/captcha) and refuses to run on
@@ -180,6 +180,13 @@ The app never gets access to Gmail. Purchases are matched by transaction ID: one
 registered with the same data are skipped, different data or likely duplicates are asked about,
 cancelled orders are left out, and nothing is written before you confirm. Imported items then
 appear under **Review import** in the app to set each one's grade, cert number or packaging.
+
+Shops that send no receipt email (e.g. Mercari, where buyers are only notified in the app) use
+links instead: paste the links of things you bought under **Review import > Add purchases by
+link** (from the phone is fine). The next `pnpm collect` on the home PC reads each link once with
+the importer whose `matchesLink` accepts it (`readLink`), imports it the same way and shows what
+happened next to each link (imported, matched an entry you added by hand, already registered,
+skipped with the reason, failed).
 
 ### Private plug-ins (submodule)
 

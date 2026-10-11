@@ -323,6 +323,29 @@ export const cancelledOrders = sqliteTable(
   (t) => [uniqueIndex('cancelled_orders_uq').on(t.userId, t.orderSource, t.orderId)],
 );
 
+/**
+ * Links to purchases the user pasted in the app (shops that send no receipt email, e.g.
+ * Mercari). The home PC reads each on the next collect and imports it into the review queue.
+ */
+export const purchaseLinks = sqliteTable(
+  'purchase_links',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    url: text('url').notNull(),
+    /** pending | imported | matched | duplicate | skipped | failed */
+    status: text('status').notNull().default('pending'),
+    /** What happened, in plain words (e.g. why it was skipped). */
+    message: text('message'),
+    holdingId: text('holding_id').references(() => holdings.id, { onDelete: 'set null' }),
+    processedAt: text('processed_at'),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('purchase_links_uq').on(t.userId, t.url)],
+);
+
 export const holdingEvents = sqliteTable(
   'holding_events',
   {
@@ -471,6 +494,7 @@ export const loginAttempts = sqliteTable(
 );
 
 export type User = typeof users.$inferSelect;
+export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type UserDevice = typeof userDevices.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;
 export type NewTcgSet = typeof tcgSets.$inferInsert;

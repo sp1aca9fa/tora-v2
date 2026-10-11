@@ -1,6 +1,7 @@
 import { acquiredFromSuggestions, getProduct, productValueSuggestions } from '@tora/db';
 import { tokyoDate } from '@tora/core';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { AddFlow } from './add-flow';
@@ -28,7 +29,15 @@ export default async function AddPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
+        <Link
+          href="/imports#links"
+          className="text-sm text-muted-foreground underline hover:text-foreground"
+        >
+          {t('fromLinks')}
+        </Link>
+      </header>
       <AddFlow
         today={tokyoDate()}
         fromSuggestions={[...new Set([...fromHistory, ...STORES])].sort((a, b) =>

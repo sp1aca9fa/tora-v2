@@ -74,7 +74,7 @@ export type ProductDetails = Partial<
   Pick<Product, 'name' | 'rarity' | 'setName' | 'setCode' | 'cardNumber' | 'variant' | 'imageUrl'>
 >;
 
-/** One purchase read from an order confirmation email. */
+/** One purchase read from an order confirmation email (or a pasted purchase link). */
 export interface PurchaseReceipt {
   /** Transaction / order ID at the marketplace (e.g. a SNKRDUNK 取引ID). */
   orderId: string;
@@ -91,7 +91,23 @@ export interface PurchaseReceipt {
   listing?: { externalId: string; url: string } | null;
   /** Condition as the marketplace shows it (e.g. "A", "PSA10"). */
   condition?: string | null;
+  /** The marketplace's category names, top level first (e.g. ["ゲーム・おもちゃ・グッズ", …]). */
+  categoryPath?: string[];
+  /** The listing of this exact item: becomes a reference sale on the product's search. */
+  reference?: string | null;
+  /** Photo of the item (the product's picture when it has none). */
+  photo?: string | null;
+  /** The date is approximate (e.g. read from the listing, not a receipt): checked in review. */
+  dateApprox?: boolean;
 }
+
+/** What a pasted purchase link turned out to be. */
+export type LinkRead =
+  | { kind: 'purchase'; receipt: PurchaseReceipt }
+  /** Not imported on purpose, with the reason shown to the user (e.g. not a collectible). */
+  | { kind: 'skip'; reason: string }
+  /** Could not be imported (e.g. the listing has not sold); shown to the user. */
+  | { kind: 'fail'; reason: string };
 
 export type ReceiptMail =
   | { kind: 'purchase'; receipt: PurchaseReceipt }
@@ -103,16 +119,23 @@ export type ReceiptMail =
   /** Something about an order worth a look, e.g. `deadline_missed` (the buyer may cancel). */
   | { kind: 'notice'; orderId: string; reason: string };
 
-/** Reads a marketplace's emails into purchases (requirements S5b). */
+/**
+ * Reads a marketplace's purchases (requirements S5b): from receipt emails, from links the user
+ * pasted in the app (shops that send no receipt email), or both.
+ */
 export interface PurchaseImporter {
   /** Order source key (`holdings.order_source`, `product_sources.source`). */
   source: string;
   /** Stored as the holding's "acquired from". */
   label: string;
   /** Cheap pre-filter on a raw header block (e.g. the sender domain). */
-  matchesHeader(rawHeader: string): boolean;
+  matchesHeader?(rawHeader: string): boolean;
   /** Null for mails that are not receipts or cancellations. */
-  parse(mail: Email): ReceiptMail | null;
+  parse?(mail: Email): ReceiptMail | null;
+  /** Whether a pasted link is this marketplace's. */
+  matchesLink?(url: string): boolean;
+  /** Reads a pasted link to something the user bought. */
+  readLink?(url: string, http: PoliteHttp): Promise<LinkRead>;
   /** Product to create when no product is linked to the listing yet; null when unclear. */
   productFor(receipt: PurchaseReceipt): ProductInput | null;
   /** Holding fields read from the receipt for that product (condition, grading, packaging). */

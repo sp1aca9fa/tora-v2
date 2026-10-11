@@ -585,6 +585,18 @@ describe('confirmImportReview', () => {
       'invalid_input',
     );
   });
+
+  it('takes a corrected purchase date', async () => {
+    const lot = await createHolding(
+      db,
+      uid,
+      { product: { category: 'game', kind: 'other', name: 'Retro Station' } },
+      { quantity: 1, costTotalJpy: 22000, acquiredAt: day('09-05'), reviewPending: true },
+    );
+    await confirmImportReview(db, uid, [{ id: lot.holding.id, acquiredAt: day('09-02') }]);
+    const { holding } = (await getHoldingDetail(db, uid, lot.holding.id))!;
+    expect(holding.acquiredAt).toBe(day('09-02'));
+  });
 });
 
 describe('cancelled orders and review flags', () => {

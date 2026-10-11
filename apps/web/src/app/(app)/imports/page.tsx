@@ -1,10 +1,13 @@
 import { productClass } from '@tora/core';
-import { pendingImportReview } from '@tora/db';
-import { ChevronLeft } from 'lucide-react';
+import { pendingImportReview, purchaseLinksOf } from '@tora/db';
+import { ChevronLeft, RotateCw, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
+import { Button } from '@/components/ui/button';
+import { removeLinkAction, retryLinkAction } from './actions';
+import { LinksForm } from './links-form';
 import { ReviewForm, type ReviewItem } from './review-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -13,7 +16,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ImportReviewPage() {
   const { db, user } = await authed();
-  const [rows, t] = await Promise.all([pendingImportReview(db, user.id), getTranslations()]);
+  const [rows, links, t] = await Promise.all([
+    pendingImportReview(db, user.id),
+    purchaseLinksOf(db, user.id, 50),
+    getTranslations(),
+  ]);
   const items: ReviewItem[] = rows.map(({ holding, product }) => {
     const cls = productClass(product);
     return {
@@ -54,6 +61,70 @@ export default async function ImportReviewPage() {
       ) : (
         <ReviewForm items={items} />
       )}
+
+      <section id="links" className="scroll-mt-20 space-y-3">
+        <header className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight">{t('imports.links.title')}</h2>
+          <p className="text-sm text-muted-foreground">{t('imports.links.intro')}</p>
+        </header>
+        <LinksForm />
+        {links.length > 0 && (
+          <ul className="divide-y rounded-xl border bg-card text-sm">
+            {links.map((l) => (
+              <li key={l.id} className="flex items-start gap-2 px-4 py-2.5">
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block truncate text-muted-foreground hover:text-foreground"
+                  >
+                    {l.url.replace(/^https?:\/\//, '')}
+                  </a>
+                  <p className="text-xs">
+                    <span className={l.status === 'failed' ? 'text-destructive' : 'font-medium'}>
+                      {t(`imports.links.status.${l.status}`)}
+                    </span>
+                    {l.message && <span className="text-muted-foreground"> · {l.message}</span>}
+                    {l.holdingId && (
+                      <>
+                        {' · '}
+                        <Link href={`/holdings/${l.holdingId}`} className="underline">
+                          {t('imports.links.open')}
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                </div>
+                {l.status === 'failed' && (
+                  <form action={retryLinkAction.bind(null, l.id)}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('imports.links.retry')}
+                    >
+                      <RotateCw className="size-4" />
+                    </Button>
+                  </form>
+                )}
+                {l.status !== 'imported' && l.status !== 'matched' && (
+                  <form action={removeLinkAction.bind(null, l.id)}>
+                    <Button
+                      type="submit"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('imports.links.remove')}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

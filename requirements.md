@@ -16,7 +16,7 @@
 | S2 | Registration UI (products, lots, pulls, events) | done (reworked by S2b) |
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
-| S4 | Mercari sold collector | collector + query editor built; awaiting user check (purchase importer pending) |
+| S4 | Mercari sold collector + purchase import by link | built; awaiting user check |
 | S4b | MCP server: Claude reads the data (sanity checks, analysis, dev feedback) | built; awaiting user setup |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
@@ -87,6 +87,8 @@
 - 2026-10-10: Mercari is searched for every product (user: try everything, maybe turn cards off later). No public project filters Mercari bundles or parts; hosted scrapers stop at sold-only + dedupe + median/percentiles, and Japanese price sites mostly use partner store prices (e.g. ポケカチ with Card Rush). So filtering is rule-based and transparent: every rejected item is kept with its reason and can be included by hand.
 - 2026-10-11: Add item: typed product details survive switching category / kind; "acquired on release day" fills the date from a known full release date; "Unknown" is the first shop suggestion and the other lists are alphabetical; total cost may be left blank when a retail price is known (retail price x quantity is used, and the form says so).
 - 2026-10-11: Valuation fallback for rare items: a source needs 3 sales; steps are the holding's condition over 30 / 90 / 180 days, then a year, then similar conditions pooled (an item's conditions, a card's raw grades, intact boxes with or without shrink; never graded slabs or opened boxes) over 180 days, then a year. A source reaching 3 sales wins over an earlier source with fewer; otherwise the first source with any sale is used. Year-long or pooled values are low confidence and labeled "similar conditions pooled".
+- 2026-10-11: Mercari purchase importer keeps purchases whose Mercari category is a collectible one (top category ゲーム・おもちゃ・グッズ: cards, toys / hobby, games, figures), read from the listing; other purchases are skipped with the reason shown, not imported. Kept ones still go through the in-app review.
+- 2026-10-11: Mercari sends buyers no purchase email (the user's export held only sales, cancellations and Merpay bills; the monthly Merpay payment mail lists deferred-payment items without date or ID). So Mercari purchases come from links the user pastes in the app (Review import > Add purchases by link), read by the home PC on the next collect; reading the purchase history with the user's login was rejected (token on the PC, fragile, account risk). Each link is read once; the purchase date is the listing's last update (approximate, editable in the review); a lot that looks like an entry added by hand gets the item ID instead of a second lot; the bought item becomes a reference sale on the product's Mercari search. Mercari Shops product links are read too (no reference: a shop's page is not one sale).
 
 ---
 
@@ -344,6 +346,7 @@ Acceptance:
 - Scenario items 1-3 (CE, amiibo, controllers) get Mercari sold observations with sensible buckets.
 - Data gate repeated for 3 non-card items.
 - Mercari purchase importer (private plug-in): import the user's Mercari collectible purchases through the same `PurchaseImporter` interface and import flow as SNKRDUNK. This proves the "bring your own sources" design works for more than one shop (without it, that claim does not hold). Can come after the user's own SNKRDUNK flow is settled.
+- Built (2026-10-11) as purchase import by link: `PurchaseImporter` gained `matchesLink` / `readLink` (email methods became optional) and receipts carry the category path, a reference listing, a photo and "date approximate". Table `purchase_links` (status pending / imported / matched / duplicate / skipped / failed, message, holding). `pnpm collect` reads pending links first (so new products are searched in the same run), plans and applies them like an email import without questions (likely matches get the ID, conflicts keep the registered data), and stops reading when Mercari blocks (the rest stay pending). Products are made from the listing title: singles (card number, card code, or rarity in the title) get name / rarity / set code / number / set name, also from card shops' "(SR) {103/100} [S9/スターバース]" titles; sealed kinds from BOX / パック / デッキ words; games from the category (controller, software, figure, console). Slab grades come from the title; a raw card's grade is set in the review. Review shows "date read from the listing" and "new item made from the listing title", with a date field. Live check: CAPCOM RETRO STATION (2026-01-29, ¥22,000, minor damage, reference added to a new search), a Shops PSA10 ピカチュウex (graded PSA 10), a dining chair skipped (家具・インテリア), a missing item reported.
 
 ## S4b: MCP server (Claude reads the data)
 

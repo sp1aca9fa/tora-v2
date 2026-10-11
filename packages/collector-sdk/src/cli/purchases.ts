@@ -42,9 +42,13 @@ if (!user) {
 }
 const { importers, missing } = await loadCollectors();
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
-const selected = importers.filter((i) => !values.source || i.source === values.source);
+const selected = importers.filter(
+  (i) => i.parse && i.matchesHeader && (!values.source || i.source === values.source),
+);
 if (selected.length === 0) {
-  console.error('No purchase importer available (they live in the private collectors package).');
+  console.error(
+    'No email purchase importer available (they live in the private collectors package).',
+  );
   process.exit(1);
 }
 // pnpm runs the script inside the package; paths are relative to where the command was typed.
@@ -83,11 +87,11 @@ for (const importer of selected) {
   console.log(`== ${importer.label} ==`);
   const mails: ReceiptMail[] = [];
   let exportedAt: string | null = null;
-  for await (const mail of readMbox(path, importer.matchesHeader)) {
+  for await (const mail of readMbox(path, importer.matchesHeader!)) {
     if (mail.date && (!exportedAt || mail.date.toISOString() > exportedAt)) {
       exportedAt = mail.date.toISOString();
     }
-    const parsed = importer.parse(mail);
+    const parsed = importer.parse!(mail);
     if (parsed) mails.push(parsed);
   }
   const gathered = gatherReceipts(mails);
