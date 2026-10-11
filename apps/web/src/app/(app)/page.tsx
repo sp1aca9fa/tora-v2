@@ -10,6 +10,7 @@ import {
   cardGradeCounts,
   imageVersions,
   importReviewCount,
+  failedPurchaseLinkCount,
   listInventory,
   pendingMatchesForUser,
   portfolioSeries,
@@ -55,13 +56,14 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, series, matches, grades, toReview, t] = await Promise.all([
+  const [rows, portfolio, series, matches, grades, toReview, failedLinks, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
     portfolioValuation(db, user.id),
     portfolioSeries(db, user.id),
     pendingMatchesForUser(db, user.id),
     cardGradeCounts(db, user.id),
     importReviewCount(db, user.id),
+    failedPurchaseLinkCount(db, user.id),
     getTranslations(),
   ]);
   const { totals } = portfolio;
@@ -186,6 +188,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
           className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
         >
           <span>{t('imports.banner', { count: toReview })}</span>
+          <ChevronRight className="size-4" />
+        </Link>
+      )}
+
+      {failedLinks > 0 && (
+        <Link
+          href="/imports#failed"
+          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <span>{t('imports.links.banner', { count: failedLinks })}</span>
           <ChevronRight className="size-4" />
         </Link>
       )}

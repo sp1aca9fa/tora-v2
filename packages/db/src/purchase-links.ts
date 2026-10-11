@@ -1,6 +1,6 @@
 // Purchase links pasted in the app (shops without receipt emails); read by the home PC.
 import { toTokyoIso } from '@tora/core';
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { type PurchaseLink, purchaseLinks } from './schema';
 
@@ -95,4 +95,13 @@ export async function retryPurchaseLinks(db: Db, userId: string, ids: string[]):
     .update(purchaseLinks)
     .set({ status: 'pending', message: null, updatedAt: toTokyoIso() })
     .where(and(eq(purchaseLinks.userId, userId), inArray(purchaseLinks.id, ids)));
+}
+
+/** Links that could not be imported and are still listed (the user removes each once added by hand). */
+export async function failedPurchaseLinkCount(db: Db, userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(purchaseLinks)
+    .where(and(eq(purchaseLinks.userId, userId), eq(purchaseLinks.status, 'failed')));
+  return row?.n ?? 0;
 }

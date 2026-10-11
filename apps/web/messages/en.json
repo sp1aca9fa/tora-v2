@@ -211,7 +211,8 @@
     "stale": "Not collected for 3+ days:",
     "never": "never",
     "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
-    "recentRuns": "Recent runs"
+    "recentRuns": "Recent runs",
+    "importsHint": "Imported purchases to check, purchase links and what happened to each"
   },
   "fields": {
     "type": "Type",
@@ -517,7 +518,11 @@
         "duplicate": "Already registered",
         "skipped": "Skipped",
         "failed": "Failed"
-      }
+      },
+      "banner": "{count, plural, one {# purchase link could not be imported: add it by hand} other {# purchase links could not be imported: add them by hand}}",
+      "failedTitle": "Could not import ({count})",
+      "failedIntro": "Open each link (you can still see your purchases), add the item by hand, then remove the link with ×.",
+      "addByHand": "Add an item"
     }
   },
   "product": {

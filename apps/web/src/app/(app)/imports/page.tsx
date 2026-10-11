@@ -42,6 +42,51 @@ export default async function ImportReviewPage() {
     };
   });
 
+  const failed = links.filter((l) => l.status === 'failed');
+  const others = links.filter((l) => l.status !== 'failed');
+  const linkRow = (l: (typeof links)[number]) => (
+    <li key={l.id} className="flex items-start gap-2 px-4 py-2.5">
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <a
+          href={l.url}
+          target="_blank"
+          rel="noreferrer"
+          className="block truncate text-muted-foreground hover:text-foreground"
+        >
+          {l.url.replace(/^https?:\/\//, '')}
+        </a>
+        <p className="text-xs">
+          <span className={l.status === 'failed' ? 'text-destructive' : 'font-medium'}>
+            {t(`imports.links.status.${l.status}`)}
+          </span>
+          {l.message && <span className="text-muted-foreground"> · {l.message}</span>}
+          {l.holdingId && (
+            <>
+              {' · '}
+              <Link href={`/holdings/${l.holdingId}`} className="underline">
+                {t('imports.links.open')}
+              </Link>
+            </>
+          )}
+        </p>
+      </div>
+      {l.status === 'failed' && (
+        <form action={retryLinkAction.bind(null, l.id)}>
+          <Button type="submit" variant="ghost" size="icon" aria-label={t('imports.links.retry')}>
+            <RotateCw className="size-4" />
+          </Button>
+        </form>
+      )}
+      {l.status !== 'imported' && l.status !== 'matched' && (
+        <form action={removeLinkAction.bind(null, l.id)}>
+          <Button type="submit" variant="ghost" size="icon" aria-label={t('imports.links.remove')}>
+            <X className="size-4" />
+          </Button>
+        </form>
+      )}
+    </li>
+  );
+
   return (
     <div className="space-y-4">
       <Link
@@ -54,6 +99,21 @@ export default async function ImportReviewPage() {
         <h1 className="text-2xl font-semibold tracking-tight">{t('imports.title')}</h1>
         <p className="text-sm text-muted-foreground">{t('imports.intro')}</p>
       </header>
+      {failed.length > 0 && (
+        <section id="failed" className="scroll-mt-20 space-y-2">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {t('imports.links.failedTitle', { count: failed.length })}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {t('imports.links.failedIntro')}{' '}
+            <Link href="/add" className="underline">
+              {t('imports.links.addByHand')}
+            </Link>
+          </p>
+          <ul className="divide-y rounded-xl border bg-card text-sm">{failed.map(linkRow)}</ul>
+        </section>
+      )}
+
       {items.length === 0 ? (
         <p className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           {t('imports.none')}
@@ -68,61 +128,8 @@ export default async function ImportReviewPage() {
           <p className="text-sm text-muted-foreground">{t('imports.links.intro')}</p>
         </header>
         <LinksForm />
-        {links.length > 0 && (
-          <ul className="divide-y rounded-xl border bg-card text-sm">
-            {links.map((l) => (
-              <li key={l.id} className="flex items-start gap-2 px-4 py-2.5">
-                <div className="min-w-0 flex-1 space-y-0.5">
-                  <a
-                    href={l.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block truncate text-muted-foreground hover:text-foreground"
-                  >
-                    {l.url.replace(/^https?:\/\//, '')}
-                  </a>
-                  <p className="text-xs">
-                    <span className={l.status === 'failed' ? 'text-destructive' : 'font-medium'}>
-                      {t(`imports.links.status.${l.status}`)}
-                    </span>
-                    {l.message && <span className="text-muted-foreground"> · {l.message}</span>}
-                    {l.holdingId && (
-                      <>
-                        {' · '}
-                        <Link href={`/holdings/${l.holdingId}`} className="underline">
-                          {t('imports.links.open')}
-                        </Link>
-                      </>
-                    )}
-                  </p>
-                </div>
-                {l.status === 'failed' && (
-                  <form action={retryLinkAction.bind(null, l.id)}>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t('imports.links.retry')}
-                    >
-                      <RotateCw className="size-4" />
-                    </Button>
-                  </form>
-                )}
-                {l.status !== 'imported' && l.status !== 'matched' && (
-                  <form action={removeLinkAction.bind(null, l.id)}>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={t('imports.links.remove')}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </form>
-                )}
-              </li>
-            ))}
-          </ul>
+        {others.length > 0 && (
+          <ul className="divide-y rounded-xl border bg-card text-sm">{others.map(linkRow)}</ul>
         )}
       </section>
     </div>
