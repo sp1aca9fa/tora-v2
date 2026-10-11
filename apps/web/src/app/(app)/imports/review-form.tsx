@@ -50,6 +50,7 @@ const initialRow = (item: ReviewItem): ReviewRow => ({
         : 'sealed_shrink'
       : undefined,
   acquiredAt: item.reasons.includes('date_approx') ? item.acquiredAt : undefined,
+  quantity: item.quantity,
 });
 
 /** One row per imported transaction: grade + cert for cards, shrink for sealed product. */
@@ -98,16 +99,35 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                   {t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r}
                 </p>
               ))}
-              {row.acquiredAt !== undefined && !row.cancelled && (
-                <label className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">{t('imports.purchasedOn')}</span>
-                  <Input
-                    type="date"
-                    value={row.acquiredAt}
-                    onChange={(e) => update(item.id, { acquiredAt: e.target.value })}
-                    className="w-40"
-                  />
-                </label>
+              {!row.cancelled && (
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">{t('fields.quantity')}</span>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      value={row.quantity ?? item.quantity}
+                      onChange={(e) =>
+                        update(item.id, {
+                          quantity: Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                        })
+                      }
+                      className="w-20"
+                    />
+                  </label>
+                  {row.acquiredAt !== undefined && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">{t('imports.purchasedOn')}</span>
+                      <Input
+                        type="date"
+                        value={row.acquiredAt}
+                        onChange={(e) => update(item.id, { acquiredAt: e.target.value })}
+                        className="w-40"
+                      />
+                    </label>
+                  )}
+                </div>
               )}
               {item.orderId && (
                 <label className="flex items-center gap-2 text-sm">

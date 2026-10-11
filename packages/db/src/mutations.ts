@@ -538,6 +538,8 @@ export interface ImportReview {
   packagingState?: PackagingState | null;
   /** Corrected purchase time (Tokyo ISO), e.g. when the import only knew it roughly. */
   acquiredAt?: string | null;
+  /** Corrected number of units (e.g. a listing that sold several cards together); cost stays. */
+  quantity?: number | null;
 }
 
 /**
@@ -587,6 +589,10 @@ export async function confirmImportReview(
       }
       if (row.acquiredAt && row.acquiredAt.slice(0, 10) !== holding.acquiredAt.slice(0, 10)) {
         patch.acquiredAt = row.acquiredAt;
+      }
+      if (row.quantity != null && row.quantity !== holding.quantity) {
+        assertQuantity(row.quantity);
+        patch.quantity = row.quantity;
       }
       const changes: Record<string, { before: unknown; after: unknown }> = {};
       for (const [key, after] of Object.entries(patch) as [keyof Holding, unknown][]) {

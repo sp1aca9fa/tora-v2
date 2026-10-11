@@ -586,16 +586,18 @@ describe('confirmImportReview', () => {
     );
   });
 
-  it('takes a corrected purchase date', async () => {
+  it('takes a corrected purchase date and quantity', async () => {
     const lot = await createHolding(
       db,
       uid,
       { product: { category: 'game', kind: 'other', name: 'Retro Station' } },
       { quantity: 1, costTotalJpy: 22000, acquiredAt: day('09-05'), reviewPending: true },
     );
-    await confirmImportReview(db, uid, [{ id: lot.holding.id, acquiredAt: day('09-02') }]);
+    await confirmImportReview(db, uid, [
+      { id: lot.holding.id, acquiredAt: day('09-02'), quantity: 3 },
+    ]);
     const { holding } = (await getHoldingDetail(db, uid, lot.holding.id))!;
-    expect(holding.acquiredAt).toBe(day('09-02'));
+    expect(holding).toMatchObject({ acquiredAt: day('09-02'), quantity: 3, costTotalJpy: 22000 });
   });
 });
 

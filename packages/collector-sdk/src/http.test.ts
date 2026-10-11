@@ -86,3 +86,14 @@ describe('match helpers', () => {
     ).toBe(0.5);
   });
 });
+
+describe('errorText', () => {
+  it('shows the cause of a failed query, not the query', async () => {
+    const { errorText } = await import('./http');
+    const wrapped = new Error('Failed query: insert into "price_observations" values (?, ?, ?)', {
+      cause: new Error('SQLITE_BUSY: database is locked'),
+    });
+    expect(errorText(wrapped)).toBe('SQLITE_BUSY: database is locked');
+    expect(errorText('x'.repeat(600))).toHaveLength(501);
+  });
+});

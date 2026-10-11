@@ -5,7 +5,7 @@ import { createDb, inferLotSizes, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
-import { PoliteHttp } from '../http';
+import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { loadCollectors } from '../registry';
@@ -69,7 +69,7 @@ try {
   });
   console.log(`images: ${images.saved} saved, ${images.failed} failed`);
 } catch (error) {
-  console.log(`images: stopped (${String(error)})`);
+  console.log(`images: stopped (${errorText(error)})`);
 }
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);

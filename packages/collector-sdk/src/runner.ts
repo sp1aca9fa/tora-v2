@@ -16,7 +16,13 @@ import {
   syncProductDetails,
   updateSourceProgress,
 } from '@tora/db';
-import { BlockedError, PoliteHttp, type PoliteHttpOptions, RequestCapError } from './http';
+import {
+  BlockedError,
+  PoliteHttp,
+  type PoliteHttpOptions,
+  RequestCapError,
+  errorText,
+} from './http';
 import type { Collector, CollectorContext } from './types';
 
 export interface RunOptions {
@@ -69,8 +75,8 @@ export async function runCollector(
     errors: [],
   };
   const fail = (what: string, e: unknown) => {
-    summary.errors.push(`${what}: ${e instanceof Error ? e.message : String(e)}`);
-    log(`error ${what}: ${e instanceof Error ? e.message : String(e)}`);
+    summary.errors.push(`${what}: ${errorText(e)}`);
+    log(`error ${what}: ${errorText(e)}`);
   };
 
   try {

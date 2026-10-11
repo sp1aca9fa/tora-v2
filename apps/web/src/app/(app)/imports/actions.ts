@@ -26,6 +26,7 @@ const rowSchema = z.object({
   grade: z.string().max(10).optional(),
   certNumber: z.string().max(40).optional(),
   packagingState: z.enum(['sealed_shrink', 'sealed_no_shrink']).optional(),
+  quantity: z.number().int().min(1).max(100_000).optional(),
   /** Purchase date, when the import only knew it roughly (YYYY-MM-DD). */
   acquiredAt: z
     .string()
@@ -90,6 +91,7 @@ export async function confirmReviewAction(
       certNumber: grade?.grading === 'graded' ? row.certNumber : null,
       packagingState: row.cls === 'sealed' ? (row.packagingState ?? null) : null,
       acquiredAt: row.acquiredAt ? tokyoDateToIso(row.acquiredAt) : null,
+      quantity: row.quantity ?? null,
     });
   }
   if (reviews.length === 0 && cancelled.length === 0) return { error: 'noneGraded' };

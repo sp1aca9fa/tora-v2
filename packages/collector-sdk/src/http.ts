@@ -152,3 +152,15 @@ export class PoliteHttp {
     this.last = Date.now();
   }
 }
+
+/**
+ * A short error message: the underlying reason, not a wrapper. Database errors print the whole
+ * query with its values, which hid the actual cause in the collect log.
+ */
+export function errorText(error: unknown): string {
+  let e: unknown = error;
+  while (e instanceof Error && e.cause && /^Failed query/.test(e.message)) e = e.cause;
+  const text =
+    e instanceof Error ? `${e.name === 'Error' ? '' : `${e.name}: `}${e.message}` : String(e);
+  return text.length > 500 ? `${text.slice(0, 500)}…` : text;
+}

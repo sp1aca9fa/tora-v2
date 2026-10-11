@@ -12,7 +12,7 @@ import {
   pendingPurchaseLinks,
   setPurchaseLinkResult,
 } from '@tora/db';
-import { BlockedError, type PoliteHttp, RequestCapError } from './http';
+import { BlockedError, type PoliteHttp, RequestCapError, errorText } from './http';
 import { type Decision, applyImport, gatherReceipts, planImport } from './purchases';
 import type { Collector, LinkRead, PurchaseImporter, PurchaseReceipt } from './types';
 
@@ -71,10 +71,10 @@ export async function importPurchaseLinks(
     } catch (error) {
       if (error instanceof BlockedError || error instanceof RequestCapError) {
         summary.left = pending.length - i;
-        log(`stopped reading links (${String(error)}); the rest stay pending`);
+        log(`stopped reading links (${errorText(error)}); the rest stay pending`);
         break;
       }
-      await finish(link, 'failed', `Could not read the listing (${String(error)}).`);
+      await finish(link, 'failed', `Could not read the listing (${errorText(error)}).`);
       continue;
     }
     if (read.kind !== 'purchase') {
