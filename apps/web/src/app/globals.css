@@ -78,4 +78,11 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+  /* The open list of a native <select> (Windows draws it on its own white unless told): use the
+     theme's colors, so dark mode does not show white text on white. */
+  select option,
+  select optgroup {
+    background-color: var(--card);
+    color: var(--card-foreground);
+  }
 }
