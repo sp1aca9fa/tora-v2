@@ -1,8 +1,9 @@
-import { openSuggestions } from '@tora/db';
-import { ChevronLeft } from 'lucide-react';
+import { type SuggestionListing, openSuggestions } from '@tora/db';
+import { ChevronLeft, ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import type { getTranslations as GetT } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
@@ -41,7 +42,8 @@ export default async function SuggestionsPage() {
           {rows.map(({ suggestion: s, product }) => {
             const payload = s.payload as Record<string, unknown>;
             const evidence = (s.evidence ?? {}) as Record<string, unknown>;
-            const titles = (evidence.titles as string[] | undefined) ?? [];
+            const listings = (evidence.listings as SuggestionListing[] | undefined) ?? [];
+            const keptCount = listings.filter((l) => l.kept).length;
             return (
               <li key={s.id} className="space-y-2 rounded-xl border bg-card px-4 py-3 text-sm">
                 <div className="flex items-baseline justify-between gap-3">
@@ -69,6 +71,22 @@ export default async function SuggestionsPage() {
                     {evidence.title ? (
                       <p className="text-muted-foreground">{String(evidence.title)}</p>
                     ) : null}
+                    {evidence.url ? (
+                      <a
+                        href={String(evidence.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium underline"
+                      >
+                        {t(
+                          evidence.title
+                            ? 'suggestions.openListing'
+                            : 'suggestions.openProductPage',
+                          { source: sourceLabel(String(evidence.source ?? '')) },
+                        )}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    ) : null}
                     {payload.unsure ? (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
                         {t('suggestions.unsure')}
@@ -85,14 +103,13 @@ export default async function SuggestionsPage() {
                         source: sourceLabel(String(payload.source ?? '')),
                       })}
                     </p>
-                    {titles.length > 0 && (
-                      <ul className="list-inside list-disc text-xs text-muted-foreground">
-                        {titles.slice(0, 5).map((title) => (
-                          <li key={title} className="truncate">
-                            {title}
-                          </li>
-                        ))}
-                      </ul>
+                    {listings.length > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          {t('suggestions.wordListings', { kept: keptCount })}
+                        </p>
+                        <ListingList listings={listings} t={t} />
+                      </>
                     )}
                   </div>
                 )}
@@ -114,10 +131,11 @@ export default async function SuggestionsPage() {
                         ))}
                       </tbody>
                     </table>
-                    {titles.length > 0 && (
-                      <p className="truncate text-xs text-muted-foreground">
-                        {t('suggestions.seenIn', { title: titles[0]! })}
-                      </p>
+                    {listings.length > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">{t('suggestions.seenIn')}</p>
+                        <ListingList listings={listings} t={t} />
+                      </>
                     )}
                   </div>
                 )}
@@ -147,5 +165,45 @@ export default async function SuggestionsPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+/** Collected listings behind a suggestion, each opening the listing on its site. */
+function ListingList({
+  listings,
+  t,
+}: {
+  listings: SuggestionListing[];
+  t: Awaited<ReturnType<typeof GetT>>;
+}) {
+  return (
+    <ul className="space-y-1 text-xs">
+      {listings.map((l) => (
+        <li key={l.url ?? l.title} className="flex items-baseline gap-2">
+          <span
+            className={
+              l.kept
+                ? 'shrink-0 rounded bg-amber-500/15 px-1 text-amber-700 dark:text-amber-300'
+                : 'shrink-0 rounded bg-muted px-1 text-muted-foreground'
+            }
+          >
+            {t(l.kept ? 'suggestions.counted' : 'suggestions.leftOut')}
+          </span>
+          {l.url ? (
+            <a
+              href={l.url}
+              target="_blank"
+              rel="noreferrer"
+              className="min-w-0 truncate underline decoration-muted-foreground/50"
+            >
+              {l.title}
+            </a>
+          ) : (
+            <span className="min-w-0 truncate">{l.title}</span>
+          )}
+          <span className="shrink-0 text-muted-foreground">{formatJpy(l.priceJpy)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

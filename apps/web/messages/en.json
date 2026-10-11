@@ -591,13 +591,18 @@
     "sale": "{price} on {date} ({source}); the value is {value}.",
     "unsure": "The models were not sure: check the listing.",
     "word": "Make the {source} search skip listings with “{word}”. Its sales are fetched again on the next collect.",
-    "seenIn": "Seen in: {title}",
+    "seenIn": "Seen in:",
     "why": "{reason} ({model}, {confidence}% sure)",
     "accept": {
       "exclude_sale": "Exclude",
       "exclude_word": "Skip the word",
       "fix_product": "Apply"
     },
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "openListing": "Open the listing on {source}",
+    "openProductPage": "Open the product on {source} (it shows no single trade)",
+    "wordListings": "{kept, plural, =0 {Listings with the word (none counted in the value now):} one {Listings with the word (# counted in the value now, removed on accept):} other {Listings with the word (# counted in the value now, removed on accept):}}",
+    "counted": "counted",
+    "leftOut": "left out"
   }
 }

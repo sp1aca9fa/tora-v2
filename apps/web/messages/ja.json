@@ -591,13 +591,18 @@
     "sale": "{date}に{price}（{source}）。評価額は{value}です。",
     "unsure": "モデルも判断できませんでした。出品を確認してください。",
     "word": "{source}の検索で「{word}」を含む出品を除外します。次回の収集で販売記録を取り直します。",
-    "seenIn": "出品例: {title}",
+    "seenIn": "出品例:",
     "why": "{reason}（{model}、確信度{confidence}%）",
     "accept": {
       "exclude_sale": "除外する",
       "exclude_word": "除外語に追加",
       "fix_product": "適用する"
     },
-    "dismiss": "却下"
+    "dismiss": "却下",
+    "openListing": "{source}で出品を開く",
+    "openProductPage": "{source}で商品ページを開く（個別の取引は表示されません）",
+    "wordListings": "{kept, plural, =0 {この語を含む出品（今の評価額には入っていません）:} other {この語を含む出品（#件が評価額に入っていて、承認すると外れます）:}}",
+    "counted": "反映中",
+    "leftOut": "除外済み"
   }
 }

@@ -57,6 +57,7 @@ async function seed() {
     observedAt: ago(d),
     fetchedAt: ago(0),
     externalRef: ref,
+    url: `https://item/${ref}`,
     raw: { name },
   });
   await insertObservations(db, [
@@ -142,9 +143,14 @@ it('files a word to skip for the special edition and an exclusion for the cheap 
   const open = await openSuggestions(db, user.id);
   const word = open.find((o) => o.suggestion.kind === 'exclude_word')!.suggestion;
   expect(word.payload).toMatchObject({ word: 'FUTURISTIC' });
-  expect(word.evidence?.titles).toHaveLength(2);
+  // Every listing the word would drop, with its link.
+  expect(word.evidence?.listings).toEqual([
+    expect.objectContaining({ title: '30th FUTURISTIC BOX', kept: true }),
+    expect.objectContaining({ title: '30th FUTURISTIC BOX 未開封', kept: true }),
+  ]);
   const sale = open.find((o) => o.suggestion.kind === 'exclude_sale')!.suggestion;
   expect(sale.model).toBe('claude-sonnet');
+  expect(sale.evidence).toMatchObject({ title: '30th BOX 空箱', url: 'https://item/c1' });
 
   // Accepting: the sale is excluded; the word is added and the search fetched again.
   await decideSuggestion(db, user, sale.id, true);

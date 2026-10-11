@@ -10,6 +10,7 @@ import {
   FIXABLE_FIELDS,
   fileSuggestion,
   judgedTargets,
+  suggestionListings,
   loadMarketData,
   oddSales,
   schema,
@@ -89,6 +90,8 @@ export interface ReviewCases {
       /** The product's search the case came from (sales: its search on that site, if any). */
       search?: ProductSource;
       titles: string[];
+      /** The sale's listing (sale cases). */
+      url?: string | null;
     }
   >;
 }
@@ -149,9 +152,10 @@ export async function buildReviewCases(
     picked.push(o);
   }
   const raws = new Map<string, unknown>();
+  const urls = new Map<string, string | null>();
   if (picked.length) {
     const found = await db
-      .select({ id: priceObservations.id, raw: priceObservations.raw })
+      .select({ id: priceObservations.id, raw: priceObservations.raw, url: priceObservations.url })
       .from(priceObservations)
       .where(
         inArray(
@@ -159,7 +163,10 @@ export async function buildReviewCases(
           picked.map((o) => o.observationId!),
         ),
       );
-    for (const r of found) raws.set(r.id, r.raw);
+    for (const r of found) {
+      raws.set(r.id, r.raw);
+      urls.set(r.id, r.url);
+    }
   }
   for (const [i, o] of picked.entries()) {
     const id = `s${i + 1}`;
@@ -186,6 +193,7 @@ export async function buildReviewCases(
       observationId: o.observationId,
       search: searches.find((s) => s.productId === o.product.id && s.source === o.source),
       titles: title ? [title] : [],
+      url: urls.get(o.observationId!) ?? null,
     });
   }
 
@@ -437,7 +445,11 @@ export async function runReview(
           productId: target.productId,
           payload: { sourceId: link.id, word, source: link.source },
           reason: f.reason,
-          evidence: { titles: [...new Set(titles)].slice(0, 10), keywords: link.query?.keywords },
+          // Every collected listing the word would drop (kept ones first), with links to check.
+          evidence: {
+            listings: await suggestionListings(db, target.productId, { source: link.source, word }),
+            keywords: link.query?.keywords,
+          },
           model: f.model,
           confidence: f.confidence,
         })
@@ -462,7 +474,7 @@ export async function runReview(
             before: Object.fromEntries(
               Object.keys(changes).map((k) => [k, target.product[k as keyof ProductFix]]),
             ),
-            titles: target.titles.slice(0, 5),
+            listings: await suggestionListings(db, target.productId, { titles: target.titles }, 5),
           },
           model: f.model,
           confidence: f.confidence,
@@ -501,7 +513,7 @@ export async function runReview(
         productId: target.productId,
         payload: { observationId: target.observationId, unsure: v.verdict === 'unsure' },
         reason: v.reason,
-        evidence: { ...c.sale, valueJpy: c.valueJpy, bucket: c.bucket },
+        evidence: { ...c.sale, url: target.url, valueJpy: c.valueJpy, bucket: c.bucket },
         model: v.model,
         confidence: v.confidence,
       })

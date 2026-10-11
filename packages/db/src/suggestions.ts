@@ -177,3 +177,60 @@ export async function decideSuggestion(
     .where(eq(suggestions.id, id));
   return s.productId;
 }
+
+export interface SuggestionListing {
+  title: string;
+  url: string | null;
+  priceJpy: number;
+  /** Counted in the value now (else already left out by the filter or by hand). */
+  kept: boolean;
+}
+
+const fold = (s: string) => s.normalize('NFKC').toLowerCase();
+
+/**
+ * A product's collected listings with a word in the title, or with one of the given titles (the
+ * evidence shown with a suggestion, each with its link): kept ones first, newest first.
+ */
+export async function suggestionListings(
+  db: Db,
+  productId: string,
+  match: { source?: string; word?: string; titles?: string[] },
+  limit = 10,
+): Promise<SuggestionListing[]> {
+  const rows = await db
+    .select({
+      url: priceObservations.url,
+      raw: priceObservations.raw,
+      priceJpy: priceObservations.priceJpy,
+      excluded: priceObservations.excluded,
+    })
+    .from(priceObservations)
+    .where(
+      and(
+        eq(priceObservations.productId, productId),
+        match.source ? eq(priceObservations.source, match.source) : undefined,
+      ),
+    )
+    .orderBy(desc(priceObservations.observedAt));
+  const word = match.word ? fold(match.word) : null;
+  const titles = match.titles ? new Set(match.titles) : null;
+  const seen = new Set<string>();
+  return rows
+    .map((r) => ({
+      title: ((r.raw ?? {}) as { name?: string }).name ?? '',
+      url: r.url,
+      priceJpy: r.priceJpy,
+      kept: !r.excluded,
+    }))
+    .filter((l) => l.title && (!word || fold(l.title).includes(word)))
+    .filter((l) => !titles || titles.has(l.title))
+    .filter((l) => {
+      const key = l.url ?? l.title;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => Number(b.kept) - Number(a.kept))
+    .slice(0, limit);
+}
