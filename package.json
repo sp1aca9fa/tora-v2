@@ -24,7 +24,8 @@
     "user": "pnpm --silent --filter @tora/db user",
     "catalog:fetch": "pnpm --filter @tora/catalog run fetch",
     "catalog:sync": "pnpm --filter @tora/db catalog:sync",
-    "valuate": "pnpm --filter @tora/db valuate"
+    "valuate": "pnpm --filter @tora/db valuate",
+    "mcp": "pnpm --silent --filter @tora/mcp start"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

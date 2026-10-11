@@ -1,0 +1,22 @@
+{
+  "name": "@tora/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/tools.ts"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@tora/core": "workspace:*",
+    "@tora/db": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.45.4"
+  }
+}

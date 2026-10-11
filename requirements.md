@@ -17,7 +17,7 @@
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
 | S4 | Mercari sold collector | collector + query editor built; awaiting user check (purchase importer pending) |
-| S4b | MCP server: Claude reads the data (sanity checks, analysis, dev feedback) | todo (next after S4) |
+| S4b | MCP server: Claude reads the data (sanity checks, analysis, dev feedback) | built; awaiting user setup |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |

@@ -225,6 +225,36 @@ crontab -e
 Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`
 to go through the scheduled path.
 
+## Claude access (MCP)
+
+`packages/mcp` is a local [MCP](https://modelcontextprotocol.io) server that lets Claude read one
+user's data, to sanity-check it, explain it and find what to improve. It is read-only, runs on the
+home PC over stdio with the root `.env`, and is never deployed.
+
+```bash
+# Claude Code (from anywhere):
+claude mcp add tora -- pnpm --silent --dir /path/to/tora-v2 mcp --user <username>
+```
+
+For Claude Desktop, add the same command to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "tora": {
+      "command": "pnpm",
+      "args": ["--silent", "--dir", "/path/to/tora-v2", "mcp", "--user", "<username>"]
+    }
+  }
+}
+```
+
+(On Windows with the repo in WSL, use `"command": "wsl"` and put `pnpm ...` in `args`.)
+
+Tools: `portfolio_summary`, `list_products`, `product_detail`, `price_history`, `sales`,
+`collector_status`, `review_queue`, `data_checks` (start here for "does anything look off?") and
+`query_sql` (one read-only SELECT).
+
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE.md): free for personal, hobby, research, educational and
