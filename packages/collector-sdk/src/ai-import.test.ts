@@ -408,3 +408,30 @@ it('imports a pair the model was unsure of as two lots, which the user merges', 
     holdingId: keep.id,
   });
 });
+
+it('joins look-alikes of different batches when the model, asked separately, is sure', () => {
+  // A listing page (guessed date from its age) and its transaction page, never seen together.
+  const listing = row({
+    file: 'listing.png',
+    title: 'Pokemon LEGENDS アルセウス',
+    priceJpy: 2999,
+    date: '2026-04-12',
+    dateApprox: true,
+  });
+  const deal = row({
+    file: 'deal.png',
+    title: 'Pokemon LEGENDS アル…',
+    priceJpy: 2999,
+    date: '2022-08-24',
+    orderId: 'm71075994789',
+  });
+  // Not asked yet: offered to merge (the guessed date does not count against it).
+  expect(mergeRows([listing, deal]).pairs).toHaveLength(1);
+  const sure = mergeRows([listing, deal], () => ({ same: true, confidence: 0.9 }));
+  expect(sure.rows).toEqual([
+    expect.objectContaining({ orderId: 'm71075994789', date: '2022-08-24', dateApprox: false }),
+  ]);
+  const different = mergeRows([listing, deal], () => ({ same: false, confidence: 0.9 }));
+  expect(different.rows).toHaveLength(2);
+  expect(different.pairs).toEqual([]);
+});

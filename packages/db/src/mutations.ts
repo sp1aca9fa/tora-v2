@@ -1022,3 +1022,25 @@ export async function mergeProducts(
     return into;
   });
 }
+
+/**
+ * Deletes a product nobody holds (e.g. one an import made from a cut-off title, whose lot was
+ * merged into another): its listings, sales data, suggestions and picture go with it. Returns
+ * false, changing nothing, when any lot still refers to it.
+ */
+export async function deleteUnusedProduct(db: Db, productId: string): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const [used] = await tx
+      .select({ n: count() })
+      .from(holdings)
+      .where(eq(holdings.productId, productId));
+    if ((used?.n ?? 0) > 0) return false;
+    await tx.delete(priceObservations).where(eq(priceObservations.productId, productId));
+    await tx.delete(manualPrices).where(eq(manualPrices.productId, productId));
+    await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, productId));
+    await tx.delete(productSources).where(eq(productSources.productId, productId));
+    await tx.delete(productImages).where(eq(productImages.productId, productId));
+    await tx.delete(products).where(eq(products.id, productId));
+    return true;
+  });
+}

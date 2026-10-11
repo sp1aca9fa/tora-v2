@@ -1,7 +1,7 @@
 // Imports hub (requirements S5d): import runs and what needs the user after an import.
 import { toTokyoIso } from '@tora/core';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { DomainError, deleteHolding, editHolding } from './mutations';
+import { DomainError, deleteHolding, deleteUnusedProduct, editHolding } from './mutations';
 import type { Db } from './client';
 import { failedPurchaseLinkCount } from './purchase-links';
 import { cardGradeCounts, importReviewCount } from './queries';
@@ -125,6 +125,10 @@ export async function mergeImportedLots(
     .set({ holdingId: keepId, updatedAt: toTokyoIso() })
     .where(eq(purchaseLinks.holdingId, dropId));
   await deleteHolding(db, userId, dropId);
+  // An item the import made for the other lot (e.g. from a cut-off title) goes too.
+  if (drop.productId !== keep.productId && reasons(drop).includes('new_product')) {
+    await deleteUnusedProduct(db, drop.productId);
+  }
   const edit: { orderId?: string; acquiredAt?: string; costTotalJpy?: number } = {};
   if (!keep.orderId && drop.orderId) edit.orderId = drop.orderId;
   if (!keep.costTotalJpy && drop.costTotalJpy) edit.costTotalJpy = drop.costTotalJpy;

@@ -128,6 +128,25 @@ export const ROWS_SCHEMA = {
   required: ['rows'],
 };
 
+const PAIRS_SCHEMA = {
+  type: 'object',
+  properties: {
+    pairs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pair: { type: 'integer' },
+          same: { type: 'boolean' },
+          confidence: { type: 'number' },
+        },
+        required: ['pair', 'same', 'confidence'],
+      },
+    },
+  },
+  required: ['pairs'],
+};
+
 export const EXTRACT_SYSTEM = `You read a collector's purchase history from Japanese shops (screenshots of order lists or order pages, PDFs, CSV or copied text) and list every item they bought, as JSON. You never invent data: a field that is not shown is null.`;
 
 export function extractPrompt(
@@ -150,7 +169,7 @@ One row per distinct item in an order. Several of the same item are one row with
 - title: the item's title as shown. url: when shown.
 - priceJpy: what was paid for this item: item price plus shipping and fees when charged separately, minus coupons and discounts (クーポン利用, 割引). Points or balance used to pay (メルペイ残高, ポイント利用, PayPay) are a way of paying, not a discount. The item price when that is all there is. Several items in one order: each item's own price.
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
-- date: the order / purchase date as YYYY-MM-DD. Year missing or only a relative date ("3日前"): your best guess with dateApprox true. Not shown at all: null.
+- date: the order / purchase date as YYYY-MM-DD (購入日時, 注文日). An order date missing its year: your best guess with dateApprox true. A listing page's age or update time (半年以上前, 3日前, 更新) is not the purchase date: null. Not shown at all: null.
 - status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
 - collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures; false for anything else.
 - productId: when the item is clearly one of the user's products listed below (same card name and number, same box or set, same game and platform), its id; else null.
@@ -212,6 +231,8 @@ export type RowFlag =
 
 export interface CheckContext {
   products: Map<string, Product>;
+  /** Order IDs of the user's lots: rows with one are already registered, nothing to check. */
+  orderIds: Set<string>;
   /** Unit value of each product the user holds (latest snapshot), for "price far from value". */
   unitValue: Map<string, number>;
 }
@@ -220,6 +241,7 @@ const fold = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, ''
 
 export function checkRow(row: ExtractedRow, ctx: CheckContext): RowFlag[] {
   if (row.status !== 'purchased' || !row.collectible) return [];
+  if (row.orderId && ctx.orderIds.has(row.orderId)) return [];
   const flags: RowFlag[] = [];
   if (row.unsure) flags.push('unsure');
   if (!row.priceJpy || row.priceJpy <= 0) flags.push('no_price');
@@ -255,6 +277,9 @@ export function checkRow(row: ExtractedRow, ctx: CheckContext): RowFlag[] {
 export async function checkContext(db: Db, userId: string): Promise<CheckContext> {
   const owned = await holdingsWithProducts(db, userId);
   const products = new Map(owned.map(({ product }) => [product.id, product]));
+  const orderIds = new Set(
+    owned.map(({ holding }) => holding.orderId).filter((id): id is string => !!id),
+  );
   const unitValue = new Map<string, number>();
   const [latest] = await db
     .select({ date: schema.valuationSnapshots.date })
@@ -277,7 +302,7 @@ export async function checkContext(db: Db, userId: string): Promise<CheckContext
       }
     }
   }
-  return { products, unitValue };
+  return { products, orderIds, unitValue };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -436,13 +461,18 @@ export type AskClaude = <T>(options: {
 
 export interface ReadCache {
   version: 1;
+  /** The model's answers on look-alike rows of different batches ("same purchase?"). */
+  pairs?: Record<string, { same: boolean; confidence: number }>;
   files: Record<
     string,
     {
       name: string;
       model: ModelAlias;
       rows: ExtractedRow[];
-      /** Why Sonnet read it. */ why?: string;
+      /** Why Sonnet read it. */
+      why?: string;
+      /** Drawn for the random check already (once per file, not on every run). */
+      drawn?: boolean;
     }
   >;
 }
@@ -479,7 +509,8 @@ function compatible(a: ExtractedRow, b: ExtractedRow): boolean {
   if (shopKey(a.shop) !== shopKey(b.shop)) return false;
   if (a.priceJpy && b.priceJpy && a.priceJpy !== b.priceJpy) return false;
   if (a.orderId && b.orderId && a.orderId !== b.orderId) return false;
-  return sameDay(a.date, b.date);
+  // A guessed date says nothing against another page's date.
+  return a.dateApprox || b.dateApprox || sameDay(a.date, b.date);
 }
 
 /** Sure enough of the model's "same purchase" to join the rows without asking. */
@@ -492,7 +523,12 @@ export const SAME_SURE = 0.8;
  * something disagreeing, or a look-alike the code finds: same shop and price, one title the other
  * cut short) stay apart as `pairs`, for the user to merge in review.
  */
-export function mergeRows(rows: ExtractedRow[]): {
+export function mergeRows(
+  rows: ExtractedRow[],
+  /** The model's answer on a look-alike pair it was asked about separately. */
+  judged: (a: ExtractedRow, b: ExtractedRow) => { same: boolean; confidence: number } | null = () =>
+    null,
+): {
   rows: ExtractedRow[];
   merged: string[][];
   pairs: [ExtractedRow, ExtractedRow][];
@@ -500,7 +536,9 @@ export function mergeRows(rows: ExtractedRow[]): {
   const join = (a: ExtractedRow, b: ExtractedRow): ExtractedRow => {
     // The fuller title knows the item (name, quantity, category); the other the order.
     const [full, other] = titleCore(a.title).length >= titleCore(b.title).length ? [a, b] : [b, a];
-    const dated = a.date ? a : b;
+    // A date read from the order beats one guessed (e.g. from a listing's age).
+    const real = (r: ExtractedRow) => !!r.date && !r.dateApprox;
+    const dated = real(a) ? a : real(b) ? b : a.date ? a : b;
     return {
       ...full,
       file: [...filesOf(a), ...filesOf(b)].join(' + '),
@@ -542,7 +580,18 @@ export function mergeRows(rows: ExtractedRow[]): {
       const [a, b] = [titleCore(o.title), titleCore(row.title)].sort((x, y) => x.length - y.length);
       return a!.length >= 6 && b!.startsWith(a!) && compatible(o, row);
     });
-    if (alike) pairs.push([alike, row]);
+    const verdict = alike ? judged(alike, row) : null;
+    if (alike && verdict?.same && verdict.confidence >= SAME_SURE) {
+      const joined = join(alike, row);
+      out[out.indexOf(alike)] = joined;
+      for (const p of pairs) for (let k = 0; k < 2; k++) if (p[k] === alike) p[k] = joined;
+      merged.push(filesOf(joined));
+      continue;
+    }
+    // Judged different purchases: nothing to offer.
+    if (alike && !(verdict && !verdict.same && verdict.confidence >= SAME_SURE)) {
+      pairs.push([alike, row]);
+    }
     out.push(row);
   }
   return { rows: out, merged, pairs };
@@ -641,16 +690,20 @@ export async function readPurchases(
     const names = filesOf(row).filter((n) => !queued.has(n) && modelOf(n) !== 'sonnet');
     if (names.length === 0) continue;
     const flags = checkRow(row, ctx).filter((f) => f !== 'no_date');
-    const why = flags.length
-      ? flags.join(', ')
-      : row.status === 'purchased' && random() < (options.sample ?? 0.1)
-        ? 'random check'
-        : null;
+    // The random check is drawn once per file (a new draw on every run would add up).
+    const entries = names.map((n) => cache.files[files.find((f) => f.name === n)!.hash]!);
+    const draw =
+      row.status === 'purchased' &&
+      entries.some((e) => !e.drawn) &&
+      random() < (options.sample ?? 0.1);
+    for (const e of entries) e.drawn = true;
+    const why = flags.length ? flags.join(', ') : draw ? 'random check' : null;
     if (!why) continue;
     // The whole file is read again: every purchase in it goes along.
     for (const n of names) queued.add(n);
     again.push({ names, why });
   }
+  await options.saveCache?.(cache);
   for (let i = 0; i < again.length;) {
     const batch: typeof again = [];
     while (i < again.length && batch.flatMap((b) => b.names).length < 4) batch.push(again[i++]!);
@@ -665,7 +718,43 @@ export async function readPurchases(
     await store(await call('sonnet', names, { rows: hintRows, flags }), 'sonnet', batch);
   }
 
-  const { rows, merged, pairs } = assemble();
+  // Look-alikes the model never saw together (different batches): asked about as text only.
+  const cache_pairs = (cache.pairs ??= {});
+  const pairKey = (a: ExtractedRow, b: ExtractedRow) =>
+    [a, b]
+      .map((r) => `${r.file}|${r.title}|${r.priceJpy}`)
+      .sort()
+      .join(' || ');
+  const open = assemble().pairs.filter(([a, b]) => !cache_pairs[pairKey(a, b)]);
+  if (open.length) {
+    log(`Haiku comparing ${open.length} look-alike pair(s) across files`);
+    const view = (r: ExtractedRow) => ({
+      file: r.file,
+      title: r.title,
+      priceJpy: r.priceJpy,
+      quantity: r.quantity,
+      date: r.dateApprox ? null : r.date,
+      orderId: r.orderId,
+    });
+    const r = await ask<{ pairs: { pair: number; same: boolean; confidence: number }[] }>({
+      model: 'haiku',
+      system: EXTRACT_SYSTEM,
+      prompt: `Each pair below is two rows read from different files of a collector's purchase history (e.g. a listing page with the full title, and a transaction or order page with the date, order ID and a cut-off title). For each pair: is it one and the same purchase? Answer same (true/false) and confidence (0 to 1). Titles cut short ("…", "...") count as matching when one starts like the other; a different order ID or order date means different purchases. A quantity may differ: an order page often shows 1 for a set the listing calls "2枚" or "N個セット".\n\n${JSON.stringify(open.map(([a, b], i) => ({ pair: i + 1, a: view(a), b: view(b) })))}`,
+      schema: PAIRS_SCHEMA,
+    });
+    result.calls.push({ model: r.modelName, costUsd: r.costUsd, tokens: r.tokens });
+    result.costUsd += r.costUsd;
+    for (const answer of r.output.pairs) {
+      const pair = open[answer.pair - 1];
+      if (pair)
+        cache_pairs[pairKey(...pair)] = { same: answer.same, confidence: answer.confidence };
+    }
+    await options.saveCache?.(cache);
+  }
+  const { rows, merged, pairs } = mergeRows(
+    files.flatMap((f) => cache.files[f.hash]!.rows),
+    (a, b) => cache_pairs[pairKey(a, b)] ?? null,
+  );
   result.merged = merged;
   for (const row of rows) {
     const flags = checkRow(row, ctx);

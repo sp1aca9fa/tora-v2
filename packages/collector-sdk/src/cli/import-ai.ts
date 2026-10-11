@@ -42,14 +42,14 @@ let dir: string;
 let names: string[];
 if (paths.length === 1 && (await stat(paths[0]!)).isDirectory()) {
   dir = paths[0]!;
-  names = (await readdir(dir)).filter((f) => FILE_TYPES.test(f)).sort();
+  names = (await readdir(dir)).filter((f) => FILE_TYPES.test(f) && !f.startsWith('.')).sort();
 } else {
   dir = dirname(paths[0]!);
   if (paths.some((p) => dirname(p) !== dir)) {
     console.error('Put the files in one folder (or pass the folder).');
     process.exit(1);
   }
-  names = paths.map((p) => basename(p)).filter((f) => FILE_TYPES.test(f));
+  names = paths.map((p) => basename(p)).filter((f) => FILE_TYPES.test(f) && !f.startsWith('.'));
 }
 if (names.length === 0) {
   console.error(`No screenshots, PDFs or text files in ${dir}.`);
