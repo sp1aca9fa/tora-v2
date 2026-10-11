@@ -10,7 +10,7 @@ import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
-import { claudeJudge } from '../claude-judge';
+import { claudeJudge } from '../claude';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
 

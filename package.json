@@ -22,6 +22,7 @@
     "collect": "pnpm --filter @tora/collector-sdk collect",
     "purchases": "pnpm --silent --filter @tora/collector-sdk purchases",
     "review": "pnpm --silent --filter @tora/collector-sdk review",
+    "import-ai": "pnpm --silent --filter @tora/collector-sdk import-ai",
     "user": "pnpm --silent --filter @tora/db user",
     "catalog:fetch": "pnpm --filter @tora/catalog run fetch",
     "catalog:sync": "pnpm --filter @tora/db catalog:sync",

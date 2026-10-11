@@ -99,6 +99,11 @@ export interface PurchaseReceipt {
   photo?: string | null;
   /** The date is approximate (e.g. read from the listing, not a receipt): checked in review. */
   dateApprox?: boolean;
+  /**
+   * The source showed no order ID: `orderId` is only a key for this import and is not stored.
+   * Such a purchase is recognised again only by product, price and date (as a likely match).
+   */
+  noOrderId?: boolean;
 }
 
 /** What a pasted purchase link turned out to be. */

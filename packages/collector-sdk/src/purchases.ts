@@ -244,7 +244,11 @@ export async function planImport(
       continue;
     }
 
-    const listingProduct = listed(receipt)?.id;
+    const resolved = await productRef(receipt);
+    // The product the receipt is (its listing's, or the one its details resolve to).
+    const listingProduct =
+      listed(receipt)?.id ??
+      (resolved && 'existing' in resolved.ref ? resolved.ref.existing.id : null);
     const likely = owned
       .filter(
         ({ holding, product }) =>
@@ -265,7 +269,6 @@ export async function planImport(
           daysApart(a.holding.acquiredAt, receipt.orderedAt) -
             daysApart(b.holding.acquiredAt, receipt.orderedAt),
       )[0];
-    const resolved = await productRef(receipt);
     if (likely) {
       claimed.add(likely.holding.id);
       entries.push({
@@ -339,7 +342,7 @@ export async function applyImport(
         acquiredAt: receipt.orderedAt,
         acquiredFrom: importer.label,
         acquisitionType: 'purchase',
-        orderId: receipt.orderId,
+        orderId: receipt.noOrderId ? null : receipt.orderId,
         ...importer.holdingFor?.(receipt, shape),
         // Grade, cert and packaging are checked in the app's import review.
         reviewPending: true,
@@ -381,6 +384,8 @@ export async function applyImport(
         }
         await editHolding(db, userId, entry.existing[0]!.id, edit);
         outcome.updated++;
+      } else if (entry.type === 'likely' && decision === 'same' && receipt.noOrderId) {
+        // Nothing to attach: the entry already stands for this purchase.
       } else if (entry.type === 'likely' && decision === 'same') {
         const from = entry.existing.acquiredFrom;
         await editHolding(db, userId, entry.existing.id, {

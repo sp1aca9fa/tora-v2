@@ -28,6 +28,7 @@ export default async function ImportsPage() {
   const failed = links.filter((l) => l.status === 'failed');
   const others = links.filter((l) => l.status !== 'failed');
   const lastEmail = runs.find((r) => r.method === 'email');
+  const lastAi = runs.find((r) => r.method === 'claude');
   const countsText = (counts: Record<string, number>) =>
     Object.entries(counts)
       .map(([k, n]) =>
@@ -160,6 +161,19 @@ export default async function ImportsPage() {
             {lastEmail
               ? t('imports.hub.emailLast', { date: dateTime(lastEmail.startedAt) })
               : t('imports.hub.emailNever')}
+          </p>
+        </div>
+
+        <div className="space-y-2 rounded-xl border bg-card px-4 py-3">
+          <h3 className="font-medium">{t('imports.hub.aiTitle')}</h3>
+          <p className="text-sm text-muted-foreground">{t('imports.hub.aiIntro')}</p>
+          <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">
+            pnpm import-ai &lt;folder&gt; --user {user.username}
+          </pre>
+          <p className="text-xs text-muted-foreground">
+            {lastAi
+              ? t('imports.hub.aiLast', { date: dateTime(lastAi.startedAt) })
+              : t('imports.hub.aiNever')}
           </p>
         </div>
       </section>

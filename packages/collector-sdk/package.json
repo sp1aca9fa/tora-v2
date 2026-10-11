@@ -11,7 +11,8 @@
     "typecheck": "tsc -p .",
     "collect": "tsx src/cli/collect.ts",
     "purchases": "tsx src/cli/purchases.ts",
-    "review": "tsx src/cli/review.ts"
+    "review": "tsx src/cli/review.ts",
+    "import-ai": "tsx src/cli/import-ai.ts"
   },
   "dependencies": {
     "@tora/core": "workspace:*",

@@ -1,0 +1,533 @@
+// Import purchases from any shop through Claude (requirements S4c). The user drops what they have
+// (screenshots of an order list, PDFs, CSV or copied text) in a folder; Haiku reads the files and
+// lists every purchase, matched to the user's products or described as a new one. The code then
+// checks each row with signals it computes itself (missing price or date, a product match the
+// title does not support, a price far from the product's value, the model saying it is unsure),
+// and Sonnet reads again the files with flagged rows. What remains goes through the same import
+// plan as receipt emails and lands in Review import.
+import { createHash } from 'node:crypto';
+import {
+  type Category,
+  type Grader,
+  GRADERS,
+  PRODUCT_KINDS,
+  type ProductKind,
+  REGIONS,
+  type Region,
+} from '@tora/core';
+import { type Db, type Product, type ProductInput, holdingsWithProducts, schema } from '@tora/db';
+import { desc, eq } from 'drizzle-orm';
+import type { ClaudeResult, ModelAlias } from './claude';
+import { termCoverage } from './match';
+import type { PurchaseImporter, PurchaseReceipt } from './types';
+
+export const FILE_TYPES = /\.(png|jpe?g|webp|gif|pdf|txt|csv|tsv|html?|md|json|eml)$/i;
+/** Files per Haiku call (each image is read with the Read tool). */
+export const BATCH = 6;
+
+export interface ExtractedRow {
+  file: string;
+  shop: string;
+  orderId: string | null;
+  title: string;
+  url: string | null;
+  /** Total paid for this item (shipping and fees included when shown). */
+  priceJpy: number | null;
+  quantity: number;
+  /** YYYY-MM-DD */
+  date: string | null;
+  dateApprox: boolean;
+  status: 'purchased' | 'cancelled' | 'not_purchase';
+  collectible: boolean;
+  /** An existing product of the user's (from the list given to the model). */
+  productId: string | null;
+  product: NewProduct | null;
+  /** "PSA 10" when the item is a graded slab. */
+  gradedAs: string | null;
+  sealedState: 'shrink' | 'no_shrink' | null;
+  unsure: string | null;
+}
+
+interface NewProduct {
+  category: Category;
+  kind: ProductKind;
+  name: string;
+  franchise: string | null;
+  setName: string | null;
+  setCode: string | null;
+  cardNumber: string | null;
+  rarity: string | null;
+  platform: string | null;
+  region: string | null;
+}
+
+const str = { type: ['string', 'null'] };
+export const ROWS_SCHEMA = {
+  type: 'object',
+  properties: {
+    rows: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          file: { type: 'string' },
+          shop: { type: 'string' },
+          orderId: str,
+          title: { type: 'string' },
+          url: str,
+          priceJpy: { type: ['number', 'null'] },
+          quantity: { type: 'integer' },
+          date: str,
+          dateApprox: { type: 'boolean' },
+          status: { type: 'string', enum: ['purchased', 'cancelled', 'not_purchase'] },
+          collectible: { type: 'boolean' },
+          productId: str,
+          product: {
+            type: ['object', 'null'],
+            properties: {
+              category: { type: 'string', enum: ['tcg', 'game'] },
+              kind: { type: 'string', enum: [...PRODUCT_KINDS] },
+              name: { type: 'string' },
+              franchise: str,
+              setName: str,
+              setCode: str,
+              cardNumber: str,
+              rarity: str,
+              platform: str,
+              region: str,
+            },
+            required: ['category', 'kind', 'name'],
+          },
+          gradedAs: str,
+          sealedState: { type: ['string', 'null'], enum: ['shrink', 'no_shrink', null] },
+          unsure: str,
+        },
+        required: [
+          'file',
+          'shop',
+          'orderId',
+          'title',
+          'priceJpy',
+          'quantity',
+          'date',
+          'dateApprox',
+          'status',
+          'collectible',
+          'productId',
+          'product',
+          'unsure',
+        ],
+      },
+    },
+  },
+  required: ['rows'],
+};
+
+export const EXTRACT_SYSTEM = `You read a collector's purchase history from Japanese shops (screenshots of order lists or order pages, PDFs, CSV or copied text) and list every item they bought, as JSON. You never invent data: a field that is not shown is null.`;
+
+export function extractPrompt(
+  files: string[],
+  products: ProductLine[],
+  hints?: { rows: ExtractedRow[]; flags: Record<string, string[]> },
+): string {
+  return `Open each of these files with the Read tool (they are in the current folder) and list every item bought in them:
+${files.map((f) => `- ${f}`).join('\n')}
+
+One row per distinct item in an order (several copies of the same item: one row with quantity). For each row:
+- file: the file it is in.
+- shop: mercari, amazon, yahoo (ヤフオク / Yahoo!フリマ), snkrdunk, surugaya, or the shop's name in lowercase.
+- orderId: exactly as shown (Mercari 商品ID like m12345678901 or 取引ID; Amazon 注文番号 like 503-1234567-1234567); null when none is shown.
+- title: the item's title as shown. url: when shown.
+- priceJpy: what was paid for this item, shipping and fees included when the page shows them; the item price when that is all there is. Several items in one Amazon order: each item's own price.
+- quantity: number of copies (1 unless shown).
+- date: the order / purchase date as YYYY-MM-DD. Year missing or only a relative date ("3日前"): your best guess with dateApprox true. Not shown at all: null.
+- status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
+- collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures; false for anything else.
+- productId: when the item is clearly one of the user's products listed below (same card name and number, same box or set, same game and platform), its id; else null.
+- product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind; name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region "jp" unless it says English / overseas (英語版, 海外版). Null for non-collectibles.
+- gradedAs: "PSA 10" (grader and grade) when the item is a graded slab; else null.
+- sealedState: for sealed boxes and packs, "shrink" or "no_shrink" when the title says (シュリンク付き / シュリンクなし); else null.
+- unsure: null, or a short reason when any field is a guess.
+
+The user's products:
+${JSON.stringify(products)}
+${
+  hints
+    ? `
+A first reading of these files, with the problems the checks found (fix them; keep what is right):
+${JSON.stringify(hints)}
+`
+    : ''
+}`;
+}
+
+/** What the model sees of a product to match against. */
+export interface ProductLine {
+  id: string;
+  name: string;
+  kind: string;
+  setCode: string | null;
+  cardNumber: string | null;
+  rarity: string | null;
+  platform: string | null;
+}
+
+export const productLine = (p: Product): ProductLine => ({
+  id: p.id,
+  name: p.name,
+  kind: p.kind,
+  setCode: p.setCode,
+  cardNumber: p.cardNumber,
+  rarity: p.rarity,
+  platform: p.platform,
+});
+
+export const fileHash = (content: Buffer) =>
+  createHash('sha256').update(content).digest('hex').slice(0, 32);
+
+// ---------------------------------------------------------------------------------------------
+// Checks the code computes (not the model's own confidence)
+
+export type RowFlag =
+  | 'unsure'
+  | 'no_price'
+  | 'no_date'
+  | 'odd_quantity'
+  | 'unknown_product'
+  | 'weak_match'
+  | 'maybe_registered'
+  | 'price_far';
+
+export interface CheckContext {
+  products: Map<string, Product>;
+  /** Unit value of each product the user holds (latest snapshot), for "price far from value". */
+  unitValue: Map<string, number>;
+}
+
+const fold = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+
+export function checkRow(row: ExtractedRow, ctx: CheckContext): RowFlag[] {
+  if (row.status !== 'purchased' || !row.collectible) return [];
+  const flags: RowFlag[] = [];
+  if (row.unsure) flags.push('unsure');
+  if (!row.priceJpy || row.priceJpy <= 0) flags.push('no_price');
+  if (!row.date || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) flags.push('no_date');
+  if (!Number.isInteger(row.quantity) || row.quantity < 1 || row.quantity > 20) {
+    flags.push('odd_quantity');
+  }
+  const product = row.productId ? ctx.products.get(row.productId) : null;
+  if (row.productId && !product) flags.push('unknown_product');
+  if (!row.productId && !row.product?.name) flags.push('unknown_product');
+  if (product) {
+    // The title has to carry the product's name (or its card number).
+    const coverage = Math.max(
+      termCoverage([product.name], row.title),
+      product.cardNumber ? termCoverage([product.cardNumber], row.title) : 0,
+    );
+    if (coverage < 0.5) flags.push('weak_match');
+    const value = ctx.unitValue.get(product.id);
+    const unit = row.priceJpy && row.quantity ? row.priceJpy / row.quantity : null;
+    if (value && unit && (unit > value * 3 || unit < value / 3)) flags.push('price_far');
+  }
+  if (!product && row.product?.name) {
+    // A new product named like one the user has: the match may have been missed.
+    const name = fold(row.product.name);
+    const near = [...ctx.products.values()].some(
+      (p) => p.kind === row.product!.kind && (fold(p.name) === name || fold(p.name).includes(name)),
+    );
+    if (near) flags.push('maybe_registered');
+  }
+  return flags;
+}
+
+export async function checkContext(db: Db, userId: string): Promise<CheckContext> {
+  const owned = await holdingsWithProducts(db, userId);
+  const products = new Map(owned.map(({ product }) => [product.id, product]));
+  const unitValue = new Map<string, number>();
+  const [latest] = await db
+    .select({ date: schema.valuationSnapshots.date })
+    .from(schema.valuationSnapshots)
+    .orderBy(desc(schema.valuationSnapshots.date))
+    .limit(1);
+  if (latest) {
+    const rows = await db
+      .select({
+        holdingId: schema.valuationSnapshots.holdingId,
+        value: schema.valuationSnapshots.valueJpy,
+      })
+      .from(schema.valuationSnapshots)
+      .where(eq(schema.valuationSnapshots.date, latest.date));
+    const byHolding = new Map(owned.map((o) => [o.holding.id, o]));
+    for (const r of rows) {
+      const o = byHolding.get(r.holdingId);
+      if (o && r.value && o.holding.quantity) {
+        unitValue.set(o.product.id, Math.round(r.value / o.holding.quantity));
+      }
+    }
+  }
+  return { products, unitValue };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rows -> the import plan
+
+const SHOP_LABELS: Record<string, string> = {
+  mercari: 'Mercari',
+  amazon: 'Amazon',
+  yahoo: 'Yahoo',
+  snkrdunk: 'SNKRDUNK',
+  surugaya: '駿河屋',
+};
+
+export function shopKey(shop: string): string {
+  const s = shop.normalize('NFKC').toLowerCase().trim();
+  if (/mercari|メルカリ/.test(s)) return 'mercari';
+  if (/amazon|アマゾン/.test(s)) return 'amazon';
+  if (/yahoo|ヤフ|paypay/.test(s)) return 'yahoo';
+  if (/snkrdunk|スニダン|スニーカーダンク/.test(s)) return 'snkrdunk';
+  if (/surugaya|駿河屋/.test(s)) return 'surugaya';
+  return s.replace(/\s+/g, '_') || 'other';
+}
+
+/** The rows that become purchases, each with the key the plan knows it by. */
+export interface ImportRow {
+  row: ExtractedRow;
+  flags: RowFlag[];
+  receipt: PurchaseReceipt;
+  /** Read again by Sonnet (and why). */
+  reviewedBy: string | null;
+}
+
+export function toReceipts(
+  rows: { row: ExtractedRow; flags: RowFlag[]; reviewedBy: string | null }[],
+  fallbackDate: (file: string) => string,
+): ImportRow[] {
+  // Several items of one order share its ID: each gets its own key ("<order>#2").
+  const perOrder = new Map<string, number>();
+  for (const { row } of rows) {
+    if (row.orderId) perOrder.set(row.orderId, (perOrder.get(row.orderId) ?? 0) + 1);
+  }
+  const seen = new Map<string, number>();
+  return rows.map(({ row, flags, reviewedBy }) => {
+    let orderId = row.orderId?.trim() || null;
+    if (orderId && (perOrder.get(orderId) ?? 0) > 1) {
+      const n = (seen.get(orderId) ?? 0) + 1;
+      seen.set(orderId, n);
+      orderId = `${orderId}#${n}`;
+    }
+    const date = row.date && /^\d{4}-\d{2}-\d{2}$/.test(row.date) ? row.date : null;
+    const key =
+      orderId ??
+      `~${createHash('sha256')
+        .update([row.file, row.title, row.priceJpy, row.date].join('|'))
+        .digest('hex')
+        .slice(0, 16)}`;
+    const receipt: PurchaseReceipt = {
+      orderId: key,
+      noOrderId: !orderId,
+      // Noon in Tokyo: a date alone, never shifted to the day before.
+      orderedAt: date ? `${date}T12:00:00.000+09:00` : fallbackDate(row.file),
+      title: row.title,
+      quantity: row.quantity >= 1 && row.quantity <= 100 ? row.quantity : 1,
+      totalJpy: Math.round(row.priceJpy ?? 0),
+      listing: null,
+      dateApprox: row.dateApprox || !date,
+    };
+    return { row, flags, receipt, reviewedBy };
+  });
+}
+
+function gradeOf(text: string | null): { grader: Grader; grade: string } | null {
+  const m = text?.normalize('NFKC').match(/\b([A-Za-z]{3})\s*(10|9\.5|9|8\.5|8|7|6|5|4|3|2|1)\b/);
+  const grader = m?.[1]?.toUpperCase() as Grader | undefined;
+  return grader && (GRADERS as readonly string[]).includes(grader)
+    ? { grader, grade: m![2]! }
+    : null;
+}
+
+/** A purchase importer for one shop, built from the rows Claude read. */
+export function aiImporter(
+  shop: string,
+  rows: ImportRow[],
+  products: Map<string, Product>,
+): PurchaseImporter {
+  const byKey = new Map(rows.map((r) => [r.receipt.orderId, r.row]));
+  return {
+    source: shop,
+    label: SHOP_LABELS[shop] ?? shop,
+    productFor: (receipt) => {
+      const row = byKey.get(receipt.orderId);
+      if (!row) return null;
+      const existing = row.productId ? products.get(row.productId) : null;
+      // An existing product: its own identity, which the plan finds again.
+      if (existing) {
+        return {
+          category: existing.category,
+          kind: existing.kind,
+          name: existing.name,
+          setCode: existing.setCode,
+          cardNumber: existing.cardNumber,
+        } as ProductInput;
+      }
+      const p = row.product;
+      if (!p?.name) return null;
+      return {
+        category: p.category,
+        kind: p.kind,
+        name: p.name.trim(),
+        franchise: p.franchise,
+        setName: p.setName,
+        setCode: p.setCode,
+        cardNumber: p.cardNumber,
+        rarity: p.rarity,
+        platform: p.platform,
+        region: (REGIONS as readonly string[]).includes(p.region ?? '')
+          ? (p.region as Region)
+          : 'jp',
+      };
+    },
+    holdingFor: (receipt) => {
+      const row = byKey.get(receipt.orderId);
+      const graded = gradeOf(row?.gradedAs ?? null);
+      if (graded) return { grading: 'graded', ...graded };
+      if (row?.sealedState) {
+        return {
+          packagingState: row.sealedState === 'shrink' ? 'sealed_shrink' : 'sealed_no_shrink',
+        };
+      }
+      return {};
+    },
+  };
+}
+
+/** Review reasons the app explains, from the flags left after Sonnet. */
+export function reviewReasons(flags: RowFlag[]): string[] {
+  const reasons = new Set<string>();
+  for (const f of flags) {
+    if (f === 'price_far') reasons.add('price_far');
+    else if (f === 'weak_match' || f === 'maybe_registered') reasons.add('check_product');
+    else if (f === 'no_date')
+      continue; // date_approx says it
+    else reasons.add('ai_unsure');
+  }
+  return [...reasons];
+}
+
+export type AskClaude = <T>(options: {
+  model: ModelAlias;
+  system: string;
+  prompt: string;
+  schema: object;
+  readDir?: string;
+}) => Promise<ClaudeResult<T>>;
+
+export interface ReadCache {
+  version: 1;
+  files: Record<string, { name: string; model: ModelAlias; rows: ExtractedRow[] }>;
+}
+
+export interface ReadResult {
+  rows: { row: ExtractedRow; flags: RowFlag[]; reviewedBy: string | null }[];
+  files: number;
+  /** Files Sonnet read again, with why. */
+  reviewed: { file: string; why: string }[];
+  calls: { model: string; costUsd: number; tokens: number }[];
+  costUsd: number;
+}
+
+/**
+ * Reads the files (Haiku), checks every row, and has Sonnet read again the files with flagged
+ * rows plus a random sample of the others. Results are cached per file content in the folder
+ * (\`.tora-import.json\`), so running again only reads new files.
+ */
+export async function readPurchases(
+  ctx: CheckContext,
+  dir: string,
+  files: { name: string; hash: string }[],
+  ask: AskClaude,
+  options: {
+    sample?: number;
+    log?: (m: string) => void;
+    loadCache?: () => Promise<ReadCache | null>;
+    saveCache?: (cache: ReadCache) => Promise<void>;
+    random?: () => number;
+  } = {},
+): Promise<ReadResult> {
+  const log = options.log ?? (() => {});
+  const random = options.random ?? Math.random;
+  const cache: ReadCache = (await options.loadCache?.()) ?? { version: 1, files: {} };
+  const result: ReadResult = { rows: [], files: files.length, reviewed: [], calls: [], costUsd: 0 };
+  const products = [...ctx.products.values()].map(productLine);
+  const call = async (
+    model: ModelAlias,
+    batch: string[],
+    hints?: Parameters<typeof extractPrompt>[2],
+  ) => {
+    const r = await ask<{ rows: ExtractedRow[] }>({
+      model,
+      system: EXTRACT_SYSTEM,
+      prompt: extractPrompt(batch, products, hints),
+      schema: ROWS_SCHEMA,
+      readDir: dir,
+    });
+    result.calls.push({ model: r.modelName, costUsd: r.costUsd, tokens: r.tokens });
+    result.costUsd += r.costUsd;
+    // Rows go to the file they name (a lone file takes them all).
+    const out = new Map<string, ExtractedRow[]>(batch.map((f) => [f, []]));
+    for (const row of r.output.rows) {
+      const file =
+        batch.length === 1 ? batch[0]! : batch.find((f) => f === row.file || f.endsWith(row.file));
+      if (file) out.get(file)!.push({ ...row, file });
+    }
+    return out;
+  };
+  const store = async (byFile: Map<string, ExtractedRow[]>, model: ModelAlias) => {
+    for (const [name, rows] of byFile) {
+      const hash = files.find((f) => f.name === name)!.hash;
+      cache.files[hash] = { name, model, rows };
+    }
+    await options.saveCache?.(cache);
+  };
+
+  const unread = files.filter((f) => !cache.files[f.hash]);
+  for (let i = 0; i < unread.length; i += BATCH) {
+    const batch = unread.slice(i, i + BATCH).map((f) => f.name);
+    log(`Haiku reading ${batch.length} file(s): ${batch.join(', ')}`);
+    await store(await call('haiku', batch), 'haiku');
+  }
+
+  // Files with flagged rows (and a sample of the rest) are read again by Sonnet.
+  const again: { name: string; why: string }[] = [];
+  for (const f of files) {
+    const entry = cache.files[f.hash]!;
+    if (entry.model === 'sonnet') continue;
+    const flags = [...new Set(entry.rows.flatMap((r) => checkRow(r, ctx)))];
+    if (flags.length) again.push({ name: f.name, why: flags.join(', ') });
+    else if (entry.rows.length && random() < (options.sample ?? 0.1)) {
+      again.push({ name: f.name, why: 'random check' });
+    }
+  }
+  for (let i = 0; i < again.length; i += 3) {
+    const batch = again.slice(i, i + 3);
+    const names = batch.map((b) => b.name);
+    const hintRows = names.flatMap((n) => cache.files[files.find((f) => f.name === n)!.hash]!.rows);
+    const flags = Object.fromEntries(
+      hintRows.map((r, j) => [`${r.file} row ${j + 1}: ${r.title}`, checkRow(r, ctx)]),
+    );
+    log(`Sonnet reading again: ${batch.map((b) => `${b.name} (${b.why})`).join(', ')}`);
+    await store(await call('sonnet', names, { rows: hintRows, flags }), 'sonnet');
+    result.reviewed.push(...batch.map((b) => ({ file: b.name, why: b.why })));
+  }
+
+  const reviewedWhy = new Map(result.reviewed.map((r) => [r.file, r.why]));
+  for (const f of files) {
+    for (const row of cache.files[f.hash]!.rows) {
+      result.rows.push({
+        row,
+        flags: checkRow(row, ctx),
+        reviewedBy: reviewedWhy.get(f.name) ?? null,
+      });
+    }
+  }
+  return result;
+}

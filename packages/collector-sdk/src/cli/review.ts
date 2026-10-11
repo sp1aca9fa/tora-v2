@@ -7,7 +7,7 @@ import { createDb, getUserByUsername, listUsers } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
-import { claudeJudge } from '../claude-judge';
+import { claudeJudge } from '../claude';
 import { reviewUsers } from './review-run';
 
 const { values } = parseArgs({

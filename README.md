@@ -189,6 +189,25 @@ the importer whose `matchesLink` accepts it (`readLink`), imports it the same wa
 happened next to each link (imported, matched an entry you added by hand, already registered,
 skipped with the reason, failed).
 
+### Import through Claude (any shop)
+
+For shops without an importer: put what you have (screenshots of the order list or order pages,
+PDFs, CSV, copied text) in one folder and run, on the home PC:
+
+```bash
+pnpm import-ai <folder> --user <username> [--dry-run] [--yes]   # Windows paths work too
+```
+
+Haiku reads the files (`claude -p` with only the Read tool, confined to that folder) and lists
+every purchase, matched to your items or as a new one. The code checks each row (missing price or
+date, a match the title does not support, a price far from the item's value, the model unsure),
+and Sonnet reads again the files with flagged rows plus a 10 % sample (`--sample`). The plan is
+the same as for order emails: already registered purchases are recognised (by order ID, or by
+item, price and date when there is none), non-collectibles and cancelled orders are left out, and
+nothing is written before you confirm. New lots wait in **Imports > Review**; failed Mercari links
+whose item it imported are marked as resolved. Readings are cached in the folder
+(`.tora-import.json`), so running again only reads new files.
+
 ### Data review
 
 The checks flag sales far from an item's value and searches that keep little of what they find.

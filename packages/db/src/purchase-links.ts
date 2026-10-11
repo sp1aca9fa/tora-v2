@@ -118,11 +118,12 @@ export async function resolvePurchaseLink(
   userId: string,
   id: string,
   holdingId: string,
+  message = 'Added by hand.',
 ): Promise<void> {
   const now = toTokyoIso();
   await db
     .update(purchaseLinks)
-    .set({ status: 'matched', message: 'Added by hand.', holdingId, updatedAt: now })
+    .set({ status: 'matched', message, holdingId, updatedAt: now })
     .where(
       and(
         eq(purchaseLinks.id, id),

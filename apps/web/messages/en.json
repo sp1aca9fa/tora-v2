@@ -499,7 +499,10 @@
       "deadline_missed": "The seller missed the shipping deadline: if you cancelled this order, tick the box below.",
       "no_delivery": "Some purchases of this item have no delivery email: if this was one you cancelled, tick the box below.",
       "date_approx": "Date read from the listing (its last update, usually a few days after the purchase): correct it if you know the day.",
-      "new_product": "New item made from the listing title: check its name and details on its page."
+      "new_product": "New item made from the listing title: check its name and details on its page.",
+      "price_far": "The price is far from what this item sells for: check the item and the price.",
+      "check_product": "Claude matched this to an item the title may not support (or to a new one named like an item you have): check which item it is.",
+      "ai_unsure": "Claude was not sure about part of this row (read from your files): check the details."
     },
     "purchasedOn": "Purchased on",
     "links": {
@@ -560,7 +563,11 @@
         "cancelled": "{count, plural, one {# cancelled} other {# cancelled}}",
         "unclassified": "{count, plural, one {# unclassified} other {# unclassified}}",
         "left": "{count, plural, one {# left for next time} other {# left for next time}}"
-      }
+      },
+      "aiTitle": "Through Claude (any shop)",
+      "aiIntro": "Screenshots of order lists or order pages, PDFs, CSV or copied text from any shop: put them in one folder and run this on the home PC. Haiku reads them, Sonnet reads again what looks off, and everything lands here to review.",
+      "aiLast": "Last import through Claude: {date}",
+      "aiNever": "No import through Claude yet."
     }
   },
   "product": {
