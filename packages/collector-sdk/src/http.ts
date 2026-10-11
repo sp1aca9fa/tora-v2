@@ -3,7 +3,11 @@
 
 /** The site refused us (403/429/captcha): stop this source for the run, do not retry. */
 export class BlockedError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** Start of the response body, for APIs that also answer 403 for other reasons. */
+    readonly body: string = '',
+  ) {
     super(message);
     this.name = 'BlockedError';
   }
@@ -121,7 +125,8 @@ export class PoliteHttp {
         headers: { ...BROWSER_HEADERS, ...headers },
       });
       if (res.status === 403 || res.status === 429) {
-        throw new BlockedError(`HTTP ${res.status} for ${url}`);
+        const body = await res.text().catch(() => '');
+        throw new BlockedError(`HTTP ${res.status} for ${url}`, body.slice(0, 500));
       }
       if (res.status >= 500 && attempt < this.o.retries) {
         await this.o.sleep(2 ** attempt * 5000);
