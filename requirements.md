@@ -23,7 +23,7 @@
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
 | S5d | Imports hub: one Imports menu for every import, its results and follow-ups | built; awaiting user check |
 | S4d | Automated data review: cheap model checks flagged data, suggestions queue | built; awaiting user check |
-| S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | built; awaiting user's real files |
+| S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | built; first real import done (39 Mercari screenshots) |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
