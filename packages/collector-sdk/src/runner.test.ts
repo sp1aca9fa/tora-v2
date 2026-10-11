@@ -239,7 +239,10 @@ it('replaces auto-made queries of an older version, but keeps edited ones', asyn
       packagingState: 'sealed_shrink',
     },
   );
-  await createQuerySource(db, a.product.id, 'fake', { keywords: ['old'] });
+  await createQuerySource(db, a.product.id, 'fake', {
+    keywords: ['old'],
+    extra: { references: ['https://x/1'] },
+  });
   await createQuerySource(db, b.product.id, 'fake', {
     keywords: ['mine'],
     extra: { edited: true },
@@ -255,5 +258,8 @@ it('replaces auto-made queries of an older version, but keeps edited ones', asyn
   });
   await runCollector(db, collector, { ...quiet, collectOnly: true });
   expect(seen.get(a.product.id)).toEqual(['new BP BOX']);
+  // What the user added to the old query stays.
+  const [upgraded] = await listProductSources(db, a.product.id);
+  expect(upgraded?.query?.extra).toMatchObject({ references: ['https://x/1'], v: 2 });
   expect(seen.get(b.product.id)).toEqual(['mine']);
 });

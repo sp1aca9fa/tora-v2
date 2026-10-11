@@ -398,7 +398,15 @@
       "save": "Save search",
       "saved": "Saved. The next collect searches again with it.",
       "excludeWords": "Excluded words",
-      "used": "Sales used"
+      "used": "Sales used",
+      "references": "Listings you added ({count})",
+      "referenceUrl": "Listing link",
+      "addReference": "Add",
+      "referenceHint": "Paste a link to a listing of this exact item. A sold one counts as a price; any listing teaches the search the words, category and photo sellers use. Read on the next collect.",
+      "sold": "sold",
+      "forSale": "for sale",
+      "readNext": "Read on the next collect",
+      "remove": "Remove"
     }
   },
   "valuation": {

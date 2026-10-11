@@ -5,10 +5,19 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { addPull, createHolding, createProduct, mergeProducts } from './mutations';
-import { collectorRuns, holdings, productSources, products } from './schema';
+import { collectorRuns, holdings, priceObservations, productSources, products } from './schema';
 import { linkedListingImages, saveProductImage } from './images';
 import { cardNumberKey, suggestFromKnownProducts } from './similar';
-import { linkSource, listPendingCandidates, rejectCandidate, startRun } from './sources';
+import {
+  createQuerySource,
+  insertObservations,
+  linkSource,
+  listPendingCandidates,
+  listProductSources,
+  rejectCandidate,
+  setSourceReferences,
+  startRun,
+} from './sources';
 import { createUser } from './users';
 
 let db: Db;
@@ -165,4 +174,29 @@ it('finds the stored picture of the product already linked to a listing', async 
   ]);
   expect([...images.keys()]).toEqual(['snkrdunk|777']);
   expect(images.get('snkrdunk|777')?.productId).toBe(linked.id);
+});
+
+it('pasted sales are included even when stored excluded before; references are kept in the query', async () => {
+  const p = await single('レトロ');
+  await createQuerySource(db, p.id, 'mercari', { keywords: ['x'] });
+  const [src] = await listProductSources(db, p.id);
+  await setSourceReferences(db, src!.id, ['https://jp.mercari.com/item/m1']);
+  expect((await listProductSources(db, p.id))[0]?.query?.extra).toMatchObject({
+    references: ['https://jp.mercari.com/item/m1'],
+  });
+  const row = {
+    productId: p.id,
+    source: 'mercari',
+    observationType: 'sold' as const,
+    bucket: 'cond:good',
+    priceJpy: 30000,
+    currency: 'JPY',
+    observedAt: at,
+    fetchedAt: at,
+    externalRef: 'm1',
+  };
+  await insertObservations(db, [{ ...row, excluded: true, excludedReason: 'mismatch' as const }]);
+  await insertObservations(db, [{ ...row, raw: { reference: true } }]);
+  const [obs] = await db.select().from(priceObservations);
+  expect(obs).toMatchObject({ excluded: false, excludedReason: null });
 });

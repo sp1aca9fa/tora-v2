@@ -5,7 +5,19 @@ import { Button } from '@/components/ui/button';
 import { sourceLabel } from '@/lib/product-display';
 import { cn, formatJpy } from '@/lib/utils';
 import { QueryForm } from './query-form';
-import { excludeObservationAction, unlinkSourceAction } from './source-actions';
+import { ReferenceForm } from './reference-form';
+import {
+  excludeObservationAction,
+  removeReferenceAction,
+  unlinkSourceAction,
+} from './source-actions';
+
+interface ReferenceInfo {
+  name: string;
+  price: number;
+  sold: boolean;
+  updated: number;
+}
 
 /**
  * A search-based source (e.g. Mercari): its query, and the latest sold items it found, with why
@@ -31,6 +43,12 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
     .filter((r) => r.v.method === 'median')
     .sort((a, b) => b.v.sampleSize - a.v.sampleSize);
   const query = link.query;
+  // Listing links the user added, with what the collector read from them (once).
+  const references = (query?.extra?.references as string[] | undefined) ?? [];
+  const read = ((link.state as { references?: Record<string, ReferenceInfo> } | null)?.references ??
+    {}) as Record<string, ReferenceInfo>;
+  const infoFor = (url: string) =>
+    Object.entries(read).find(([id]) => url.includes(id))?.[1] ?? null;
   const keptCount = sales.filter((s) => !s.excluded).length;
   return (
     <div className="space-y-3 rounded-md border p-3">
@@ -95,6 +113,46 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
           </table>
         </div>
       )}
+
+      <details className="text-sm" open={references.length > 0 || undefined}>
+        <summary className="cursor-pointer text-muted-foreground">
+          {t('sources.search.references', { count: references.length })}
+        </summary>
+        <div className="mt-2 space-y-2">
+          {references.length > 0 && (
+            <ul className="divide-y">
+              {references.map((url) => {
+                const info = infoFor(url);
+                return (
+                  <li key={url} className="flex items-center gap-3 py-1.5">
+                    <div className="min-w-0 flex-1 text-xs">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="line-clamp-1 hover:underline"
+                      >
+                        {info?.name ?? url}
+                      </a>
+                      <p className="text-muted-foreground">
+                        {info
+                          ? `${formatJpy(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
+                          : t('sources.search.readNext')}
+                      </p>
+                    </div>
+                    <form action={removeReferenceAction.bind(null, link.id, url)}>
+                      <Button variant="ghost" size="sm">
+                        {t('sources.search.remove')}
+                      </Button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <ReferenceForm sourceId={link.id} />
+        </div>
+      </details>
 
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">

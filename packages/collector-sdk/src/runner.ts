@@ -126,7 +126,14 @@ export async function runCollector(
             !extra?.edited &&
             (extra?.v ?? 1) < collector.queryVersion
           ) {
-            const query = collector.defaultQuery(product);
+            const fresh = collector.defaultQuery(product);
+            // Keep what the user added to the old query (e.g. pasted reference listings).
+            const {
+              auto: _auto,
+              v: _v,
+              ...kept
+            } = (link.query?.extra ?? {}) as Record<string, unknown>;
+            const query = fresh && { ...fresh, extra: { ...kept, ...fresh.extra } };
             if (query) {
               await updateSourceQuery(db, link.id, query);
               link = { ...link, query, state: null };

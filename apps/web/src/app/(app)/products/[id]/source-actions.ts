@@ -6,6 +6,7 @@ import {
   confirmCandidate,
   getObservation,
   reactivateSource,
+  setSourceReferences,
   setObservationExcluded,
   updateSourceQuery,
   getCandidate,
@@ -117,4 +118,36 @@ export async function excludeObservationAction(observationId: string, excluded: 
   if (obs && (await allowed(obs.productId)))
     await setObservationExcluded(db, observationId, excluded);
   revalidatePath(`/products/${obs?.productId}`);
+}
+
+/** Adds a listing link of this exact item to a search (read by the next collect). */
+export async function addReferenceAction(
+  sourceId: string,
+  _prev: QueryFormState,
+  formData: FormData,
+): Promise<QueryFormState> {
+  const { db } = await authed();
+  const link = await getProductSource(db, sourceId);
+  if (!link || !(await allowed(link.productId))) return { error: 'not_found' };
+  const url = String(formData.get('url') ?? '').trim();
+  if (!/^https:\/\/\S+$/.test(url) || url.length > 300) return { error: 'badSourceUrl' };
+  const references = (link.query?.extra?.references as string[] | undefined) ?? [];
+  if (!references.includes(url)) {
+    await setSourceReferences(db, sourceId, [...references, url].slice(-20));
+  }
+  revalidatePath(`/products/${link.productId}`);
+  return { saved: true };
+}
+
+export async function removeReferenceAction(sourceId: string, url: string) {
+  const { db } = await authed();
+  const link = await getProductSource(db, sourceId);
+  if (!link || !(await allowed(link.productId))) return;
+  const references = (link.query?.extra?.references as string[] | undefined) ?? [];
+  await setSourceReferences(
+    db,
+    sourceId,
+    references.filter((r) => r !== url),
+  );
+  revalidatePath(`/products/${link.productId}`);
 }

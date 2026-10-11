@@ -383,6 +383,20 @@ export async function activeSources(
 /** Inserts observations, skipping ones already stored (same source + external_ref). */
 export async function insertObservations(db: Db, rows: NewPriceObservation[]): Promise<number> {
   let added = 0;
+  // Sales the user vouched for (a pasted listing) are included even if stored excluded before.
+  const vouched = rows.filter((r) => (r.raw as { reference?: boolean } | null)?.reference);
+  for (const r of vouched) {
+    const inserted = await db
+      .insert(priceObservations)
+      .values(r)
+      .onConflictDoUpdate({
+        target: [priceObservations.source, priceObservations.externalRef],
+        set: { excluded: false, excludedReason: null, bucket: r.bucket, raw: r.raw },
+      })
+      .returning({ id: priceObservations.id });
+    added += inserted.length;
+  }
+  rows = rows.filter((r) => !vouched.includes(r));
   for (let i = 0; i < rows.length; i += 100) {
     const inserted = await db
       .insert(priceObservations)
@@ -768,4 +782,16 @@ export async function keptObservations(db: Db, productId: string, source: string
         gte(priceObservations.observedAt, toTokyoIso(new Date(Date.now() - days * 86_400_000))),
       ),
     );
+}
+
+/** Listing links the user added to a search-based source (kept in its query, not refetched). */
+export async function setSourceReferences(
+  db: Db,
+  sourceId: string,
+  references: string[],
+): Promise<void> {
+  const [link] = await db.select().from(productSources).where(eq(productSources.id, sourceId));
+  if (!link) return;
+  const query: SourceQuery = { ...link.query, extra: { ...link.query?.extra, references } };
+  await db.update(productSources).set({ query }).where(eq(productSources.id, sourceId));
 }
