@@ -48,6 +48,11 @@ export interface Collector {
    */
   defaultQuery?(product: Product): SourceQuery | null;
   /**
+   * Version of `defaultQuery`. Auto-made queries of an older version are regenerated on the next
+   * run; queries the user edited (`extra.edited`) are kept.
+   */
+  queryVersion?: number;
+  /**
    * Fetches new observations for a linked listing and saves them through `ctx.save`.
    * `heldBuckets`: the conditions users own of this product (e.g. `graded:PSA:10`), for sources
    * that only show a few trades per condition.

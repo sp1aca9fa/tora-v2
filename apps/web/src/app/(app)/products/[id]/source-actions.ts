@@ -95,6 +95,8 @@ export async function updateQueryAction(
     excludeKeywords: words(formData.get('excludeKeywords')),
     priceMin: yenOrUndefined(formData.get('priceMin')),
     priceMax: yenOrUndefined(formData.get('priceMax')),
+    // Edited by the user: never replaced by newer default queries.
+    extra: { ...link.query?.extra, auto: false, edited: true },
   };
   await updateSourceQuery(db, sourceId, query);
   revalidatePath(`/products/${link.productId}`);

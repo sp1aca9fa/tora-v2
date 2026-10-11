@@ -33,11 +33,11 @@ import {
   dateText,
   optEnum,
   optText,
+  optYen,
   parseForm,
   qty,
   reqEnum,
   runDomain,
-  yen,
 } from '@/lib/form';
 import {
   conditionInputFrom,
@@ -57,6 +57,8 @@ export interface ProductSummary {
   cardNumber: string | null;
   rarity: string | null;
   platform: string | null;
+  releaseDate: string | null;
+  retailPriceJpy: number | null;
   /** Has an active price source (a listing). */
   linked: boolean;
 }
@@ -95,6 +97,8 @@ export async function searchProductsAction(
     cardNumber: p.cardNumber,
     rarity: p.rarity,
     platform: p.platform,
+    releaseDate: p.releaseDate,
+    retailPriceJpy: p.retailPriceJpy,
     linked: linked.has(p.id),
   }));
 }
@@ -139,7 +143,8 @@ const holdingSchema = z.object({
   acquisitionType: reqEnum(['purchase', 'gift', 'trade'] as const),
   orderId: optText,
   quantity: qty,
-  costTotalJpy: yen,
+  /** Optional when a retail price is known: blank means retail price x quantity. */
+  costTotalJpy: optYen,
   notes: optText,
 });
 
@@ -154,11 +159,13 @@ export async function createHoldingAction(
 
   let ref: ProductRef;
   let cls: ProductClass;
+  let retailPriceJpy: number | null = null;
   if (d.mode === 'existing') {
     const product = d.productId ? await getProduct(db, d.productId) : null;
     if (!product) return { error: 'not_found' };
     ref = { productId: product.id };
     cls = productClass(product);
+    retailPriceJpy = product.retailPriceJpy;
   } else if (d.mode === 'catalog') {
     const set = d.catalogSetId ? await getSet(db, d.catalogSetId) : null;
     if (!set || !d.catalogKind) return { error: 'check', fields: ['setName'] };
@@ -178,7 +185,11 @@ export async function createHoldingAction(
     if (!product) return { error: 'check', fields: ['name'] };
     ref = { product };
     cls = productClass(product);
+    retailPriceJpy = product.retailPriceJpy ?? null;
   }
+  const costTotalJpy =
+    d.costTotalJpy ?? (retailPriceJpy !== null ? retailPriceJpy * d.quantity : undefined);
+  if (costTotalJpy === undefined) return { error: 'check', fields: ['costTotalJpy'] };
 
   const condition = parseForm(conditionSchema, formData);
   if ('state' in condition) return condition.state;
@@ -188,7 +199,7 @@ export async function createHoldingAction(
   const result = await runDomain(() =>
     createHolding(db, user.id, ref, {
       quantity: d.quantity,
-      costTotalJpy: d.costTotalJpy,
+      costTotalJpy,
       acquisitionType: d.acquisitionType,
       ...input,
       acquiredAt: tokyoDateToIso(d.acquiredAt),

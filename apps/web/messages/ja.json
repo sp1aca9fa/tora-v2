@@ -107,7 +107,11 @@
     "variantPlaceholder": "例: Collector",
     "orderIdHint": "任意。スニダンの取引IDやメルカリの取引IDなど。重複登録やインポートの照合に使います。",
     "existingHint": "登録済みの商品ですか？選ぶと同じ商品として登録されます：",
-    "linked": "連携済み"
+    "linked": "連携済み",
+    "onRelease": "発売日に入手（{date}）",
+    "onReleaseUnknown": "発売日に入手（先に発売日を入力してください）",
+    "unknownFrom": "不明",
+    "costFromRetail": "空欄の場合、定価×数量（{amount}）を使います。"
   },
   "holding": {
     "costBasis": "取得原価",
@@ -393,7 +397,8 @@
       "priceMax": "最高価格",
       "save": "検索を保存",
       "saved": "保存しました。次回の収集で新しい検索を使います。",
-      "excludeWords": "除外ワード"
+      "excludeWords": "除外ワード",
+      "used": "使用した取引"
     }
   },
   "valuation": {

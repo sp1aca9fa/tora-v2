@@ -107,7 +107,11 @@
     "variantPlaceholder": "e.g. Collector",
     "orderIdHint": "Optional. e.g. SNKRDUNK 取引ID or Mercari transaction ID; used to catch duplicates and imports.",
     "existingHint": "Already registered? Pick it to add this under the same item:",
-    "linked": "linked"
+    "linked": "linked",
+    "onRelease": "Acquired on release day ({date})",
+    "onReleaseUnknown": "Acquired on release day (enter a full release date first)",
+    "unknownFrom": "Unknown",
+    "costFromRetail": "Left blank: the retail price x quantity ({amount}) is used."
   },
   "holding": {
     "costBasis": "Cost basis",
@@ -393,7 +397,8 @@
       "priceMax": "Max price",
       "save": "Save search",
       "saved": "Saved. The next collect searches again with it.",
-      "excludeWords": "Excluded words"
+      "excludeWords": "Excluded words",
+      "used": "Sales used"
     }
   },
   "valuation": {

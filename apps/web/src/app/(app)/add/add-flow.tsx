@@ -67,6 +67,21 @@ function Chips<T extends string>({
   );
 }
 
+/** Product fields remembered across category / kind switches. */
+const DRAFT_FIELDS = new Set([
+  'name',
+  'setName',
+  'setCode',
+  'cardNumber',
+  'rarity',
+  'variant',
+  'releaseDate',
+  'retailPriceJpy',
+  'platform',
+  'franchise',
+  'notes',
+]);
+
 export function AddFlow({
   today,
   fromSuggestions,
@@ -96,6 +111,10 @@ export function AddFlow({
   const [stepError, setStepError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [cost, setCost] = useState('');
+  // Product details typed so far: kept when switching category or kind and coming back.
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [acquiredAt, setAcquiredAt] = useState(today);
+  const [onRelease, setOnRelease] = useState(false);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
 
   const isSealed = kind !== null && SEALED_KINDS.includes(kind);
@@ -146,6 +165,21 @@ export function AddFlow({
     if (validateStep()) setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
+  // A full release date of the item (typed, of the chosen product, or of the catalog set).
+  const releaseDate = [
+    mode === 'existing'
+      ? selected?.releaseDate
+      : catalogMode
+        ? set?.releaseDate
+        : draft.releaseDate,
+  ].find((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today);
+  const retail =
+    mode === 'existing'
+      ? (selected?.retailPriceJpy ?? null)
+      : catalogMode
+        ? null
+        : Number((draft.retailPriceJpy ?? '').replace(/[^\d]/g, '')) || null;
+
   const perUnit =
     Number(quantity) > 1 && cost
       ? unitCost(Number(cost.replace(/[^\d]/g, '')) || 0, Number(quantity))
@@ -171,6 +205,9 @@ export function AddFlow({
       onChange={(e) => {
         const target = e.target as unknown as HTMLInputElement;
         if (target.name === 'name') setName(target.value);
+        if (DRAFT_FIELDS.has(target.name)) {
+          setDraft((d) => ({ ...d, [target.name]: target.value }));
+        }
       }}
       className="space-y-6"
     >
@@ -393,6 +430,7 @@ export function AddFlow({
                 franchiseInput={category === 'game'}
                 showRegion={category === 'game'}
                 franchiseSuggestions={franchiseSuggestions}
+                defaults={draft}
               />
             )}
             {category && kind && !catalogMode && (
@@ -426,9 +464,31 @@ export function AddFlow({
               name="acquiredAt"
               type="date"
               required
-              defaultValue={today}
+              value={acquiredAt}
+              onChange={(e) => {
+                setAcquiredAt(e.target.value);
+                setOnRelease(false);
+              }}
               max={today}
             />
+            <label
+              className={cn(
+                'mt-1.5 flex items-center gap-2 text-xs',
+                releaseDate ? 'text-muted-foreground' : 'text-muted-foreground/50',
+              )}
+            >
+              <input
+                type="checkbox"
+                className="size-3.5"
+                disabled={!releaseDate}
+                checked={onRelease && !!releaseDate}
+                onChange={(e) => {
+                  setOnRelease(e.target.checked);
+                  setAcquiredAt(e.target.checked && releaseDate ? releaseDate : today);
+                }}
+              />
+              {releaseDate ? t('add.onRelease', { date: releaseDate }) : t('add.onReleaseUnknown')}
+            </label>
           </Field>
           <Field label={t('fields.acquiredFrom')} htmlFor="acquiredFrom">
             <Input
@@ -438,6 +498,7 @@ export function AddFlow({
               autoComplete="off"
             />
             <datalist id="from-suggestions">
+              <option value={t('add.unknownFrom')} />
               {fromSuggestions.map((s) => (
                 <option key={s} value={s} />
               ))}
@@ -469,9 +530,13 @@ export function AddFlow({
             label={t('fields.costTotalJpy')}
             htmlFor="costTotalJpy"
             hint={
-              perUnit !== null
-                ? t('common.perUnit', { amount: formatJpy(perUnit) })
-                : t('add.costHint')
+              !cost.trim() && retail
+                ? t('add.costFromRetail', {
+                    amount: formatJpy(retail * (Number(quantity) || 1)),
+                  })
+                : perUnit !== null
+                  ? t('common.perUnit', { amount: formatJpy(perUnit) })
+                  : t('add.costHint')
             }
             className="sm:col-span-2"
           >
@@ -479,7 +544,7 @@ export function AddFlow({
               id="costTotalJpy"
               name="costTotalJpy"
               inputMode="numeric"
-              required
+              required={!retail}
               pattern="[\d,¥￥\s]*"
               placeholder="¥"
               value={cost}

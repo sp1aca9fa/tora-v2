@@ -8,6 +8,8 @@ import {
   insertObservations,
   productsToMatch,
   productsWithoutSource,
+  QUERY_SOURCE_ID,
+  updateSourceQuery,
   saveCandidates,
   suggestFromKnownProducts,
   startRun,
@@ -110,10 +112,27 @@ export async function runCollector(
       }
     }
     if (!options.matchOnly) {
-      for (const { source: link, product } of await activeSources(db, collector.source, {
+      for (const { source: listing, product } of await activeSources(db, collector.source, {
         productId: options.productId,
       })) {
+        let link = listing;
         try {
+          // An auto-made query from an older version of the collector's defaults is regenerated.
+          const extra = link.query?.extra as { edited?: boolean; v?: number } | undefined;
+          if (
+            collector.defaultQuery &&
+            collector.queryVersion &&
+            link.externalId === QUERY_SOURCE_ID &&
+            !extra?.edited &&
+            (extra?.v ?? 1) < collector.queryVersion
+          ) {
+            const query = collector.defaultQuery(product);
+            if (query) {
+              await updateSourceQuery(db, link.id, query);
+              link = { ...link, query, state: null };
+              log(`search for "${product.name}" updated: ${(query.keywords ?? []).join(' ')}`);
+            }
+          }
           const before = added;
           const result = await collector.collect(
             link,

@@ -745,3 +745,27 @@ export async function getObservation(db: Db, id: string) {
   const [row] = await db.select().from(priceObservations).where(eq(priceObservations.id, id));
   return row ?? null;
 }
+
+/** Kept (not excluded) sold observations of one source for a product, within `days`. */
+export async function keptObservations(db: Db, productId: string, source: string, days = 180) {
+  return db
+    .select({
+      source: priceObservations.source,
+      bucket: priceObservations.bucket,
+      priceJpy: priceObservations.priceJpy,
+      observedAt: priceObservations.observedAt,
+      observationType: priceObservations.observationType,
+      excluded: priceObservations.excluded,
+      quantityInferred: priceObservations.quantityInferred,
+    })
+    .from(priceObservations)
+    .where(
+      and(
+        eq(priceObservations.productId, productId),
+        eq(priceObservations.source, source),
+        eq(priceObservations.observationType, 'sold'),
+        eq(priceObservations.excluded, false),
+        gte(priceObservations.observedAt, toTokyoIso(new Date(Date.now() - days * 86_400_000))),
+      ),
+    );
+}

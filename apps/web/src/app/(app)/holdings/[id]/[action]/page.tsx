@@ -46,14 +46,14 @@ const ACTIONS = {
 type ActionKey = keyof typeof ACTIONS;
 
 const PLATFORMS = [
+  'Card shop',
+  'eBay',
   'Mercari',
   'SNKRDUNK',
   'Yahoo Auctions',
   'Yahoo Flea Market',
-  'eBay',
   '駿河屋',
-  'Card shop',
-];
+].sort((a, b) => a.localeCompare(b, 'ja'));
 
 export default async function HoldingActionPage({
   params,

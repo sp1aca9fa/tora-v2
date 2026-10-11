@@ -31,8 +31,10 @@ export default async function AddPage({
       <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
       <AddFlow
         today={tokyoDate()}
-        fromSuggestions={[...new Set([...fromHistory, ...STORES])]}
-        franchiseSuggestions={franchises}
+        fromSuggestions={[...new Set([...fromHistory, ...STORES])].sort((a, b) =>
+          a.localeCompare(b, 'ja'),
+        )}
+        franchiseSuggestions={[...franchises].sort((a, b) => a.localeCompare(b, 'ja'))}
         initialProduct={
           product && {
             id: product.id,
@@ -45,6 +47,8 @@ export default async function AddPage({
             cardNumber: product.cardNumber,
             rarity: product.rarity,
             platform: product.platform,
+            releaseDate: product.releaseDate,
+            retailPriceJpy: product.retailPriceJpy,
             linked: false,
           }
         }

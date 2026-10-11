@@ -5,6 +5,7 @@ import {
   confirmCandidate,
   createDb,
   createHolding,
+  createQuerySource,
   createUser,
   linkSource,
   listPendingCandidates,
@@ -223,4 +224,36 @@ it('search-based sources: every product gets its query once, and an unlinked one
   await runCollector(db, collector, quiet);
   expect((await listProductSources(db, product.id)).filter((s) => s.active)).toEqual([]);
   expect(queries).toHaveLength(1);
+});
+
+it('replaces auto-made queries of an older version, but keeps edited ones', async () => {
+  const a = await box();
+  const b = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'Other BOX' } },
+    {
+      quantity: 1,
+      costTotalJpy: 1,
+      acquiredAt: '2026-10-01T12:00:00.000+09:00',
+      packagingState: 'sealed_shrink',
+    },
+  );
+  await createQuerySource(db, a.product.id, 'fake', { keywords: ['old'] });
+  await createQuerySource(db, b.product.id, 'fake', {
+    keywords: ['mine'],
+    extra: { edited: true },
+  });
+  const seen = new Map<string, unknown>();
+  const collector = fakeCollector({
+    defaultQuery: (p) => ({ keywords: [`new ${p.name}`], extra: { auto: true, v: 2 } }),
+    queryVersion: 2,
+    collect: async (link) => {
+      seen.set(link.productId, link.query?.keywords);
+      return { state: { mode: 'incremental' }, complete: true };
+    },
+  });
+  await runCollector(db, collector, { ...quiet, collectOnly: true });
+  expect(seen.get(a.product.id)).toEqual(['new BP BOX']);
+  expect(seen.get(b.product.id)).toEqual(['mine']);
 });

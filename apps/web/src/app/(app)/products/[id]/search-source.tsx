@@ -1,4 +1,5 @@
-import { type Db, type ProductSource, sourceObservations } from '@tora/db';
+import { valueUnit } from '@tora/core';
+import { type Db, type ProductSource, keptObservations, sourceObservations } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { sourceLabel } from '@/lib/product-display';
@@ -11,13 +12,26 @@ import { excludeObservationAction, unlinkSourceAction } from './source-actions';
  * an item was left out and buttons to exclude or include one by hand.
  */
 export async function SearchSource({ db, link }: { db: Db; link: ProductSource }) {
-  const [t, format, sales] = await Promise.all([
+  const [t, format, sales, kept] = await Promise.all([
     getTranslations(),
     getFormatter(),
     sourceObservations(db, link.productId, link.source, 30),
+    keptObservations(db, link.productId, link.source),
   ]);
+  // What the valuation computes from this source, per condition (same rules: 30/90/180-day
+  // window, outliers removed, median).
+  const summary = [...new Set(kept.map((o) => o.bucket).filter((b): b is string => !!b))]
+    .map((bucket) => {
+      const v = valueUnit({ bucket, observations: kept });
+      const latest = kept
+        .filter((o) => o.bucket === bucket)
+        .toSorted((a, b) => b.observedAt.localeCompare(a.observedAt))[0];
+      return { bucket, v, latest };
+    })
+    .filter((r) => r.v.method === 'median')
+    .sort((a, b) => b.v.sampleSize - a.v.sampleSize);
   const query = link.query;
-  const kept = sales.filter((s) => !s.excluded).length;
+  const keptCount = sales.filter((s) => !s.excluded).length;
   return (
     <div className="space-y-3 rounded-md border p-3">
       <div className="flex items-start justify-between gap-3">
@@ -36,7 +50,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
           </p>
           <p className="text-xs text-muted-foreground">
             {link.lastSuccessAt
-              ? t('sources.search.found', { kept, total: sales.length })
+              ? t('sources.search.found', { kept: keptCount, total: sales.length })
               : t('sources.waiting')}
           </p>
         </div>
@@ -46,6 +60,41 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
           </Button>
         </form>
       </div>
+
+      {summary.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="py-1 font-normal">{t('holding.bucket')}</th>
+                <th className="py-1 text-right font-normal">{t('sources.median')}</th>
+                <th className="py-1 text-right font-normal">{t('sources.search.used')}</th>
+                <th className="py-1 text-right font-normal">{t('valuation.lastSale')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.map(({ bucket, v, latest }) => (
+                <tr key={bucket}>
+                  <td className="py-1">
+                    <code className="text-xs">{bucket}</code>
+                  </td>
+                  <td className="py-1 text-right font-medium tabular-nums">
+                    {v.unitJpy === null ? '-' : formatJpy(v.unitJpy)}
+                  </td>
+                  <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
+                    {t('valuation.medianOf', { count: v.sampleSize, days: v.windowDays ?? 0 })}
+                  </td>
+                  <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
+                    {latest
+                      ? `${formatJpy(latest.priceJpy)} · ${format.dateTime(new Date(latest.observedAt), { dateStyle: 'medium' })}`
+                      : '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">
