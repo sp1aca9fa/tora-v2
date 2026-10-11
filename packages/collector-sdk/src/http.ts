@@ -69,6 +69,11 @@ export class PoliteHttp {
     return this.o.maxRequests - this.requests;
   }
 
+  /** Requests allowed in this run. */
+  get limit(): number {
+    return this.o.maxRequests;
+  }
+
   async text(url: string, headers: Record<string, string> = {}): Promise<string> {
     return (await this.request(url, { Accept: 'text/html', ...headers })).text();
   }

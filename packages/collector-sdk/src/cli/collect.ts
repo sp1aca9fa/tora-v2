@@ -10,6 +10,7 @@ import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
+import { Progress } from './progress';
 
 const { values } = parseArgs({
   options: {
@@ -34,46 +35,59 @@ console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 await exitIfUnmigrated(db);
 let exitCode = 0;
+const withLinks = !values.product && importers.some((i) => i.readLink);
+// Steps: purchase links, each collector, then pictures + lot sizes + snapshots.
+const progress = new Progress((withLinks ? 1 : 0) + selected.length + 1);
+const log = progress.log;
 // Purchase links pasted in the app go first, so new products get searched in this run.
-if (!values.product && importers.some((i) => i.readLink)) {
+if (withLinks) {
+  progress.next('purchase links');
   const links = await importPurchaseLinks(
     db,
     importers,
     collectors,
     new PoliteHttp({ maxRequests: 200 }),
-    (m) => console.log(`[purchase links] ${m}`),
+    (m) => log(`[purchase links] ${m}`),
+    (p) => progress.update('purchase links', p.fraction, `${p.done}/${p.total}`),
   );
   const { imported, matched, duplicate, skipped, failed } = links.counts;
   if (links.read + failed + links.left > 0) {
-    console.log(
+    log(
       `purchase links: ${imported} imported (see Review import), ${matched} matched, ${duplicate} already registered, ${skipped} skipped, ${failed} failed${links.left ? `, ${links.left} left for next time` : ''}`,
     );
   }
 }
 if (selected.length === 0) console.log('No collectors registered.');
 for (const collector of selected) {
+  progress.next(collector.source);
   const s = await runCollector(db, collector, {
     productId: values.product,
     matchOnly: values['match-only'],
     collectOnly: values['collect-only'],
+    log: (m) => log(`[${collector.source}] ${m}`),
+    onProgress: (p) => progress.update(collector.source, p.fraction, `${p.done}/${p.total}`),
   });
-  console.log(
+  log(
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
 }
 // Product pictures not stored yet (separate polite client: the collectors' cap is spent).
+progress.next('pictures, lot sizes, chart');
 try {
   const images = await downloadProductImages(db, new PoliteHttp({ maxRequests: 40 }), {
-    log: (m) => console.log(`[images] ${m}`),
+    log: (m) => log(`[images] ${m}`),
   });
-  console.log(`images: ${images.saved} saved, ${images.failed} failed`);
+  log(`images: ${images.saved} saved, ${images.failed} failed`);
 } catch (error) {
-  console.log(`images: stopped (${errorText(error)})`);
+  log(`images: stopped (${errorText(error)})`);
 }
+progress.update('pictures, lot sizes, chart', 0.3);
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);
-console.log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+progress.update('pictures, lot sizes, chart', 0.5);
 const snap = await runSnapshots(db);
+progress.done();
 console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
 process.exit(exitCode);

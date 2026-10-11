@@ -34,6 +34,11 @@ export interface RunOptions {
   collectOnly?: boolean;
   http?: PoliteHttpOptions;
   log?: (message: string) => void;
+  /**
+   * After each product: how far the run is (products done, or requests used when the request
+   * budget is what will end it).
+   */
+  onProgress?: (p: { fraction: number; done: number; total: number }) => void;
   now?: Date;
 }
 
@@ -66,6 +71,18 @@ export async function runCollector(
     },
   };
   const runId = await startRun(db, collector.source);
+  // Progress: items (products to match + listings to collect) done before the current one.
+  let total = 0;
+  let done = 0;
+  const report = () => {
+    if (!options.onProgress || total === 0) return;
+    const fraction = Math.max(done / total, http.requests / http.limit);
+    options.onProgress({ fraction: Math.min(1, fraction), done, total });
+  };
+  const tick = () => {
+    report();
+    done++;
+  };
   const summary: RunSummary = {
     source: collector.source,
     status: 'ok',
@@ -97,7 +114,9 @@ export async function runCollector(
       const toMatch = (
         await productsToMatch(db, collector.source, { productId: options.productId })
       ).filter((p) => collector.supports(p));
+      total += toMatch.length;
       for (const product of toMatch) {
+        tick();
         try {
           // A linked look-alike (same card or item) is offered first, without searching the site;
           // the search runs on a later run if the user dismisses it.
@@ -118,9 +137,12 @@ export async function runCollector(
       }
     }
     if (!options.matchOnly) {
-      for (const { source: listing, product } of await activeSources(db, collector.source, {
+      const sources = await activeSources(db, collector.source, {
         productId: options.productId,
-      })) {
+      });
+      total += sources.length;
+      for (const { source: listing, product } of sources) {
+        tick();
         let link = listing;
         try {
           // An auto-made query from an older version of the collector's defaults is regenerated.
@@ -179,6 +201,8 @@ export async function runCollector(
         }
       }
     }
+    done = total;
+    report();
     if (summary.errors.length) summary.status = 'partial';
   } catch (e) {
     if (e instanceof BlockedError) {

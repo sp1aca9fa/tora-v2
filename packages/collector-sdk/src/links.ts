@@ -33,8 +33,16 @@ export async function importPurchaseLinks(
   collectors: Collector[],
   http: PoliteHttp,
   log: (message: string) => void = () => {},
+  onProgress?: (p: { fraction: number; done: number; total: number }) => void,
 ): Promise<LinkImportSummary> {
   const pending = await pendingPurchaseLinks(db);
+  // Reading the links is what takes time (one polite request each).
+  const progress = (done: number) =>
+    onProgress?.({
+      fraction: pending.length ? done / pending.length : 1,
+      done,
+      total: pending.length,
+    });
   const summary: LinkImportSummary = {
     read: 0,
     counts: { imported: 0, matched: 0, duplicate: 0, skipped: 0, failed: 0 },
@@ -85,6 +93,7 @@ export async function importPurchaseLinks(
     }
   >();
   for (const [i, link] of pending.entries()) {
+    progress(i);
     const importer = importers.find((im) => im.readLink && im.matchesLink?.(link.url));
     if (!importer) {
       await finish(link, 'failed', 'No importer reads links from this site.');
@@ -113,6 +122,7 @@ export async function importPurchaseLinks(
     groups.set(key, group);
   }
 
+  progress(pending.length);
   for (const { userId, importer, items } of groups.values()) {
     const gathered = gatherReceipts(
       items.map(({ receipt }) => ({ kind: 'purchase' as const, receipt })),
