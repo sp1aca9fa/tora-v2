@@ -404,6 +404,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
   // Recent kept sales far from the value they feed.
   const odd: unknown[] = [];
   const since = now.getTime() - 30 * 86_400_000;
+  const seenSales = new Set<string>();
   for (const x of valued) {
     if (x.v.unitJpy === null || x.v.method !== 'median') continue;
     for (const o of market.observations.get(x.product.id) ?? []) {
@@ -414,7 +415,9 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       )
         continue;
       const ratio = o.priceJpy / x.v.unitJpy;
-      if (ratio > 3 || ratio < 1 / 3) {
+      const key = `${x.product.id}|${o.source}|${o.priceJpy}|${o.observedAt}`;
+      if ((ratio > 3 || ratio < 1 / 3) && !seenSales.has(key)) {
+        seenSales.add(key);
         odd.push({
           ...lot(x.holding, x.product),
           source: o.source,
