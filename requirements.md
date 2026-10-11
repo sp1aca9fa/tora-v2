@@ -24,9 +24,9 @@
 | S5d | Imports hub: one Imports menu for every import, its results and follow-ups | built; awaiting user check |
 | S4d | Automated data review: cheap model checks flagged data, suggestions queue | built; awaiting user check |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | built; awaiting user's real files |
-| S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
+| S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 
 ### Decision log
 
@@ -101,6 +101,7 @@
 - 2026-10-12: import-ai, several files per purchase (user: share data in whatever form, e.g. a Mercari listing page plus its transaction page): the model lists each file's view as its own row and tags rows it thinks are one purchase with a confidence; the code joins them only when the model is at least 0.8 sure and nothing disagrees (shop, price, order ID, date). Otherwise, and for look-alikes the code finds (same shop and price, one title the other cut short), both lots are imported and flagged `maybe_same`; Review import offers "Same purchase as" to merge two lots (the chosen one stays and takes the other's order ID, price or order date where it lacks them; links move over). Lots without an order ID can be removed in review. Mercari cost = 商品代金 minus coupons (メルペイ / points are payment, not discounts).
 - 2026-10-12: import-ai fixes after the user's first real run (39 Mercari screenshots, all listings first and then all transaction pages, so no pair shared a batch: 38 lots for 20 purchases; merged by Claude at the user's request with the new lot merge, failed links resolved): look-alike pairs of different batches are asked about as text only (Haiku, cached), joined when sure; a guessed date (a listing's age, 半年以上前) never counts against a pair and is not a purchase date; the folder's own cache file and other dotfiles are never inputs; rows whose order ID is already registered are not checked (no Sonnet re-reads on re-runs); the random Sonnet check is drawn once per file; an item made only for a merged-away lot is deleted.
 - 2026-10-12: Plan (user): cards not linked to SNKRDUNK get a warning; non-card items get a stable product-page source (駿河屋 product pages, not Mercari) with the same warning; both in S7. Mixed bundles in one listing noted as an undecided future idea.
+- 2026-10-12: Plan (user): S6 moved after S8. The user wants imports handled from the app rather than terminal commands; to revisit with S6 (in-app file upload, Gmail auto-import, where the model runs). Next: S7.
 
 ---
 
@@ -500,6 +501,7 @@ Build:
 - Round-trip test: seed -> export -> import into empty DB -> identical computed totals and row counts.
 - Scheduled local backup of the Turso DB to the home PC (dated SQL dump or JSON export, keep last 30).
 - **Purchase file import in the app**: upload a generic purchases file (CSV/JSON: shop, order ID, date, item title, quantity, amount paid, optional item price / listing link / cancelled flag) and go through the S5b flow in the browser: summary (new, already registered, cancelled, unclassified), choices for conflicts and likely duplicates, confirm, then Review import. Shop-specific email reading stays in private plug-ins: `pnpm purchases <export.mbox> --out purchases.json` writes this file on the home PC; anyone can also make it by hand or from another shop's export. The 11 MB+ mail export never leaves the PC.
+- Imports from the app (user, 2026-10-12): every import (order emails, screenshots / files through Claude, purchase files) started and followed in the app, not by typing commands on the home PC. Open: where the model runs. Either the app keeps the request and the uploaded files and the home PC's next collect (or a frequent job) runs it with the Claude Code login, results shown in Imports; or model calls from the server with an Anthropic API key on Vercel (pay per use, separate from the Claude plan). Revisit together with the in-app purchase file upload and the Gmail item below.
 - Automatic purchase import: the daily job on the home PC checks Gmail for new SNKRDUNK receipts (and cancellations) and imports them with the S5b rules, asking about conflicts in the app. Gmail access is read-only, its token stored only on the home PC (never on Vercel or in the database).
 
 Acceptance:
