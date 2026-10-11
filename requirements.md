@@ -21,7 +21,8 @@
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
-| S4d | Automated data review: cheap model checks flagged data, suggestions queue | todo (next, after a trial) |
+| S5d | Imports hub: one Imports menu for every import, its results and follow-ups | todo (next) |
+| S4d | Automated data review: cheap model checks flagged data, suggestions queue | todo (after S5d; trial first) |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | todo (after S4d) |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
@@ -90,6 +91,7 @@
 - 2026-10-11: Add item: typed product details survive switching category / kind; "acquired on release day" fills the date from a known full release date; "Unknown" is the first shop suggestion and the other lists are alphabetical; total cost may be left blank when a retail price is known (retail price x quantity is used, and the form says so).
 - 2026-10-11: Valuation fallback for rare items: a source needs 3 sales; steps are the holding's condition over 30 / 90 / 180 days, then a year, then similar conditions pooled (an item's conditions, a card's raw grades, intact boxes with or without shrink; never graded slabs or opened boxes) over 180 days, then a year. A source reaching 3 sales wins over an earlier source with fewer; otherwise the first source with any sale is used. Year-long or pooled values are low confidence and labeled "similar conditions pooled".
 - 2026-10-11: Mercari purchase importer keeps purchases whose Mercari category is a collectible one (top category ゲーム・おもちゃ・グッズ: cards, toys / hobby, games, figures), read from the listing; other purchases are skipped with the reason shown, not imported. Kept ones still go through the in-app review.
+- 2026-10-11: Plan: S5d Imports hub next (user: failed links were not findable once the review page was closed; all import actions should start from and return to one Imports menu); stopgap shipped: failed-links banner and list, Imports link in Settings.
 - 2026-10-11: Plan (user + Claude): S4d automated data review first (Haiku on the flagged data only, after a trial against Sonnet; suggestions the user accepts in the app; later Sonnet may make the final call), then S4c import from any shop (Haiku extracts and matches, Sonnet reviews rows flagged by code-computed checks, not by the model's self-rated confidence). Earlier the same day: S4c import purchases through Claude via MCP write tools (any format the user shares, same import rules, everything lands in Review import; the first MCP writes, add-only, approved in the chat); S8 gets per-lot "count in cost" / "count in value" switches with separate portfolio groups, and portfolio page speed (stream the slow parts).
 - 2026-10-11: Mercari sends buyers no purchase email (the user's export held only sales, cancellations and Merpay bills; the monthly Merpay payment mail lists deferred-payment items without date or ID). So Mercari purchases come from links the user pastes in the app (Review import > Add purchases by link), read by the home PC on the next collect; reading the purchase history with the user's login was rejected (token on the PC, fragile, account risk). Each link is read once; the purchase date is the listing's last update (approximate, editable in the review); a lot that looks like an entry added by hand gets the item ID instead of a second lot; the bought item becomes a reference sale on the product's Mercari search. Mercari Shops product links are read too (no reference: a shop's page is not one sale).
 
@@ -368,6 +370,23 @@ Build:
 
 Acceptance:
 - From Claude: "does anything look off?" runs the checks and explains the findings; "which of my items gained the most since I bought them, and why?" is answered from the data.
+
+## S5d: Imports hub
+
+Added at the user's request (2026-10-11): imports grew piece by piece (email import from the terminal, Review import, pasted links, cancelled orders, card grades after import) without a home; once the review banner was gone there was no way back to the page (stopgap: Settings link and a banner for failed links). One Imports menu where every import starts, reports back and is followed up.
+
+Build:
+- An **Imports** entry in the main navigation (phone bottom bar and wide-screen nav), with a badge counting what needs the user (items to review, failed links, conflicts).
+- The Imports page, sections:
+  - Needs attention: items to review, links that could not be imported (to add by hand; open the listing, then "add an item" prefilled from what is known, which clears the link), conflicts and likely duplicates waiting for a decision, cancelled-looking orders.
+  - Start an import: paste purchase links; upload a purchases file (S6); import through Claude (S4c, how to start it); email import (how to run it on the home PC, when it last ran).
+  - History: every import run (method: email, links, file, Claude; when; counts new / matched / already registered / skipped / failed), each opening its own results.
+- Import runs are recorded (`import_runs`: user, method, source, started / finished, counts, notes); imported lots and links point to their run. The terminal email import and the link import in `pnpm collect` record runs too, so they show in History.
+- Everything import-related lives under the hub and returns to it: Review import becomes a sub-page; card grades for imported cards, "order cancelled", link results and the add-by-hand flow for a failed link link back; banners elsewhere (portfolio) point into the hub instead of separate pages.
+- Later: conflicts and likely duplicates from the email import decided in the app instead of the terminal (the S6 in-app file import uses the same screens).
+
+Acceptance:
+- From any screen, Imports is one tap away; after pasting links and collecting, the user finds what was imported, what to review and what failed (with what to do) in one place.
 
 ## S4d: Automated data review (cheap model, suggestions queue)
 
