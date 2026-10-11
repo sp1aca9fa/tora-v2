@@ -5,6 +5,7 @@ import {
   createHolding,
   createUser,
   importRunsOf,
+  mergeImportedLots,
   purchaseLinksOf,
   schema,
   setPurchaseLinkResult,
@@ -21,6 +22,7 @@ import {
   type ReadCache,
   checkContext,
   checkRow,
+  mergeRows,
   readPurchases,
 } from './ai-import';
 import { applyAiImport, planAiImport } from './ai-import-plan';
@@ -238,6 +240,7 @@ it('imports new lots, skips what is not a collectible, matches again on a second
     rows: rows.map((r) => ({ row: r, flags: checkRow(r, ctx), reviewedBy: null })),
     files: 2,
     reviewed: [],
+    merged: [],
     calls: [],
     costUsd: 0,
   };
@@ -273,4 +276,135 @@ it('imports new lots, skips what is not a collectible, matches again on a second
   const second = await applyAiImport(db, userId, plan2, 'again');
   expect(second.counts.imported ?? 0).toBe(0);
   expect(await db.select().from(schema.holdings)).toHaveLength(5);
+});
+
+it('joins rows the model is sure are one purchase; leaves the rest for the user to merge', () => {
+  const listing = row({
+    file: 'listing.png',
+    title: 'ポケカWCS2023 ヨコハマ限定 デッキシールド 葛飾北斎',
+    priceJpy: 18000,
+    quantity: 8,
+    date: null,
+    product: card('デッキシールド 葛飾北斎', ''),
+    samePurchase: 'p1',
+    sameConfidence: 0.9,
+  });
+  const deal = row({
+    file: 'deal.png',
+    title: 'ポケカWCS2023 ヨコハマ限定 デッ…',
+    priceJpy: 18000,
+    orderId: 'm46676306959',
+    date: '2023-10-13',
+    samePurchase: 'p1',
+    sameConfidence: 0.95,
+  });
+  const other = row({ file: 'deal.png', title: 'ミュウ', priceJpy: 18000 });
+  const { rows, merged, pairs } = mergeRows([listing, deal, other]);
+  expect(merged).toEqual([['listing.png', 'deal.png']]);
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toMatchObject({
+    file: 'listing.png + deal.png',
+    title: 'ポケカWCS2023 ヨコハマ限定 デッキシールド 葛飾北斎',
+    quantity: 8,
+    orderId: 'm46676306959',
+    date: '2023-10-13',
+  });
+  expect(pairs).toEqual([]);
+
+  // The model unsure, or something disagreeing: two rows, offered to merge.
+  const unsure = mergeRows([listing, { ...deal, sameConfidence: 0.6 }]);
+  expect(unsure.rows).toHaveLength(2);
+  expect(unsure.pairs).toHaveLength(1);
+  const otherPrice = mergeRows([listing, { ...deal, priceJpy: 17000 }]);
+  expect(otherPrice.rows).toHaveLength(2);
+  expect(otherPrice.pairs).toHaveLength(1);
+  // Not tagged by the model, but one title is the other cut short: offered too.
+  const untagged = mergeRows([
+    { ...listing, samePurchase: null },
+    { ...deal, samePurchase: null },
+  ]);
+  expect(untagged.rows).toHaveLength(2);
+  expect(untagged.pairs).toHaveLength(1);
+  // Different IDs: different purchases, nothing offered.
+  const two = mergeRows([
+    { ...deal, samePurchase: null },
+    { ...deal, file: 'x.png', samePurchase: null, orderId: 'm1' },
+  ]);
+  expect(two.pairs).toEqual([]);
+});
+
+it('imports a pair the model was unsure of as two lots, which the user merges', async () => {
+  await addPurchaseLinks(db, userId, ['https://jp.mercari.com/item/m46676306959']);
+  const [link] = await purchaseLinksOf(db, userId);
+  await setPurchaseLinkResult(db, link!.id, {
+    status: 'failed',
+    message: 'deleted',
+    holdingId: null,
+    importRunId: null,
+  });
+  const listing = row({
+    file: 'listing.png',
+    title: 'ポケカWCS2023 ヨコハマ限定 デッキシールド 葛飾北斎',
+    priceJpy: 18000,
+    quantity: 8,
+    date: null,
+    product: { ...card('デッキシールド 葛飾北斎', ''), kind: 'supply', cardNumber: null },
+  });
+  const deal = row({
+    file: 'deal.png',
+    title: 'ポケカWCS2023 ヨコハマ限定 デッ…',
+    priceJpy: 18000,
+    orderId: 'm46676306959',
+    date: '2023-10-13',
+    product: { ...card('ポケカWCS2023 ヨコハマ限定 デッ', ''), kind: 'supply', cardNumber: null },
+  });
+  const ctx = await checkContext(db, userId);
+  const { rows, pairs } = mergeRows([listing, deal]);
+  const read = {
+    rows: rows.map((r) => ({
+      row: r,
+      flags: [
+        ...checkRow(r, ctx),
+        ...(pairs.some((p) => p.includes(r)) ? (['maybe_same'] as const) : []),
+      ],
+      reviewedBy: null,
+    })),
+    files: 2,
+    reviewed: [],
+    merged: [],
+    calls: [],
+    costUsd: 0,
+  };
+  const plan = await planAiImport(
+    db,
+    userId,
+    read,
+    ctx.products,
+    () => '2026-10-12T12:00:00.000+09:00',
+  );
+  const outcome = await applyAiImport(db, userId, plan, 'pair');
+  expect(outcome.counts.imported).toBe(2);
+  const lots = await db.select().from(schema.holdings);
+  const keep = lots.find((l) => l.quantity === 8)!;
+  const drop = lots.find((l) => l.orderId === 'm46676306959')!;
+  expect(keep.reviewReason).toContain('maybe_same');
+  expect(keep.reviewReason).toContain('date_approx');
+
+  const { dateTaken } = await mergeImportedLots(db, userId, keep.id, drop.id);
+  expect(dateTaken).toBe(true);
+  const after = await db.select().from(schema.holdings);
+  expect(after).toHaveLength(1);
+  expect(after[0]).toMatchObject({
+    id: keep.id,
+    orderId: 'm46676306959',
+    quantity: 8,
+    acquiredAt: '2023-10-13T12:00:00.000+09:00',
+  });
+  expect(after[0]!.reviewReason).not.toContain('maybe_same');
+  expect(after[0]!.reviewReason).not.toContain('date_approx');
+  // The failed link the import resolved now points at the kept lot.
+  expect((await purchaseLinksOf(db, userId))[0]).toMatchObject({
+    status: 'matched',
+    holdingId: keep.id,
+  });
 });

@@ -1,6 +1,7 @@
 // Imports hub (requirements S5d): import runs and what needs the user after an import.
 import { toTokyoIso } from '@tora/core';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import { DomainError, deleteHolding, editHolding } from './mutations';
 import type { Db } from './client';
 import { failedPurchaseLinkCount } from './purchase-links';
 import { cardGradeCounts, importReviewCount } from './queries';
@@ -94,4 +95,47 @@ export async function getImportRun(db: Db, userId: string, id: string): Promise<
     .from(importRuns)
     .where(and(eq(importRuns.id, id), eq(importRuns.userId, userId)));
   return run ?? null;
+}
+
+/**
+ * Two imported lots waiting for review are one purchase (e.g. read from two screenshots): the
+ * kept lot (and its item) stays and takes the other's order ID or price when it has none, and its
+ * date when only the other's was read from the order; pasted links move over; the other lot is
+ * removed.
+ */
+export async function mergeImportedLots(
+  db: Db,
+  userId: string,
+  keepId: string,
+  dropId: string,
+): Promise<{ dateTaken: boolean }> {
+  const lots = await db
+    .select()
+    .from(holdings)
+    .where(and(eq(holdings.userId, userId), inArray(holdings.id, [keepId, dropId])));
+  const keep = lots.find((h) => h.id === keepId);
+  const drop = lots.find((h) => h.id === dropId);
+  if (!keep || !drop || keepId === dropId) throw new DomainError('not_found');
+  // The kept lot's item stays (the other may have been made from a cut-off title).
+  if (!keep.reviewPending || !drop.reviewPending) throw new DomainError('invalid_input');
+  const reasons = (h: typeof keep) => (h.reviewReason ?? '').split(',').filter(Boolean);
+  const dateTaken = reasons(keep).includes('date_approx') && !reasons(drop).includes('date_approx');
+  await db
+    .update(purchaseLinks)
+    .set({ holdingId: keepId, updatedAt: toTokyoIso() })
+    .where(eq(purchaseLinks.holdingId, dropId));
+  await deleteHolding(db, userId, dropId);
+  const edit: { orderId?: string; acquiredAt?: string; costTotalJpy?: number } = {};
+  if (!keep.orderId && drop.orderId) edit.orderId = drop.orderId;
+  if (!keep.costTotalJpy && drop.costTotalJpy) edit.costTotalJpy = drop.costTotalJpy;
+  if (dateTaken) edit.acquiredAt = drop.acquiredAt;
+  if (Object.keys(edit).length) await editHolding(db, userId, keepId, edit);
+  const left = reasons(keep).filter(
+    (r) => r !== 'maybe_same' && !(dateTaken && r === 'date_approx'),
+  );
+  await db
+    .update(holdings)
+    .set({ reviewReason: left.join(',') || null, updatedAt: toTokyoIso() })
+    .where(eq(holdings.id, keepId));
+  return { dateTaken };
 }

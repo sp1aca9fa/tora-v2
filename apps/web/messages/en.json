@@ -502,7 +502,8 @@
       "new_product": "New item made from the listing title: check its name and details on its page.",
       "price_far": "The price is far from what this item sells for: check the item and the price.",
       "check_product": "Claude matched this to an item the title may not support (or to a new one named like an item you have): check which item it is.",
-      "ai_unsure": "Claude was not sure about part of this row (read from your files): check the details."
+      "ai_unsure": "Claude was not sure about part of this row (read from your files): check the details.",
+      "maybe_same": "Another lot from your files may be the same purchase (e.g. its listing and its transaction page): if so, merge them with “Same purchase as”."
     },
     "purchasedOn": "Purchased on",
     "links": {
@@ -568,7 +569,11 @@
       "aiIntro": "Screenshots of order lists or order pages, PDFs, CSV or copied text from any shop: put them in one folder and run this on the home PC. Haiku reads them, Sonnet reads again what looks off, and everything lands here to review.",
       "aiLast": "Last import through Claude: {date}",
       "aiNever": "No import through Claude yet."
-    }
+    },
+    "removeLot": "Remove this lot (not one of my purchases)",
+    "sameAs": "Same purchase as",
+    "sameAsNone": "(a separate purchase)",
+    "sameAsHint": "This lot is merged into the one chosen: that one stays, taking this one's order ID, price or date where it has none."
   },
   "product": {
     "unitsOwned": "Units owned",

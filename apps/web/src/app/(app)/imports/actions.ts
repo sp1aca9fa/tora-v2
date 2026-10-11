@@ -7,7 +7,9 @@ import {
   addPurchaseLinks,
   confirmImportReview,
   linksIn,
+  deleteHolding,
   markOrderCancelled,
+  mergeImportedLots,
   removePurchaseLinks,
   retryPurchaseLinks,
 } from '@tora/db';
@@ -34,6 +36,8 @@ const rowSchema = z.object({
     .optional(),
   /** The order was cancelled: remove its lots instead of confirming. */
   cancelled: z.boolean().optional(),
+  /** The same purchase as this other lot: merged into it (that one stays). */
+  mergeInto: z.string().min(1).max(64).optional(),
 });
 export type ReviewRow = z.infer<typeof rowSchema>;
 const payloadSchema = z.array(rowSchema).max(1000);
@@ -73,7 +77,12 @@ export async function confirmReviewAction(
   const all = formData.get('mode') === 'all';
   const reviews: ImportReview[] = [];
   const cancelled: string[] = [];
+  // Merges into a lot that is itself merged away are left out (no chains or loops).
+  const merges = rows.filter(
+    (r) => r.mergeInto && !rows.some((o) => o.id === r.mergeInto && o.mergeInto),
+  );
   for (const row of rows) {
+    if (row.mergeInto) continue;
     if (row.cancelled) {
       cancelled.push(row.id);
       continue;
@@ -94,16 +103,28 @@ export async function confirmReviewAction(
       quantity: row.quantity ?? null,
     });
   }
-  if (reviews.length === 0 && cancelled.length === 0) return { error: 'noneGraded' };
+  if (reviews.length === 0 && cancelled.length === 0 && merges.length === 0) {
+    return { error: 'noneGraded' };
+  }
   const result = await runDomain(async () => {
+    for (const row of merges) {
+      const { dateTaken } = await mergeImportedLots(db, user.id, row.mergeInto!, row.id);
+      // The kept lot's date came from the other lot's order: the guessed one shown is dropped.
+      const kept = reviews.find((r) => r.id === row.mergeInto);
+      if (kept && dateTaken) kept.acquiredAt = null;
+    }
     // A cancelled order removes all its lots (several rows may share it): skip ones already gone.
+    // A lot without an order ID (e.g. read from a screenshot) is only removed.
     let removed = 0;
     for (const id of cancelled) {
       try {
         await markOrderCancelled(db, user.id, id);
         removed++;
       } catch (e) {
-        if (!(e instanceof DomainError && e.code === 'not_found')) throw e;
+        if (e instanceof DomainError && e.code === 'invalid_input') {
+          await deleteHolding(db, user.id, id);
+          removed++;
+        } else if (!(e instanceof DomainError && e.code === 'not_found')) throw e;
       }
     }
     return { done: await confirmImportReview(db, user.id, reviews), cancelled: removed };

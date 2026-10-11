@@ -97,7 +97,7 @@ const plan = await planAiImport(
   user.id,
   read,
   ctx.products,
-  (f) => mtimes.get(f) ?? toTokyoIso(),
+  (f) => mtimes.get(f.split(' + ')[0]!) ?? toTokyoIso(),
 );
 
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
@@ -139,6 +139,10 @@ for (const [why, label] of [
     console.log(`${label}:`);
     for (const { row } of list) console.log(`  ${row.date ?? '?'}  ${row.title}`);
   }
+}
+if (read.merged.length) {
+  console.log('One purchase in several files (joined):');
+  for (const files of read.merged) console.log(`  ${files.join(' + ')}`);
 }
 const newLots = plan.shops.flatMap((s) => s.plan.filter((e) => e.type === 'new')).length;
 const calls = read.calls.map((c) => `${c.model} ${Math.round(c.tokens / 1000)}k tokens`).join(', ');

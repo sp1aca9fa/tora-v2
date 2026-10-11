@@ -18,6 +18,8 @@ export default async function ImportReviewPage() {
     const cls = productClass(product);
     return {
       id: holding.id,
+      productId: product.id,
+      importRunId: holding.importRunId,
       cls,
       name: product.name,
       details: [product.rarity, product.setCode, product.cardNumber].filter(Boolean).join(' '),

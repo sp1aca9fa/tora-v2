@@ -12,6 +12,8 @@ import { type ReviewRow, type ReviewState, confirmReviewAction } from '../action
 
 export interface ReviewItem {
   id: string;
+  productId: string;
+  importRunId: string | null;
   cls: 'card' | 'sealed' | 'item';
   name: string;
   details: string;
@@ -63,10 +65,26 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
   );
   const update = (id: string, patch: Partial<ReviewRow>) =>
     setRows((m) => new Map(m).set(id, { ...m.get(id)!, ...patch }));
+  // Lots this one may be the same purchase as: the same item, or flagged as maybe the same in
+  // the same import (e.g. one made from a cut-off title).
+  const sameCandidates = (item: ReviewItem) =>
+    items.filter(
+      (o) =>
+        o.id !== item.id &&
+        !rows.get(o.id)?.mergeInto &&
+        (o.productId === item.productId ||
+          (item.reasons.includes('maybe_same') &&
+            o.reasons.includes('maybe_same') &&
+            o.importRunId === item.importRunId)),
+    );
   // Rows confirmed by the last save disappear from `items` after revalidation.
   const payload = JSON.stringify(items.map((i) => rows.get(i.id) ?? initialRow(i)));
   const ungraded = items.filter(
-    (i) => i.cls === 'card' && !rows.get(i.id)?.gradeType && !rows.get(i.id)?.cancelled,
+    (i) =>
+      i.cls === 'card' &&
+      !rows.get(i.id)?.gradeType &&
+      !rows.get(i.id)?.cancelled &&
+      !rows.get(i.id)?.mergeInto,
   ).length;
 
   return (
@@ -75,6 +93,7 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
       <ul className="divide-y rounded-xl border bg-card">
         {items.map((item) => {
           const row = rows.get(item.id) ?? initialRow(item);
+          const candidates = sameCandidates(item);
           return (
             <li key={item.id} className="space-y-2 px-4 py-3">
               <div className="min-w-0">
@@ -99,7 +118,7 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                   {t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r}
                 </p>
               ))}
-              {!row.cancelled && (
+              {!row.cancelled && !row.mergeInto && (
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   <label className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">{t('fields.quantity')}</span>
@@ -129,7 +148,33 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                   )}
                 </div>
               )}
-              {item.orderId && (
+              {(candidates.length > 0 || row.mergeInto) && (
+                <label className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">{t('imports.sameAs')}</span>
+                  <NativeSelect
+                    value={row.mergeInto ?? ''}
+                    onChange={(e) =>
+                      update(item.id, { mergeInto: e.target.value || undefined, cancelled: false })
+                    }
+                    className="w-auto max-w-full"
+                  >
+                    <option value="">{t('imports.sameAsNone')}</option>
+                    {candidates.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {[o.name, o.acquiredAt, o.orderId && `#${o.orderId}`, formatJpy(o.costJpy)]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  {row.mergeInto && (
+                    <span className="w-full text-xs text-muted-foreground">
+                      {t('imports.sameAsHint')}
+                    </span>
+                  )}
+                </label>
+              )}
+              {!row.mergeInto && (
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -138,11 +183,11 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
                     className="size-4"
                   />
                   <span className={row.cancelled ? 'text-destructive' : 'text-muted-foreground'}>
-                    {t('imports.cancelled')}
+                    {t(item.orderId ? 'imports.cancelled' : 'imports.removeLot')}
                   </span>
                 </label>
               )}
-              {row.cancelled ? null : item.cls === 'card' ? (
+              {row.cancelled || row.mergeInto ? null : item.cls === 'card' ? (
                 <div className="flex flex-wrap gap-2">
                   <NativeSelect
                     aria-label={t('fields.grading')}

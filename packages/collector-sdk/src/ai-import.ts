@@ -46,6 +46,9 @@ export interface ExtractedRow {
   gradedAs: string | null;
   sealedState: 'shrink' | 'no_shrink' | null;
   unsure: string | null;
+  /** Rows of different files the model thinks are one purchase share this tag. */
+  samePurchase?: string | null;
+  sameConfidence?: number | null;
 }
 
 interface NewProduct {
@@ -101,6 +104,8 @@ export const ROWS_SCHEMA = {
           gradedAs: str,
           sealedState: { type: ['string', 'null'], enum: ['shrink', 'no_shrink', null] },
           unsure: str,
+          samePurchase: str,
+          sameConfidence: { type: ['number', 'null'] },
         },
         required: [
           'file',
@@ -135,12 +140,15 @@ ${files.map((f) => `- ${f}`).join('\n')}
 
 These files show things the user bought: a sold listing page or an order page is their purchase. Only rows that clearly show the user's own sales (売上, 出品した商品, 販売履歴) are "not_purchase".
 
+One file may hold several purchases (an order list): one row each. One purchase may also be shown in several files (a listing page with the full title and description, and an order or transaction page with the date, order ID and amount paid; or a list and an order detail page): give each file's view its own row, with the same samePurchase tag (e.g. "p1") on the rows you think are one purchase, and sameConfidence (0 to 1) for how sure you are. They are one purchase when the item matches (same picture, a cut-off title that starts like the full one) and nothing disagrees (price, date, order ID).
+
 One row per distinct item in an order. Several of the same item are one row with quantity: a set of N of the same item (N個セット, N枚セット, ×N, N点 of one item) has quantity N and the item's name without the count. For each row:
 - file: the file it is in.
+- samePurchase, sameConfidence: see above; null when the purchase is shown in one file only.
 - shop: mercari, amazon, yahoo (ヤフオク / Yahoo!フリマ), snkrdunk, surugaya, or the shop's name in lowercase.
 - orderId: exactly as shown (Mercari 商品ID like m12345678901 or 取引ID; Amazon 注文番号 like 503-1234567-1234567); null when none is shown.
 - title: the item's title as shown. url: when shown.
-- priceJpy: what was paid for this item, shipping and fees included when the page shows them; the item price when that is all there is. Several items in one Amazon order: each item's own price.
+- priceJpy: what was paid for this item: item price plus shipping and fees when charged separately, minus coupons and discounts (クーポン利用, 割引). Points or balance used to pay (メルペイ残高, ポイント利用, PayPay) are a way of paying, not a discount. The item price when that is all there is. Several items in one order: each item's own price.
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
 - date: the order / purchase date as YYYY-MM-DD. Year missing or only a relative date ("3日前"): your best guess with dateApprox true. Not shown at all: null.
 - status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
@@ -198,7 +206,9 @@ export type RowFlag =
   | 'unknown_product'
   | 'weak_match'
   | 'maybe_registered'
-  | 'price_far';
+  | 'price_far'
+  /** Maybe the same purchase as a row of another file: the user merges them in review. */
+  | 'maybe_same';
 
 export interface CheckContext {
   products: Map<string, Product>;
@@ -407,6 +417,7 @@ export function reviewReasons(flags: RowFlag[]): string[] {
   const reasons = new Set<string>();
   for (const f of flags) {
     if (f === 'price_far') reasons.add('price_far');
+    else if (f === 'maybe_same') reasons.add('maybe_same');
     else if (f === 'weak_match' || f === 'maybe_registered') reasons.add('check_product');
     else if (f === 'no_date')
       continue; // date_approx says it
@@ -425,7 +436,15 @@ export type AskClaude = <T>(options: {
 
 export interface ReadCache {
   version: 1;
-  files: Record<string, { name: string; model: ModelAlias; rows: ExtractedRow[] }>;
+  files: Record<
+    string,
+    {
+      name: string;
+      model: ModelAlias;
+      rows: ExtractedRow[];
+      /** Why Sonnet read it. */ why?: string;
+    }
+  >;
 }
 
 export interface ReadResult {
@@ -433,6 +452,8 @@ export interface ReadResult {
   files: number;
   /** Files Sonnet read again, with why. */
   reviewed: { file: string; why: string }[];
+  /** Purchases shown in several files, joined (their files). */
+  merged: string[][];
   calls: { model: string; costUsd: number; tokens: number }[];
   costUsd: number;
 }
@@ -442,6 +463,91 @@ export interface ReadResult {
  * rows plus a random sample of the others. Results are cached per file content in the folder
  * (\`.tora-import.json\`), so running again only reads new files.
  */
+/** The files a row came from ("a.png + b.png" when one purchase was shown on several pages). */
+export const filesOf = (row: ExtractedRow) => row.file.split(' + ').map((f) => f.trim());
+
+const titleCore = (t: string) =>
+  t
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/(\.{3}|…)\s*$/, '')
+    .replace(/\s+/g, '');
+const sameDay = (a: string | null, b: string | null) => !a || !b || a === b;
+
+/** Nothing in two rows says they are different purchases. */
+function compatible(a: ExtractedRow, b: ExtractedRow): boolean {
+  if (shopKey(a.shop) !== shopKey(b.shop)) return false;
+  if (a.priceJpy && b.priceJpy && a.priceJpy !== b.priceJpy) return false;
+  if (a.orderId && b.orderId && a.orderId !== b.orderId) return false;
+  return sameDay(a.date, b.date);
+}
+
+/** Sure enough of the model's "same purchase" to join the rows without asking. */
+export const SAME_SURE = 0.8;
+
+/**
+ * One purchase shown in several files (a listing page with the full title, a transaction page
+ * with the date and ID): rows the model tagged as one purchase, sure enough and with nothing
+ * disagreeing, are joined. Rows that may be one purchase but are not joined (the model unsure,
+ * something disagreeing, or a look-alike the code finds: same shop and price, one title the other
+ * cut short) stay apart as `pairs`, for the user to merge in review.
+ */
+export function mergeRows(rows: ExtractedRow[]): {
+  rows: ExtractedRow[];
+  merged: string[][];
+  pairs: [ExtractedRow, ExtractedRow][];
+} {
+  const join = (a: ExtractedRow, b: ExtractedRow): ExtractedRow => {
+    // The fuller title knows the item (name, quantity, category); the other the order.
+    const [full, other] = titleCore(a.title).length >= titleCore(b.title).length ? [a, b] : [b, a];
+    const dated = a.date ? a : b;
+    return {
+      ...full,
+      file: [...filesOf(a), ...filesOf(b)].join(' + '),
+      orderId: a.orderId ?? b.orderId,
+      url: full.url ?? other.url,
+      priceJpy: full.priceJpy ?? other.priceJpy,
+      date: dated.date,
+      dateApprox: dated.date ? dated.dateApprox : full.dateApprox,
+      status: a.status === 'cancelled' || b.status === 'cancelled' ? 'cancelled' : full.status,
+      unsure: [full.unsure, other.unsure].filter(Boolean).join('; ') || null,
+    };
+  };
+  const out: ExtractedRow[] = [];
+  const merged: string[][] = [];
+  const pairs: [ExtractedRow, ExtractedRow][] = [];
+  const distinctFiles = (a: ExtractedRow, b: ExtractedRow) =>
+    !filesOf(a).some((f) => filesOf(b).includes(f));
+  for (const row of rows) {
+    const tagged =
+      row.samePurchase &&
+      out.find((o) => o.samePurchase === row.samePurchase && distinctFiles(o, row));
+    if (tagged) {
+      const sure = Math.min(tagged.sameConfidence ?? 0, row.sameConfidence ?? 0) >= SAME_SURE;
+      if (sure && compatible(tagged, row)) {
+        const joined = join(tagged, row);
+        out[out.indexOf(tagged)] = joined;
+        for (const p of pairs) for (let k = 0; k < 2; k++) if (p[k] === tagged) p[k] = joined;
+        merged.push(filesOf(joined));
+      } else {
+        pairs.push([tagged, row]);
+        out.push(row);
+      }
+      continue;
+    }
+    // Look-alikes the model did not tag (e.g. read in different batches).
+    const alike = out.find((o) => {
+      if (!distinctFiles(o, row) || !o.priceJpy || o.priceJpy !== row.priceJpy) return false;
+      if (o.status === 'not_purchase' || row.status === 'not_purchase') return false;
+      const [a, b] = [titleCore(o.title), titleCore(row.title)].sort((x, y) => x.length - y.length);
+      return a!.length >= 6 && b!.startsWith(a!) && compatible(o, row);
+    });
+    if (alike) pairs.push([alike, row]);
+    out.push(row);
+  }
+  return { rows: out, merged, pairs };
+}
+
 export async function readPurchases(
   ctx: CheckContext,
   dir: string,
@@ -458,7 +564,14 @@ export async function readPurchases(
   const log = options.log ?? (() => {});
   const random = options.random ?? Math.random;
   const cache: ReadCache = (await options.loadCache?.()) ?? { version: 1, files: {} };
-  const result: ReadResult = { rows: [], files: files.length, reviewed: [], calls: [], costUsd: 0 };
+  const result: ReadResult = {
+    rows: [],
+    files: files.length,
+    reviewed: [],
+    merged: [],
+    calls: [],
+    costUsd: 0,
+  };
   const products = [...ctx.products.values()].map(productLine);
   const call = async (
     model: ModelAlias,
@@ -473,20 +586,35 @@ export async function readPurchases(
       readDir: dir,
     });
     result.calls.push({ model: r.modelName, costUsd: r.costUsd, tokens: r.tokens });
+    // Same-purchase tags mean something within one answer only.
+    const tag = `${Date.now().toString(36)}${result.calls.length}:`;
+    for (const row of r.output.rows)
+      if (row.samePurchase) row.samePurchase = tag + row.samePurchase;
     result.costUsd += r.costUsd;
-    // Rows go to the file they name (a lone file takes them all).
+    // Rows go to the file they name, a purchase seen in several files to the first of them (a
+    // lone file takes them all). Their \`file\` keeps every name, for the files read together.
     const out = new Map<string, ExtractedRow[]>(batch.map((f) => [f, []]));
     for (const row of r.output.rows) {
-      const file =
-        batch.length === 1 ? batch[0]! : batch.find((f) => f === row.file || f.endsWith(row.file));
-      if (file) out.get(file)!.push({ ...row, file });
+      const named = filesOf(row)
+        .map((n) => batch.find((f) => f === n || f.endsWith(n)))
+        .filter((f): f is string => !!f);
+      const file = batch.length === 1 ? batch[0]! : named[0];
+      if (file) {
+        out
+          .get(file)!
+          .push({ ...row, file: (named.length ? [...new Set(named)] : [file]).join(' + ') });
+      }
     }
     return out;
   };
-  const store = async (byFile: Map<string, ExtractedRow[]>, model: ModelAlias) => {
+  const store = async (
+    byFile: Map<string, ExtractedRow[]>,
+    model: ModelAlias,
+    why: { names: string[]; why: string }[] = [],
+  ) => {
     for (const [name, rows] of byFile) {
       const hash = files.find((f) => f.name === name)!.hash;
-      cache.files[hash] = { name, model, rows };
+      cache.files[hash] = { name, model, rows, why: why.find((w) => w.names.includes(name))?.why };
     }
     await options.saveCache?.(cache);
   };
@@ -498,41 +626,57 @@ export async function readPurchases(
     await store(await call('haiku', batch), 'haiku');
   }
 
-  // Files with flagged rows (and a sample of the rest) are read again by Sonnet.
-  const again: { name: string; why: string }[] = [];
-  for (const f of files) {
-    const entry = cache.files[f.hash]!;
-    if (entry.model === 'sonnet') continue;
-    // A missing date is not on the page: reading it again cannot find one.
-    const flags = [...new Set(entry.rows.flatMap((r) => checkRow(r, ctx)))].filter(
-      (f) => f !== 'no_date',
-    );
-    if (flags.length) again.push({ name: f.name, why: flags.join(', ') });
-    else if (entry.rows.length && random() < (options.sample ?? 0.1)) {
-      again.push({ name: f.name, why: 'random check' });
-    }
+  // Rows of all files, one purchase shown in several files joined, then checked.
+  const assemble = () => {
+    const all = files.flatMap((f) => cache.files[f.hash]!.rows);
+    return mergeRows(all);
+  };
+  const modelOf = (name: string) => cache.files[files.find((f) => f.name === name)!.hash]!.model;
+
+  // Purchases with flagged rows (and a sample of the rest) are read again by Sonnet, all of
+  // their files together. A missing date is not on the page: reading again cannot find one.
+  const again: { names: string[]; why: string }[] = [];
+  const queued = new Set<string>();
+  for (const row of assemble().rows) {
+    const names = filesOf(row).filter((n) => !queued.has(n) && modelOf(n) !== 'sonnet');
+    if (names.length === 0) continue;
+    const flags = checkRow(row, ctx).filter((f) => f !== 'no_date');
+    const why = flags.length
+      ? flags.join(', ')
+      : row.status === 'purchased' && random() < (options.sample ?? 0.1)
+        ? 'random check'
+        : null;
+    if (!why) continue;
+    // The whole file is read again: every purchase in it goes along.
+    for (const n of names) queued.add(n);
+    again.push({ names, why });
   }
-  for (let i = 0; i < again.length; i += 3) {
-    const batch = again.slice(i, i + 3);
-    const names = batch.map((b) => b.name);
+  for (let i = 0; i < again.length;) {
+    const batch: typeof again = [];
+    while (i < again.length && batch.flatMap((b) => b.names).length < 4) batch.push(again[i++]!);
+    const names = batch.flatMap((b) => b.names);
     const hintRows = names.flatMap((n) => cache.files[files.find((f) => f.name === n)!.hash]!.rows);
     const flags = Object.fromEntries(
       hintRows.map((r, j) => [`${r.file} row ${j + 1}: ${r.title}`, checkRow(r, ctx)]),
     );
-    log(`Sonnet reading again: ${batch.map((b) => `${b.name} (${b.why})`).join(', ')}`);
-    await store(await call('sonnet', names, { rows: hintRows, flags }), 'sonnet');
-    result.reviewed.push(...batch.map((b) => ({ file: b.name, why: b.why })));
+    log(
+      `Sonnet reading again: ${batch.map((b) => `${b.names.join(' + ')} (${b.why})`).join(', ')}`,
+    );
+    await store(await call('sonnet', names, { rows: hintRows, flags }), 'sonnet', batch);
   }
 
-  const reviewedWhy = new Map(result.reviewed.map((r) => [r.file, r.why]));
-  for (const f of files) {
-    for (const row of cache.files[f.hash]!.rows) {
-      result.rows.push({
-        row,
-        flags: checkRow(row, ctx),
-        reviewedBy: reviewedWhy.get(f.name) ?? null,
-      });
-    }
+  const { rows, merged, pairs } = assemble();
+  result.merged = merged;
+  for (const row of rows) {
+    const flags = checkRow(row, ctx);
+    if (pairs.some((pair) => pair.includes(row))) flags.push('maybe_same');
+    const why = filesOf(row)
+      .map((n) => cache.files[files.find((f) => f.name === n)!.hash]!.why)
+      .find(Boolean);
+    result.rows.push({ row, flags, reviewedBy: why ?? null });
   }
+  result.reviewed = files
+    .filter((f) => cache.files[f.hash]!.why)
+    .map((f) => ({ file: f.name, why: cache.files[f.hash]!.why! }));
   return result;
 }
