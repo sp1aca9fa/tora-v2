@@ -124,18 +124,18 @@ export async function addLinksAction(_: LinksState, formData: FormData): Promise
   if (links.length === 0) return { error: 'noLinks' };
   if (links.length > 200) return { error: 'tooManyLinks' };
   const result = await addPurchaseLinks(db, user.id, links);
-  revalidatePath('/imports');
+  revalidatePath('/', 'layout');
   return result;
 }
 
 export async function removeLinkAction(id: string) {
   const { db, user } = await authed();
   await removePurchaseLinks(db, user.id, [id]);
-  revalidatePath('/imports');
+  revalidatePath('/', 'layout');
 }
 
 export async function retryLinkAction(id: string) {
   const { db, user } = await authed();
   await retryPurchaseLinks(db, user.id, [id]);
-  revalidatePath('/imports');
+  revalidatePath('/', 'layout');
 }

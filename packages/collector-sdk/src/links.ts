@@ -8,9 +8,11 @@ import {
   type PurchaseLinkStatus,
   type Product,
   addSourceReference,
+  finishImportRun,
   holdingsWithProducts,
   pendingPurchaseLinks,
   setPurchaseLinkResult,
+  startImportRun,
 } from '@tora/db';
 import { BlockedError, type PoliteHttp, RequestCapError, errorText } from './http';
 import { type Decision, applyImport, gatherReceipts, planImport } from './purchases';
@@ -38,13 +40,37 @@ export async function importPurchaseLinks(
     counts: { imported: 0, matched: 0, duplicate: 0, skipped: 0, failed: 0 },
     left: 0,
   };
+  // One import run per user and collect (the Imports history), opened on their first link.
+  const runs = new Map<
+    string,
+    { id: string; counts: Record<string, number>; sources: Set<string> }
+  >();
+  const runOf = async (userId: string) => {
+    let run = runs.get(userId);
+    if (!run) {
+      run = {
+        id: await startImportRun(db, { userId, method: 'links' }),
+        counts: {},
+        sources: new Set(),
+      };
+      runs.set(userId, run);
+    }
+    return run;
+  };
   const finish = async (
     link: PurchaseLink,
     status: Exclude<PurchaseLinkStatus, 'pending'>,
     message: string | null,
     holdingId: string | null = null,
   ) => {
-    await setPurchaseLinkResult(db, link.id, { status, message, holdingId });
+    const run = await runOf(link.userId);
+    run.counts[status] = (run.counts[status] ?? 0) + 1;
+    await setPurchaseLinkResult(db, link.id, {
+      status,
+      message,
+      holdingId,
+      importRunId: run.id,
+    });
     summary.counts[status]++;
     log(`${status}: ${link.url}${message ? ` (${message})` : ''}`);
   };
@@ -103,7 +129,11 @@ export async function importPurchaseLinks(
         entry.flags = reasons;
       }
     }
-    const outcome = await applyImport(db, userId, importer, plan, decisions);
+    const run = await runOf(userId);
+    run.sources.add(importer.source);
+    const outcome = await applyImport(db, userId, importer, plan, decisions, {
+      importRunId: run.id,
+    });
     const failed = new Map(outcome.failed.map((f) => [f.orderId, f.error]));
 
     // The lots each link ended up as (new ones, or the entries they matched).
@@ -163,6 +193,13 @@ export async function importPurchaseLinks(
         );
       }
     }
+  }
+  for (const run of runs.values()) {
+    if (summary.left) run.counts.left = summary.left;
+    // A run of one shop's links is named after it.
+    await finishImportRun(db, run.id, run.counts, {
+      source: run.sources.size === 1 ? [...run.sources][0]! : null,
+    });
   }
   return summary;
 }

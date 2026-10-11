@@ -184,7 +184,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
 
       {toReview > 0 && (
         <Link
-          href="/imports"
+          href="/imports/review"
           className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
         >
           <span>{t('imports.banner', { count: toReview })}</span>

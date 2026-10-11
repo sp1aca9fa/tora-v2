@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutGrid, PlusCircle, Settings } from 'lucide-react';
+import { Inbox, LayoutGrid, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 const ITEMS = [
   { href: '/', key: 'portfolio', icon: LayoutGrid },
   { href: '/add', key: 'add', icon: PlusCircle },
+  { href: '/imports', key: 'imports', icon: Inbox },
   { href: '/settings', key: 'settings', icon: Settings },
 ] as const;
 
@@ -17,8 +18,22 @@ function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname.startsWith(href);
 }
 
-/** Bottom tab bar on mobile, side nav on desktop. */
-export function Nav() {
+/** A count of what needs the user, on a nav item. */
+function Badge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="min-w-5 rounded-full bg-amber-500 px-1.5 text-center text-[10px] leading-5 font-medium text-white">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+/** Bottom tab bar on mobile, side nav on desktop. `badges`: counts per item key. */
+export function Nav({
+  badges = {},
+}: {
+  badges?: Partial<Record<(typeof ITEMS)[number]['key'], number>>;
+}) {
   const t = useTranslations();
   const pathname = usePathname();
 
@@ -43,7 +58,8 @@ export function Nav() {
               )}
             >
               <Icon className="size-4" />
-              {t(`nav.${key}`)}
+              <span className="flex-1">{t(`nav.${key}`)}</span>
+              <Badge count={badges[key] ?? 0} />
             </Link>
           ))}
         </nav>
@@ -57,7 +73,7 @@ export function Nav() {
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {ITEMS.map(({ href, key, icon: Icon }) => (
             <Link
               key={href}
@@ -68,7 +84,12 @@ export function Nav() {
                 isActive(pathname, href) && 'font-medium text-foreground',
               )}
             >
-              <Icon className="size-5" />
+              <span className="relative">
+                <Icon className="size-5" />
+                <span className="absolute -top-1.5 left-3.5">
+                  <Badge count={badges[key] ?? 0} />
+                </span>
+              </span>
               {t(`nav.${key}`)}
             </Link>
           ))}

@@ -65,7 +65,12 @@ export async function pendingPurchaseLinks(db: Db): Promise<PurchaseLink[]> {
 export async function setPurchaseLinkResult(
   db: Db,
   id: string,
-  result: { status: PurchaseLinkStatus; message?: string | null; holdingId?: string | null },
+  result: {
+    status: PurchaseLinkStatus;
+    message?: string | null;
+    holdingId?: string | null;
+    importRunId?: string | null;
+  },
 ): Promise<void> {
   const now = toTokyoIso();
   await db
@@ -74,6 +79,7 @@ export async function setPurchaseLinkResult(
       status: result.status,
       message: result.message ?? null,
       holdingId: result.holdingId ?? null,
+      ...(result.importRunId !== undefined ? { importRunId: result.importRunId } : {}),
       processedAt: now,
       updatedAt: now,
     })
@@ -104,4 +110,36 @@ export async function failedPurchaseLinkCount(db: Db, userId: string): Promise<n
     .from(purchaseLinks)
     .where(and(eq(purchaseLinks.userId, userId), eq(purchaseLinks.status, 'failed')));
   return row?.n ?? 0;
+}
+
+/** A link that could not be imported, added by hand: done (keeps the lot it became). */
+export async function resolvePurchaseLink(
+  db: Db,
+  userId: string,
+  id: string,
+  holdingId: string,
+): Promise<void> {
+  const now = toTokyoIso();
+  await db
+    .update(purchaseLinks)
+    .set({ status: 'matched', message: 'Added by hand.', holdingId, updatedAt: now })
+    .where(
+      and(
+        eq(purchaseLinks.id, id),
+        eq(purchaseLinks.userId, userId),
+        eq(purchaseLinks.status, 'failed'),
+      ),
+    );
+}
+
+export async function getPurchaseLink(
+  db: Db,
+  userId: string,
+  id: string,
+): Promise<PurchaseLink | null> {
+  const [link] = await db
+    .select()
+    .from(purchaseLinks)
+    .where(and(eq(purchaseLinks.id, id), eq(purchaseLinks.userId, userId)));
+  return link ?? null;
 }

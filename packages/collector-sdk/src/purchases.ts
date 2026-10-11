@@ -311,6 +311,8 @@ export async function applyImport(
   importer: PurchaseImporter,
   plan: PlanEntry[],
   decisions: Map<string, Decision>,
+  /** The import run the new lots belong to (Imports history). */
+  options: { importRunId?: string | null } = {},
 ): Promise<ImportOutcome> {
   const outcome: ImportOutcome = { created: 0, updated: 0, attached: 0, flagged: 0, failed: [] };
 
@@ -342,6 +344,7 @@ export async function applyImport(
         // Grade, cert and packaging are checked in the app's import review.
         reviewPending: true,
         reviewReason: flags.length ? flags.join(',') : null,
+        importRunId: options.importRunId ?? null,
       },
     );
     if ('create' in ref) {

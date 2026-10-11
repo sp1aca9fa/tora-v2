@@ -22,6 +22,7 @@ import {
   linkedProductIds,
   searchProducts,
   searchSets,
+  resolvePurchaseLink,
   suggestFromKnownProducts,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
@@ -211,6 +212,9 @@ export async function createHoldingAction(
   if (!result.ok) return result.state;
   // Offer a linked look-alike's listing right away (no need to wait for the collector).
   await suggestFromKnownProducts(db, result.value.product.id);
-  revalidatePath('/');
-  redirect(`/holdings/${result.value.holding.id}`);
+  // Added by hand for a purchase link that could not be imported: that link is done.
+  const linkId = String(formData.get('purchaseLinkId') ?? '');
+  if (linkId) await resolvePurchaseLink(db, user.id, linkId, result.value.holding.id);
+  revalidatePath('/', 'layout');
+  redirect(linkId ? '/imports#failed' : `/holdings/${result.value.holding.id}`);
 }

@@ -87,11 +87,19 @@ export function AddFlow({
   fromSuggestions,
   franchiseSuggestions,
   initialProduct,
+  fromLink,
 }: {
   today: string;
   fromSuggestions: string[];
   franchiseSuggestions: string[];
   initialProduct: ProductSummary | null;
+  /** Adding a purchase link that could not be imported: shop and order ID prefilled. */
+  fromLink?: {
+    id: string;
+    url: string;
+    acquiredFrom: string | null;
+    orderId: string | null;
+  } | null;
 }) {
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(createHoldingAction, {});
@@ -211,6 +219,14 @@ export function AddFlow({
       }}
       className="space-y-6"
     >
+      {fromLink && (
+        <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+          {t('add.fromLink')}{' '}
+          <a href={fromLink.url} target="_blank" rel="noreferrer" className="break-all underline">
+            {fromLink.url.replace(/^https?:\/\//, '')}
+          </a>
+        </p>
+      )}
       <ol className="flex gap-2 text-xs">
         {STEPS.map((s, i) => (
           <li
@@ -496,6 +512,7 @@ export function AddFlow({
               name="acquiredFrom"
               list="from-suggestions"
               autoComplete="off"
+              defaultValue={fromLink?.acquiredFrom ?? undefined}
             />
             <datalist id="from-suggestions">
               <option value={t('add.unknownFrom')} />
@@ -557,7 +574,14 @@ export function AddFlow({
             hint={t('add.orderIdHint')}
             className="sm:col-span-2"
           >
-            <Input id="orderId" name="orderId" autoComplete="off" inputMode="text" />
+            <Input
+              id="orderId"
+              name="orderId"
+              autoComplete="off"
+              inputMode="text"
+              defaultValue={fromLink?.orderId ?? undefined}
+            />
+            {fromLink && <input type="hidden" name="purchaseLinkId" value={fromLink.id} />}
           </Field>
         </div>
       </section>

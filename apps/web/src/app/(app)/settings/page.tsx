@@ -4,9 +4,7 @@ import {
   listDevices,
   listRecentCollectorRuns,
 } from '@tora/db';
-import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { logout, revokeDeviceAction } from '@/app/actions';
 import { Button } from '@/components/ui/button';
@@ -35,17 +33,6 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
-
-      <Link
-        href="/imports"
-        className="flex items-center justify-between rounded-xl border bg-card px-4 py-3 text-sm"
-      >
-        <span>
-          <span className="font-medium">{t('imports.title')}</span>
-          <span className="block text-xs text-muted-foreground">{t('settings.importsHint')}</span>
-        </span>
-        <ChevronRight className="size-4" />
-      </Link>
 
       <Card>
         <CardHeader>

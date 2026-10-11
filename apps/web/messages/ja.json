@@ -6,7 +6,8 @@
   "nav": {
     "portfolio": "ポートフォリオ",
     "add": "登録",
-    "settings": "設定"
+    "settings": "設定",
+    "imports": "インポート"
   },
   "common": {
     "save": "保存",
@@ -112,7 +113,8 @@
     "onReleaseUnknown": "発売日に入手（先に発売日を入力してください）",
     "unknownFrom": "不明",
     "costFromRetail": "空欄の場合、定価×数量（{amount}）を使います。",
-    "fromLinks": "メルカリで購入？リンクを貼り付けて追加"
+    "fromLinks": "メルカリで購入？リンクを貼り付けて追加",
+    "fromLink": "インポートできなかったリンクの購入を手動で追加します（保存するとリンクは完了になります）："
   },
   "holding": {
     "costBasis": "取得原価",
@@ -211,8 +213,7 @@
     "stale": "3日以上収集されていません:",
     "never": "未実行",
     "jumps": "中央値が50%以上変動（直近7日 vs その前30日）:",
-    "recentRuns": "最近の実行",
-    "importsHint": "確認待ちのインポート、購入リンクとその結果"
+    "recentRuns": "最近の実行"
   },
   "fields": {
     "type": "種類",
@@ -521,8 +522,45 @@
       },
       "banner": "{count}件の購入リンクをインポートできませんでした。手動で追加してください",
       "failedTitle": "インポートできなかったリンク（{count}件）",
-      "failedIntro": "各リンクを開いて（購入者には表示されます）手動でアイテムを追加し、×でリンクを削除してください。",
-      "addByHand": "アイテムを追加"
+      "failedIntro": "各リンクを開き（購入者には表示されます）、「手動で追加」からアイテムを追加してください。保存するとリンクは完了になります。不要なリンクは×で削除できます。",
+      "addByHand": "手動で追加",
+      "pasted": "貼り付けたリンク（{count}件、次回の収集待ち{pending}件）"
+    },
+    "hub": {
+      "intro": "インポートのすべて：対応が必要なもの、インポート方法、各インポートの結果。",
+      "attention": "対応が必要",
+      "allClear": "今は対応が必要なものはありません。",
+      "start": "購入をインポート",
+      "emailTitle": "注文メール",
+      "emailIntro": "ショップの注文メールをGoogle Takeoutで書き出し、ホームPCでこのコマンドを実行します。インポートしたアイテムはここで確認できます。",
+      "emailLast": "前回のメールインポート：{date}",
+      "emailNever": "メールインポートはまだありません。",
+      "history": "履歴",
+      "noHistory": "インポートはまだありません。",
+      "nothing": "新しいものなし",
+      "back": "インポートに戻る",
+      "runTitle": "インポート",
+      "lots": "このインポートのロット{count}件",
+      "noLots": "このインポートで作成されたロットはありません。",
+      "linksRead": "読み取ったリンク{count}件",
+      "method": {
+        "email": "注文メール",
+        "links": "購入リンク",
+        "file": "購入ファイル",
+        "claude": "Claude経由"
+      },
+      "count": {
+        "imported": "{count}件インポート",
+        "matched": "{count}件既存と一致",
+        "duplicate": "{count}件登録済み",
+        "skipped": "{count}件スキップ",
+        "failed": "{count}件失敗",
+        "corrected": "{count}件修正",
+        "flagged": "{count}件要確認",
+        "cancelled": "{count}件キャンセル",
+        "unclassified": "{count}件分類不可",
+        "left": "{count}件次回へ"
+      }
     }
   },
   "product": {

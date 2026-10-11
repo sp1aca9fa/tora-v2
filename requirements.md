@@ -21,7 +21,7 @@
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
-| S5d | Imports hub: one Imports menu for every import, its results and follow-ups | todo (next) |
+| S5d | Imports hub: one Imports menu for every import, its results and follow-ups | built; awaiting user check |
 | S4d | Automated data review: cheap model checks flagged data, suggestions queue | todo (after S5d; trial first) |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | todo (after S4d) |
 | S6 | Export / import (JSON, CSV) + backups | todo |
@@ -384,6 +384,8 @@ Build:
 - Import runs are recorded (`import_runs`: user, method, source, started / finished, counts, notes); imported lots and links point to their run. The terminal email import and the link import in `pnpm collect` record runs too, so they show in History.
 - Everything import-related lives under the hub and returns to it: Review import becomes a sub-page; card grades for imported cards, "order cancelled", link results and the add-by-hand flow for a failed link link back; banners elsewhere (portfolio) point into the hub instead of separate pages.
 - Later: conflicts and likely duplicates from the email import decided in the app instead of the terminal (the S6 in-app file import uses the same screens).
+
+Built (2026-10-11): Imports in the main navigation with a badge (items to review + failed links + cards without grade); `/imports` hub with Needs you (review, card grades, links that could not be imported with "Add by hand"), Import purchases (paste links with the list of pasted links, order emails with the command and the last run) and History (each run with its counts, opening `/imports/runs/<id>` with its lots and links); Review import moved to `/imports/review` and links back to the hub; `import_runs` recorded by the email import and the link import (one run per user per collect), lots and links point to their run. "Add by hand" opens Add with the shop and the item ID (the link's last path part) filled in; saving marks the link as done and returns to the hub. The Settings stopgap was removed. Not yet: conflicts decided in the app (later, with S6).
 
 Acceptance:
 - From any screen, Imports is one tap away; after pasting links and collecting, the user finds what was imported, what to review and what failed (with what to do) in one place.

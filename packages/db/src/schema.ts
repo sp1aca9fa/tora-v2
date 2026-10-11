@@ -285,6 +285,8 @@ export const holdings = sqliteTable(
      * confirms, so the same reason does not flag it again.
      */
     reviewReason: text('review_reason'),
+    /** The import that created this lot (null for lots added by hand). */
+    importRunId: text('import_run_id').references(() => importRuns.id, { onDelete: 'set null' }),
     ...timestamps,
   },
   (t) => [
@@ -324,6 +326,27 @@ export const cancelledOrders = sqliteTable(
 );
 
 /**
+ * One import of purchases (requirements S5d): an email export, a batch of pasted links, later a
+ * file or an import through Claude. Shown in the Imports history with what it did.
+ */
+export const importRuns = sqliteTable('import_runs', {
+  id: id(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id),
+  /** email | links | file | claude */
+  method: text('method').notNull(),
+  /** Shop (order source), e.g. snkrdunk, mercari. */
+  source: text('source'),
+  startedAt: text('started_at').notNull(),
+  finishedAt: text('finished_at'),
+  /** What it did: created, matched, duplicate, skipped, failed, corrected, flagged, ... */
+  counts: text('counts', { mode: 'json' }).$type<Record<string, number>>().notNull().default({}),
+  note: text('note'),
+  ...timestamps,
+});
+
+/**
  * Links to purchases the user pasted in the app (shops that send no receipt email, e.g.
  * Mercari). The home PC reads each on the next collect and imports it into the review queue.
  */
@@ -340,6 +363,8 @@ export const purchaseLinks = sqliteTable(
     /** What happened, in plain words (e.g. why it was skipped). */
     message: text('message'),
     holdingId: text('holding_id').references(() => holdings.id, { onDelete: 'set null' }),
+    /** The import run that read this link. */
+    importRunId: text('import_run_id').references(() => importRuns.id, { onDelete: 'set null' }),
     processedAt: text('processed_at'),
     ...timestamps,
   },
@@ -495,6 +520,7 @@ export const loginAttempts = sqliteTable(
 
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
+export type ImportRun = typeof importRuns.$inferSelect;
 export type UserDevice = typeof userDevices.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;
 export type NewTcgSet = typeof tcgSets.$inferInsert;

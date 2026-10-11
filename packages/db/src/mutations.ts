@@ -97,6 +97,8 @@ export interface HoldingInput {
   reviewPending?: boolean;
   /** Why it waits for review (comma-separated reasons, e.g. `deadline_missed`). */
   reviewReason?: string | null;
+  /** The import that created it (Imports history). */
+  importRunId?: string | null;
 }
 
 /** A sealed product of a catalog set; created on first use. */

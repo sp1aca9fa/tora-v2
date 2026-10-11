@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { formatJpy } from '@/lib/utils';
-import { type ReviewRow, type ReviewState, confirmReviewAction } from './actions';
+import { type ReviewRow, type ReviewState, confirmReviewAction } from '../actions';
 
 export interface ReviewItem {
   id: string;

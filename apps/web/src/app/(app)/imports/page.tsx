@@ -1,50 +1,41 @@
-import { productClass } from '@tora/core';
-import { pendingImportReview, purchaseLinksOf } from '@tora/db';
-import { ChevronLeft, RotateCw, X } from 'lucide-react';
+import { type PurchaseLink, importAttention, importRunsOf, purchaseLinksOf } from '@tora/db';
+import { ChevronRight, RotateCw, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
-import { authed } from '@/lib/auth/guard';
+import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
+import { authed } from '@/lib/auth/guard';
+import { sourceLabel } from '@/lib/product-display';
 import { removeLinkAction, retryLinkAction } from './actions';
 import { LinksForm } from './links-form';
-import { ReviewForm, type ReviewItem } from './review-form';
 
 export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await getTranslations('imports'))('title') };
+  return { title: (await getTranslations('nav'))('imports') };
 }
 
-export default async function ImportReviewPage() {
+/** Imports hub (requirements S5d): what needs you, ways to import, and what each import did. */
+export default async function ImportsPage() {
   const { db, user } = await authed();
-  const [rows, links, t] = await Promise.all([
-    pendingImportReview(db, user.id),
-    purchaseLinksOf(db, user.id, 50),
+  const [attention, links, runs, t, format] = await Promise.all([
+    importAttention(db, user.id),
+    purchaseLinksOf(db, user.id, 200),
+    importRunsOf(db, user.id),
     getTranslations(),
+    getFormatter(),
   ]);
-  const items: ReviewItem[] = rows.map(({ holding, product }) => {
-    const cls = productClass(product);
-    return {
-      id: holding.id,
-      cls,
-      name: product.name,
-      details: [product.rarity, product.setCode, product.cardNumber].filter(Boolean).join(' '),
-      acquiredAt: holding.acquiredAt.slice(0, 10),
-      orderId: holding.orderId,
-      costJpy: holding.costTotalJpy,
-      quantity: holding.quantity,
-      packagingState: holding.packagingState,
-      reasons: (holding.reviewReason ?? '').split(',').filter(Boolean),
-      grading: holding.grading,
-      rawGrade: holding.rawGrade,
-      grader: holding.grader,
-      grade: holding.grade,
-      certNumber: holding.certNumber,
-    };
-  });
-
+  const dateTime = (iso: string) =>
+    format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
   const failed = links.filter((l) => l.status === 'failed');
   const others = links.filter((l) => l.status !== 'failed');
-  const linkRow = (l: (typeof links)[number]) => (
+  const lastEmail = runs.find((r) => r.method === 'email');
+  const countsText = (counts: Record<string, number>) =>
+    Object.entries(counts)
+      .map(([k, n]) =>
+        t.has(`imports.hub.count.${k}`) ? t(`imports.hub.count.${k}`, { count: n }) : `${k} ${n}`,
+      )
+      .join(', ');
+
+  const linkRow = (l: PurchaseLink) => (
     <li key={l.id} className="flex items-start gap-2 px-4 py-2.5">
       <div className="min-w-0 flex-1 space-y-0.5">
         <a
@@ -69,6 +60,11 @@ export default async function ImportReviewPage() {
             </>
           )}
         </p>
+        {l.status === 'failed' && (
+          <Link href={`/add?link=${l.id}`} className="inline-block text-xs font-medium underline">
+            {t('imports.links.addByHand')}
+          </Link>
+        )}
       </div>
       {l.status === 'failed' && (
         <form action={retryLinkAction.bind(null, l.id)}>
@@ -87,49 +83,110 @@ export default async function ImportReviewPage() {
     </li>
   );
 
+  const tile = (href: string, text: string) => (
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+    >
+      <span>{text}</span>
+      <ChevronRight className="size-4" />
+    </Link>
+  );
+
   return (
-    <div className="space-y-4">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="size-4" /> {t('portfolio.title')}
-      </Link>
+    <div className="space-y-8">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('imports.title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('imports.intro')}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('nav.imports')}</h1>
+        <p className="text-sm text-muted-foreground">{t('imports.hub.intro')}</p>
       </header>
-      {failed.length > 0 && (
-        <section id="failed" className="scroll-mt-20 space-y-2">
-          <h2 className="text-lg font-semibold tracking-tight">
-            {t('imports.links.failedTitle', { count: failed.length })}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {t('imports.links.failedIntro')}{' '}
-            <Link href="/add" className="underline">
-              {t('imports.links.addByHand')}
-            </Link>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">{t('imports.hub.attention')}</h2>
+        {attention.total === 0 ? (
+          <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+            {t('imports.hub.allClear')}
           </p>
-          <ul className="divide-y rounded-xl border bg-card text-sm">{failed.map(linkRow)}</ul>
-        </section>
-      )}
+        ) : (
+          <div className="space-y-2">
+            {attention.toReview > 0 &&
+              tile('/imports/review', t('imports.banner', { count: attention.toReview }))}
+            {attention.ungradedCards > 0 &&
+              tile('/holdings/grades', t('grades.banner', { count: attention.ungradedCards }))}
+          </div>
+        )}
+        {failed.length > 0 && (
+          <div id="failed" className="scroll-mt-20 space-y-2">
+            <h3 className="font-medium">
+              {t('imports.links.failedTitle', { count: failed.length })}
+            </h3>
+            <p className="text-sm text-muted-foreground">{t('imports.links.failedIntro')}</p>
+            <ul className="divide-y rounded-xl border bg-card text-sm">{failed.map(linkRow)}</ul>
+          </div>
+        )}
+      </section>
 
-      {items.length === 0 ? (
-        <p className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          {t('imports.none')}
-        </p>
-      ) : (
-        <ReviewForm items={items} />
-      )}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight">{t('imports.hub.start')}</h2>
 
-      <section id="links" className="scroll-mt-20 space-y-3">
-        <header className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-tight">{t('imports.links.title')}</h2>
+        <div id="links" className="scroll-mt-20 space-y-2 rounded-xl border bg-card px-4 py-3">
+          <h3 className="font-medium">{t('imports.links.title')}</h3>
           <p className="text-sm text-muted-foreground">{t('imports.links.intro')}</p>
-        </header>
-        <LinksForm />
-        {others.length > 0 && (
-          <ul className="divide-y rounded-xl border bg-card text-sm">{others.map(linkRow)}</ul>
+          <LinksForm />
+          {others.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                {t('imports.links.pasted', {
+                  count: others.length,
+                  pending: others.filter((l) => l.status === 'pending').length,
+                })}
+              </summary>
+              <ul className="mt-2 divide-y rounded-lg border">{others.map(linkRow)}</ul>
+            </details>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-xl border bg-card px-4 py-3">
+          <h3 className="font-medium">{t('imports.hub.emailTitle')}</h3>
+          <p className="text-sm text-muted-foreground">{t('imports.hub.emailIntro')}</p>
+          <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">
+            pnpm purchases &lt;export.mbox&gt; --user {user.username}
+          </pre>
+          <p className="text-xs text-muted-foreground">
+            {lastEmail
+              ? t('imports.hub.emailLast', { date: dateTime(lastEmail.startedAt) })
+              : t('imports.hub.emailNever')}
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">{t('imports.hub.history')}</h2>
+        {runs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('imports.hub.noHistory')}</p>
+        ) : (
+          <ul className="divide-y rounded-xl border bg-card text-sm">
+            {runs.map((r) => (
+              <li key={r.id}>
+                <Link
+                  href={`/imports/runs/${r.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-accent"
+                >
+                  <span className="min-w-0">
+                    <span className="font-medium">
+                      {t(`imports.hub.method.${r.method}`)}
+                      {r.source ? ` · ${sourceLabel(r.source)}` : ''}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {dateTime(r.startedAt)}
+                      {' · '}
+                      {countsText(r.counts) || t('imports.hub.nothing')}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

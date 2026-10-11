@@ -3,7 +3,7 @@
 // the home PC; the app never gets Gmail access. Nothing is written before the summary is
 // confirmed, and existing entries are never removed.
 import { tokyoDate } from '@tora/core';
-import { createDb, getUserByUsername } from '@tora/db';
+import { createDb, finishImportRun, getUserByUsername, startImportRun } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { resolve } from 'node:path';
@@ -196,7 +196,22 @@ for (const importer of selected) {
     console.log('Nothing written.\n');
     continue;
   }
-  const outcome = await applyImport(db, user.id, importer, plan, decisions);
+  const run = await startImportRun(db, {
+    userId: user.id,
+    method: 'email',
+    source: importer.source,
+  });
+  const outcome = await applyImport(db, user.id, importer, plan, decisions, { importRunId: run });
+  await finishImportRun(db, run, {
+    imported: outcome.created,
+    corrected: outcome.updated,
+    matched: outcome.attached,
+    flagged: outcome.flagged,
+    duplicate: of('duplicate').length,
+    cancelled: of('cancelled').length + of('cancelledInApp').length,
+    unclassified: of('unclassified').length,
+    failed: outcome.failed.length,
+  });
   console.log(
     `Done: ${outcome.created} created, ${outcome.updated} corrected, ${outcome.attached} order ID(s) added, ${outcome.flagged} review flag(s) added.`,
   );

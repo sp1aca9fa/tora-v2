@@ -6,7 +6,8 @@
   "nav": {
     "portfolio": "Portfolio",
     "add": "Add",
-    "settings": "Settings"
+    "settings": "Settings",
+    "imports": "Imports"
   },
   "common": {
     "save": "Save",
@@ -112,7 +113,8 @@
     "onReleaseUnknown": "Acquired on release day (enter a full release date first)",
     "unknownFrom": "Unknown",
     "costFromRetail": "Left blank: the retail price x quantity ({amount}) is used.",
-    "fromLinks": "Bought on Mercari? Paste the links instead"
+    "fromLinks": "Bought on Mercari? Paste the links instead",
+    "fromLink": "Adding by hand a purchase whose link could not be imported (saving marks the link as done):"
   },
   "holding": {
     "costBasis": "Cost basis",
@@ -211,8 +213,7 @@
     "stale": "Not collected for 3+ days:",
     "never": "never",
     "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
-    "recentRuns": "Recent runs",
-    "importsHint": "Imported purchases to check, purchase links and what happened to each"
+    "recentRuns": "Recent runs"
   },
   "fields": {
     "type": "Type",
@@ -521,8 +522,45 @@
       },
       "banner": "{count, plural, one {# purchase link could not be imported: add it by hand} other {# purchase links could not be imported: add them by hand}}",
       "failedTitle": "Could not import ({count})",
-      "failedIntro": "Open each link (you can still see your purchases), add the item by hand, then remove the link with ×.",
-      "addByHand": "Add an item"
+      "failedIntro": "Open each link (you can still see your purchase there) and add the item by hand from its \"Add by hand\" link; saving marks the link as done. Remove a link with × if you do not need it.",
+      "addByHand": "Add by hand",
+      "pasted": "Pasted links ({count}, {pending} waiting for the next collect)"
+    },
+    "hub": {
+      "intro": "Everything you import: what needs you, ways to import, and what each import did.",
+      "attention": "Needs you",
+      "allClear": "Nothing needs you right now.",
+      "start": "Import purchases",
+      "emailTitle": "Order emails",
+      "emailIntro": "Export the shop's order emails with Google Takeout, then run this on the home PC. Imported items show up here to review.",
+      "emailLast": "Last email import: {date}",
+      "emailNever": "No email import yet.",
+      "history": "History",
+      "noHistory": "No imports yet.",
+      "nothing": "nothing new",
+      "back": "Back to Imports",
+      "runTitle": "Import",
+      "lots": "{count, plural, one {# lot from this import} other {# lots from this import}}",
+      "noLots": "This import created no lots.",
+      "linksRead": "{count, plural, one {# link read} other {# links read}}",
+      "method": {
+        "email": "Order emails",
+        "links": "Purchase links",
+        "file": "Purchases file",
+        "claude": "Through Claude"
+      },
+      "count": {
+        "imported": "{count, plural, one {# imported} other {# imported}}",
+        "matched": "{count, plural, one {# matched an entry} other {# matched entries}}",
+        "duplicate": "{count, plural, one {# already registered} other {# already registered}}",
+        "skipped": "{count, plural, one {# skipped} other {# skipped}}",
+        "failed": "{count, plural, one {# failed} other {# failed}}",
+        "corrected": "{count, plural, one {# corrected} other {# corrected}}",
+        "flagged": "{count, plural, one {# flagged for review} other {# flagged for review}}",
+        "cancelled": "{count, plural, one {# cancelled} other {# cancelled}}",
+        "unclassified": "{count, plural, one {# unclassified} other {# unclassified}}",
+        "left": "{count, plural, one {# left for next time} other {# left for next time}}"
+      }
     }
   },
   "product": {

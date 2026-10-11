@@ -4,6 +4,8 @@ import {
   createDb,
   createHolding,
   createUser,
+  importRunDetail,
+  importRunsOf,
   linksIn,
   listProductSources,
   purchaseLinksOf,
@@ -126,6 +128,17 @@ describe('importPurchaseLinks', () => {
       auto: true,
       references: ['https://shop.example/item/a1'],
     });
+
+    // One run in the Imports history, with the lot and the links it read.
+    const [run] = await importRunsOf(db, userId);
+    expect(run).toMatchObject({
+      method: 'links',
+      source: 'shop',
+      counts: { imported: 1, skipped: 1, failed: 2 },
+    });
+    const detail = await importRunDetail(db, userId, run!.id);
+    expect(detail!.lots.map((l) => l.holding.id)).toEqual([lot!.id]);
+    expect(detail!.links).toHaveLength(4);
 
     const again = await importPurchaseLinks(db, [importer], [collector], http);
     expect(again.read).toBe(0);
