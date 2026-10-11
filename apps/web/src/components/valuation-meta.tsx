@@ -36,6 +36,7 @@ export function ValuationMeta({ v, className }: { v: HoldingValuation; className
   else {
     parts.push(sourceLabel(v.source ?? ''));
     parts.push(t('samples', { count: v.sampleSize, days: v.windowDays ?? 0 }));
+    if (v.pooled) parts.push(t('pooled'));
   }
   if (v.ageDays !== null && v.method !== 'retail') parts.push(t('age', { days: v.ageDays }));
   return (

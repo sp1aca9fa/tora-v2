@@ -17,6 +17,7 @@
 | S2b | Accounts + 2FA + devices, TCG/Game taxonomy, region, TCG set catalog | done |
 | S3 | Collector framework + SNKRDUNK + source matching | built; awaiting data gate with user |
 | S4 | Mercari sold collector | collector + query editor built; awaiting user check (purchase importer pending) |
+| S4b | MCP server: Claude reads the data (sanity checks, analysis, dev feedback) | todo (next after S4) |
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
@@ -85,6 +86,7 @@
 - 2026-10-10: Cost basis of pulls (user decision): an opened (consumed) item keeps its full cost in the totals, the P/L base and the value-over-time cost line, at no market value; the pulls logged from it cost nothing and carry the market value. Unlogged cards are thus not guessed at. Each pull shows an estimated cost for reference only (the opened item's cost split across all its logged pulls by market value, equal shares where unknown), never counted in totals. Previously an opened item's cost dropped out of the totals, which overstated P/L.
 - 2026-10-10: Mercari is searched for every product (user: try everything, maybe turn cards off later). No public project filters Mercari bundles or parts; hosted scrapers stop at sold-only + dedupe + median/percentiles, and Japanese price sites mostly use partner store prices (e.g. ポケカチ with Card Rush). So filtering is rule-based and transparent: every rejected item is kept with its reason and can be included by hand.
 - 2026-10-11: Add item: typed product details survive switching category / kind; "acquired on release day" fills the date from a known full release date; "Unknown" is the first shop suggestion and the other lists are alphabetical; total cost may be left blank when a retail price is known (retail price x quantity is used, and the form says so).
+- 2026-10-11: Valuation fallback for rare items: a source needs 3 sales; steps are the holding's condition over 30 / 90 / 180 days, then a year, then similar conditions pooled (an item's conditions, a card's raw grades, intact boxes with or without shrink; never graded slabs or opened boxes) over 180 days, then a year. A source reaching 3 sales wins over an earlier source with fewer; otherwise the first source with any sale is used. Year-long or pooled values are low confidence and labeled "similar conditions pooled".
 
 ---
 
@@ -342,6 +344,24 @@ Acceptance:
 - Scenario items 1-3 (CE, amiibo, controllers) get Mercari sold observations with sensible buckets.
 - Data gate repeated for 3 non-card items.
 - Mercari purchase importer (private plug-in): import the user's Mercari collectible purchases through the same `PurchaseImporter` interface and import flow as SNKRDUNK. This proves the "bring your own sources" design works for more than one shop (without it, that claim does not hold). Can come after the user's own SNKRDUNK flow is settled.
+
+## S4b: MCP server (Claude reads the data)
+
+Added at the user's request (2026-10-11): connect Claude to the tool, to sanity-check the data, explain it (what goes up, what does not, why) and find what to build next.
+
+Build:
+- `packages/mcp`: a local MCP server (stdio), started by Claude Code / Claude Desktop on the home PC with the root `.env`. Never deployed; nothing exposed online. Read-only, scoped to one configured user.
+- Tools (structured results, small by default, with limits):
+  - `portfolio_summary` (totals, breakdown, P/L, value over time), `list_products` (filters: kind, franchise, owned / sold, unvalued), `product_detail` (lots, valuation and how it was computed, sources, queries, references).
+  - `price_history` (daily medians per source and condition), `sales` (collected sales incl. excluded ones with the reason; filters by product, source, date, kept / excluded).
+  - `collector_health` (runs, stale sources, request use), `review_queue` (imports to review, pending matches, ungraded cards).
+  - `data_checks`: canned sanity checks with explanations: unvalued owned items, low-confidence / pooled values, look-alike products (duplicates), sales far from the median, sources with few kept sales or many exclusions, estimated lot sizes, missing set names / numbers / pictures, cancelled-looking orders.
+  - `query_sql`: read-only `SELECT` for open questions (one statement, row limit, no writes).
+- Later, opt-in: write tools behind explicit confirmation in the chat (exclude / include a sale, edit a search query, merge duplicates, set a manual price).
+- A short guide in the README: registering the server in Claude Code / Claude Desktop.
+
+Acceptance:
+- From Claude: "does anything look off?" runs the checks and explains the findings; "which of my items gained the most since I bought them, and why?" is answered from the data.
 
 ## S5: Valuation, Portfolio, Item detail
 

@@ -5,6 +5,8 @@ import {
   type SourceSummary,
   type Valuation,
   type ValuationObservation,
+  LONG_WINDOW,
+  bucketFamily,
   buylistFloor,
   deriveBucket,
   median,
@@ -33,7 +35,8 @@ import {
 
 const DAY = 86_400_000;
 /** Valuation looks back 180 days; snapshot backfill adds 90 more. */
-const LOOKBACK_DAYS = 180 + 90;
+/** Sales loaded for a valuation: the year-long fallback window, plus a margin for charts. */
+const LOOKBACK_DAYS = LONG_WINDOW + 90;
 
 export interface HoldingValuation extends Valuation {
   bucket: string | null;
@@ -354,7 +357,7 @@ export function heldOn(holding: Holding, events: HoldingEvent[], day: string): b
 }
 
 /** Longest valuation window: a day's value only looks at sales up to this far back. */
-const WINDOW_DAYS = 180;
+const WINDOW_DAYS = LONG_WINDOW;
 /** How far back the chart can go. */
 const MAX_HISTORY_DAYS = 3 * 366;
 
@@ -407,7 +410,15 @@ export async function runSnapshots(db: Db, now = new Date()) {
     let s = series.get(key);
     if (!s) {
       const observations = (markets.get(userId)!.observations.get(productId) ?? [])
-        .filter((o) => o.bucket === bucket)
+        // Similar conditions too: a rare item's value may pool them (see valueUnit).
+        .filter(
+          (o) =>
+            o.bucket === bucket ||
+            (bucket !== null &&
+              o.bucket !== null &&
+              bucketFamily(bucket) !== null &&
+              bucketFamily(o.bucket) === bucketFamily(bucket)),
+        )
         .toSorted((a, b) => a.observedAt.localeCompare(b.observedAt));
       s = { at: observations.map((o) => Date.parse(o.observedAt)), observations };
       series.set(key, s);

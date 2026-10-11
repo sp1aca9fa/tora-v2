@@ -101,6 +101,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {t('valuation.medianOf', { count: v.sampleSize, days: v.windowDays ?? 0 })}
+                    {v.pooled && ` · ${t('valuation.pooled')}`}
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {latest

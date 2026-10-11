@@ -35,11 +35,29 @@ export interface Valuation {
   confidence: Confidence | null;
   /** Samples whose lot size was estimated (0 when none, or not a median). */
   estimatedSamples: number;
+  /** Too few sales in the holding's own condition: similar conditions were pooled. */
+  pooled: boolean;
 }
 
 /** Market sources in fallback order; sources not listed come after these. */
 export const SOURCE_PRIORITY = ['snkrdunk', 'mercari', 'surugaya'];
 export const WINDOWS = [30, 90, 180] as const;
+/** Fewer sales than this in a window: try a longer one, then similar conditions. */
+export const MIN_SAMPLES = 3;
+/** The longest look back, used only when the usual windows have too few sales. */
+export const LONG_WINDOW = 365;
+
+/**
+ * Conditions close enough to pool when one has too few sales: an item's conditions ("cond:*"), a
+ * card's raw grades ("raw:*"), an intact box with or without shrink. Graded slabs never (a PSA 10
+ * and a PSA 9 are priced far apart), nor opened boxes.
+ */
+export function bucketFamily(bucket: string): string | null {
+  // Only intact boxes pool (with or without shrink); an opened box is another thing.
+  if (bucket.startsWith('sealed:')) return /^sealed:(no_)?shrink$/.test(bucket) ? 'sealed' : null;
+  const prefix = bucket.split(':')[0]!;
+  return prefix === 'graded' ? null : prefix;
+}
 
 /** Parsed `observedAt` per observation object (snapshot rebuilds value thousands of days). */
 const parsedTimes = new WeakMap<object, number>();
@@ -99,6 +117,7 @@ export function valueUnit(input: {
     ageDays: null,
     confidence: null,
     estimatedSamples: 0,
+    pooled: false,
   };
 
   const manual = input.manualPrices
@@ -116,38 +135,70 @@ export function valueUnit(input: {
   }
 
   if (input.bucket) {
+    const family = bucketFamily(input.bucket);
     const sold = input.observations.filter(
       (o) =>
         o.observationType === 'sold' &&
         !o.excluded &&
-        o.bucket === input.bucket &&
+        !!o.bucket &&
+        (o.bucket === input.bucket || (family !== null && bucketFamily(o.bucket) === family)) &&
         timeOf(o) <= now.getTime(),
     );
+    // Steps, best first: the holding's own condition over 30 / 90 / 180 days, then a year; then
+    // similar conditions pooled over 180 days, then a year.
+    const steps = [
+      ...WINDOWS.map((days) => ({ days, pooled: false })),
+      { days: LONG_WINDOW, pooled: false },
+      ...(family
+        ? [
+            { days: 180, pooled: true },
+            { days: LONG_WINDOW, pooled: true },
+          ]
+        : []),
+    ];
+    let fallback: Valuation | null = null;
     for (const source of sourceOrder([...new Set(sold.map((o) => o.source))])) {
       const ofSource = sold.filter((o) => o.source === source);
-      const within = (days: number) =>
-        ofSource.filter((o) => now.getTime() - timeOf(o) <= days * DAY);
-      const window = WINDOWS.find((d) => within(d).length >= 3) ?? 180;
-      const samples = within(window);
-      if (samples.length === 0) continue;
+      const take = (step: { days: number; pooled: boolean }) =>
+        ofSource.filter(
+          (o) =>
+            (step.pooled || o.bucket === input.bucket) &&
+            now.getTime() - timeOf(o) <= step.days * DAY,
+        );
+      const step = steps.find((s) => take(s).length >= MIN_SAMPLES);
+      // A source with enough sales wins; otherwise remember the first source with any sale.
+      const chosen = step ?? steps.find((s) => take(s).length > 0);
+      if (!chosen) continue;
+      const samples = take(chosen);
       const prices = withoutOutliers(samples.map((o) => o.priceJpy));
       const newestAt = samples
         .map((o) => o.observedAt)
         .sort()
         .at(-1)!;
-      const recent = within(30).length;
-      return {
+      const own = (days: number) => take({ days, pooled: false }).length;
+      const valuation: Valuation = {
         unitJpy: Math.round(median(prices)!),
         method: 'median',
         source,
         sampleSize: samples.length,
-        windowDays: window,
+        windowDays: chosen.days,
         newestAt,
         ageDays: ageDays(newestAt, now),
-        confidence: recent >= 5 ? 'high' : within(180).length >= 3 ? 'medium' : 'low',
+        confidence:
+          chosen.pooled || chosen.days > 180
+            ? 'low'
+            : own(30) >= 5
+              ? 'high'
+              : own(180) >= MIN_SAMPLES
+                ? 'medium'
+                : 'low',
         estimatedSamples: samples.filter((o) => o.quantityInferred).length,
+        pooled: chosen.pooled,
       };
+      if (step) return valuation;
+      fallback ??= valuation;
     }
+    if (fallback) return fallback;
   }
 
   if (input.retailPriceJpy) {

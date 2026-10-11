@@ -30,6 +30,63 @@ describe('withoutOutliers', () => {
   });
 });
 
+describe('valueUnit fallbacks for rare items', () => {
+  const at = (source: string, price: number, ago: number, bucket: string) =>
+    sold(source, price, ago, bucket);
+
+  it('looks back a year before pooling conditions', () => {
+    const obs = [
+      at('mercari', 30_000, 20, 'cond:like_new'),
+      at('mercari', 26_000, 250, 'cond:like_new'),
+      at('mercari', 28_000, 300, 'cond:like_new'),
+    ];
+    expect(valueUnit({ bucket: 'cond:like_new', observations: obs, now })).toMatchObject({
+      unitJpy: 28_000,
+      windowDays: 365,
+      pooled: false,
+      confidence: 'low',
+    });
+  });
+
+  it('pools similar conditions, never graded slabs', () => {
+    const obs = [
+      at('mercari', 30_000, 20, 'cond:like_new'),
+      at('mercari', 22_000, 40, 'cond:good'),
+      at('mercari', 25_000, 60, 'cond:fair'),
+    ];
+    expect(valueUnit({ bucket: 'cond:like_new', observations: obs, now })).toMatchObject({
+      unitJpy: 25_000,
+      sampleSize: 3,
+      pooled: true,
+      confidence: 'low',
+    });
+    const slabs = [
+      at('snkrdunk', 10_000, 5, 'graded:PSA:10'),
+      at('snkrdunk', 4_000, 6, 'graded:PSA:9'),
+      at('snkrdunk', 4_100, 7, 'graded:PSA:9'),
+      at('snkrdunk', 4_200, 8, 'graded:PSA:9'),
+    ];
+    expect(valueUnit({ bucket: 'graded:PSA:10', observations: slabs, now })).toMatchObject({
+      unitJpy: 10_000,
+      sampleSize: 1,
+      pooled: false,
+    });
+  });
+
+  it('prefers a source with enough sales over one with a single sale', () => {
+    const obs = [
+      at('snkrdunk', 9_000, 5, 'cond:new'),
+      at('mercari', 3_000, 5, 'cond:new'),
+      at('mercari', 3_100, 6, 'cond:new'),
+      at('mercari', 2_900, 7, 'cond:new'),
+    ];
+    expect(valueUnit({ bucket: 'cond:new', observations: obs, now })).toMatchObject({
+      source: 'mercari',
+      unitJpy: 3_000,
+    });
+  });
+});
+
 describe('valueUnit', () => {
   it('counts samples whose lot size was estimated', () => {
     const obs = [10_000, 10_200, 9_800].map((p, i) => ({

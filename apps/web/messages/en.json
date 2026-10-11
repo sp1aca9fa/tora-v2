@@ -455,7 +455,8 @@
     "noMedian": "No sales in this condition",
     "estimatedDay": "includes estimated lot sizes",
     "estimatedNote": "Up to {date}, some trades did not say how many units they covered (e.g. 10 cards in one sale); their lot sizes are estimated from the going price, so those days may be off.",
-    "estimatedSamples": "{count} of the {total} sales in this median have an estimated lot size (the source did not report how many units they covered)."
+    "estimatedSamples": "{count} of the {total} sales in this median have an estimated lot size (the source did not report how many units they covered).",
+    "pooled": "similar conditions pooled (few sales)"
   },
   "box": {
     "paid": "Paid",
