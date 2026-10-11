@@ -133,21 +133,23 @@ export function extractPrompt(
   return `Open each of these files with the Read tool (they are in the current folder) and list every item bought in them:
 ${files.map((f) => `- ${f}`).join('\n')}
 
-One row per distinct item in an order (several copies of the same item: one row with quantity). For each row:
+These files show things the user bought: a sold listing page or an order page is their purchase. Only rows that clearly show the user's own sales (売上, 出品した商品, 販売履歴) are "not_purchase".
+
+One row per distinct item in an order. Several of the same item are one row with quantity: a set of N of the same item (N個セット, N枚セット, ×N, N点 of one item) has quantity N and the item's name without the count. For each row:
 - file: the file it is in.
 - shop: mercari, amazon, yahoo (ヤフオク / Yahoo!フリマ), snkrdunk, surugaya, or the shop's name in lowercase.
 - orderId: exactly as shown (Mercari 商品ID like m12345678901 or 取引ID; Amazon 注文番号 like 503-1234567-1234567); null when none is shown.
 - title: the item's title as shown. url: when shown.
 - priceJpy: what was paid for this item, shipping and fees included when the page shows them; the item price when that is all there is. Several items in one Amazon order: each item's own price.
-- quantity: number of copies (1 unless shown).
+- quantity: number of copies (1 unless shown or the title says a set of N of the same item).
 - date: the order / purchase date as YYYY-MM-DD. Year missing or only a relative date ("3日前"): your best guess with dateApprox true. Not shown at all: null.
 - status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
 - collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures; false for anything else.
 - productId: when the item is clearly one of the user's products listed below (same card name and number, same box or set, same game and platform), its id; else null.
-- product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind; name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region "jp" unless it says English / overseas (英語版, 海外版). Null for non-collectibles.
+- product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind; name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region: one of jp, en, zh_cn, zh_tw, kr, other ("jp" unless the item itself is an English or other-language version, 英語版 / 海外版; where it was sold does not matter). Null for non-collectibles.
 - gradedAs: "PSA 10" (grader and grade) when the item is a graded slab; else null.
 - sealedState: for sealed boxes and packs, "shrink" or "no_shrink" when the title says (シュリンク付き / シュリンクなし); else null.
-- unsure: null, or a short reason when any field is a guess.
+- unsure: null, or a short reason when you guessed a field from what is shown. A field that is simply not shown is null and is not a reason to be unsure.
 
 The user's products:
 ${JSON.stringify(products)}
@@ -501,7 +503,10 @@ export async function readPurchases(
   for (const f of files) {
     const entry = cache.files[f.hash]!;
     if (entry.model === 'sonnet') continue;
-    const flags = [...new Set(entry.rows.flatMap((r) => checkRow(r, ctx)))];
+    // A missing date is not on the page: reading it again cannot find one.
+    const flags = [...new Set(entry.rows.flatMap((r) => checkRow(r, ctx)))].filter(
+      (f) => f !== 'no_date',
+    );
     if (flags.length) again.push({ name: f.name, why: flags.join(', ') });
     else if (entry.rows.length && random() < (options.sample ?? 0.1)) {
       again.push({ name: f.name, why: 'random check' });

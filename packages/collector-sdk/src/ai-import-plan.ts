@@ -63,6 +63,14 @@ export async function planAiImport(
       if (r.row.orderId) cancels.push(r.row);
     } else kept.push(r);
   }
+  // A file named after the item's ID ("m12345678901.png") gives the ID the page does not show.
+  for (const r of kept) {
+    const id = r.row.file.match(/\bm\d{10,12}\b/)?.[0];
+    const alone = kept.filter((k) => k.row.file === r.row.file).length === 1;
+    if (!r.row.orderId && id && alone && shopKey(r.row.shop) === 'mercari') {
+      r.row = { ...r.row, orderId: id };
+    }
+  }
   const rows = toReceipts(kept, fallbackDate);
   const shops: ShopPlan[] = [];
   for (const shop of new Set(rows.map((r) => shopKey(r.row.shop)))) {
