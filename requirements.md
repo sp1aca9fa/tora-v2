@@ -21,7 +21,8 @@
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
-| S4c | Import purchases through Claude (MCP write tools) | todo |
+| S4d | Automated data review: cheap model checks flagged data, suggestions queue | todo (next, after a trial) |
+| S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | todo (after S4d) |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
@@ -89,7 +90,7 @@
 - 2026-10-11: Add item: typed product details survive switching category / kind; "acquired on release day" fills the date from a known full release date; "Unknown" is the first shop suggestion and the other lists are alphabetical; total cost may be left blank when a retail price is known (retail price x quantity is used, and the form says so).
 - 2026-10-11: Valuation fallback for rare items: a source needs 3 sales; steps are the holding's condition over 30 / 90 / 180 days, then a year, then similar conditions pooled (an item's conditions, a card's raw grades, intact boxes with or without shrink; never graded slabs or opened boxes) over 180 days, then a year. A source reaching 3 sales wins over an earlier source with fewer; otherwise the first source with any sale is used. Year-long or pooled values are low confidence and labeled "similar conditions pooled".
 - 2026-10-11: Mercari purchase importer keeps purchases whose Mercari category is a collectible one (top category ゲーム・おもちゃ・グッズ: cards, toys / hobby, games, figures), read from the listing; other purchases are skipped with the reason shown, not imported. Kept ones still go through the in-app review.
-- 2026-10-11: Plan additions (user): S4c import purchases through Claude via MCP write tools (any format the user shares, same import rules, everything lands in Review import; the first MCP writes, add-only, approved in the chat); S8 gets per-lot "count in cost" / "count in value" switches with separate portfolio groups, and portfolio page speed (stream the slow parts).
+- 2026-10-11: Plan (user + Claude): S4d automated data review first (Haiku on the flagged data only, after a trial against Sonnet; suggestions the user accepts in the app; later Sonnet may make the final call), then S4c import from any shop (Haiku extracts and matches, Sonnet reviews rows flagged by code-computed checks, not by the model's self-rated confidence). Earlier the same day: S4c import purchases through Claude via MCP write tools (any format the user shares, same import rules, everything lands in Review import; the first MCP writes, add-only, approved in the chat); S8 gets per-lot "count in cost" / "count in value" switches with separate portfolio groups, and portfolio page speed (stream the slow parts).
 - 2026-10-11: Mercari sends buyers no purchase email (the user's export held only sales, cancellations and Merpay bills; the monthly Merpay payment mail lists deferred-payment items without date or ID). So Mercari purchases come from links the user pastes in the app (Review import > Add purchases by link), read by the home PC on the next collect; reading the purchase history with the user's login was rejected (token on the PC, fragile, account risk). Each link is read once; the purchase date is the listing's last update (approximate, editable in the review); a lot that looks like an entry added by hand gets the item ID instead of a second lot; the bought item becomes a reference sale on the product's Mercari search. Mercari Shops product links are read too (no reference: a shop's page is not one sale).
 
 ---
@@ -368,23 +369,45 @@ Build:
 Acceptance:
 - From Claude: "does anything look off?" runs the checks and explains the findings; "which of my items gained the most since I bought them, and why?" is answered from the data.
 
-## S4c: Import purchases through Claude (MCP write tools)
+## S4d: Automated data review (cheap model, suggestions queue)
 
-Added at the user's request (2026-10-11). The SNKRDUNK email import works well, but per-shop importers do not scale (Mercari sends no email, so it needs pasted links). Instead the user shares their purchase history with Claude in whatever form they have (screenshots of a purchase list, a CSV, copied text, an order page) and Claude reads it and records it, through the same import rules.
+Added at the user's request (2026-10-11): automate the checking the user has been doing by hand (do these sales make sense, is this the right product), without paying for a model to read everything.
+
+Layers (cost rule: a model only looks at what the code could not settle):
+1. No model, always on: importers, collectors, filters, `data_checks`. A problem the model keeps finding becomes a code rule, so the model has less to read over time.
+2. Cheap model on the exceptions (this phase): after `pnpm collect`, when `data_checks` has findings, the home PC runs Claude non-interactively (`claude -p`, Haiku) with the tora MCP. It looks at the flagged items only (odd sales, weak searches, look-alike products, ...), capped per run (e.g. 20), and files **suggestions** (exclude this sale because ..., these two products look the same, this query misses ...), each with its reason and evidence. It changes nothing itself.
+3. The user accepts or dismisses each suggestion in the app (one tap); accepting runs the existing action (exclude a sale, merge, edit a query).
 
 Build:
-- MCP write tools, the first ones (S4b was read-only), still local and scoped to one user:
-  - `find_products`: match a described item to existing products (name, set, number, look-alikes) so purchases attach to the right product instead of creating duplicates.
-  - `plan_purchases`: takes purchases (shop, order ID if known, date, title, quantity, amount paid, optional product ID / new product details / condition / grade / packaging / listing link) and returns what would happen, without writing: new, already registered, likely the same as an entry added by hand, conflicts, unclassified (the S5b plan).
-  - `import_purchases`: writes a plan the user approved in the chat. Only adds (or attaches an order ID to an entry the user confirmed as the same purchase); never deletes or overwrites. Everything lands in Review import (`review_pending`), so the app stays the place where the user confirms.
-- Claude shows the plan in the chat and asks before `import_purchases`; the tool descriptions say so.
-- Imported lots record that they came through Claude (acquired from = the shop; an event notes the import).
+- Trial first, before any code: on real flagged data, compare Haiku's and Sonnet's verdicts with a careful review; measure agreement and how much a run uses. Build only if Haiku is reliable enough (else use Sonnet, or narrow what it judges).
+- Table `suggestions` (kind, target, proposed action, reason, evidence, model, status open / accepted / dismissed); MCP write tool `suggest` (add-only, no other writes); a Suggestions list in the app (badge like Review import).
+- `pnpm review` (and an option in the collect cron) runs the headless review when there are findings; skips when there are none; logs what it used.
+- Dismissed suggestions are remembered so the same one is not filed again.
+
+Later (user's idea, after the error rate is known): a stronger model (Sonnet) makes the final call on suggestions automatically, with the user's check reduced to spot checks.
+
+Acceptance:
+- After a collect with odd sales, sensible suggestions appear in the app; accepting one excludes the sale; nothing changes without the user.
+
+## S4c: Import purchases from any shop through Claude
+
+Added at the user's request (2026-10-11). The SNKRDUNK email import works well, but per-shop importers do not scale (Mercari sends no email, so it needs pasted links). Instead the user hands over their purchase history in whatever form they have (screenshots of a purchase list, a CSV, copied text, order pages or links) and Claude reads it and records it, through the same import rules. Works for any shop when the data says what the item is (title, link or photo), the price paid, the date (approximate is fine) and the shop; an order ID is optional but prevents duplicates (without one, the tools warn and rely on date + price matching).
+
+Two steps, cheap model first:
+1. Haiku extracts the purchases and matches each to a product (or proposes a new one), saving a draft.
+2. The tools check every draft row with signals the code computes, not the model's own confidence (self-rated confidence is unreliable): weak or ambiguous product match, missing or implausible price / date / quantity, price far from what the product sells for, a likely duplicate of an entry added by hand, or Haiku marking the row unsure. Flagged rows go to Sonnet, which reviews and corrects them. During the trial period Sonnet also re-checks a random sample (e.g. 10 %) of the unflagged rows, to measure Haiku's error rate and tune the triggers.
+3. The result goes to Review import (`review_pending`), where the user confirms as with every import.
+
+Build:
+- MCP write tools (add-only, scoped to one user; never delete or overwrite): `find_products` (match score + candidates), `plan_purchases` (the S5b plan for a batch, no writes, with the check signals per row), `save_import_draft` / `import_purchases` (write the approved rows; an entry confirmed as the same purchase only gets the order ID).
+- `pnpm import-ai <files or folder>` on the home PC runs both steps headless (`claude -p`, Haiku then Sonnet for the flagged rows) and prints a summary; the same tools also work from a chat.
+- Imported lots note that they came through Claude (event), with the shop as "acquired from".
 
 Open when we get there:
 - Whether S6's in-app purchase file upload is still needed (this may replace it), and whether the Mercari link import stays (it can coexist).
 
 Acceptance:
-- The user shares a Mercari purchase history in a free form; Claude imports the collectibles into Review import with sensible products, skips the rest, and does not duplicate what was already registered.
+- A Mercari purchase history shared as screenshots or text ends up in Review import with sensible products, non-collectibles left out, nothing already registered duplicated; the summary shows which rows Sonnet reviewed and why.
 
 ## S5: Valuation, Portfolio, Item detail
 
