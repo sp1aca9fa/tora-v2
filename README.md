@@ -150,6 +150,7 @@ pnpm collect --source <source>       # one collector
 pnpm collect --match-only            # only look for listings of unlinked items
 pnpm collect --collect-only          # only fetch trades for linked listings
 pnpm collect --product <product-id>  # one product
+pnpm collect --review                # then the data review below (or TORA_REVIEW=1)
 pnpm valuate                         # only refresh valuation snapshots (collect does this too)
 ```
 
@@ -182,11 +183,21 @@ cancelled orders are left out, and nothing is written before you confirm. Import
 appear under **Review import** in the app to set each one's grade, cert number or packaging.
 
 Shops that send no receipt email (e.g. Mercari, where buyers are only notified in the app) use
-links instead: paste the links of things you bought under **Review import > Add purchases by
-link** (from the phone is fine). The next `pnpm collect` on the home PC reads each link once with
+links instead: paste the links of things you bought under **Imports > Purchase links** (from the
+phone is fine). The next `pnpm collect` on the home PC reads each link once with
 the importer whose `matchesLink` accepts it (`readLink`), imports it the same way and shows what
 happened next to each link (imported, matched an entry you added by hand, already registered,
 skipped with the reason, failed).
+
+### Data review
+
+The checks flag sales far from an item's value and searches that keep little of what they find.
+`pnpm review` (or `pnpm collect --review`) hands only those to Claude Code on the home PC
+(`claude -p`, with your Claude login; no tools, no MCP): Haiku judges each case, the ones it is
+unsure about go to Sonnet, and the findings appear under **Imports > Suggestions** (exclude a
+sale, make a search skip a word, fill in product details). Nothing changes until you accept one;
+dismissed suggestions and cases judged fine are not looked at again. `--dry-run` prints the
+verdicts without filing anything. A run with ~20 cases costs a few cents.
 
 ### Private plug-ins (submodule)
 

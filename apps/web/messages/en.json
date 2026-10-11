@@ -577,5 +577,27 @@
     "into": "Keep",
     "submit": "Merge",
     "confirm": "Move {lots, plural, one {# lot} other {# lots}} (and its sales data and listings) to \"{name}\" and delete the duplicate."
+  },
+  "suggestions": {
+    "title": "Suggestions",
+    "intro": "Fixes the data review proposes after a collect: a model looked at sales and searches the checks flagged. Nothing changes until you accept. Filled by `pnpm review` (or `pnpm collect --review`) on the home PC.",
+    "none": "No suggestions right now.",
+    "banner": "{count, plural, one {# suggestion to check} other {# suggestions to check}}",
+    "kind": {
+      "exclude_sale": "Exclude a sale",
+      "exclude_word": "Skip listings with a word",
+      "fix_product": "Fix product details"
+    },
+    "sale": "{price} on {date} ({source}); the value is {value}.",
+    "unsure": "The models were not sure: check the listing.",
+    "word": "Make the {source} search skip listings with “{word}”. Its sales are fetched again on the next collect.",
+    "seenIn": "Seen in: {title}",
+    "why": "{reason} ({model}, {confidence}% sure)",
+    "accept": {
+      "exclude_sale": "Exclude",
+      "exclude_word": "Skip the word",
+      "fix_product": "Apply"
+    },
+    "dismiss": "Dismiss"
   }
 }

@@ -2,6 +2,8 @@
 import { median } from './market';
 
 export interface ValuationObservation {
+  /** The stored observation (absent for sales that only live in a source's recent list). */
+  id?: string;
   source: string;
   bucket: string | null;
   priceJpy: number;

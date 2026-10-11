@@ -112,6 +112,11 @@ export default async function ImportsPage() {
               tile('/imports/review', t('imports.banner', { count: attention.toReview }))}
             {attention.ungradedCards > 0 &&
               tile('/holdings/grades', t('grades.banner', { count: attention.ungradedCards }))}
+            {attention.suggestions > 0 &&
+              tile(
+                '/imports/suggestions',
+                t('suggestions.banner', { count: attention.suggestions }),
+              )}
           </div>
         )}
         {failed.length > 0 && (

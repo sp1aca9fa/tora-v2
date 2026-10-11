@@ -14,6 +14,7 @@ import {
   listPendingCandidates,
   listProductSources,
   loadMarketData,
+  oddSales,
   pendingImportReview,
   pendingMatchesForUser,
   portfolioSeries,
@@ -401,39 +402,18 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     ),
   );
 
-  // Recent kept sales far from the value they feed.
-  const odd: unknown[] = [];
-  const since = now.getTime() - 30 * 86_400_000;
-  const seenSales = new Set<string>();
-  for (const x of valued) {
-    if (x.v.unitJpy === null || x.v.method !== 'median') continue;
-    for (const o of market.observations.get(x.product.id) ?? []) {
-      if (
-        o.bucket !== x.v.bucket ||
-        o.observationType !== 'sold' ||
-        Date.parse(o.observedAt) < since
-      )
-        continue;
-      const ratio = o.priceJpy / x.v.unitJpy;
-      const key = `${x.product.id}|${o.source}|${o.priceJpy}|${o.observedAt}`;
-      if ((ratio > 3 || ratio < 1 / 3) && !seenSales.has(key)) {
-        seenSales.add(key);
-        odd.push({
-          ...lot(x.holding, x.product),
-          source: o.source,
-          priceJpy: o.priceJpy,
-          valueJpy: x.v.unitJpy,
-          at: day(o.observedAt),
-        });
-      }
-    }
-  }
   findings.push(
     finding(
       'odd_sales',
       'info',
       'Sales of the last 30 days at over 3x or under 1/3 of the value (the median ignores them, but they may be mismatches to exclude).',
-      odd,
+      oddSales(valued, market, now).map((o) => ({
+        ...lot(o.holding, o.product),
+        source: o.source,
+        priceJpy: o.priceJpy,
+        valueJpy: o.valueJpy,
+        at: day(o.observedAt),
+      })),
     ),
   );
 

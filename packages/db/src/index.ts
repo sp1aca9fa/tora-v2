@@ -10,5 +10,6 @@ export * from './images';
 export * from './similar';
 export * from './purchase-links';
 export * from './imports';
+export * from './suggestions';
 export * as schema from './schema';
 export type * from './schema';

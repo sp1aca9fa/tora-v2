@@ -22,7 +22,7 @@
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
 | S5d | Imports hub: one Imports menu for every import, its results and follow-ups | built; awaiting user check |
-| S4d | Automated data review: cheap model checks flagged data, suggestions queue | todo (after S5d; trial first) |
+| S4d | Automated data review: cheap model checks flagged data, suggestions queue | built; awaiting user check |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | todo (after S4d) |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
@@ -94,6 +94,8 @@
 - 2026-10-11: Plan: S5d Imports hub next (user: failed links were not findable once the review page was closed; all import actions should start from and return to one Imports menu); stopgap shipped: failed-links banner and list, Imports link in Settings.
 - 2026-10-11: Plan (user + Claude): S4d automated data review first (Haiku on the flagged data only, after a trial against Sonnet; suggestions the user accepts in the app; later Sonnet may make the final call), then S4c import from any shop (Haiku extracts and matches, Sonnet reviews rows flagged by code-computed checks, not by the model's self-rated confidence). Earlier the same day: S4c import purchases through Claude via MCP write tools (any format the user shares, same import rules, everything lands in Review import; the first MCP writes, add-only, approved in the chat); S8 gets per-lot "count in cost" / "count in value" switches with separate portfolio groups, and portfolio page speed (stream the slow parts).
 - 2026-10-11: Mercari sends buyers no purchase email (the user's export held only sales, cancellations and Merpay bills; the monthly Merpay payment mail lists deferred-payment items without date or ID). So Mercari purchases come from links the user pastes in the app (Review import > Add purchases by link), read by the home PC on the next collect; reading the purchase history with the user's login was rejected (token on the PC, fragile, account risk). Each link is read once; the purchase date is the listing's last update (approximate, editable in the review); a lot that looks like an entry added by hand gets the item ID instead of a second lot; the bought item becomes a reference sale on the product's Mercari search. Mercari Shops product links are read too (no reference: a shop's page is not one sale).
+- 2026-10-11: S4d trial (26 odd sales after a full collect): Haiku and Sonnet each agreed with Claude's verdicts on 23 of 26; both took "X様" (reserved listing) as suspect because the trial prompt suggested it, so the prompt now says it is an ordinary sale. Most value was in fixes, not per-sale verdicts: 15 of the 26 came from one search also catching the "30th CELEBRATION FUTURISTIC BOX" (applied: excluded word), and ピカチュウ 長場雄 kept almost no raw sales for lack of card details (applied: 208 / S-P / P / YU NAGABA set).
+- 2026-10-11: S4d built as a script, not MCP write tools: `pnpm review` builds the cases itself (odd sales with their titles and the bucket's other sales; searches keeping under 30%), asks `claude -p` (Haiku, no tools, JSON schema), sends cases under 0.7 confidence or "unsure" to Sonnet, and files suggestions (exclude_sale, exclude_word, fix_product) plus remembered verdicts (sale_ok, search_ok; searches looked at again after 14 days). The MCP server stays read-only. One exclude_word covers the sales it explains (no separate sale suggestions). First real run: 21 cases, 11 to Sonnet, 8 suggestions, $0.08.
 
 ---
 
@@ -401,7 +403,7 @@ Layers (cost rule: a model only looks at what the code could not settle):
 
 Build:
 - Trial first, before any code: on real flagged data, compare Haiku's and Sonnet's verdicts with a careful review; measure agreement and how much a run uses. Build only if Haiku is reliable enough (else use Sonnet, or narrow what it judges).
-- Table `suggestions` (kind, target, proposed action, reason, evidence, model, status open / accepted / dismissed); MCP write tool `suggest` (add-only, no other writes); a Suggestions list in the app (badge like Review import).
+- Table `suggestions` (kind, target, proposed action, reason, evidence, model, status open / accepted / dismissed); a Suggestions list in the app (badge like Review import). Built without an MCP write tool: the review script files them (see Decision log).
 - `pnpm review` (and an option in the collect cron) runs the headless review when there are findings; skips when there are none; logs what it used.
 - Dismissed suggestions are remembered so the same one is not filed again.
 

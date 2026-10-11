@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import type { Db } from './client';
 import { failedPurchaseLinkCount } from './purchase-links';
 import { cardGradeCounts, importReviewCount } from './queries';
+import { openSuggestionCount } from './suggestions';
 import { type ImportRun, holdings, importRuns, products, purchaseLinks } from './schema';
 
 export type ImportMethod = 'email' | 'links' | 'file' | 'claude';
@@ -72,16 +73,18 @@ export async function importRunDetail(db: Db, userId: string, id: string) {
 
 /** What waits for the user after imports (the Imports badge counts all of it). */
 export async function importAttention(db: Db, userId: string) {
-  const [toReview, failedLinks, grades] = await Promise.all([
+  const [toReview, failedLinks, grades, suggestions] = await Promise.all([
     importReviewCount(db, userId),
     failedPurchaseLinkCount(db, userId),
     cardGradeCounts(db, userId),
+    openSuggestionCount(db, userId),
   ]);
   return {
     toReview,
     failedLinks,
     ungradedCards: grades.ungraded,
-    total: toReview + failedLinks + grades.ungraded,
+    suggestions,
+    total: toReview + failedLinks + grades.ungraded + suggestions,
   };
 }
 

@@ -371,6 +371,43 @@ export const purchaseLinks = sqliteTable(
   (t) => [uniqueIndex('purchase_links_uq').on(t.userId, t.url)],
 );
 
+/**
+ * Fixes proposed by the automated data review (requirements S4d): a model looks at what the
+ * checks flagged and files a suggestion; nothing changes until the user accepts it.
+ */
+export const suggestions = sqliteTable(
+  'suggestions',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** exclude_sale | exclude_word | fix_product, or sale_ok / search_ok (judged fine, kept as memory) */
+    kind: text('kind').notNull(),
+    /** What it is about, unique per kind: an observation ID, "<source ID>|<word>", a product ID. */
+    targetKey: text('target_key').notNull(),
+    productId: text('product_id').references(() => products.id, { onDelete: 'cascade' }),
+    /** What accepting does: { observationId } | { sourceId, word } | { changes } */
+    payload: text('payload', { mode: 'json' })
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    reason: text('reason').notNull(),
+    /** What the model saw: titles, prices, the value. */
+    evidence: text('evidence', { mode: 'json' }).$type<Record<string, unknown>>(),
+    model: text('model'),
+    confidence: real('confidence'),
+    /** open | accepted | dismissed | closed (not shown: a verdict kept so it is not judged again) */
+    status: text('status').notNull().default('open'),
+    decidedAt: text('decided_at'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('suggestions_uq').on(t.userId, t.kind, t.targetKey),
+    index('suggestions_status_idx').on(t.userId, t.status),
+  ],
+);
+
 export const holdingEvents = sqliteTable(
   'holding_events',
   {
@@ -521,6 +558,7 @@ export const loginAttempts = sqliteTable(
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
+export type Suggestion = typeof suggestions.$inferSelect;
 export type UserDevice = typeof userDevices.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;
 export type NewTcgSet = typeof tcgSets.$inferInsert;

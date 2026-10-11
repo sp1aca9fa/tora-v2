@@ -74,6 +74,7 @@ export async function loadMarketData(
     const ids = productIds.slice(i, i + 200);
     const rows = await db
       .select({
+        id: priceObservations.id,
         productId: priceObservations.productId,
         source: priceObservations.source,
         bucket: priceObservations.bucket,
@@ -159,6 +160,55 @@ export function valueHolding(
     trendPct: v.method === 'median' ? trend(last?.priceJpy, v.unitJpy) : null,
     sources: sourceSummaries(observations, recent, bucket, now),
   };
+}
+
+export interface OddSale {
+  observationId: string | undefined;
+  holding: Holding;
+  product: Product;
+  source: string;
+  bucket: string;
+  priceJpy: number;
+  /** The lot's unit value the sale is far from. */
+  valueJpy: number;
+  observedAt: string;
+}
+
+/**
+ * Kept sales of the last 30 days at over 3x or under 1/3 of the median value they feed: the
+ * median ignores them, but they may be listings of something else (data checks, S4d review).
+ */
+export function oddSales(
+  valued: { holding: Holding; product: Product; v: HoldingValuation }[],
+  market: MarketData,
+  now = new Date(),
+): OddSale[] {
+  const odd: OddSale[] = [];
+  const since = now.getTime() - 30 * DAY;
+  const seen = new Set<string>();
+  for (const { holding, product, v } of valued) {
+    if (v.unitJpy === null || v.method !== 'median' || !v.bucket) continue;
+    for (const o of market.observations.get(product.id) ?? []) {
+      if (o.bucket !== v.bucket || o.observationType !== 'sold' || Date.parse(o.observedAt) < since)
+        continue;
+      const ratio = o.priceJpy / v.unitJpy;
+      const key = o.id ?? `${product.id}|${o.source}|${o.priceJpy}|${o.observedAt}`;
+      if ((ratio > 3 || ratio < 1 / 3) && !seen.has(key)) {
+        seen.add(key);
+        odd.push({
+          observationId: o.id,
+          holding,
+          product,
+          source: o.source,
+          bucket: v.bucket,
+          priceJpy: o.priceJpy,
+          valueJpy: v.unitJpy,
+          observedAt: o.observedAt,
+        });
+      }
+    }
+  }
+  return odd;
 }
 
 // ---------------------------------------------------------------------------------------------

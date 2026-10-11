@@ -1,7 +1,7 @@
-// `pnpm collect [--source x] [--product id] [--match-only] [--collect-only]`
+// `pnpm collect [--source x] [--product id] [--match-only] [--collect-only] [--review]`
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
-import { createDb, inferLotSizes, runSnapshots } from '@tora/db';
+import { createDb, inferLotSizes, listUsers, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -10,7 +10,9 @@ import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { loadCollectors } from '../registry';
 import { runCollector } from '../runner';
+import { claudeJudge } from '../claude-judge';
 import { Progress } from './progress';
+import { reviewUsers } from './review-run';
 
 const { values } = parseArgs({
   options: {
@@ -18,6 +20,8 @@ const { values } = parseArgs({
     product: { type: 'string' },
     'match-only': { type: 'boolean', default: false },
     'collect-only': { type: 'boolean', default: false },
+    /** Then the automated data review (S4d), also when TORA_REVIEW=1. */
+    review: { type: 'boolean', default: false },
   },
 });
 
@@ -90,4 +94,7 @@ progress.update('pictures, lot sizes, chart', 0.5);
 const snap = await runSnapshots(db);
 progress.done();
 console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
+if (values.review || process.env.TORA_REVIEW === '1') {
+  await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
+}
 process.exit(exitCode);
