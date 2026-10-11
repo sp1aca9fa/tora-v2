@@ -477,7 +477,7 @@ Build:
 - A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
 - A consistent visual language across screens (spacing, typography, cards, badges, charts).
 - Portfolio revamp (user, 2026-10-11):
-  - Per-lot tracking switches: "count in cost" and "count in value". For things bought to use (consoles, games to play) that are not investments but may still gain value. Proposed: on by default; set on the lot (add form, lot page), with "apply to all lots of this item"; maybe off by default for some kinds (console, software), to confirm with the user.
+  - Per-lot tracking switches: "count in cost" and "count in value". For things bought to use (consoles, games to play) that are not investments but may still gain value. On by default for every kind (user, 2026-10-11); set on the lot (add form, lot page), with "apply to all lots of this item".
   - Totals: cost sums the lots counted in cost, value the lots counted in value; unrealized P/L only covers lots counted in both (otherwise it is meaningless).
   - The portfolio lists them in separate groups so the numbers stay readable: investments (both), value only (bought to use, value still shown), not tracked (neither), and cost only if anyone uses it.
 - Speed: the portfolio page shows nothing until every number is loaded. Measure where the time goes, then show the page at once and let the slow parts (chart, per-product list) fill in as they load (streaming with placeholders), and precompute what can be (e.g. at the end of a collect).
