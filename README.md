@@ -29,7 +29,7 @@ packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
 packages/collector-sdk   Collector interface, registry, `pnpm collect`
-collectors-public/       Publishable plug-ins (public APIs, e.g. TCGCSV and FX rates, planned)
+collectors-public/       Publishable plug-ins (public APIs: TCGCSV prices, USD/JPY rates)
 collectors/              Optional private plug-ins (git submodule; not in this repo)
 ```
 
@@ -167,6 +167,20 @@ pnpm valuate                         # only refresh valuation snapshots (collect
 
 Settings shows each source's last run, items waiting for confirmation, listings not collected for
 3+ days and big median moves.
+
+### Sources and what they are used for
+
+- **Value (Japan)**: sales on SNKRDUNK and Mercari. When an item has no sale at all, a 駿河屋 store
+  price in the same condition (at most 30 days old) is used, then the retail price. Only yen
+  prices count.
+- **US prices**: TCGplayer market prices through TCGCSV (public files, updated daily), for
+  Japanese and English Pokemon cards and sealed product. Converted with that day's USD/JPY rate
+  (Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
+  US**, never counted in the value. TCGplayer only prices ungraded cards; eBay (graded cards) is
+  not built yet because eBay blocks requests from the home PC.
+- **Stable sources**: every card should be linked to SNKRDUNK, and every other item costing more
+  than ¥3,000 to a 駿河屋 page (store and 買取 prices). Missing ones show under Imports > Needs you
+  and on the portfolio; the list links to each item's price sources.
 
 ### Purchase import
 

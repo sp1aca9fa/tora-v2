@@ -24,7 +24,7 @@
 | S5d | Imports hub: one Imports menu for every import, its results and follow-ups | built; awaiting user check |
 | S4d | Automated data review: cheap model checks flagged data, suggestions queue | built; awaiting user check |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | built; first real import done (39 Mercari screenshots) |
-| S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
+| S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built (eBay deferred); acceptance waits on the user confirming TCGplayer / 駿河屋 suggestions |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 
@@ -103,6 +103,7 @@
 - 2026-10-12: Plan (user): cards not linked to SNKRDUNK get a warning; non-card items get a stable product-page source (駿河屋 product pages, not Mercari) with the same warning; both in S7. Mixed bundles in one listing noted as an undecided future idea.
 - 2026-10-12: Plan (user): S6 moved after S8. The user wants imports handled from the app rather than terminal commands; to revisit with S6 (in-app file upload, Gmail auto-import, where the model runs). Next: S7.
 - 2026-10-12: S7 scope (user): TCGCSV and eBay sold for US prices; 駿河屋 for non-card items only (games, consoles, controllers, supplies, boxes, decks; cards stay on SNKRDUNK + Mercari); the "not linked to 駿河屋" warning only for non-card items costing more than ¥3,000 (changeable later). eBay answered 403 to every request from the home PC (search, home and item pages, plain fetch and headless Chrome) and PriceCharting / 130point sit behind Cloudflare challenges, so eBay is deferred (user): S7 ships without it and PSA cards have no US price yet. US prices never feed the valuation (JP market value); they are shown side by side.
+- 2026-10-12: S7 build: US prices are stored as `listing` observations in dollars and loaded nowhere in the valuation (which now takes yen prices only); 駿河屋 asking prices became the valuation's last market fallback (`store` method) as section 6 planned; first matching run: 36 TCGplayer and 36 駿河屋 suggestions (a first 駿河屋 pass made 74, mostly related goods, and was redone with a tighter rule before the user saw it).
 
 ---
 
@@ -517,6 +518,14 @@ Build:
 - 駿河屋 collector (private): new/used store prices and 買取 (buylist) prices for mapped products.
 - Item detail: JP vs US comparison (JPY converted, with fx date), spread %.
 - Price source coverage (user, 2026-10-12): a warning (data check, Imports "Needs you" and the portfolio) for every card not linked to a SNKRDUNK listing: SNKRDUNK is the stable, product-level source for cards; Mercari searches are a plus. For non-card items the equivalent is a stable product page with store prices, which Mercari does not have (its item pages are single listings that disappear): 駿河屋 product pages (used / new store price and 買取 price) are the candidate, linked like SNKRDUNK listings (suggested, confirmed or pasted), with the same "not linked yet" warning. Open: whether every game needs one or only items worth more than a threshold.
+
+Built (2026-10-12):
+- Rate sources are a plug-in type (`rates` next to `collectors`); `pnpm collect` stores the missing days of USD/JPY first (Frankfurter, ECB working days; the first run fills ~400 days). `fxRateOn` uses the last rate on or before a date.
+- TCGCSV (`collectors-public`): cards matched by set code (own or from the catalog set) and the card number's leading digits; sealed product by the set's code, else the sets released within 3 days, ranked by kind words. The listing link carries the set (URL slug), so pasted links work. One observation per printing per day: `listing` type, no bucket, dollars in `price_original` (cents) with the rate used.
+- 駿河屋 (private): product pages are behind a Cloudflare challenge, the search and 買取 search are not; searching an item number returns the item with used / new / list / time-sale / marketplace prices, so collecting needs two requests per item. Matching by name coverage, the item's 駿河屋 kind and platform; only suggestions close to the best one (at most 4). Used stock of a game is `cond:good`, new `cond:new`; new boxes `sealed:shrink`, used boxes no bucket; 買取 as `buylist`.
+- Valuation loads yen prices only; `store` method: the newest shop asking price of the exact condition (30 days) when no source has a sale, before the retail price, low confidence.
+- Item page: Japan vs US card (Japanese value of the condition TCGplayer quotes: the user's raw / sealed condition, else raw A / shrink-wrapped; a note for graded lots); suggestions open per source; 駿河屋 / TCGplayer links can be pasted for any item.
+- Missing stable sources: `missingPriceSources` (cards without SNKRDUNK, other items over ¥3,000 without 駿河屋, lots under import review left out) in Imports > Needs you, a portfolio banner, Imports > Price sources to link (`/imports/sources`) and the MCP data checks. Pending matches are counted per source, so a Mercari search no longer hides a 駿河屋 suggestion.
 
 Acceptance:
 - At least one card and one non-card item show JP vs US side by side.
