@@ -188,9 +188,18 @@ it('remembers sales judged fine and suggestions dismissed', async () => {
   const first = await runReview(db, user.id, judge, { now });
   expect(first.filed).toEqual({ exclude_sale: 1 });
   const [open] = await openSuggestions(db, user.id);
-  await decideSuggestion(db, user, open!.suggestion.id, false);
+  await decideSuggestion(db, user, open!.suggestion.id, false, '  The real price, a rare sale.  ');
   const second = await runReview(db, user.id, judge, { now });
   expect(second.cases).toBe(0);
+  // The note goes to the model on later reviews.
+  expect((await buildReviewCases(db, user.id, now)).notes).toEqual([
+    {
+      product: '30th BOX',
+      about: 'exclude_sale: r',
+      decision: 'dismissed',
+      note: 'The real price, a rare sale.',
+    },
+  ]);
 });
 
 it('fills product details on accept and fetches the search again', async () => {

@@ -10,6 +10,7 @@ import {
   FIXABLE_FIELDS,
   fileSuggestion,
   judgedTargets,
+  reviewNotes,
   suggestionListings,
   loadMarketData,
   oddSales,
@@ -78,7 +79,17 @@ export interface SearchCase {
 }
 
 /** What the model sees, and what each case points to (kept out of the prompt). */
+/** A comment the user left when deciding an earlier suggestion. */
+export interface UserNote {
+  product: string | null;
+  /** What the suggestion proposed, and what the user did with it. */
+  about: string;
+  decision: string;
+  note: string;
+}
+
 export interface ReviewCases {
+  notes: UserNote[];
   sales: SaleCase[];
   searches: SearchCase[];
   targets: Map<
@@ -132,7 +143,17 @@ export async function buildReviewCases(
           ),
         )
     : [];
-  const out: ReviewCases = { sales: [], searches: [], targets: new Map() };
+  const out: ReviewCases = {
+    notes: (await reviewNotes(db, userId, 40)).map((n) => ({
+      product: n.productName,
+      about: `${n.kind}: ${n.reason}`,
+      decision: n.status,
+      note: n.note!,
+    })),
+    sales: [],
+    searches: [],
+    targets: new Map(),
+  };
 
   // Odd sales not judged before, newest first, a few per product.
   const perProduct = new Map<string, number>();
@@ -329,6 +350,8 @@ Prefer one exclude_word fix over excluding many sales for the same reason.
 
 Japanese title notes: "X様" or "X様専用" means the seller reserved the listing for a buyer who asked; it is still an ordinary sale, judge it by its title and price like any other. 未開封 = unopened; シュリンク = shrink wrap; PSA/BGS/ARS = graded; ソフト = game software (often disc or cartridge only); 箱説付き = with box and manual. SNKRDUNK sales have no title: they are sales of exactly the linked product; judge them only by price.
 
+"notes": comments the collector (the user) left on earlier suggestions. They know these products: follow their notes over your own judgment, for the product named and for anything the note says in general.
+
 confidence is 0 to 1. Keep each reason under 15 words. Give a verdict for every case.
 
 Cases:
@@ -337,7 +360,7 @@ Cases:
 /** Asks a model; returns its answer and what it cost. */
 export type Judge = (
   model: 'haiku' | 'sonnet',
-  input: { sales: SaleCase[]; searches: SearchCase[] },
+  input: { notes: UserNote[]; sales: SaleCase[]; searches: SearchCase[] },
 ) => Promise<{ answer: ReviewAnswer; costUsd: number; tokens: number; modelName: string }>;
 
 export interface ReviewSummary {
@@ -379,7 +402,11 @@ export async function runReview(
     summary.tokens += r.tokens;
     return { ...r.answer, modelName: r.modelName };
   };
-  const first = await ask('haiku', { sales: cases.sales, searches: cases.searches });
+  const first = await ask('haiku', {
+    notes: cases.notes,
+    sales: cases.sales,
+    searches: cases.searches,
+  });
   const verdicts = new Map<string, CaseVerdict & { model: string }>();
   for (const v of first.verdicts) {
     if (cases.targets.has(v.case)) verdicts.set(v.case, { ...v, model: first.modelName });
@@ -399,6 +426,7 @@ export async function runReview(
   if (doubtful.size) {
     summary.escalated = doubtful.size;
     const second = await ask('sonnet', {
+      notes: cases.notes,
       sales: cases.sales.filter((c) => doubtful.has(c.case)),
       searches: cases.searches.filter((c) => doubtful.has(c.case)),
     });

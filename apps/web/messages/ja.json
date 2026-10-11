@@ -603,6 +603,15 @@
     "openProductPage": "{source}で商品ページを開く（個別の取引は表示されません）",
     "wordListings": "{kept, plural, =0 {この語を含む出品（今の評価額には入っていません）:} other {この語を含む出品（#件が評価額に入っていて、承認すると外れます）:}}",
     "counted": "反映中",
-    "leftOut": "除外済み"
+    "leftOut": "除外済み",
+    "noteLabel": "レビューへのメモ",
+    "notePlaceholder": "レビューへのメモ（任意）：理由や、次回知っておくべきこと",
+    "notesTitle": "あなたのメモ",
+    "notesIntro": "以降のレビューで毎回モデルに渡され、モデル自身の判断より優先されます。不要になったら削除してください。",
+    "deleteNote": "メモを削除",
+    "decision": {
+      "accepted": "承認",
+      "dismissed": "却下"
+    }
   }
 }

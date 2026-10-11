@@ -603,6 +603,15 @@
     "openProductPage": "Open the product on {source} (it shows no single trade)",
     "wordListings": "{kept, plural, =0 {Listings with the word (none counted in the value now):} one {Listings with the word (# counted in the value now, removed on accept):} other {Listings with the word (# counted in the value now, removed on accept):}}",
     "counted": "counted",
-    "leftOut": "left out"
+    "leftOut": "left out",
+    "noteLabel": "Note for the review",
+    "notePlaceholder": "Note for the review (optional): why, or what it should know next time",
+    "notesTitle": "Your notes",
+    "notesIntro": "Given to the models on every later review; they follow them over their own judgment. Delete one when it no longer applies.",
+    "deleteNote": "Delete note",
+    "decision": {
+      "accepted": "accepted",
+      "dismissed": "dismissed"
+    }
   }
 }

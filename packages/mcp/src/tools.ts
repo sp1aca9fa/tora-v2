@@ -14,6 +14,8 @@ import {
   listPendingCandidates,
   listProductSources,
   loadMarketData,
+  openSuggestionCount,
+  reviewNotes,
   oddSales,
   pendingImportReview,
   pendingMatchesForUser,
@@ -541,6 +543,25 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       review.map(({ holding, product }) => ({
         ...lot(holding, product),
         reasons: holding.reviewReason,
+      })),
+    ),
+  );
+  const [open, notes] = await Promise.all([
+    openSuggestionCount(db, userId),
+    reviewNotes(db, userId, SHOWN),
+  ]);
+  findings.push(
+    finding(
+      'review_notes',
+      'info',
+      `The user's comments on data review suggestions (the review model follows them; ${open} suggestion(s) still open). Notes that keep coming up may belong in the filters as a rule.`,
+      notes.map((n) => ({
+        note: n.note,
+        product: n.productName,
+        suggestion: n.kind,
+        decision: n.status,
+        reason: n.reason,
+        at: n.decidedAt ? day(n.decidedAt) : null,
       })),
     ),
   );

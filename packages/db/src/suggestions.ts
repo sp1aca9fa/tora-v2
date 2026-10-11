@@ -2,7 +2,7 @@
 // files them; the user accepts or dismisses each in the app, and accepting runs the same action
 // as doing it by hand (exclude a sale, add an excluded word to a search, fill product details).
 import { toTokyoIso } from '@tora/core';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError, canEditProduct } from './mutations';
 import {
@@ -163,6 +163,8 @@ export async function decideSuggestion(
   user: Pick<User, 'id' | 'role'>,
   id: string,
   accept: boolean,
+  /** The user's comment, for the model in later reviews. */
+  note?: string | null,
 ): Promise<string | null> {
   const [s] = await db
     .select()
@@ -173,7 +175,12 @@ export async function decideSuggestion(
   const now = toTokyoIso();
   await db
     .update(suggestions)
-    .set({ status: accept ? 'accepted' : 'dismissed', decidedAt: now, updatedAt: now })
+    .set({
+      status: accept ? 'accepted' : 'dismissed',
+      decidedAt: now,
+      updatedAt: now,
+      userNote: note?.trim().slice(0, 1000) || null,
+    })
     .where(eq(suggestions.id, id));
   return s.productId;
 }
@@ -233,4 +240,31 @@ export async function suggestionListings(
     })
     .sort((a, b) => Number(b.kept) - Number(a.kept))
     .slice(0, limit);
+}
+
+/** The user's comments on decided suggestions, newest first (shown in the app, given to the model). */
+export async function reviewNotes(db: Db, userId: string, limit = 50) {
+  return db
+    .select({
+      id: suggestions.id,
+      note: suggestions.userNote,
+      kind: suggestions.kind,
+      status: suggestions.status,
+      reason: suggestions.reason,
+      decidedAt: suggestions.decidedAt,
+      productId: suggestions.productId,
+      productName: products.name,
+    })
+    .from(suggestions)
+    .leftJoin(products, eq(products.id, suggestions.productId))
+    .where(and(eq(suggestions.userId, userId), isNotNull(suggestions.userNote)))
+    .orderBy(desc(suggestions.decidedAt))
+    .limit(limit);
+}
+
+export async function clearReviewNote(db: Db, userId: string, id: string): Promise<void> {
+  await db
+    .update(suggestions)
+    .set({ userNote: null, updatedAt: toTokyoIso() })
+    .where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)));
 }

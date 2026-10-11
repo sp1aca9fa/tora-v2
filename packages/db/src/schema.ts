@@ -400,6 +400,8 @@ export const suggestions = sqliteTable(
     /** open | accepted | dismissed | closed (not shown: a verdict kept so it is not judged again) */
     status: text('status').notNull().default('open'),
     decidedAt: text('decided_at'),
+    /** The user's comment when deciding: given to the model in later reviews. */
+    userNote: text('user_note'),
     ...timestamps,
   },
   (t) => [

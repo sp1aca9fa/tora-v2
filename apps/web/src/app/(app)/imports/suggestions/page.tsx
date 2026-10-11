@@ -1,14 +1,15 @@
-import { type SuggestionListing, openSuggestions } from '@tora/db';
-import { ChevronLeft, ExternalLink } from 'lucide-react';
+import { type SuggestionListing, openSuggestions, reviewNotes } from '@tora/db';
+import { ChevronLeft, ExternalLink, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import type { getTranslations as GetT } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
-import { decideSuggestionAction } from './actions';
+import { clearNoteAction, decideSuggestionAction } from './actions';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('suggestions'))('title') };
@@ -17,7 +18,11 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Fixes the automated data review proposes (requirements S4d); nothing changes until accepted. */
 export default async function SuggestionsPage() {
   const { db, user } = await authed();
-  const [rows, t] = await Promise.all([openSuggestions(db, user.id), getTranslations()]);
+  const [rows, notes, t] = await Promise.all([
+    openSuggestions(db, user.id),
+    reviewNotes(db, user.id),
+    getTranslations(),
+  ]);
   const fieldLabel = (f: string) => (t.has(`fields.${f}`) ? t(`fields.${f}`) : f);
   const empty = (v: unknown) => (v === null || v === undefined || v === '' ? '-' : String(v));
 
@@ -147,22 +152,67 @@ export default async function SuggestionsPage() {
                     confidence: Math.round((s.confidence ?? 0) * 100),
                   })}
                 </p>
-                <div className="flex gap-2">
-                  <form action={decideSuggestionAction.bind(null, s.id, true)}>
-                    <Button type="submit" size="sm">
+                <form className="space-y-2">
+                  <Textarea
+                    name="note"
+                    rows={1}
+                    maxLength={1000}
+                    placeholder={t('suggestions.notePlaceholder')}
+                    aria-label={t('suggestions.noteLabel')}
+                    className="min-h-9 text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      formAction={decideSuggestionAction.bind(null, s.id, true)}
+                    >
                       {t(`suggestions.accept.${s.kind}`)}
                     </Button>
-                  </form>
-                  <form action={decideSuggestionAction.bind(null, s.id, false)}>
-                    <Button type="submit" size="sm" variant="outline">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="outline"
+                      formAction={decideSuggestionAction.bind(null, s.id, false)}
+                    >
                       {t('suggestions.dismiss')}
                     </Button>
-                  </form>
-                </div>
+                  </div>
+                </form>
               </li>
             );
           })}
         </ul>
+      )}
+
+      {notes.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold tracking-tight">{t('suggestions.notesTitle')}</h2>
+          <p className="text-sm text-muted-foreground">{t('suggestions.notesIntro')}</p>
+          <ul className="divide-y rounded-xl border bg-card text-sm">
+            {notes.map((n) => (
+              <li key={n.id} className="flex items-start gap-2 px-4 py-2.5">
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <p className="whitespace-pre-wrap">{n.note}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {t(`suggestions.kind.${n.kind}`)} · {t(`suggestions.decision.${n.status}`)}
+                    {n.productName ? ` · ${n.productName}` : ''}
+                  </p>
+                </div>
+                <form action={clearNoteAction.bind(null, n.id)}>
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('suggestions.deleteNote')}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );
