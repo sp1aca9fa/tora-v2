@@ -103,7 +103,13 @@ export function ConditionFields({
             </div>
           </Field>
           {grading === 'raw' ? (
-            <Field label={t('fields.rawGrade')} htmlFor="c-raw" hint={t('add.rawGradeHint')}>
+            // Keyed: otherwise React reuses the grader <select> and "PSA" falls back to "S".
+            <Field
+              key="raw"
+              label={t('fields.rawGrade')}
+              htmlFor="c-raw"
+              hint={t('add.rawGradeHint')}
+            >
               <NativeSelect id="c-raw" name="rawGrade" defaultValue={defaults.rawGrade ?? 'A'}>
                 {RAW_GRADES.map((g) => (
                   <option key={g} value={g}>
@@ -114,7 +120,7 @@ export function ConditionFields({
             </Field>
           ) : (
             <>
-              <Field label={t('fields.grader')} htmlFor="c-grader">
+              <Field key="grader" label={t('fields.grader')} htmlFor="c-grader">
                 <NativeSelect id="c-grader" name="grader" defaultValue={defaults.grader ?? 'PSA'}>
                   {GRADERS.map((g) => (
                     <option key={g} value={g}>

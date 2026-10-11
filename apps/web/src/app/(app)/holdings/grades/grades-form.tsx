@@ -70,7 +70,8 @@ export function GradesForm({ cards }: { cards: GradeRow[] }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {grading === 'raw' ? (
-            <Field label={t('fields.rawGrade')} htmlFor="g-raw">
+            // Keyed: otherwise React reuses the grader <select> and "PSA" falls back to "S".
+            <Field key="raw" label={t('fields.rawGrade')} htmlFor="g-raw">
               <NativeSelect id="g-raw" name="rawGrade" defaultValue="A">
                 {RAW_GRADES.map((g) => (
                   <option key={g} value={g}>
@@ -81,7 +82,7 @@ export function GradesForm({ cards }: { cards: GradeRow[] }) {
             </Field>
           ) : (
             <>
-              <Field label={t('fields.grader')} htmlFor="g-grader">
+              <Field key="grader" label={t('fields.grader')} htmlFor="g-grader">
                 <NativeSelect id="g-grader" name="grader" defaultValue="PSA">
                   {GRADERS.map((g) => (
                     <option key={g} value={g}>
