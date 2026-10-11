@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { syncCatalog } from './catalog';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
+import { cardGradeCounts } from './queries';
 import {
   DomainError,
   addNote,
@@ -397,6 +398,24 @@ describe('lot actions', () => {
       occurredAt: day('10-01'),
     });
     expect(changed).toMatchObject({ grading: 'raw', rawGrade: 'A', quantity: 3 });
+  });
+
+  it('counts cards with no grade, not the ones still in the import review', async () => {
+    const card = {
+      product: { category: 'tcg' as const, kind: 'single' as const, name: 'イーブイ' },
+    };
+    await createHolding(db, uid, card, {
+      quantity: 1,
+      costTotalJpy: 800,
+      acquiredAt: day('09-01'),
+    });
+    await createHolding(db, uid, card, {
+      quantity: 1,
+      costTotalJpy: 800,
+      acquiredAt: day('09-02'),
+      reviewPending: true,
+    });
+    expect(await cardGradeCounts(db, uid)).toEqual({ cards: 2, ungraded: 1 });
   });
 
   it('edits facts and logs before/after; adds notes', async () => {

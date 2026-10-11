@@ -238,7 +238,8 @@ export async function cardGradeCounts(db: Db, userId: string) {
   const [row] = await db
     .select({
       cards: count(),
-      ungraded: sql<number>`coalesce(sum(case when ${holdings.grading} is null or (${holdings.grading} = 'raw' and ${holdings.rawGrade} is null) then 1 else 0 end), 0)`,
+      // Cards still in the import review get their grade there: not counted twice.
+      ungraded: sql<number>`coalesce(sum(case when ${holdings.reviewPending} = 0 and (${holdings.grading} is null or (${holdings.grading} = 'raw' and ${holdings.rawGrade} is null)) then 1 else 0 end), 0)`,
     })
     .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
