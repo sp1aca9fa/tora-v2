@@ -21,9 +21,10 @@
 | S5 | Valuation engine, Portfolio, Item detail, charts | built; awaiting user check |
 | S5b | SNKRDUNK purchase import (Gmail Takeout) + order IDs | built; awaiting user import |
 | S5c | Portfolio as a per-product summary + product images | built; awaiting user check |
+| S4c | Import purchases through Claude (MCP write tools) | todo |
 | S6 | Export / import (JSON, CSV) + backups | todo |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | todo |
-| S8 | Visual redesign + wide-screen layout | todo |
+| S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
 
 ### Decision log
 
@@ -88,6 +89,7 @@
 - 2026-10-11: Add item: typed product details survive switching category / kind; "acquired on release day" fills the date from a known full release date; "Unknown" is the first shop suggestion and the other lists are alphabetical; total cost may be left blank when a retail price is known (retail price x quantity is used, and the form says so).
 - 2026-10-11: Valuation fallback for rare items: a source needs 3 sales; steps are the holding's condition over 30 / 90 / 180 days, then a year, then similar conditions pooled (an item's conditions, a card's raw grades, intact boxes with or without shrink; never graded slabs or opened boxes) over 180 days, then a year. A source reaching 3 sales wins over an earlier source with fewer; otherwise the first source with any sale is used. Year-long or pooled values are low confidence and labeled "similar conditions pooled".
 - 2026-10-11: Mercari purchase importer keeps purchases whose Mercari category is a collectible one (top category ゲーム・おもちゃ・グッズ: cards, toys / hobby, games, figures), read from the listing; other purchases are skipped with the reason shown, not imported. Kept ones still go through the in-app review.
+- 2026-10-11: Plan additions (user): S4c import purchases through Claude via MCP write tools (any format the user shares, same import rules, everything lands in Review import; the first MCP writes, add-only, approved in the chat); S8 gets per-lot "count in cost" / "count in value" switches with separate portfolio groups, and portfolio page speed (stream the slow parts).
 - 2026-10-11: Mercari sends buyers no purchase email (the user's export held only sales, cancellations and Merpay bills; the monthly Merpay payment mail lists deferred-payment items without date or ID). So Mercari purchases come from links the user pastes in the app (Review import > Add purchases by link), read by the home PC on the next collect; reading the purchase history with the user's login was rejected (token on the PC, fragile, account risk). Each link is read once; the purchase date is the listing's last update (approximate, editable in the review); a lot that looks like an entry added by hand gets the item ID instead of a second lot; the bought item becomes a reference sale on the product's Mercari search. Mercari Shops product links are read too (no reference: a shop's page is not one sale).
 
 ---
@@ -366,6 +368,24 @@ Build:
 Acceptance:
 - From Claude: "does anything look off?" runs the checks and explains the findings; "which of my items gained the most since I bought them, and why?" is answered from the data.
 
+## S4c: Import purchases through Claude (MCP write tools)
+
+Added at the user's request (2026-10-11). The SNKRDUNK email import works well, but per-shop importers do not scale (Mercari sends no email, so it needs pasted links). Instead the user shares their purchase history with Claude in whatever form they have (screenshots of a purchase list, a CSV, copied text, an order page) and Claude reads it and records it, through the same import rules.
+
+Build:
+- MCP write tools, the first ones (S4b was read-only), still local and scoped to one user:
+  - `find_products`: match a described item to existing products (name, set, number, look-alikes) so purchases attach to the right product instead of creating duplicates.
+  - `plan_purchases`: takes purchases (shop, order ID if known, date, title, quantity, amount paid, optional product ID / new product details / condition / grade / packaging / listing link) and returns what would happen, without writing: new, already registered, likely the same as an entry added by hand, conflicts, unclassified (the S5b plan).
+  - `import_purchases`: writes a plan the user approved in the chat. Only adds (or attaches an order ID to an entry the user confirmed as the same purchase); never deletes or overwrites. Everything lands in Review import (`review_pending`), so the app stays the place where the user confirms.
+- Claude shows the plan in the chat and asks before `import_purchases`; the tool descriptions say so.
+- Imported lots record that they came through Claude (acquired from = the shop; an event notes the import).
+
+Open when we get there:
+- Whether S6's in-app purchase file upload is still needed (this may replace it), and whether the Mercari link import stays (it can coexist).
+
+Acceptance:
+- The user shares a Mercari purchase history in a free form; Claude imports the collectibles into Review import with sensible products, skips the rest, and does not duplicate what was already registered.
+
 ## S5: Valuation, Portfolio, Item detail
 
 Build:
@@ -456,6 +476,11 @@ Build:
 - Rework screens once the features have settled: fewer unrelated panels per screen. Crowded screens (e.g. the item page with valuation, sources, matching, events and actions) are split into tabs, sub-pages or collapsible sections, each with one purpose.
 - A real wide-screen layout instead of one centered column: on large screens, panels are arranged in columns (e.g. list and detail side by side, charts beside their tables, navigation always visible), so more screen space means clearer organization and easier navigation. The phone layout stays single-column.
 - A consistent visual language across screens (spacing, typography, cards, badges, charts).
+- Portfolio revamp (user, 2026-10-11):
+  - Per-lot tracking switches: "count in cost" and "count in value". For things bought to use (consoles, games to play) that are not investments but may still gain value. Proposed: on by default; set on the lot (add form, lot page), with "apply to all lots of this item"; maybe off by default for some kinds (console, software), to confirm with the user.
+  - Totals: cost sums the lots counted in cost, value the lots counted in value; unrealized P/L only covers lots counted in both (otherwise it is meaningless).
+  - The portfolio lists them in separate groups so the numbers stay readable: investments (both), value only (bought to use, value still shown), not tracked (neither), and cost only if anyone uses it.
+- Speed: the portfolio page shows nothing until every number is loaded. Measure where the time goes, then show the page at once and let the slow parts (chart, per-product list) fill in as they load (streaming with placeholders), and precompute what can be (e.g. at the end of a collect).
 - Source names out of the public code ("bring your own sources"): each plug-in declares its label, color, priority, listing-link pattern and order-source aliases; collectors save that metadata to the database on each run, and the app reads it from there (the web cannot load private plug-ins). Built-in lists naming specific shops (source priority, chart colors, "paste a SNKRDUNK link" copy, スニダン aliases) go away; the raw grade scale becomes plug-in-provided too.
 
 Acceptance:
