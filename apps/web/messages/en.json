@@ -5,6 +5,7 @@
   },
   "nav": {
     "portfolio": "Portfolio",
+    "actions": "Actions",
     "add": "Add",
     "settings": "Settings",
     "imports": "Imports"
@@ -145,26 +146,44 @@
     "estimatedCostNote": "Pulled from \"{name}\". That item keeps its cost; this estimate splits it across the {count, plural, one {# pull} other {# pulls}} logged from it by market value. It is not counted in any total."
   },
   "actions": {
-    "partialHint": "You have {total}. Choosing fewer moves them into a separate entry first.",
-    "splitQuantity": "Units to move",
-    "splitHint": "Cost is divided in proportion to the units.",
-    "openSealedHint": "Once the packs are opened the box counts as consumed; its value lives on in the pulls.",
-    "feeHint": "Added to the cost basis.",
-    "extraFeeHint": "Upcharges or return shipping. Added to the cost basis.",
-    "priceHint": "Total for all units sold.",
-    "feesHint": "Platform fee and shipping you paid.",
-    "editCostHint": "Correct the total paid. Use grading or sell for later changes.",
-    "deleteConfirm": "Delete this entry and its history. Only for entries registered by mistake; this cannot be undone.",
-    "intro": {
-      "edit": "Correct what was recorded. The change is kept in the history.",
-      "split": "Move some units into their own entry, e.g. before selling or grading only some of them.",
-      "grade-submit": "The fee is added to the cost basis. The card stays raw until it comes back.",
-      "sell": "Partial sales split the lot automatically.",
-      "condition": "Only the fields you change are recorded.",
-      "editProduct": "Applies to every entry of this item.",
-      "cancel-order": "For orders you cancelled yourself: shops often send no email for that, so the import cannot tell."
+    "intro": "Everything waiting for you, most urgent first. Settle each card here; open the item when a card is not enough.",
+    "banner": "{count, plural, one {# thing needs} other {# things need}} your attention",
+    "group": {
+      "all": "All",
+      "sources": "Price sources",
+      "lots": "Grades and conditions",
+      "imports": "Imports"
     },
-    "cancelOrderConfirm": "The order #{order} ({from}) was cancelled: remove all of its lots. Future imports will skip this order."
+    "search": "Search",
+    "none": "Nothing waiting for you.",
+    "noneShown": "Nothing matches.",
+    "count": {
+      "import_review": "{count, plural, one {# imported lot} other {# imported lots}} to review",
+      "failed_link": "{count, plural, one {# purchase link} other {# purchase links}} could not be imported",
+      "data_review": "{count, plural, one {# data review suggestion} other {# data review suggestions}} to decide"
+    },
+    "type": {
+      "tcg_main_source": "Main price source missing",
+      "game_main_source": "Main price source missing",
+      "second_source": "Another price source",
+      "card_grade": "No grade",
+      "game_condition": "No condition",
+      "import_review": "Import review",
+      "failed_link": "Failed link",
+      "data_review": "Data review"
+    },
+    "need": {
+      "card_grade": "pick a grade to value it",
+      "game_condition": "pick a condition to value it"
+    },
+    "suggestions": "{count, plural, one {# {source} suggestion} other {# {source} suggestions}}",
+    "noSuggestion": "no {source} match found: paste a link",
+    "yourItem": "Your item",
+    "owned": "{units, plural, one {# unit} other {# units}} · paid {amount}",
+    "moreSuggestions": "{count, plural, one {# more suggestion} other {# more suggestions}}",
+    "paste": "Or paste the {source} page of this item:",
+    "openItem": "Open item",
+    "openLot": "Open lot"
   },
   "pulls": {
     "mode": {
@@ -571,7 +590,8 @@
       "aiTitle": "Through Claude (any shop)",
       "aiIntro": "Screenshots of order lists or order pages, PDFs, CSV or copied text from any shop: put them in one folder and run this on the home PC. Haiku reads them, Sonnet reads again what looks off, and everything lands here to review.",
       "aiLast": "Last import through Claude: {date}",
-      "aiNever": "No import through Claude yet."
+      "aiNever": "No import through Claude yet.",
+      "otherActions": "{count, plural, one {# other thing needs} other {# other things need}} you on the Actions page"
     },
     "removeLot": "Remove this lot (not one of my purchases)",
     "sameAs": "Same purchase as",

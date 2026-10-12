@@ -57,7 +57,8 @@ export async function linkUrlAction(
   const parsed = parseSourceUrl(String(formData.get('url') ?? ''));
   if (!parsed) return { error: 'badSourceUrl' };
   await linkSource(db, productId, parsed);
-  revalidatePath(`/products/${productId}`);
+  // Also the Actions page and the badges (a main source may be linked now).
+  revalidatePath('/', 'layout');
   return {};
 }
 

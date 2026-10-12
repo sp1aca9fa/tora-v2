@@ -1,6 +1,6 @@
 'use client';
 
-import { Inbox, LayoutGrid, PlusCircle, Settings } from 'lucide-react';
+import { Inbox, LayoutGrid, ListChecks, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 const ITEMS = [
   { href: '/', key: 'portfolio', icon: LayoutGrid },
+  { href: '/actions', key: 'actions', icon: ListChecks },
   { href: '/add', key: 'add', icon: PlusCircle },
   { href: '/imports', key: 'imports', icon: Inbox },
   { href: '/settings', key: 'settings', icon: Settings },
@@ -81,7 +82,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {ITEMS.map(({ href, key, icon: Icon }) => (
             <Link
               key={href}

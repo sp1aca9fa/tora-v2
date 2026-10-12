@@ -24,7 +24,7 @@ import {
   rejectCandidateAction,
   unlinkSourceAction,
 } from './source-actions';
-import { setSourceWarningAction } from '../../imports/sources/actions';
+import { setSourceWarningAction } from '../../actions/actions';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for

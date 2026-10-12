@@ -8,13 +8,10 @@ import {
 } from '@tora/core';
 import {
   type Db,
+  actionTotal,
   cardGradeCounts,
   imageVersions,
-  importReviewCount,
-  failedPurchaseLinkCount,
   listInventory,
-  missingPriceSources,
-  pendingMatchesForUser,
   portfolioSeries,
   portfolioValuation,
   summarizeByProduct,
@@ -27,9 +24,11 @@ import { Suspense } from 'react';
 import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
+import { LEVEL_STYLE } from '@/components/notice-level';
+import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
+import { cn, formatJpy } from '@/lib/utils';
 import { InventoryFilters } from './inventory-filters';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -58,14 +57,11 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, matches, grades, toReview, failedLinks, missing, t] = await Promise.all([
+  const [rows, portfolio, actions, grades, t] = await Promise.all([
     listInventory(db, user.id, { category, kind, status, q }),
     portfolioValuation(db, user.id),
-    pendingMatchesForUser(db, user.id),
+    userActions(),
     cardGradeCounts(db, user.id),
-    importReviewCount(db, user.id),
-    failedPurchaseLinkCount(db, user.id),
-    missingPriceSources(db, user.id),
     getTranslations(),
   ]);
   const { totals } = portfolio;
@@ -166,52 +162,15 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         </details>
       )}
 
-      {matches.length > 0 && (
+      {actions.length > 0 && (
         <Link
-          href="/matches"
-          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+          href="/actions"
+          className={cn(
+            'flex items-center justify-between rounded-xl border px-4 py-3 text-sm',
+            LEVEL_STYLE[actions[0]!.level].banner,
+          )}
         >
-          <span>{t('sources.banner', { count: matches.length })}</span>
-          <ChevronRight className="size-4" />
-        </Link>
-      )}
-
-      {toReview > 0 && (
-        <Link
-          href="/imports/review"
-          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
-        >
-          <span>{t('imports.banner', { count: toReview })}</span>
-          <ChevronRight className="size-4" />
-        </Link>
-      )}
-
-      {failedLinks > 0 && (
-        <Link
-          href="/imports#failed"
-          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
-        >
-          <span>{t('imports.links.banner', { count: failedLinks })}</span>
-          <ChevronRight className="size-4" />
-        </Link>
-      )}
-
-      {missing.length > 0 && (
-        <Link
-          href="/imports/sources"
-          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
-        >
-          <span>{t('coverage.banner', { count: missing.length })}</span>
-          <ChevronRight className="size-4" />
-        </Link>
-      )}
-
-      {toReview === 0 && grades.ungraded > 0 && (
-        <Link
-          href="/holdings/grades"
-          className="flex items-center justify-between rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
-        >
-          <span>{t('grades.banner', { count: grades.ungraded })}</span>
+          <span>{t('actions.banner', { count: actionTotal(actions) })}</span>
           <ChevronRight className="size-4" />
         </Link>
       )}

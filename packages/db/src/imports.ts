@@ -3,10 +3,6 @@ import { toTokyoIso } from '@tora/core';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DomainError, deleteHolding, deleteUnusedProduct, editHolding } from './mutations';
 import type { Db } from './client';
-import { failedPurchaseLinkCount } from './purchase-links';
-import { cardGradeCounts, importReviewCount } from './queries';
-import { missingPriceSources } from './sources';
-import { openSuggestionCount } from './suggestions';
 import { type ImportRun, holdings, importRuns, products, purchaseLinks } from './schema';
 
 export type ImportMethod = 'email' | 'links' | 'file' | 'claude';
@@ -71,25 +67,6 @@ export async function importRunDetail(db: Db, userId: string, id: string) {
       .where(and(eq(purchaseLinks.userId, userId), eq(purchaseLinks.importRunId, id))),
   ]);
   return { run, lots, links };
-}
-
-/** What waits for the user after imports (the Imports badge counts all of it). */
-export async function importAttention(db: Db, userId: string) {
-  const [toReview, failedLinks, grades, suggestions, missing] = await Promise.all([
-    importReviewCount(db, userId),
-    failedPurchaseLinkCount(db, userId),
-    cardGradeCounts(db, userId),
-    openSuggestionCount(db, userId),
-    missingPriceSources(db, userId),
-  ]);
-  return {
-    toReview,
-    failedLinks,
-    ungradedCards: grades.ungraded,
-    suggestions,
-    missingSources: missing.length,
-    total: toReview + failedLinks + grades.ungraded + suggestions + missing.length,
-  };
 }
 
 export async function getImportRun(db: Db, userId: string, id: string): Promise<ImportRun | null> {

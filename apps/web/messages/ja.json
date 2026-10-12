@@ -5,6 +5,7 @@
   },
   "nav": {
     "portfolio": "ポートフォリオ",
+    "actions": "対応",
     "add": "登録",
     "settings": "設定",
     "imports": "インポート"
@@ -145,26 +146,44 @@
     "estimatedCostNote": "「{name}」から開封。取得額は開封元に残り、この推定値は記録した{count}件の開封分に相場の比率で按分したものです。合計には含まれません。"
   },
   "actions": {
-    "partialHint": "{total}点所有。少ない数を選ぶと、先に別の登録に分割されます。",
-    "splitQuantity": "移す数量",
-    "splitHint": "取得原価は数量に応じて按分されます。",
-    "openSealedHint": "パックを開封するとBOXは消費済みになり、価値は開封結果に引き継がれます。",
-    "feeHint": "取得原価に加算されます。",
-    "extraFeeHint": "追加料金や返送料。取得原価に加算されます。",
-    "priceHint": "売却した全数量の合計。",
-    "feesHint": "支払った手数料と送料。",
-    "editCostHint": "記録した支払額の訂正用。後の変更は鑑定・売却から。",
-    "deleteConfirm": "この登録と履歴を削除します。誤登録の場合のみ使用してください。元に戻せません。",
-    "intro": {
-      "edit": "記録内容を訂正します。変更は履歴に残ります。",
-      "split": "一部を別の登録に分けます（一部だけ売却・鑑定する前など）。",
-      "grade-submit": "鑑定料は取得原価に加算されます。返却まで未鑑定のままです。",
-      "sell": "一部売却の場合は自動でロットを分割します。",
-      "condition": "変更した項目だけが記録されます。",
-      "editProduct": "このアイテムのすべての登録に反映されます。",
-      "cancel-order": "自分でキャンセルした取引用です。この場合キャンセルのメールが届かないことが多く、インポートでは判別できません。"
+    "intro": "対応が必要なものを緊急度の高い順に表示します。各カードでその場で対応し、足りない場合はアイテムを開いてください。",
+    "banner": "対応が必要なものが{count}件あります",
+    "group": {
+      "all": "すべて",
+      "sources": "価格ソース",
+      "lots": "グレード・状態",
+      "imports": "インポート"
     },
-    "cancelOrderConfirm": "取引 #{order}（{from}）はキャンセルされました。この取引の登録をすべて削除し、今後のインポートでも取り込みません。"
+    "search": "検索",
+    "none": "対応が必要なものはありません。",
+    "noneShown": "該当なし。",
+    "count": {
+      "import_review": "確認待ちのインポート {count}件",
+      "failed_link": "インポートできなかった購入リンク {count}件",
+      "data_review": "判断待ちのデータレビュー提案 {count}件"
+    },
+    "type": {
+      "tcg_main_source": "メイン価格ソースなし",
+      "game_main_source": "メイン価格ソースなし",
+      "second_source": "他の価格ソース",
+      "card_grade": "グレードなし",
+      "game_condition": "状態なし",
+      "import_review": "インポート確認",
+      "failed_link": "失敗したリンク",
+      "data_review": "データレビュー"
+    },
+    "need": {
+      "card_grade": "グレードを選ぶと評価されます",
+      "game_condition": "状態を選ぶと評価されます"
+    },
+    "suggestions": "{source}の候補 {count}件",
+    "noSuggestion": "{source}で見つかりません: リンクを貼ってください",
+    "yourItem": "あなたのアイテム",
+    "owned": "{units}点 · 支払い {amount}",
+    "moreSuggestions": "他の候補 {count}件",
+    "paste": "またはこのアイテムの{source}のページを貼り付け:",
+    "openItem": "アイテムを開く",
+    "openLot": "ロットを開く"
   },
   "pulls": {
     "mode": {
@@ -571,7 +590,8 @@
       "aiTitle": "Claude経由（どのショップでも）",
       "aiIntro": "注文一覧や注文ページのスクリーンショット、PDF、CSV、コピーしたテキストを1つのフォルダに入れ、自宅PCでこれを実行します。Haikuが読み取り、気になる点はSonnetが読み直し、すべてここで確認できます。",
       "aiLast": "前回のClaude経由のインポート: {date}",
-      "aiNever": "Claude経由のインポートはまだありません。"
+      "aiNever": "Claude経由のインポートはまだありません。",
+      "otherActions": "その他の対応 {count}件は「対応」ページにあります"
     },
     "removeLot": "このロットを削除（自分の購入ではない）",
     "sameAs": "同じ購入",

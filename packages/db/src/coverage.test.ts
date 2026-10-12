@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
+import { actionTotal, pendingActions } from './actions';
 import { type Db, createDb } from './client';
 import { foreignPrices } from './fx';
 import { migrateDb } from './migrate';
@@ -125,4 +126,46 @@ it('keeps foreign prices out of the valuation data and shows the newest per list
   expect(await foreignPrices(db, product.id, now)).toEqual([
     expect.objectContaining({ price: 23.5, currency: 'USD', priceJpy: 3525, variant: 'Holofoil' }),
   ]);
+});
+
+it('lists actions as cards by level: main sources and grades red, games and second sources blue', async () => {
+  const card = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'single', name: 'ピカチュウ' } },
+    lot(500),
+  );
+  await saveCandidates(db, card.product.id, 'snkrdunk', [
+    { externalId: '1', title: 'ピカチュウ', score: 0.9 },
+    { externalId: '2', title: 'ピカチュウ (another)', score: 0.95 },
+  ]);
+  const linked = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'single', name: 'ミュウ' } },
+    { ...lot(800), grading: 'raw', rawGrade: 'A' },
+  );
+  await linkSource(db, linked.product.id, { source: 'snkrdunk', externalId: '3' });
+  await saveCandidates(db, linked.product.id, 'tcgcsv', [
+    { externalId: '4', title: 'Mew', score: 0.7 },
+  ]);
+  const game = await createHolding(
+    db,
+    userId,
+    { product: { category: 'game', kind: 'software', name: 'ASTRAL CHAIN' } },
+    lot(5000),
+  );
+  await setSourceWarningDismissed(db, userId, game.product.id, true);
+
+  const items = await pendingActions(db, userId);
+  expect(items.map((i) => [i.level, i.type, i.kind === 'count' ? '' : i.product.name])).toEqual([
+    ['red', 'tcg_main_source', 'ピカチュウ'],
+    ['red', 'card_grade', 'ピカチュウ'],
+    ['blue', 'second_source', 'ミュウ'],
+    // Dismissed: no 駿河屋 card for the game, its condition still asked.
+    ['blue', 'game_condition', 'ASTRAL CHAIN'],
+  ]);
+  const first = items[0]!;
+  expect(first.kind === 'source' && first.candidates.map((c) => c.score)).toEqual([0.95, 0.9]);
+  expect(actionTotal(items)).toBe(4);
 });

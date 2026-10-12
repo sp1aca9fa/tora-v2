@@ -1,9 +1,10 @@
-import { type PurchaseLink, importAttention, importRunsOf, purchaseLinksOf } from '@tora/db';
+import { type PurchaseLink, actionTotal, importRunsOf, purchaseLinksOf } from '@tora/db';
 import { ChevronRight, RotateCw, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
+import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
 import { removeLinkAction, retryLinkAction } from './actions';
@@ -16,8 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /** Imports hub (requirements S5d): what needs you, ways to import, and what each import did. */
 export default async function ImportsPage() {
   const { db, user } = await authed();
-  const [attention, links, runs, t, format] = await Promise.all([
-    importAttention(db, user.id),
+  const [actions, links, runs, t, format] = await Promise.all([
+    userActions(),
     purchaseLinksOf(db, user.id, 200),
     importRunsOf(db, user.id),
     getTranslations(),
@@ -26,6 +27,11 @@ export default async function ImportsPage() {
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
   const failed = links.filter((l) => l.status === 'failed');
+  // Imports shows its own things; the rest waits on the Actions page.
+  const toReview = actionTotal(actions.filter((a) => a.type === 'import_review'));
+  const elsewhere = actionTotal(
+    actions.filter((a) => a.type !== 'import_review' && a.type !== 'failed_link'),
+  );
   const others = links.filter((l) => l.status !== 'failed');
   const lastEmail = runs.find((r) => r.method === 'email');
   const lastAi = runs.find((r) => r.method === 'claude');
@@ -103,24 +109,20 @@ export default async function ImportsPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">{t('imports.hub.attention')}</h2>
-        {attention.total === 0 ? (
+        {toReview === 0 && failed.length === 0 && (
           <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
             {t('imports.hub.allClear')}
           </p>
-        ) : (
-          <div className="space-y-2">
-            {attention.toReview > 0 &&
-              tile('/imports/review', t('imports.banner', { count: attention.toReview }))}
-            {attention.ungradedCards > 0 &&
-              tile('/holdings/grades', t('grades.banner', { count: attention.ungradedCards }))}
-            {attention.suggestions > 0 &&
-              tile(
-                '/imports/suggestions',
-                t('suggestions.banner', { count: attention.suggestions }),
-              )}
-            {attention.missingSources > 0 &&
-              tile('/imports/sources', t('coverage.banner', { count: attention.missingSources }))}
-          </div>
+        )}
+        {toReview > 0 && tile('/imports/review', t('imports.banner', { count: toReview }))}
+        {elsewhere > 0 && (
+          <Link
+            href="/actions"
+            className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm text-muted-foreground hover:bg-accent/50"
+          >
+            <span>{t('imports.hub.otherActions', { count: elsewhere })}</span>
+            <ChevronRight className="size-4" />
+          </Link>
         )}
         {failed.length > 0 && (
           <div id="failed" className="scroll-mt-20 space-y-2">
