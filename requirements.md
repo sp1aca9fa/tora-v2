@@ -107,6 +107,7 @@
 - 2026-10-12: S7 build: US prices are stored as `listing` observations in dollars and loaded nowhere in the valuation (which now takes yen prices only); 駿河屋 asking prices became the valuation's last market fallback (`store` method) as section 6 planned; first matching run: 36 TCGplayer and 36 駿河屋 suggestions (a first 駿河屋 pass made 74, mostly related goods, and was redone with a tighter rule before the user saw it).
 - 2026-10-12: SNKRDUNK matching treated "206" and "206/165" as different cards, so cards typed without the set size (e.g. エリカの招待 SV2a 206, from an import) never got a SNKRDUNK suggestion while TCGplayer (which compares the leading number) did. Numbers now match when one side leaves out the set size. Home market and currency per user noted as a future idea (user).
 - 2026-10-12: New phase S9 at the user's request: a watchlist of items not owned yet, with help finding a good price to buy at from price behaviour (the reason Tora v1 was started). After S6; starts with a design session. First ideas written down in S9, all open. "Price alerts" (future ideas) folds into it.
+- 2026-10-12: SNKRDUNK is also the main source for sealed TCG product (boxes, packs, decks, special sets; user); 駿河屋 stays a second source for them and the main one for games, consoles, supplies and other items over ¥3,000. The 駿河屋 results parser looked for an item's link only 400 characters before its title and skipped items with longer markup (the regular 30th CELEBRATION box was missed, leaving only the FUTURISTIC BOX); it now looks back to the previous item.
 
 ---
 
@@ -528,7 +529,7 @@ Built (2026-10-12):
 - 駿河屋 (private): product pages are behind a Cloudflare challenge, the search and 買取 search are not; searching an item number returns the item with used / new / list / time-sale / marketplace prices, so collecting needs two requests per item. Matching by name coverage, the item's 駿河屋 kind and platform; only suggestions close to the best one (at most 4). Used stock of a game is `cond:good`, new `cond:new`; new boxes `sealed:shrink`, used boxes no bucket; 買取 as `buylist`.
 - Valuation loads yen prices only; `store` method: the newest shop asking price of the exact condition (30 days) when no source has a sale, before the retail price, low confidence.
 - Item page: Japan vs US card (Japanese value of the condition TCGplayer quotes: the user's raw / sealed condition, else raw A / shrink-wrapped; a note for graded lots); suggestions open per source; 駿河屋 / TCGplayer links can be pasted for any item.
-- Missing stable sources: `missingPriceSources` (cards without SNKRDUNK, other items over ¥3,000 without 駿河屋, lots under import review left out) in Imports > Needs you, a portfolio banner, Imports > Price sources to link (`/imports/sources`) and the MCP data checks. Pending matches are counted per source, so a Mercari search no longer hides a 駿河屋 suggestion.
+- Missing stable sources: `missingPriceSources` (cards and sealed TCG product without SNKRDUNK, other items over ¥3,000 without 駿河屋, lots under import review left out) in Imports > Needs you, a portfolio banner, Imports > Price sources to link (`/imports/sources`) and the MCP data checks. Pending matches are counted per source, so a Mercari search no longer hides a 駿河屋 suggestion.
 
 Acceptance:
 - At least one card and one non-card item show JP vs US side by side.
@@ -571,6 +572,8 @@ Signal ideas (deterministic, computed daily at the end of a collect, every numbe
 - Calendar: new set release weeks (people sell to fund the next set), year-end and bonus seasons, reprint announcements (the last only via news, see below).
 - A fair value with a band, and a buy zone under it (e.g. "fair ¥26,000, buy under ¥22,000"), adjusted for fees and shipping. Target price set by the user wins.
 - Alerts: price entered the buy zone, a listing under the target appeared (needs active-listing checks a few times a day, not only the daily collect), a sharp drop.
+
+Buy suggestions (user, 2026-10-12): Tora proposes items to buy on its own, not only for the watchlist. The user can set a target date and a budget (e.g. "¥50,000 by the end of December"), and Tora suggests what to buy and when within them, from the signals above (items in their buy zone, expected moves before the date, liquidity to sell later). Open: where candidates come from (items similar to what the user holds or watches, sets the user follows, top movers on the sources), how to split a budget across items, and how to show the reasoning.
 
 Automatic, Claude, or both (to decide; first thought: both, layered):
 - Rules and statistics first: cheap, repeatable, explainable, testable. Backtest each rule on the collected history before trusting it ("had we bought when it said buy, how did prices move after 30 / 90 days?").

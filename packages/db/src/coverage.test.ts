@@ -50,6 +50,13 @@ it('lists cards without SNKRDUNK and items over ¥3,000 without 駿河屋', asyn
     { product: { category: 'game', kind: 'software', name: '逆転検事2' } },
     { ...lot(2000), condition: 'like_new' },
   );
+  // A box goes by SNKRDUNK too, whatever it cost.
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: '30th BOX' } },
+    { ...lot(20000), packagingState: 'sealed_shrink' },
+  );
   const game = await createHolding(
     db,
     userId,
@@ -64,6 +71,7 @@ it('lists cards without SNKRDUNK and items over ¥3,000 without 駿河屋', asyn
 
   const missing = await missingPriceSources(db, userId);
   expect(missing.map((m) => [m.product.name, m.source, m.suggestions])).toEqual([
+    ['30th BOX', 'snkrdunk', 0],
     ['ASTRAL CHAIN', 'surugaya', 1],
     ['ピカチュウ', 'snkrdunk', 0],
   ]);
@@ -74,7 +82,7 @@ it('lists cards without SNKRDUNK and items over ¥3,000 without 駿河屋', asyn
 
   await linkSource(db, game.product.id, { source: 'surugaya', externalId: '109000490' });
   await linkSource(db, card.product.id, { source: 'snkrdunk', externalId: '1' });
-  expect(await missingPriceSources(db, userId)).toEqual([]);
+  expect((await missingPriceSources(db, userId)).map((m) => m.product.name)).toEqual(['30th BOX']);
   expect(await pendingMatchesForUser(db, userId)).toEqual([]);
 });
 

@@ -1,6 +1,6 @@
 // Price sources: links between products and source listings, match candidates, observations,
 // collector runs and health. Products and market data are shared by all users.
-import { type CollectorRunStatus, median, toTokyoIso } from '@tora/core';
+import { type CollectorRunStatus, median, productClass, toTokyoIso } from '@tora/core';
 import {
   and,
   asc,
@@ -841,14 +841,16 @@ export async function addSourceReference(
 export const STORE_LINK_MIN_COST = 3000;
 
 /**
- * The stable, product-level source an item should be linked to: SNKRDUNK for cards, 駿河屋 for
- * other items costing more than ¥3,000 (what the user paid for the lots they own); else none.
+ * The stable, product-level source an item should be linked to: SNKRDUNK for cards and sealed
+ * product (boxes, packs, decks, special sets), 駿河屋 for other items costing more than ¥3,000 (what
+ * the user paid for the lots they own); else none.
  */
 export function stableSourceFor(
   product: Pick<Product, 'category' | 'kind'>,
   costJpy: number,
 ): 'snkrdunk' | 'surugaya' | null {
-  if (product.category === 'tcg' && product.kind === 'single') return 'snkrdunk';
+  const cls = productClass(product);
+  if (cls === 'card' || cls === 'sealed') return 'snkrdunk';
   return costJpy > STORE_LINK_MIN_COST ? 'surugaya' : null;
 }
 
@@ -863,9 +865,9 @@ export interface MissingSource {
 }
 
 /**
- * Owned items without their stable, product-level price source (requirements S7): cards not
- * linked to SNKRDUNK (Mercari searches are a plus, not a replacement), and other items costing
- * more than ¥3,000 not linked to a 駿河屋 page. Lots still in the import review are left out.
+ * Owned items without their stable, product-level price source (requirements S7): cards and
+ * sealed product not linked to SNKRDUNK (Mercari searches are a plus, not a replacement), and
+ * other items costing more than ¥3,000 not linked to a 駿河屋 page. Lots still in the import review are left out.
  */
 export async function missingPriceSources(db: Db, userId: string): Promise<MissingSource[]> {
   const owned = await db

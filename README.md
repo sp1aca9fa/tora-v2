@@ -178,8 +178,8 @@ Settings shows each source's last run, items waiting for confirmation, listings 
   (Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
   US**, never counted in the value. TCGplayer only prices ungraded cards; eBay (graded cards) is
   not built yet because eBay blocks requests from the home PC.
-- **Stable sources**: every card should be linked to SNKRDUNK, and every other item costing more
-  than ¥3,000 to a 駿河屋 page (store and 買取 prices). Missing ones show under Imports > Needs you
+- **Stable sources**: every card and sealed TCG product (box, pack, deck, special set) should be
+  linked to SNKRDUNK, and every other item costing more than ¥3,000 to a 駿河屋 page (store and 買取 prices). Missing ones show under Imports > Needs you
   and on the portfolio; the list links to each item's price sources.
 
 ### Purchase import
