@@ -148,33 +148,13 @@
   "actions": {
     "intro": "対応が必要なものを緊急度の高い順に表示します。各カードでその場で対応し、足りない場合はアイテムを開いてください。",
     "banner": "対応が必要なものが{count}件あります",
-    "group": {
-      "all": "すべて",
-      "sources": "価格ソース",
-      "lots": "グレード・状態",
-      "imports": "インポート"
-    },
     "search": "検索",
     "none": "対応が必要なものはありません。",
     "noneShown": "該当なし。",
-    "count": {
-      "import_review": "確認待ちのインポート {count}件",
-      "failed_link": "インポートできなかった購入リンク {count}件",
-      "data_review": "判断待ちのデータレビュー提案 {count}件"
-    },
-    "type": {
-      "tcg_main_source": "メイン価格ソースなし",
-      "game_main_source": "メイン価格ソースなし",
-      "second_source": "他の価格ソース",
-      "card_grade": "グレードなし",
-      "game_condition": "状態なし",
-      "import_review": "インポート確認",
-      "failed_link": "失敗したリンク",
-      "data_review": "データレビュー"
-    },
     "need": {
       "card_grade": "グレードを選ぶと評価されます",
-      "game_condition": "状態を選ぶと評価されます"
+      "game_condition": "状態を選ぶと評価されます",
+      "import_review": "インポート内容を確認"
     },
     "suggestions": "{source}の候補 {count}件",
     "noSuggestion": "{source}で見つかりません: リンクを貼ってください",
@@ -184,7 +164,23 @@
     "paste": "またはこのアイテムの{source}のページを貼り付け:",
     "openItem": "アイテムを開く",
     "openLot": "ロットを開く",
-    "levels": "レベルを変更"
+    "levels": "レベルを変更",
+    "section": {
+      "tcg_main_source": "メイン価格ソースがないTCGアイテム {count}件",
+      "game_main_source": "メイン価格ソースがないゲーム・その他 {count}件",
+      "second_source": "他の価格ソースの候補 {count}件",
+      "card_grade": "グレードのないカード {count}件",
+      "game_condition": "状態のないゲーム {count}件",
+      "import_review": "確認待ちのインポート {count}件",
+      "failed_link": "インポートできなかった購入リンク {count}件",
+      "data_review": "判断待ちのデータレビュー提案 {count}件"
+    },
+    "all": "すべて",
+    "openReview": "インポート確認を開く(2つのロットをまとめる等)",
+    "openImports": "インポートを開く",
+    "openDataReview": "データレビューを開く",
+    "confirmLot": "確認",
+    "removeLot": "削除"
   },
   "pulls": {
     "mode": {
@@ -702,6 +698,13 @@
     },
     "default": "初期値: {level}",
     "reset": "初期値に戻す",
-    "saved": "保存しました。"
+    "saved": "保存しました。",
+    "short": {
+      "red": "緊急",
+      "orange": "高",
+      "yellow": "中",
+      "blue": "低",
+      "grey": "静か"
+    }
   }
 }

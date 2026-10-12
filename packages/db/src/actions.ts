@@ -1,6 +1,6 @@
 // Everything waiting for the user, as cards for the Actions page (requirements S8): matches to
-// confirm and price sources to link, lots without a grade or condition, and links to the import
-// pages. Each card has a notice type and its level.
+// confirm and price sources to link, lots without a grade or condition, imported lots to review,
+// purchase links that failed and data review suggestions. Each card has a notice type and level.
 import {
   NOTICE_TYPES,
   type NoticeLevel,
@@ -13,18 +13,20 @@ import {
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { linkedListingImages, imageVersions } from './images';
-import { failedPurchaseLinkCount } from './purchase-links';
-import { importReviewCount } from './queries';
+import { pendingImportReview } from './queries';
 import {
   type Holding,
   type Product,
+  type PurchaseLink,
+  type Suggestion,
   holdings,
   productSources,
   products,
+  purchaseLinks,
   sourceCandidates,
 } from './schema';
 import { dismissedSourceWarnings, stableSourceFor } from './sources';
-import { openSuggestionCount } from './suggestions';
+import { openSuggestions } from './suggestions';
 
 export interface ListingSuggestion {
   id: string;
@@ -59,8 +61,15 @@ export type ActionItem = ActionBase &
         /** Best first; empty when nothing was found (paste a link). */
         candidates: ListingSuggestion[];
       }
+    /** A lot without a grade or condition, or an imported lot to review. */
     | { kind: 'lot'; product: Product; imageVersion: string | null; holding: Holding }
-    | { kind: 'count'; count: number }
+    | { kind: 'link'; link: PurchaseLink }
+    | {
+        kind: 'suggestion';
+        suggestion: Suggestion;
+        product: Product | null;
+        imageVersion: string | null;
+      }
   );
 
 /** Every pending action of the user, most urgent level first (levels: the user's choices). */
@@ -113,9 +122,12 @@ export async function pendingActions(
         ),
       )
       .orderBy(products.name),
-    importReviewCount(db, userId),
-    failedPurchaseLinkCount(db, userId),
-    openSuggestionCount(db, userId),
+    pendingImportReview(db, userId),
+    db
+      .select()
+      .from(purchaseLinks)
+      .where(and(eq(purchaseLinks.userId, userId), eq(purchaseLinks.status, 'failed'))),
+    openSuggestions(db, userId),
     dismissedSourceWarnings(db, userId),
   ]);
 
@@ -203,19 +215,45 @@ export async function pendingActions(
       holding,
     });
   }
-  for (const [type, count] of [
-    ['import_review', toReview],
-    ['failed_link', failedLinks],
-    ['data_review', dataReview],
-  ] as const) {
-    if (count > 0) items.push({ key: type, type, level: level(type), kind: 'count', count });
+  for (const { holding, product } of toReview) {
+    items.push({
+      key: `review:${holding.id}`,
+      type: 'import_review',
+      level: level('import_review'),
+      kind: 'lot',
+      product,
+      imageVersion: null,
+      holding,
+    });
+  }
+  for (const link of failedLinks) {
+    items.push({
+      key: `link:${link.id}`,
+      type: 'failed_link',
+      level: level('failed_link'),
+      kind: 'link',
+      link,
+    });
+  }
+  for (const { suggestion, product } of dataReview) {
+    items.push({
+      key: `suggestion:${suggestion.id}`,
+      type: 'data_review',
+      level: level('data_review'),
+      kind: 'suggestion',
+      suggestion,
+      product,
+      imageVersion: null,
+    });
   }
 
+  const productOf = (i: ActionItem) => ('product' in i ? i.product : null);
   const versions = await imageVersions(db, [
-    ...new Set(items.flatMap((i) => (i.kind === 'count' ? [] : [i.product.id]))),
+    ...new Set(items.flatMap((i) => (productOf(i) ? [productOf(i)!.id] : []))),
   ]);
   for (const i of items) {
-    if (i.kind !== 'count') i.imageVersion = versions.get(i.product.id) ?? null;
+    const product = productOf(i);
+    if (product && 'imageVersion' in i) i.imageVersion = versions.get(product.id) ?? null;
   }
   const cost = (i: ActionItem) =>
     i.kind === 'source' ? i.costJpy : i.kind === 'lot' ? i.holding.costTotalJpy : 0;
@@ -227,11 +265,6 @@ export async function pendingActions(
   );
 }
 
-/**
- * How many things wait for the user (the nav badge): a count card counts its rows; quiet (grey)
- * notices are not counted.
- */
+/** How many things wait for the user (the nav badge); quiet (grey) notices are not counted. */
 export const actionTotal = (items: ActionItem[]) =>
-  items
-    .filter((i) => countsInBadge(i.level))
-    .reduce((n, i) => n + (i.kind === 'count' ? i.count : 1), 0);
+  items.filter((i) => countsInBadge(i.level)).length;

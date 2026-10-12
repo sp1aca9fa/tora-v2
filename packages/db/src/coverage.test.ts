@@ -158,7 +158,9 @@ it('lists actions as cards by level: main sources and grades red, games and seco
   await setSourceWarningDismissed(db, userId, game.product.id, true);
 
   const items = await pendingActions(db, userId);
-  expect(items.map((i) => [i.level, i.type, i.kind === 'count' ? '' : i.product.name])).toEqual([
+  expect(
+    items.map((i) => [i.level, i.type, 'product' in i && i.product ? i.product.name : '']),
+  ).toEqual([
     ['red', 'tcg_main_source', 'ピカチュウ'],
     ['red', 'card_grade', 'ピカチュウ'],
     ['blue', 'second_source', 'ミュウ'],

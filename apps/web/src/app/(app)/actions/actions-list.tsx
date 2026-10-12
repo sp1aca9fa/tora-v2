@@ -4,18 +4,28 @@ import {
   CONDITIONS,
   type CardGrade,
   type Condition,
+  NOTICE_LEVELS,
   type NoticeLevel,
   type NoticeType,
   RAW_GRADES,
 } from '@tora/core';
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, RotateCw } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState, useSyncExternalStore, useTransition } from 'react';
+import { type ReactNode, useMemo, useState, useSyncExternalStore, useTransition } from 'react';
+import { FormError } from '@/components/form-error';
 import { LEVEL_STYLE } from '@/components/notice-level';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn, formatJpy } from '@/lib/utils';
+import {
+  type ReviewRow,
+  confirmReviewAction,
+  removeLinkAction,
+  retryLinkAction,
+} from '../imports/actions';
+import type { ReviewItem } from '../imports/review/review-item';
+import { ReviewRowFields, initialRow } from '../imports/review/review-row';
 import { LinkUrlForm } from '../products/[id]/link-url-form';
 import {
   confirmCandidateAction,
@@ -29,12 +39,14 @@ export interface ActionCardView {
   key: string;
   type: NoticeType;
   level: NoticeLevel;
-  kind: 'source' | 'lot' | 'count';
+  kind: 'source' | 'lot' | 'link' | 'suggestion';
   title: string;
-  /** Kind, set, number... (empty for count cards). */
+  /** Kind, set, number... */
   meta: string;
+  /** The closed card's second line: what is needed. */
+  summary: string;
   image: string | null;
-  /** The item page, the lot page, or the import page that settles a count card. */
+  /** Where the full page for this action is (item, lot, import review...). */
   href: string;
   productId?: string;
   source?: string;
@@ -51,14 +63,16 @@ export interface ActionCardView {
     score: number;
   }[];
   holdingId?: string;
-  count?: number;
+  /** An imported lot waiting for review. */
+  review?: ReviewItem;
+  /** A purchase link that failed. */
+  linkId?: string;
+  url?: string;
+  /** Rendered on the server (a data review suggestion and its Accept / Dismiss). */
+  body?: ReactNode;
 }
 
-type Group = 'all' | 'sources' | 'lots' | 'imports';
-const groupOf = (c: ActionCardView): Exclude<Group, 'all'> =>
-  c.kind === 'source' ? 'sources' : c.kind === 'lot' ? 'lots' : 'imports';
-
-// Which cards the viewer opened or closed, kept in this browser only.
+// Which cards and sections the viewer opened or closed, kept in this browser only.
 const OPEN_KEY = 'tora.actions.open';
 const OPEN_EVENT = 'tora-actions-open';
 const readOpen = () => {
@@ -96,40 +110,52 @@ function useOpenCards() {
   return [open, set] as const;
 }
 
-/** The Actions list: filters, search and one card per action, settled in place. */
+/** The Actions list: level filters, search, and a section per notice type, settled in place. */
 export function ActionsList({ cards }: { cards: ActionCardView[] }) {
   const t = useTranslations();
-  const [group, setGroup] = useState<Group>('all');
+  const [level, setLevel] = useState<NoticeLevel | 'all'>('all');
   const [q, setQ] = useState('');
   // Settled cards disappear at once; the server's next render drops them for good.
   const [done, setDone] = useState<Set<string>>(new Set());
   const [open, setOpen] = useOpenCards();
   const live = cards.filter((c) => !done.has(c.key));
-  const counts = { all: live.length, sources: 0, lots: 0, imports: 0 };
-  for (const c of live) counts[groupOf(c)]++;
+  const perLevel = new Map<NoticeLevel, number>();
+  for (const c of live) perLevel.set(c.level, (perLevel.get(c.level) ?? 0) + 1);
   const needle = q.trim().toLowerCase();
   const shown = live.filter(
     (c) =>
-      (group === 'all' || groupOf(c) === group) &&
+      (level === 'all' || c.level === level) &&
       (!needle || `${c.title} ${c.meta}`.toLowerCase().includes(needle)),
   );
+  // One section per notice type, in the cards' order (most urgent level first).
+  const sections = new Map<NoticeType, ActionCardView[]>();
+  for (const c of shown) sections.set(c.type, [...(sections.get(c.type) ?? []), c]);
   const settle = (key: string) => setDone((d) => new Set(d).add(key));
+  const chip = 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm';
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        {(['all', 'sources', 'lots', 'imports'] as const).map((g) => (
+        <button
+          type="button"
+          onClick={() => setLevel('all')}
+          className={cn(
+            chip,
+            level === 'all' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
+          )}
+        >
+          {t('actions.all')} {live.length}
+        </button>
+        {NOTICE_LEVELS.filter((l) => perLevel.has(l)).map((l) => (
           <button
-            key={g}
+            key={l}
             type="button"
-            onClick={() => setGroup(g)}
-            disabled={g !== 'all' && counts[g] === 0}
-            className={cn(
-              'rounded-full border px-3 py-1 text-sm disabled:opacity-40',
-              group === g ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
-            )}
+            onClick={() => setLevel(level === l ? 'all' : l)}
+            aria-pressed={level === l}
+            className={cn(chip, LEVEL_STYLE[l].banner, level === l && 'ring-2 ring-foreground/30')}
           >
-            {t(`actions.group.${g}`)} {counts[g]}
+            <span className={cn('size-2.5 rounded-full', LEVEL_STYLE[l].dot)} />
+            {t(`notices.short.${l}`)} {perLevel.get(l)}
           </button>
         ))}
         <Input
@@ -146,17 +172,49 @@ export function ActionsList({ cards }: { cards: ActionCardView[] }) {
           {live.length === 0 ? t('actions.none') : t('actions.noneShown')}
         </p>
       ) : (
-        <ul className="space-y-2">
-          {shown.map((c) => (
-            <ActionCard
-              key={c.key}
-              card={c}
-              open={open[c.key] ?? c.level === 'red'}
-              onToggle={(value) => setOpen(c.key, value)}
-              onSettled={() => settle(c.key)}
-            />
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {[...sections].map(([type, list]) => {
+            const sectionOpen = open[`type:${type}`] ?? true;
+            const style = LEVEL_STYLE[list[0]!.level];
+            return (
+              <section key={type} className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setOpen(`type:${type}`, !sectionOpen)}
+                  aria-expanded={sectionOpen}
+                  className={cn(
+                    'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium',
+                    style.banner,
+                  )}
+                >
+                  <span className={cn('size-2.5 shrink-0 rounded-full', style.dot)} />
+                  <span className="flex-1">
+                    {t(`actions.section.${type}`, { count: list.length })}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'size-4 shrink-0 transition-transform',
+                      sectionOpen && 'rotate-180',
+                    )}
+                  />
+                </button>
+                {sectionOpen && (
+                  <ul className="space-y-2">
+                    {list.map((c) => (
+                      <ActionCard
+                        key={c.key}
+                        card={c}
+                        open={open[c.key] ?? c.level === 'red'}
+                        onToggle={(value) => setOpen(c.key, value)}
+                        onSettled={() => settle(c.key)}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -175,37 +233,30 @@ function ActionCard({
 }) {
   const t = useTranslations();
   const [pending, startTransition] = useTransition();
-  /** Runs a server action; the card goes once it is done. */
-  const run = (action: () => Promise<unknown>) =>
+  /** Runs a server action; the card goes once it is done (unless it answers false). */
+  const run: Run = (action) =>
     startTransition(async () => {
-      await action();
-      onSettled();
+      if ((await action()) !== false) onSettled();
     });
-  const bar = cn('rounded-xl border border-l-4 bg-card', LEVEL_STYLE[c.level].bar);
-
-  if (c.kind === 'count') {
-    return (
-      <li className={bar}>
-        <Link
-          href={c.href}
-          className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent/50"
-        >
-          <span className="flex-1">{t(`actions.count.${c.type}`, { count: c.count ?? 0 })}</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      </li>
-    );
-  }
-
-  const summary =
+  const openLabel =
     c.kind === 'source'
-      ? c.candidates?.length
-        ? t('actions.suggestions', { count: c.candidates.length, source: c.sourceLabel ?? '' })
-        : t('actions.noSuggestion', { source: c.sourceLabel ?? '' })
-      : t(`actions.need.${c.type}`);
+      ? t('actions.openItem')
+      : c.type === 'import_review'
+        ? t('actions.openReview')
+        : c.kind === 'lot'
+          ? t('actions.openLot')
+          : c.kind === 'link'
+            ? t('actions.openImports')
+            : t('actions.openDataReview');
 
   return (
-    <li className={cn(bar, pending && 'opacity-60')}>
+    <li
+      className={cn(
+        'rounded-xl border border-l-4 bg-card',
+        LEVEL_STYLE[c.level].bar,
+        pending && 'opacity-60',
+      )}
+    >
       <button
         type="button"
         onClick={() => onToggle(!open)}
@@ -215,9 +266,7 @@ function ActionCard({
         <Thumb src={c.image} className="size-9" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{c.title}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {t(`actions.type.${c.type}`)} · {summary}
-          </span>
+          <span className="block truncate text-xs text-muted-foreground">{c.summary}</span>
         </span>
         <ChevronDown
           className={cn(
@@ -229,39 +278,125 @@ function ActionCard({
 
       {open && (
         <div className="space-y-3 border-t px-3 py-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex gap-3 rounded-md border p-2">
-              <Thumb src={c.image} className="size-16" />
-              <div className="min-w-0 space-y-0.5 text-sm">
-                <p className="text-xs text-muted-foreground">{t('actions.yourItem')}</p>
-                <p className="line-clamp-2 font-medium">{c.title}</p>
-                {c.meta && <p className="text-xs text-muted-foreground">{c.meta}</p>}
-                {c.owned && <p className="text-xs text-muted-foreground">{c.owned}</p>}
+          {c.kind !== 'link' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex gap-3 rounded-md border p-2">
+                <Thumb src={c.image} className="size-16" />
+                <div className="min-w-0 space-y-0.5 text-sm">
+                  <p className="text-xs text-muted-foreground">{t('actions.yourItem')}</p>
+                  <p className="line-clamp-2 font-medium">{c.title}</p>
+                  {c.meta && <p className="text-xs text-muted-foreground">{c.meta}</p>}
+                  {c.owned && <p className="text-xs text-muted-foreground">{c.owned}</p>}
+                </div>
               </div>
+              {c.kind === 'source' && c.candidates?.[0] && (
+                <Candidate candidate={c.candidates[0]} label={c.sourceLabel ?? ''} />
+              )}
             </div>
-            {c.kind === 'source' && c.candidates?.[0] && (
-              <Candidate candidate={c.candidates[0]} label={c.sourceLabel ?? ''} />
-            )}
-          </div>
+          )}
 
           {c.kind === 'source' && <SourceControls card={c} pending={pending} run={run} />}
-          {c.kind === 'lot' && c.type === 'card_grade' && (
+          {c.type === 'card_grade' && (
             <GradeButtons holdingId={c.holdingId!} pending={pending} run={run} />
           )}
-          {c.kind === 'lot' && c.type === 'game_condition' && (
+          {c.type === 'game_condition' && (
             <ConditionButtons holdingId={c.holdingId!} pending={pending} run={run} />
           )}
+          {c.review && <ReviewControls item={c.review} pending={pending} run={run} />}
+          {c.kind === 'link' && <LinkControls card={c} pending={pending} run={run} />}
+          {c.body}
 
           <Link
             href={c.href}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            {c.kind === 'lot' ? t('actions.openLot') : t('actions.openItem')}
+            {openLabel}
             <ChevronRight className="size-3" />
           </Link>
         </div>
       )}
     </li>
+  );
+}
+
+/** An imported lot's review controls (as on the import review page) and Confirm. */
+function ReviewControls({ item, pending, run }: { item: ReviewItem; pending: boolean; run: Run }) {
+  const t = useTranslations();
+  const [row, setRow] = useState<ReviewRow>(() => initialRow(item));
+  const [error, setError] = useState<{ error?: string; fields?: string[] }>({});
+  const confirm = () => {
+    const form = new FormData();
+    form.set('payload', JSON.stringify([row]));
+    // A card without a grade is confirmed as is; it then asks for its grade with the others.
+    form.set('mode', 'all');
+    run(async () => {
+      const result = await confirmReviewAction({}, form);
+      setError(result);
+      return !result.error;
+    });
+  };
+  return (
+    <div className="space-y-2">
+      <ReviewRowFields
+        item={item}
+        row={row}
+        update={(_, patch) => setRow((r) => ({ ...r, ...patch }))}
+        candidates={[]}
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          disabled={pending}
+          variant={row.cancelled ? 'destructive' : 'default'}
+          onClick={confirm}
+        >
+          {row.cancelled ? t('actions.removeLot') : t('actions.confirmLot')}
+        </Button>
+        <FormError state={error} />
+      </div>
+    </div>
+  );
+}
+
+/** A purchase link that failed: try again, add the purchase by hand, or drop it. */
+function LinkControls({
+  card: c,
+  pending,
+  run,
+}: {
+  card: ActionCardView;
+  pending: boolean;
+  run: Run;
+}) {
+  const t = useTranslations();
+  return (
+    <div className="space-y-2 text-sm">
+      <a
+        href={c.url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex max-w-full items-center gap-1 break-all underline"
+      >
+        {c.url} <ExternalLink className="size-3 shrink-0" />
+      </a>
+      <p className="text-xs text-muted-foreground">{c.summary}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" disabled={pending} onClick={() => run(() => retryLinkAction(c.linkId!))}>
+          <RotateCw className="size-3.5" /> {t('imports.links.retry')}
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <Link href={`/add?link=${c.linkId}`}>{t('imports.links.addByHand')}</Link>
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => run(() => removeLinkAction(c.linkId!))}
+        >
+          {t('imports.links.remove')}
+        </Button>
+      </div>
+    </div>
   );
 }
 

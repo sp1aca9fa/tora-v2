@@ -1,11 +1,11 @@
-import { productClass } from '@tora/core';
 import { pendingImportReview } from '@tora/db';
 import { ChevronLeft } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
-import { ReviewForm, type ReviewItem } from './review-form';
+import { ReviewForm } from './review-form';
+import { reviewItemOf } from './review-item';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('imports'))('title') };
@@ -14,28 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ImportReviewPage() {
   const { db, user } = await authed();
   const [rows, t] = await Promise.all([pendingImportReview(db, user.id), getTranslations()]);
-  const items: ReviewItem[] = rows.map(({ holding, product }) => {
-    const cls = productClass(product);
-    return {
-      id: holding.id,
-      productId: product.id,
-      importRunId: holding.importRunId,
-      cls,
-      name: product.name,
-      details: [product.rarity, product.setCode, product.cardNumber].filter(Boolean).join(' '),
-      acquiredAt: holding.acquiredAt.slice(0, 10),
-      orderId: holding.orderId,
-      costJpy: holding.costTotalJpy,
-      quantity: holding.quantity,
-      packagingState: holding.packagingState,
-      reasons: (holding.reviewReason ?? '').split(',').filter(Boolean),
-      grading: holding.grading,
-      rawGrade: holding.rawGrade,
-      grader: holding.grader,
-      grade: holding.grade,
-      certNumber: holding.certNumber,
-    };
-  });
+  const items = rows.map(({ holding, product }) => reviewItemOf(holding, product));
 
   return (
     <div className="space-y-4">

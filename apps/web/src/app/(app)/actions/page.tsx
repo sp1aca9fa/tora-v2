@@ -9,17 +9,13 @@ import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel, productMeta, sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { setSourceWarningAction } from './actions';
+import { reviewItemOf } from '../imports/review/review-item';
+import { SuggestionCard } from '../imports/suggestions/suggestion-card';
 import { type ActionCardView, ActionsList } from './actions-list';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('actions') };
 }
-
-const COUNT_HREF = {
-  import_review: '/imports/review',
-  failed_link: '/imports#failed',
-  data_review: '/imports/suggestions',
-} as const;
 
 /**
  * Everything waiting for the user (requirements S8): one card per action with what is needed to
@@ -38,16 +34,37 @@ export default async function ActionsPage() {
   );
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
 
+  const reasons = (list: string[]) =>
+    list.map((r) => (t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r)).join(' · ');
+
   const cards: ActionCardView[] = items.map((i): ActionCardView => {
     const base = { key: i.key, type: i.type, level: i.level, kind: i.kind };
-    if (i.kind === 'count') {
+    if (i.kind === 'link') {
       return {
         ...base,
-        title: '',
-        meta: '',
+        title: i.link.url.replace(/^https?:\/\//, ''),
+        meta: date(i.link.createdAt),
+        summary: i.link.message ?? t('imports.links.status.failed'),
         image: null,
-        href: COUNT_HREF[i.type as keyof typeof COUNT_HREF] ?? '/imports',
-        count: i.count,
+        href: '/imports#failed',
+        linkId: i.link.id,
+        url: i.link.url,
+      };
+    }
+    if (i.kind === 'suggestion') {
+      return {
+        ...base,
+        title: i.product?.name ?? t(`suggestions.kind.${i.suggestion.kind}`),
+        meta: i.product ? productMeta(i.product, t) : '',
+        summary: t(`suggestions.kind.${i.suggestion.kind}`),
+        image: i.product ? productImageUrl(i.product.id, i.imageVersion) : null,
+        href: '/imports/suggestions',
+        productId: i.product?.id,
+        body: (
+          <div className="space-y-2 text-sm">
+            <SuggestionCard suggestion={i.suggestion} product={i.product} showProduct={false} />
+          </div>
+        ),
       };
     }
     const common = {
@@ -59,22 +76,38 @@ export default async function ActionsPage() {
     };
     if (i.kind === 'lot') {
       const h = i.holding;
+      const owned = [
+        `×${h.quantity}`,
+        formatJpy(h.costTotalJpy),
+        date(h.acquiredAt),
+        lotConditionLabel(h, i.product, t),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      if (i.type === 'import_review') {
+        const review = reviewItemOf(h, i.product);
+        return {
+          ...common,
+          summary: reasons(review.reasons) || t('actions.need.import_review'),
+          href: '/imports/review',
+          holdingId: h.id,
+          owned,
+          review,
+        };
+      }
       return {
         ...common,
+        summary: t(`actions.need.${i.type}`),
         href: `/holdings/${h.id}`,
         holdingId: h.id,
-        owned: [
-          `×${h.quantity}`,
-          formatJpy(h.costTotalJpy),
-          date(h.acquiredAt),
-          lotConditionLabel(h, i.product, t),
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        owned,
       };
     }
     return {
       ...common,
+      summary: i.candidates.length
+        ? t('actions.suggestions', { count: i.candidates.length, source: sourceLabel(i.source) })
+        : t('actions.noSuggestion', { source: sourceLabel(i.source) }),
       href: `/products/${i.product.id}#sources`,
       source: i.source,
       sourceLabel: sourceLabel(i.source),
