@@ -51,7 +51,7 @@ export async function ValuationCard({
               {v.valueJpy === null ? '-' : formatJpy(v.valueJpy)}
             </p>
             {holding.quantity > 1 && v.unitJpy !== null && (
-              <p className="text-xs text-muted-foreground">
+              <p className="amount text-xs text-muted-foreground">
                 {t('perUnit', { amount: formatJpy(v.unitJpy), qty: holding.quantity })}
               </p>
             )}
@@ -126,7 +126,7 @@ export async function ValuationCard({
         )}
         {v.method === 'none' && <p className="text-sm text-muted-foreground">{t('noDataHint')}</p>}
         {v.buylist && (
-          <p className="text-sm">
+          <p className="amount text-sm">
             {t('buylist', {
               price: formatJpy(v.buylist.priceJpy),
               source: sourceLabel(v.buylist.source),

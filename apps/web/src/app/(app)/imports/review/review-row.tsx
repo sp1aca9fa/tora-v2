@@ -52,7 +52,7 @@ export function ReviewRowFields({
     <>
       <div className="min-w-0">
         <p className="truncate font-medium">{item.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="amount truncate text-xs text-muted-foreground">
           {[
             item.details,
             item.acquiredAt,

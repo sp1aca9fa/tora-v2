@@ -46,7 +46,7 @@ export async function SuggestionCard({
 
       {s.kind === 'exclude_sale' && (
         <div className="space-y-0.5">
-          <p>
+          <p className="amount">
             {t('suggestions.sale', {
               price: formatJpy(Number(evidence.priceJpy)),
               date: String(evidence.date ?? ''),
@@ -192,7 +192,7 @@ function ListingList({
           ) : (
             <span className="min-w-0 truncate">{l.title}</span>
           )}
-          <span className="shrink-0 text-muted-foreground">{formatJpy(l.priceJpy)}</span>
+          <span className="amount shrink-0 text-muted-foreground">{formatJpy(l.priceJpy)}</span>
         </li>
       ))}
     </ul>

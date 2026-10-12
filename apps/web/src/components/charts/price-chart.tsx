@@ -10,6 +10,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useAmountsHidden } from '@/components/amounts-toggle';
 import { formatYen, sourceColor, tickMarkFormatter, useChartTheme } from './chart-theme';
 
 export interface PriceChartPoint {
@@ -38,6 +39,8 @@ export function PriceChart({
 }) {
   const t = useTranslations('valuation');
   const theme = useChartTheme();
+  // Amounts hidden: the lines stay, the yen axis and hover labels go.
+  const amountsHidden = useAmountsHidden();
   const el = useRef<HTMLDivElement>(null);
 
   const buckets = useMemo(() => {
@@ -67,9 +70,9 @@ export function PriceChart({
         attributionLogo: false,
       },
       grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
-      rightPriceScale: { borderVisible: false },
+      rightPriceScale: { borderVisible: false, visible: !amountsHidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
-      crosshair: { mode: CrosshairMode.Magnet },
+      crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !amountsHidden } },
       localization: { priceFormatter: formatYen },
     });
     const seriesBySource = new Map<string, ReturnType<typeof chart.addSeries<'Line'>>>();
@@ -106,7 +109,7 @@ export function PriceChart({
     });
     return () => chart.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, bucket, hidden, theme, sources]);
+  }, [points, bucket, hidden, theme, sources, amountsHidden]);
 
   if (points.length === 0) return <p className="text-sm text-muted-foreground">{t('noHistory')}</p>;
   const estimatedDays = new Set(visible.filter((p) => p.estimated > 0).map((p) => p.day));

@@ -2,6 +2,7 @@ import { type ActionItem, actionTotal, type portfolioValuation } from '@tora/db'
 import { ChevronRight, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { AmountsToggle } from '@/components/amounts-toggle';
 import { LEVEL_STYLE } from '@/components/notice-level';
 import { Button } from '@/components/ui/button';
 import { cn, formatJpy } from '@/lib/utils';
@@ -31,7 +32,10 @@ export async function PortfolioHeader({
   return (
     <div className="space-y-4">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('portfolio.title')}</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{t('portfolio.title')}</h1>
+          <AmountsToggle />
+        </div>
         <Button asChild size="sm" className="hidden md:inline-flex">
           <Link href="/add">
             <Plus /> {t('nav.add')}
@@ -50,7 +54,7 @@ export async function PortfolioHeader({
         <div className={tile}>
           <p className="text-xs text-muted-foreground">{t('portfolio.unrealized')}</p>
           <p className="text-xl font-semibold tabular-nums">{signedJpy(pl)}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="amount text-xs text-muted-foreground">
             {totals.valuedCostJpy > 0
               ? t('portfolio.vsCost', {
                   pct: Math.round((pl / totals.valuedCostJpy) * 1000) / 10,
@@ -66,7 +70,7 @@ export async function PortfolioHeader({
             {t('portfolio.itemsValue', { units: totals.units, lots: totals.total })}
           </p>
           {totals.openedCostJpy > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="amount text-xs text-muted-foreground">
               {t('portfolio.inclOpened', { amount: formatJpy(totals.openedCostJpy) })}
             </p>
           )}

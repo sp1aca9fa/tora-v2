@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { formatJpy } from '@/lib/utils';
 
+const MONEY_EVENTS = new Set(['acquired', 'split', 'grading_submitted', 'sold']);
+
 type Payload = Record<string, unknown>;
 
 /** Holding history, newest first, one readable line per event. */
@@ -94,7 +96,16 @@ export async function EventList({ events }: { events: HoldingEvent[] }) {
               {format.dateTime(new Date(e.occurredAt), { dateStyle: 'medium' })}
             </time>
           </div>
-          <p className="text-sm whitespace-pre-line text-muted-foreground">{summary(e)}</p>
+          <p
+            className={
+              // Events that state a price or cost hide it with the other amounts.
+              MONEY_EVENTS.has(e.type)
+                ? 'amount text-sm whitespace-pre-line text-muted-foreground'
+                : 'text-sm whitespace-pre-line text-muted-foreground'
+            }
+          >
+            {summary(e)}
+          </p>
         </li>
       ))}
     </ol>

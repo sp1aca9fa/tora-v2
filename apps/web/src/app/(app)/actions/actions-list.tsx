@@ -286,7 +286,7 @@ function ActionCard({
                   <p className="text-xs text-muted-foreground">{t('actions.yourItem')}</p>
                   <p className="line-clamp-2 font-medium">{c.title}</p>
                   {c.meta && <p className="text-xs text-muted-foreground">{c.meta}</p>}
-                  {c.owned && <p className="text-xs text-muted-foreground">{c.owned}</p>}
+                  {c.owned && <p className="amount text-xs text-muted-foreground">{c.owned}</p>}
                 </div>
               </div>
               {c.kind === 'source' && c.candidates?.[0] && (
@@ -438,7 +438,7 @@ function Candidate({
           {s.title} <ExternalLink className="inline size-3" />
         </a>
         <p className="text-xs text-muted-foreground">
-          {s.priceJpy ? `${formatJpy(s.priceJpy)} · ` : ''}
+          {s.priceJpy ? <span className="amount">{formatJpy(s.priceJpy)} · </span> : ''}
           {t('sources.score', { score: Math.round(s.score * 100) })}
         </p>
       </div>

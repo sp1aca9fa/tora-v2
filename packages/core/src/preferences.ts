@@ -15,6 +15,8 @@ export type SummaryPanel = (typeof SUMMARY_PANELS)[number];
 export const ROTATE_SECONDS = [5, 8, 15, 30] as const;
 
 export interface UserPreferences {
+  /** Show amounts when a session starts (default: hidden until the eye button is pressed). */
+  amountsVisible?: boolean;
   summary?: {
     /** Cycle through the panels (default); off shows the chosen panels side by side. */
     rotate?: boolean;

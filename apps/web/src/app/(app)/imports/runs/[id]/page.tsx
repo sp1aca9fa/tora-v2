@@ -68,7 +68,7 @@ export default async function ImportRunPage({ params }: { params: Promise<{ id: 
                 >
                   <span className="min-w-0">
                     <span className="block truncate font-medium">{product.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
+                    <span className="amount block truncate text-xs text-muted-foreground">
                       {[
                         holding.acquiredAt.slice(0, 10),
                         formatJpy(holding.costTotalJpy),

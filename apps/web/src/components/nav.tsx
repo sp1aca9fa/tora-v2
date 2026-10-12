@@ -6,6 +6,7 @@ import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { logout } from '@/app/actions';
+import { AmountsToggle } from '@/components/amounts-toggle';
 import { LocaleToggle } from '@/components/locale-toggle';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +81,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
         </nav>
         <div className="mt-auto flex flex-col items-center gap-2 xl:items-stretch">
           <LocaleToggle className="flex-col xl:hidden" />
+          <AmountsToggle className="xl:hidden" />
           <form action={logout}>
             <button
               type="submit"
@@ -98,6 +100,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
           {t('app.name')}
         </Link>
         <div className="flex items-center gap-1">
+          <AmountsToggle />
           <LocaleToggle />
           <form action={logout}>
             <button

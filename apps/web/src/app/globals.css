@@ -86,3 +86,9 @@
     color: var(--card-foreground);
   }
 }
+
+/* Amounts hidden (the eye button, requirements S8): money is blurred and cannot be selected. */
+[data-amounts='hidden'] :is(.tabular-nums, .amount) {
+  filter: blur(7px);
+  user-select: none;
+}

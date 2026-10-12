@@ -94,7 +94,7 @@ export async function MarketCompare({
                     )}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="amount text-xs text-muted-foreground">
                   {t('compare.converted', {
                     price: money(f.price, f.currency),
                     rate: f.fxRate ? format.number(f.fxRate, { maximumFractionDigits: 2 }) : '-',

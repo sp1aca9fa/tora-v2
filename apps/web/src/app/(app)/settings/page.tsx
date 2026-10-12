@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
+import { setAmountsVisibleAction } from './actions';
 import { NoticeLevelsForm } from './notice-levels-form';
 import { SummaryForm } from './summary-form';
 
@@ -56,6 +57,28 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <NoticeLevelsForm levels={noticeLevelsFor(user.noticeLevels)} />
+        </CardContent>
+      </Card>
+
+      <Card id="amounts" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle>{t('amounts.title')}</CardTitle>
+          <CardDescription>{t('amounts.info')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            action={setAmountsVisibleAction.bind(null, !user.preferences?.amountsVisible)}
+            className="flex flex-wrap items-center gap-3 text-sm"
+          >
+            <span>
+              {user.preferences?.amountsVisible
+                ? t('amounts.alwaysShown')
+                : t('amounts.hiddenFirst')}
+            </span>
+            <Button variant="outline" size="sm">
+              {user.preferences?.amountsVisible ? t('amounts.makeHidden') : t('amounts.makeShown')}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

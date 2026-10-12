@@ -741,5 +741,15 @@
     "seconds": "{count} s",
     "panelsRotate": "Panels to cycle through",
     "panelsShown": "Panels to show"
+  },
+  "amounts": {
+    "show": "Show amounts",
+    "hide": "Hide amounts",
+    "title": "Amounts",
+    "info": "Values, costs and prices are hidden when you open the app until you press the eye button (it lasts until the browser closes). Like a banking app, so nobody reads them over your shoulder.",
+    "hiddenFirst": "Hidden until you press the eye button (default).",
+    "alwaysShown": "Always shown; the eye button hides them for the session.",
+    "makeShown": "Always show amounts",
+    "makeHidden": "Hide amounts by default"
   }
 }

@@ -67,7 +67,7 @@ export default async function SummaryPage() {
             >
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{t(`category.${c}`)}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="amount text-xs text-muted-foreground">
                   {t('portfolio.units', { count: s.units })} ·{' '}
                   {t('portfolio.spentShort', { amount: formatJpy(s.costJpy) })}
                 </p>

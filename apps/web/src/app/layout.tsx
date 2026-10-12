@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { amountsMode } from '@/lib/amounts-server';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -24,9 +25,10 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = await getLocale();
+  const [locale, amounts] = await Promise.all([getLocale(), amountsMode()]);
   return (
-    <html lang={locale}>
+    // The eye button flips data-amounts in the browser; the server renders the same choice.
+    <html lang={locale} data-amounts={amounts} suppressHydrationWarning>
       <body className="min-h-dvh">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>

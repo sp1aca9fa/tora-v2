@@ -135,7 +135,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                       >
                         {info?.name ?? url}
                       </a>
-                      <p className="text-muted-foreground">
+                      <p className="amount text-muted-foreground">
                         {info
                           ? `${formatJpy(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
                           : t('sources.search.readNext')}

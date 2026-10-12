@@ -11,6 +11,7 @@ import {
 } from 'lightweight-charts';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { useAmountsHidden } from '@/components/amounts-toggle';
 import { formatYen, tickMarkFormatter, useChartTheme } from './chart-theme';
 
 export interface PortfolioPoint {
@@ -31,6 +32,8 @@ export interface PortfolioPoint {
 export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
   const t = useTranslations('portfolio');
   const theme = useChartTheme();
+  // Amounts hidden: the lines stay, the yen axis and hover labels go.
+  const hidden = useAmountsHidden();
   const el = useRef<HTMLDivElement>(null);
   const latest = points.at(-1);
   const [hover, setHover] = useState<PortfolioPoint | null>(null);
@@ -48,9 +51,9 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
         attributionLogo: false,
       },
       grid: { vertLines: { visible: false }, horzLines: { color: theme.grid } },
-      rightPriceScale: { borderVisible: false },
+      rightPriceScale: { borderVisible: false, visible: !hidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
-      crosshair: { mode: CrosshairMode.Magnet },
+      crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !hidden } },
       localization: { priceFormatter: formatYen },
       handleScroll: false,
       handleScale: false,
@@ -78,7 +81,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       );
     });
     return () => chart.remove();
-  }, [points, theme]);
+  }, [points, theme, hidden]);
 
   return (
     <div className="space-y-2">
@@ -97,12 +100,12 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
           </span>
         ))}
         {shown && shown.estimatedJpy > 0 && (
-          <span className="text-amber-700 dark:text-amber-400">
+          <span className="amount text-amber-700 dark:text-amber-400">
             {t('chartEstimated', { amount: formatYen(shown.estimatedJpy) })}
           </span>
         )}
         {shown && shown.atCostJpy > 0 && (
-          <span className="text-muted-foreground">
+          <span className="amount text-muted-foreground">
             {t('chartAtCost', { amount: formatYen(shown.atCostJpy) })}
           </span>
         )}

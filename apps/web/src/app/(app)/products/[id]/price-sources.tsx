@@ -114,8 +114,11 @@ export async function PriceSources({
                 </a>
                 <p className="text-xs text-muted-foreground">
                   {sourceLabel(c.source)}
-                  {c.priceJpy ? ` · ${formatJpy(c.priceJpy)}` : ''} ·{' '}
-                  {t('sources.score', { score: Math.round(c.score * 100) })}
+                  {c.priceJpy ? (
+                    <span className="amount"> · {formatJpy(c.priceJpy)}</span>
+                  ) : (
+                    ''
+                  )} · {t('sources.score', { score: Math.round(c.score * 100) })}
                 </p>
               </div>
               <div className="flex shrink-0 flex-col gap-1">

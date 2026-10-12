@@ -171,7 +171,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
                 <h2 className="sticky top-[calc(3.1rem+env(safe-area-inset-top))] z-[5] -mx-4 flex items-baseline gap-2 border-b bg-background/95 px-4 py-1.5 text-sm font-medium backdrop-blur md:top-0 md:mx-0 md:px-1">
                   <span>{g.label}</span>
                   <span className="text-xs text-muted-foreground">
-                    {t('portfolio.itemCount', { count: st.count })} · {formatJpy(st.valueJpy)}
+                    {t('portfolio.itemCount', { count: st.count })} ·{' '}
+                    <span className="amount">{formatJpy(st.valueJpy)}</span>
                   </span>
                 </h2>
                 <ul className="divide-y rounded-xl border bg-card md:grid md:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] md:gap-3 md:divide-y-0 md:border-0 md:bg-transparent">

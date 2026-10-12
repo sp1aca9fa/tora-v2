@@ -11,6 +11,8 @@ import {
 } from '@tora/core';
 import { setNoticeLevels, setPreferences } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
+import { AMOUNTS_COOKIE } from '@/lib/amounts';
 import { authed } from '@/lib/auth/guard';
 
 export type NoticeLevelsState = { saved?: boolean };
@@ -57,4 +59,15 @@ export async function saveSummaryPrefsAction(
   });
   revalidatePath('/', 'layout');
   return { saved: true };
+}
+
+/**
+ * Amounts at the start of a session: hidden (default) or always shown. This session's eye
+ * button choice is dropped so the setting shows at once.
+ */
+export async function setAmountsVisibleAction(visible: boolean) {
+  const { db, user } = await authed();
+  await setPreferences(db, user.id, { amountsVisible: visible });
+  (await cookies()).delete(AMOUNTS_COOKIE);
+  revalidatePath('/', 'layout');
 }
