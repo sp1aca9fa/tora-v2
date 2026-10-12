@@ -112,6 +112,11 @@ pnpm user disable|enable <username>
 The first account is an admin. If the database has data from before accounts existed, the first
 account you create takes it over.
 
+A demo account shows the app without anyone's real collection: `pnpm user create demo`, then
+`pnpm demo demo` fills it with sample lots of every kind and every kind of notice (run it again
+to reset it; only accounts named `demo*` are touched), then `pnpm collect` gives the items real
+prices.
+
 ### Auth notes
 
 - Login: username + password, then a 6-digit authenticator code (or a one-time backup code).
