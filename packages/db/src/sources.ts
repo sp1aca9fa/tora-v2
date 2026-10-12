@@ -349,7 +349,7 @@ export async function productsToMatch(
       ),
     )
     .orderBy(asc(products.createdAt))
-    .limit(filter.limit ?? 50);
+    .limit(filter.limit ?? 10_000);
 }
 
 export interface CandidateInput {

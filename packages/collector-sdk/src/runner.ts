@@ -55,6 +55,9 @@ export interface RunSummary {
   errors: string[];
 }
 
+/** Products searched per source per run (the rest wait for the next run). */
+const MATCH_PER_RUN = 50;
+
 /** One run of one collector: match unlinked products, then collect linked listings. */
 export async function runCollector(
   db: Db,
@@ -121,9 +124,13 @@ export async function runCollector(
         log(`search set up for "${product.name}": ${(query.keywords ?? []).join(' ')}`);
       }
     } else if (!options.collectOnly) {
+      // Items the source does not handle are left out before the cap: otherwise the oldest of
+      // them (e.g. cards, for a shop of games) took every slot and newer items never got searched.
       const toMatch = (
         await productsToMatch(db, collector.source, { productId: options.productId })
-      ).filter((p) => collector.supports(p));
+      )
+        .filter((p) => collector.supports(p))
+        .slice(0, MATCH_PER_RUN);
       total += toMatch.length;
       for (const product of toMatch) {
         tick();

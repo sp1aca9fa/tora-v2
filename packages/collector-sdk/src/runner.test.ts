@@ -263,3 +263,19 @@ it('replaces auto-made queries of an older version, but keeps edited ones', asyn
   expect(upgraded?.query?.extra).toMatchObject({ references: ['https://x/1'], v: 2 });
   expect(seen.get(b.product.id)).toEqual(['mine']);
 });
+
+it('searches newer items too when older ones are of a kind the source does not handle', async () => {
+  // 60 older items the fake source skips (games) must not take every slot of a run.
+  for (let i = 0; i < 60; i++) {
+    await createHolding(
+      db,
+      userId,
+      { product: { category: 'game', kind: 'software', name: `Game ${i}` } },
+      { quantity: 1, costTotalJpy: 1000, acquiredAt: '2026-09-01T00:00:00.000+09:00' },
+    );
+  }
+  const { product } = await box();
+  const run = await runCollector(db, fakeCollector(), { ...quiet, matchOnly: true });
+  expect(run.candidates).toBe(2);
+  expect((await listPendingCandidates(db, product.id)).length).toBe(2);
+});
