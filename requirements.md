@@ -25,7 +25,7 @@
 | S4d | Automated data review: cheap model checks flagged data, suggestions queue | built; awaiting user check |
 | S4c | Import purchases from any shop through Claude (Haiku, Sonnet for flagged rows) | built; first real import done (39 Mercari screenshots) |
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built (eBay deferred); acceptance waits on the user confirming TCGplayer / 駿河屋 suggestions |
-| S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
+| S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page | todo (next) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 
@@ -549,6 +549,8 @@ Build:
   - Per-lot tracking switches: "count in cost" and "count in value". For things bought to use (consoles, games to play) that are not investments but may still gain value. On by default for every kind (user, 2026-10-11); set on the lot (add form, lot page), with "apply to all lots of this item".
   - Totals: cost sums the lots counted in cost, value the lots counted in value; unrealized P/L only covers lots counted in both (otherwise it is meaningless).
   - The portfolio lists them in separate groups so the numbers stay readable: investments (both), value only (bought to use, value still shown), not tracked (neither), and cost only if anyone uses it.
+- Actions page (user, 2026-10-12): one "Needs your attention" page in the main navigation, with a count badge, listing everything waiting for the user (import review, failed purchase links, grades missing, data review suggestions, matches to confirm, price sources to link, lots without a condition). Imports keeps only import things (ways to import, runs, review of imported lots) and links to Actions for the rest; the portfolio's stacked banners become one line pointing there.
+- Speed across the app, not only the portfolio (user, 2026-10-12: "super slow to load"): measure each main page (portfolio, item, Imports, Actions); the layout's attention count runs on every page and now includes the price-source check, so it must be cheap (one query, or cached and refreshed at the end of a collect).
 - Speed: the portfolio page shows nothing until every number is loaded. Measure where the time goes, then show the page at once and let the slow parts (chart, per-product list) fill in as they load (streaming with placeholders), and precompute what can be (e.g. at the end of a collect).
 - Source names out of the public code ("bring your own sources"): each plug-in declares its label, color, priority, listing-link pattern and order-source aliases; collectors save that metadata to the database on each run, and the app reads it from there (the web cannot load private plug-ins). Built-in lists naming specific shops (source priority, chart colors, "paste a SNKRDUNK link" copy, スニダン aliases) go away; the raw grade scale becomes plug-in-provided too.
 
