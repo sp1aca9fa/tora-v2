@@ -567,6 +567,14 @@ Build:
 - Speed: the portfolio page shows nothing until every number is loaded. Measure where the time goes, then show the page at once and let the slow parts (chart, per-product list) fill in as they load (streaming with placeholders), and precompute what can be (e.g. at the end of a collect).
 - Source names out of the public code ("bring your own sources"): each plug-in declares its label, color, priority, listing-link pattern and order-source aliases; collectors save that metadata to the database on each run, and the app reads it from there (the web cannot load private plug-ins). Built-in lists naming specific shops (source priority, chart colors, "paste a SNKRDUNK link" copy, スニダン aliases) go away; the raw grade scale becomes plug-in-provided too.
 
+Design plan (user + Claude, 2026-10-12; the revamp of S8):
+- Three sizes, each designed: phone (under 768 px: bottom tab bar, one column), half screen (768-1279 px, e.g. half of a 1920 monitor: a slim icon rail with badges, content full width), full screen (1280 px and up: sidebar with labels, content full width, no centred column). Forms (Add, Edit, Settings) keep a reading width at every size.
+- Portfolio: one header everywhere (Market value, Unrealized P/L, Spent, the Actions line) and two tabs, Summary (default) and Items.
+  - Summary: value-over-time chart, "by kind" as visible bars (beside the chart on wide screens), a tile per category (value, P/L, count; opens Items filtered), top movers (items whose value rose or fell most over the last 30 days).
+  - Items: category chips (All / TCG / Games, with count and value) and kind chips filter in one tap; the list is grouped under slim sticky headers per kind (count, value). Phone: row cards of today's size with bigger pictures (about 72 px) and names on up to two lines in a slightly larger font. Half and full screen: vertical cards (about 200 px wide: big picture on top, name up to 3 lines, kind, value and P/L), as many columns as fit (about 4 at half screen, 7 at full).
+- Item page next: Overview (value, lots) / Market (chart, Japan vs US, sources) / History; two columns on wide screens. Actions: two columns of cards on wide screens. Then the rest in the same visual language (spacing and type scale, cards, badges, level colours).
+- Order: layout shell, Portfolio, item page, the other screens.
+
 Acceptance:
 - User review on phone and on a wide desktop screen.
 
