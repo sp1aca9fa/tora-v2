@@ -4,7 +4,15 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 /** Pages laid out for the whole width (grids of cards); the others keep a reading width. */
-const WIDE = [/^\/$/, /^\/items$/, /^\/actions$/, /^\/products\/[^/]+$/];
+const WIDE = [
+  /^\/$/,
+  /^\/items$/,
+  /^\/actions$/,
+  /^\/products\/[^/]+$/,
+  /^\/holdings\/(?!grades$)[^/]+$/,
+  /^\/settings$/,
+  /^\/imports$/,
+];
 
 /** The page area: full width for wide pages, a centred reading column for the rest (S8). */
 export function PageWidth({ children }: { children: React.ReactNode }) {

@@ -118,137 +118,137 @@ export default async function HoldingPage({ params }: Params) {
     ]);
 
   return (
-    <div className="space-y-5">
-      <header className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          <Link href="/" className="hover:underline">
-            {t('nav.portfolio')}
-          </Link>
-          {' › '}
-          <Link href={`/products/${product.id}`} className="hover:underline">
-            {t('holding.allLots')}
-          </Link>
-        </p>
-        <h1 className="text-2xl leading-tight font-semibold tracking-tight">{product.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {productMeta(product, t)}
-          {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
-          {canEditProduct(user, product) && (
-            <>
-              {' · '}
-              <Link
-                href={`/products/${product.id}/edit?from=/holdings/${holding.id}`}
-                className="underline"
-              >
-                {t('holding.editProduct')}
-              </Link>
-            </>
-          )}
-        </p>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-muted px-2.5 py-1">{t(`status.${holding.status}`)}</span>
-          {atGrader && (
-            <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-amber-700 dark:text-amber-400">
-              {t('holding.atGrader', {
-                grader: atGrader.grader ?? '-',
-                date: format.dateTime(new Date(atGrader.since), { dateStyle: 'medium' }),
-              })}
+    // Wide screens: the lot and what to do with it on the left, its value and history on the right.
+    <div className="space-y-5 lg:grid lg:grid-cols-[minmax(18rem,26rem)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-5">
+        <header className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            <Link href="/" className="hover:underline">
+              {t('nav.portfolio')}
+            </Link>
+            {' › '}
+            <Link href={`/products/${product.id}`} className="hover:underline">
+              {t('holding.allLots')}
+            </Link>
+          </p>
+          <h1 className="text-2xl leading-tight font-semibold tracking-tight">{product.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {productMeta(product, t)}
+            {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
+            {canEditProduct(user, product) && (
+              <>
+                {' · '}
+                <Link
+                  href={`/products/${product.id}/edit?from=/holdings/${holding.id}`}
+                  className="underline"
+                >
+                  {t('holding.editProduct')}
+                </Link>
+              </>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-muted px-2.5 py-1">
+              {t(`status.${holding.status}`)}
             </span>
-          )}
-        </div>
-      </header>
+            {atGrader && (
+              <span className="rounded-full bg-amber-500/15 px-2.5 py-1 text-amber-700 dark:text-amber-400">
+                {t('holding.atGrader', {
+                  grader: atGrader.grader ?? '-',
+                  date: format.dateTime(new Date(atGrader.since), { dateStyle: 'medium' }),
+                })}
+              </span>
+            )}
+          </div>
+        </header>
 
-      {parent && (
-        <Link
-          href={`/holdings/${parent.holding.id}`}
-          className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
-        >
-          <span>{t('portfolio.pulledFrom', { name: parent.product.name })}</span>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      )}
-
-      <Card>
-        <CardContent>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-            {facts.map(([k, v]) => (
-              <div key={k} className="contents">
-                <dt className="text-muted-foreground">{k}</dt>
-                <dd className="text-right tabular-nums sm:text-left">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {estimatedCost !== null && parent && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              {t('holding.estimatedCostNote', {
-                name: parent.product.name,
-                count: pullCosts?.size ?? 0,
-              })}
-            </p>
-          )}
-          {holding.notes && <p className="mt-4 text-sm whitespace-pre-line">{holding.notes}</p>}
-        </CardContent>
-      </Card>
-
-      {/* Current value only for what is still owned; an opened box is valued "as received" below. */}
-      {holding.status === 'owned' && (
-        <ValuationCard
-          db={db}
-          userId={user.id}
-          holding={holding}
-          product={product}
-          bucket={bucket}
-        />
-      )}
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {actions.map((a) => (
-          <Button key={a.key} asChild variant="outline" size="sm">
-            <Link href={`/holdings/${holding.id}/${a.key}`}>{t(`holding.actions.${a.key}`)}</Link>
-          </Button>
-        ))}
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/add?product=${product.id}`}>{t('holding.addMore')}</Link>
-        </Button>
-      </div>
-
-      {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
-
-      <TrackingForm
-        holdingId={holding.id}
-        countInCost={holding.countInCost}
-        countInValue={holding.countInValue}
-        otherLots={itemLots.filter((l) => l.id !== holding.id).length}
-      />
-
-      <Link
-        href={`/products/${product.id}#sources`}
-        className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
-      >
-        <span>{t('holding.marketData')}</span>
-        <ChevronRight className="size-4 text-muted-foreground" />
-      </Link>
-
-      <section className="space-y-3">
-        <h2 className="font-semibold">{t('holding.history')}</h2>
-        <EventList events={events} />
-      </section>
-
-      <div className="flex flex-wrap gap-x-5 gap-y-2 pt-2">
-        {holding.orderId && (
+        {parent && (
           <Link
-            href={`/holdings/${holding.id}/cancel-order`}
-            className="text-sm text-destructive hover:underline"
+            href={`/holdings/${parent.holding.id}`}
+            className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
           >
-            {t('holding.actions.cancel-order')}
+            <span>{t('portfolio.pulledFrom', { name: parent.product.name })}</span>
+            <ChevronRight className="size-4 text-muted-foreground" />
           </Link>
         )}
+
+        <Card>
+          <CardContent>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+              {facts.map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="text-right tabular-nums sm:text-left">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            {estimatedCost !== null && parent && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t('holding.estimatedCostNote', {
+                  name: parent.product.name,
+                  count: pullCosts?.size ?? 0,
+                })}
+              </p>
+            )}
+            {holding.notes && <p className="mt-4 text-sm whitespace-pre-line">{holding.notes}</p>}
+          </CardContent>
+        </Card>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {actions.map((a) => (
+            <Button key={a.key} asChild variant="outline" size="sm">
+              <Link href={`/holdings/${holding.id}/${a.key}`}>{t(`holding.actions.${a.key}`)}</Link>
+            </Button>
+          ))}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/add?product=${product.id}`}>{t('holding.addMore')}</Link>
+          </Button>
+        </div>
+        <TrackingForm
+          holdingId={holding.id}
+          countInCost={holding.countInCost}
+          countInValue={holding.countInValue}
+          otherLots={itemLots.filter((l) => l.id !== holding.id).length}
+        />
+        <div className="flex flex-wrap gap-x-5 gap-y-2 pt-2">
+          {holding.orderId && (
+            <Link
+              href={`/holdings/${holding.id}/cancel-order`}
+              className="text-sm text-destructive hover:underline"
+            >
+              {t('holding.actions.cancel-order')}
+            </Link>
+          )}
+          <Link
+            href={`/holdings/${holding.id}/delete`}
+            className="text-sm text-destructive hover:underline"
+          >
+            {t('holding.actions.delete')}
+          </Link>
+        </div>
+      </div>
+      <div className="space-y-5">
+        {/* Current value only for what is still owned; an opened box is valued "as received" below. */}
+        {holding.status === 'owned' && (
+          <ValuationCard
+            db={db}
+            userId={user.id}
+            holding={holding}
+            product={product}
+            bucket={bucket}
+          />
+        )}
+        {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
         <Link
-          href={`/holdings/${holding.id}/delete`}
-          className="text-sm text-destructive hover:underline"
+          href={`/products/${product.id}#sources`}
+          className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
         >
-          {t('holding.actions.delete')}
+          <span>{t('holding.marketData')}</span>
+          <ChevronRight className="size-4 text-muted-foreground" />
         </Link>
+        <section className="space-y-3">
+          <h2 className="font-semibold">{t('holding.history')}</h2>
+          <EventList events={events} />
+        </section>
       </div>
     </div>
   );
