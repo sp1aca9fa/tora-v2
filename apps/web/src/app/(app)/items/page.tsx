@@ -4,7 +4,9 @@ import {
   HOLDING_STATUSES,
   type HoldingStatus,
   type ProductKind,
+  TRACKING_MODES,
   kindsFor,
+  trackingMode,
 } from '@tora/core';
 import {
   cardGradeCounts,
@@ -64,18 +66,24 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
   ]);
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
   // Everything the search and status match: the chips count it; the list shows the type picked.
-  const all = summarizeByProduct(rows, valuations);
+  // Lots are summed per item within their tracking group (S8): investments, value only, ...
+  const all = TRACKING_MODES.flatMap((mode) =>
+    summarizeByProduct(
+      rows.filter((r) => trackingMode(r.holding) === mode),
+      valuations,
+    ).map((s) => ({ ...s, mode })),
+  );
   const shown = all.filter(
     (s) => (!category || s.product.category === category) && (!kind || s.product.kind === kind),
   );
-  const images = await imageVersions(
-    db,
-    shown.map((s) => s.product.id),
-  );
+  const images = await imageVersions(db, [...new Set(shown.map((s) => s.product.id))]);
 
+  // Items (an item split across groups counts once) and the value of what counts in value.
   const stats = (list: typeof all) => ({
-    count: list.length,
-    valueJpy: list.reduce((n, s) => n + s.valueJpy, 0),
+    count: new Set(list.map((s) => s.product.id)).size,
+    valueJpy: list
+      .filter((s) => s.mode === 'investment' || s.mode === 'value_only')
+      .reduce((n, s) => n + s.valueJpy, 0),
   });
   const href = (type: string | null) => {
     const next = new URLSearchParams();
@@ -94,16 +102,23 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
     );
   const money = (n: number) => <span className="tabular-nums opacity-80">{formatJpy(n)}</span>;
 
-  // Groups by kind, in the catalog's order (category, then kind).
-  const groups: { key: string; label: string; list: typeof shown }[] = [];
-  for (const c of CATEGORIES) {
-    for (const k of kindsFor(c)) {
-      const list = shown.filter((s) => s.product.category === c && s.product.kind === k);
-      if (list.length === 0) continue;
-      const label = k === 'other' ? `${t(`category.${c}`)} · ${t(`kind.${k}`)}` : t(`kind.${k}`);
-      groups.push({ key: `${c}:${k}`, label, list });
+  // Tracking groups (investments first), then kinds in the catalog's order (category, kind).
+  const modes = TRACKING_MODES.filter((m) => shown.some((s) => s.mode === m)).map((mode) => {
+    const groups: { key: string; label: string; list: typeof shown }[] = [];
+    for (const c of CATEGORIES) {
+      for (const k of kindsFor(c)) {
+        const list = shown.filter(
+          (s) => s.mode === mode && s.product.category === c && s.product.kind === k,
+        );
+        if (list.length === 0) continue;
+        const label = k === 'other' ? `${t(`category.${c}`)} · ${t(`kind.${k}`)}` : t(`kind.${k}`);
+        groups.push({ key: `${mode}:${c}:${k}`, label, list });
+      }
     }
-  }
+    return { mode, groups };
+  });
+  // A heading per tracking group only when there is more than investments.
+  const headed = modes.some((m) => m.mode !== 'investment');
   const filtered = Boolean(category || q || status !== 'owned');
 
   return (
@@ -162,27 +177,49 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
           )}
         </div>
       ) : (
-        <div className="space-y-5">
-          {groups.map((g) => {
-            const st = stats(g.list);
-            return (
-              <section key={g.key} className="space-y-2">
-                {/* Below the phone's top bar; at the top on desktop. */}
-                <h2 className="sticky top-[calc(3.1rem+env(safe-area-inset-top))] z-[5] -mx-4 flex items-baseline gap-2 border-b bg-background/95 px-4 py-1.5 text-sm font-medium backdrop-blur md:top-0 md:mx-0 md:px-1">
-                  <span>{g.label}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {t('portfolio.itemCount', { count: st.count })} ·{' '}
-                    <span className="amount">{formatJpy(st.valueJpy)}</span>
-                  </span>
-                </h2>
-                <ul className="divide-y rounded-xl border bg-card md:grid md:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] md:gap-3 md:divide-y-0 md:border-0 md:bg-transparent">
-                  {g.list.map((s) => (
-                    <ItemCard key={s.product.id} summary={s} version={images.get(s.product.id)} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+        <div className="space-y-8">
+          {modes.map(({ mode, groups }) => (
+            <div key={mode} className="space-y-5">
+              {headed && (
+                <header className="space-y-0.5">
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    {t(`tracking.group.${mode}`)}
+                  </h2>
+                  <p className="text-xs text-muted-foreground">{t(`tracking.hint.${mode}`)}</p>
+                </header>
+              )}
+              {groups.map((g) => {
+                const st = stats(g.list);
+                return (
+                  <section key={g.key} className="space-y-2">
+                    {/* Below the phone's top bar; at the top on desktop. */}
+                    <h3 className="sticky top-[calc(3.1rem+env(safe-area-inset-top))] z-[5] -mx-4 flex items-baseline gap-2 border-b bg-background/95 px-4 py-1.5 text-sm font-medium backdrop-blur md:top-0 md:mx-0 md:px-1">
+                      <span>{g.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {t('portfolio.itemCount', { count: st.count })}
+                        {(mode === 'investment' || mode === 'value_only') && (
+                          <>
+                            {' · '}
+                            <span className="amount">{formatJpy(st.valueJpy)}</span>
+                          </>
+                        )}
+                      </span>
+                    </h3>
+                    <ul className="divide-y rounded-xl border bg-card md:grid md:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] md:gap-3 md:divide-y-0 md:border-0 md:bg-transparent">
+                      {g.list.map((s) => (
+                        <ItemCard
+                          key={s.product.id}
+                          summary={s}
+                          mode={mode}
+                          version={images.get(s.product.id)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
       {grades.cards > 0 && grades.ungraded === 0 && (

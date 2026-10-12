@@ -284,6 +284,13 @@ export const holdings = sqliteTable(
     /** Where the order was placed (normalized, e.g. `snkrdunk`) and its transaction / order ID. */
     orderSource: text('order_source'),
     orderId: text('order_id'),
+    /**
+     * Portfolio tracking (S8): what the lot cost counts in the spent total, and its market value
+     * in the value total; P/L covers lots counted in both. Off for things bought to use (a console,
+     * a game to play): "value only" still shows what it is worth.
+     */
+    countInCost: integer('count_in_cost', { mode: 'boolean' }).notNull().default(true),
+    countInValue: integer('count_in_value', { mode: 'boolean' }).notNull().default(true),
     /** Imported and not yet checked in the app's import review (grade, cert, packaging). */
     reviewPending: integer('review_pending', { mode: 'boolean' }).notNull().default(false),
     /**

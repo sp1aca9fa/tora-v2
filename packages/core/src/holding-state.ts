@@ -28,3 +28,17 @@ export function isConsumedAfterOpening(cls: ProductClass, state: PackagingState)
 export function unitCost(costTotalJpy: number, quantity: number): number {
   return quantity > 0 ? Math.round(costTotalJpy / quantity) : 0;
 }
+
+/**
+ * How a lot counts in the portfolio (requirements S8): an investment (cost and value, with P/L),
+ * value only (bought to use: worth shown, no P/L), cost only, or not tracked.
+ */
+export const TRACKING_MODES = ['investment', 'value_only', 'cost_only', 'untracked'] as const;
+export type TrackingMode = (typeof TRACKING_MODES)[number];
+
+export function trackingMode(lot: { countInCost: boolean; countInValue: boolean }): TrackingMode {
+  if (lot.countInCost && lot.countInValue) return 'investment';
+  if (lot.countInValue) return 'value_only';
+  if (lot.countInCost) return 'cost_only';
+  return 'untracked';
+}

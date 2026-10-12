@@ -33,19 +33,22 @@ export default async function SummaryPage() {
   // Per category: units, value and P/L of the valued lots.
   const categories = new Map<
     Category,
-    { units: number; valueJpy: number; costJpy: number; valuedCostJpy: number }
+    { units: number; valueJpy: number; costJpy: number; plValueJpy: number; valuedCostJpy: number }
   >();
   for (const { holding, product, valuation } of portfolio.rows) {
     const c = categories.get(product.category) ?? {
       units: 0,
       valueJpy: 0,
       costJpy: 0,
+      plValueJpy: 0,
       valuedCostJpy: 0,
     };
+    // By the lot's tracking switches, like the totals.
     c.units += holding.quantity;
-    c.costJpy += holding.costTotalJpy;
-    if (valuation.valueJpy !== null) {
-      c.valueJpy += valuation.valueJpy;
+    if (holding.countInCost) c.costJpy += holding.costTotalJpy;
+    if (holding.countInValue && valuation.valueJpy !== null) c.valueJpy += valuation.valueJpy;
+    if (holding.countInCost && holding.countInValue && valuation.valueJpy !== null) {
+      c.plValueJpy += valuation.valueJpy;
       c.valuedCostJpy += holding.costTotalJpy;
     }
     categories.set(product.category, c);
@@ -58,7 +61,7 @@ export default async function SummaryPage() {
       <section className="grid gap-3 sm:grid-cols-2">
         {CATEGORIES.filter((c) => categories.has(c)).map((c) => {
           const s = categories.get(c)!;
-          const pl = s.valueJpy - s.valuedCostJpy;
+          const pl = s.plValueJpy - s.valuedCostJpy;
           return (
             <Link
               key={c}

@@ -669,15 +669,25 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
     valuation: values.get(r.holding.id)!,
   }));
 
+  // Each lot counts by its tracking switches (S8): cost in `spentJpy`, value in `valueJpy`, and
+  // only lots counted in both in the P/L.
   const totals = {
     spentJpy: 0,
     valueJpy: 0,
+    /** Cost of the lots in the P/L (counted in both, valued, or opened). */
     valuedCostJpy: 0,
+    /** Value of those lots. */
+    plValueJpy: 0,
+    /** Lots counted in value, and how many of them have a value. */
     valued: 0,
-    total: valued.length,
+    total: 0,
+    /** Owned lots, whatever they count in. */
+    lots: valued.length,
     units: 0,
     /** Cost of opened items, included in `spentJpy` and the P/L base. */
     openedCostJpy: 0,
+    /** Lots not counted as investments (value only, cost only, not tracked). */
+    notInvestment: 0,
   };
   const breakdown = new Map<
     string,
@@ -698,24 +708,34 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
     breakdown.set(key, b);
   };
   for (const { holding, product, valuation } of valued) {
-    totals.spentJpy += holding.costTotalJpy;
+    const cost = holding.countInCost ? holding.costTotalJpy : 0;
+    const value = holding.countInValue ? (valuation.valueJpy ?? 0) : 0;
     totals.units += holding.quantity;
-    if (valuation.valueJpy !== null) {
-      totals.valueJpy += valuation.valueJpy;
-      totals.valuedCostJpy += holding.costTotalJpy;
-      totals.valued++;
+    totals.spentJpy += cost;
+    if (!holding.countInCost || !holding.countInValue) totals.notInvestment++;
+    if (holding.countInValue) {
+      totals.total++;
+      if (valuation.valueJpy !== null) {
+        totals.valueJpy += valuation.valueJpy;
+        totals.valued++;
+      }
     }
-    addToBreakdown(product, holding.costTotalJpy, valuation.valueJpy ?? 0, holding.quantity);
+    if (holding.countInCost && holding.countInValue && valuation.valueJpy !== null) {
+      totals.plValueJpy += valuation.valueJpy;
+      totals.valuedCostJpy += holding.costTotalJpy;
+    }
+    addToBreakdown(product, cost, value, holding.quantity);
   }
   for (const { holding, product } of opened) {
+    if (!holding.countInCost) continue;
     totals.spentJpy += holding.costTotalJpy;
-    totals.valuedCostJpy += holding.costTotalJpy;
     totals.openedCostJpy += holding.costTotalJpy;
+    if (holding.countInValue) totals.valuedCostJpy += holding.costTotalJpy;
     addToBreakdown(product, holding.costTotalJpy, 0, 0);
   }
   return {
     rows: valued,
-    totals: { ...totals, unrealizedJpy: totals.valueJpy - totals.valuedCostJpy },
+    totals: { ...totals, unrealizedJpy: totals.plValueJpy - totals.valuedCostJpy },
     breakdown: [...breakdown.values()].sort(
       (a, b) => b.valueJpy + b.costJpy - (a.valueJpy + a.costJpy),
     ),
@@ -1030,10 +1050,12 @@ export async function portfolioSeries(
   return db
     .select({
       date: valuationSnapshots.date,
-      valueJpy: sql<number>`coalesce(sum(coalesce(${valuationSnapshots.valueJpy}, ${holdings.costTotalJpy})), 0)`,
-      costJpy: sql<number>`coalesce(sum(${holdings.costTotalJpy}), 0)`,
-      atCostJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.valueJpy} is null then ${holdings.costTotalJpy} end), 0)`,
-      estimatedJpy: sql<number>`coalesce(sum(case when ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueJpy} end), 0)`,
+      // Lots count by their tracking switches (S8): value lines sum lots counted in value, cost
+      // lots counted in cost.
+      valueJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} then coalesce(${valuationSnapshots.valueJpy}, ${holdings.costTotalJpy}) end), 0)`,
+      costJpy: sql<number>`coalesce(sum(case when ${holdings.countInCost} then ${holdings.costTotalJpy} end), 0)`,
+      atCostJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.valueJpy} is null then ${holdings.costTotalJpy} end), 0)`,
+      estimatedJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueJpy} end), 0)`,
     })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
@@ -1236,6 +1258,7 @@ export async function valueMovers(db: Db, userId: string, days = 30): Promise<Mo
       and(
         eq(holdings.userId, userId),
         eq(holdings.status, 'owned'),
+        eq(holdings.countInValue, true),
         inArray(valuationSnapshots.date, [latest.date, then]),
       ),
     );

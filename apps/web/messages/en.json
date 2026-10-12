@@ -756,5 +756,31 @@
     "alwaysShown": "Always shown; the eye button hides them for the session.",
     "makeShown": "Always show amounts",
     "makeHidden": "Hide amounts by default"
+  },
+  "tracking": {
+    "group": {
+      "investment": "Investments",
+      "value_only": "Value only",
+      "cost_only": "Cost only",
+      "untracked": "Not tracked"
+    },
+    "hint": {
+      "investment": "Counted in cost and value, with profit and loss.",
+      "value_only": "Bought to use: what they are worth is shown and counted in the value, not their cost.",
+      "cost_only": "Counted in what you spent, not in the value.",
+      "untracked": "Kept here, left out of every total."
+    },
+    "short": {
+      "value_only": "Value only",
+      "cost_only": "Cost only",
+      "untracked": "Not tracked"
+    },
+    "title": "Counts in the portfolio",
+    "info": "Lots bought to use (a console, a game to play) can count in the value only, or stay out of the totals.",
+    "inCost": "Count in what I spent",
+    "inValue": "Count in the value",
+    "allLots": "Apply to every lot of this item",
+    "saved": "Saved.",
+    "save": "Save"
   }
 }

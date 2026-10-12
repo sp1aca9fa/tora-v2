@@ -95,6 +95,9 @@ export interface HoldingInput {
   notes?: string | null;
   /** Transaction / order ID at the place of purchase (e.g. a SNKRDUNK 取引ID). */
   orderId?: string | null;
+  /** Portfolio tracking (S8); both on unless the lot is bought to use. */
+  countInCost?: boolean;
+  countInValue?: boolean;
   /** Set by imports: the holding waits for the import review in the app. */
   reviewPending?: boolean;
   /** Why it waits for review (comma-separated reasons, e.g. `deadline_missed`). */
@@ -1052,5 +1055,31 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await clearBucketValues(tx, [productId]);
     await tx.delete(products).where(eq(products.id, productId));
     return true;
+  });
+}
+
+/**
+ * Sets how a lot counts in the portfolio (cost, value, both or neither); with `allOfItem`, every
+ * lot of the user's of the same item. Returns how many lots changed.
+ */
+export async function setLotTracking(
+  db: Db,
+  userId: string,
+  holdingId: string,
+  tracking: { countInCost: boolean; countInValue: boolean },
+  allOfItem = false,
+): Promise<number> {
+  return db.transaction(async (tx) => {
+    const { holding } = await loadHolding(tx, userId, holdingId);
+    const changed = await tx
+      .update(holdings)
+      .set({ ...tracking, updatedAt: toTokyoIso() })
+      .where(
+        allOfItem
+          ? and(eq(holdings.userId, userId), eq(holdings.productId, holding.productId))
+          : eq(holdings.id, holdingId),
+      )
+      .returning({ id: holdings.id });
+    return changed.length;
   });
 }

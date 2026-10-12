@@ -598,6 +598,21 @@ export function AddFlow({
         <Field label={t('fields.notes')} htmlFor="notes">
           <Textarea id="notes" name="notes" rows={2} />
         </Field>
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted-foreground">{t('tracking.title')}</summary>
+          <div className="mt-2 space-y-2">
+            <input type="hidden" name="tracking" value="shown" />
+            <p className="text-xs text-muted-foreground">{t('tracking.info')}</p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="countInCost" defaultChecked className="size-4" />
+              {t('tracking.inCost')}
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="countInValue" defaultChecked className="size-4" />
+              {t('tracking.inValue')}
+            </label>
+          </div>
+        </details>
       </section>
 
       {stepError && (

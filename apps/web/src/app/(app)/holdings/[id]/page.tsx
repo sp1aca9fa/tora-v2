@@ -1,5 +1,5 @@
 import { deriveBucket, holdingFieldsFor, pendingGrading, productClass, unitCost } from '@tora/core';
-import { canEditProduct, estimatedPullCosts, getHoldingDetail } from '@tora/db';
+import { canEditProduct, estimatedPullCosts, getHoldingDetail, productLots } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ import { productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { BoxCard } from './box-card';
 import { EventList } from './event-list';
+import { TrackingForm } from './tracking-form';
 import { ValuationCard } from './valuation-card';
 
 type Params = { params: Promise<{ id: string }> };
@@ -28,12 +29,13 @@ export default async function HoldingPage({ params }: Params) {
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events, parent } = detail;
-  const [t, format, pullCosts] = await Promise.all([
+  const [t, format, pullCosts, itemLots] = await Promise.all([
     getTranslations(),
     getFormatter(),
     holding.parentHoldingId
       ? estimatedPullCosts(db, user.id, holding.parentHoldingId)
       : Promise.resolve(null),
+    productLots(db, user.id, product.id),
   ]);
   const estimatedCost = pullCosts?.get(holding.id) ?? null;
 
@@ -211,6 +213,13 @@ export default async function HoldingPage({ params }: Params) {
       </div>
 
       {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
+
+      <TrackingForm
+        holdingId={holding.id}
+        countInCost={holding.countInCost}
+        countInValue={holding.countInValue}
+        otherLots={itemLots.filter((l) => l.id !== holding.id).length}
+      />
 
       <Link
         href={`/products/${product.id}#sources`}

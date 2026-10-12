@@ -5,7 +5,14 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
-import { addPull, createHolding, editHolding, markOpened, sellHolding } from './mutations';
+import {
+  addPull,
+  createHolding,
+  editHolding,
+  markOpened,
+  sellHolding,
+  setLotTracking,
+} from './mutations';
 import { insertObservations } from './sources';
 import { createUser } from './users';
 import {
@@ -283,5 +290,37 @@ describe('most traded (Summary insights)', () => {
       [mew.product.id, 5],
       [pika.product.id, 3],
     ]);
+  });
+});
+
+describe('tracking switches (S8)', () => {
+  it("counts cost, value and P/L by each lot's switches", async () => {
+    const { amiibo, mew } = await scenario();
+    const before = (await portfolioValuation(db, uid, now)).totals;
+    // Bought to use: worth still shown, cost and P/L left out.
+    await setLotTracking(db, uid, amiibo.holding.id, { countInCost: false, countInValue: true });
+    let after = (await portfolioValuation(db, uid, now)).totals;
+    expect(after.spentJpy).toBe(before.spentJpy - 9_900);
+    expect(after.valueJpy).toBe(before.valueJpy);
+    expect(after.unrealizedJpy).toBe(before.unrealizedJpy - (3_300 * 3 - 9_900));
+    expect(after.notInvestment).toBe(1);
+    // ミュウ (pulled, cost 0, worth 925 x 2) out of the P/L: its gain no longer counts.
+    await setLotTracking(db, uid, mew.holding.id, { countInCost: true, countInValue: false });
+    after = (await portfolioValuation(db, uid, now)).totals;
+    expect(after.valueJpy).toBe(before.valueJpy - 925 * 2);
+    expect(after.unrealizedJpy).toBe(before.unrealizedJpy - 925 * 2);
+  });
+
+  it('applies to every lot of the item on request', async () => {
+    const { amiibo } = await scenario();
+    await createHolding(
+      db,
+      uid,
+      { productId: amiibo.product.id },
+      { quantity: 1, costTotalJpy: 3_300, acquiredAt: ago(5), condition: 'new_unused' },
+    );
+    const off = { countInCost: false, countInValue: false };
+    expect(await setLotTracking(db, uid, amiibo.holding.id, off)).toBe(1);
+    expect(await setLotTracking(db, uid, amiibo.holding.id, off, true)).toBe(2);
   });
 });

@@ -47,7 +47,16 @@ export async function Insights({
     getTranslations(),
   ]);
   const values = new Map(rows.map((r) => [r.holding.id, r.valuation]));
-  const items = summarizeByProduct(rows, values);
+  // Gains and losses only for investments (counted in cost and value); worth for any lot
+  // counted in value (S8 tracking switches).
+  const items = summarizeByProduct(
+    rows.filter((r) => r.holding.countInValue),
+    values,
+  );
+  const investments = summarizeByProduct(
+    rows.filter((r) => r.holding.countInCost && r.holding.countInValue),
+    values,
+  );
 
   const byPct = (list: typeof movers) => ({
     up: list
@@ -80,8 +89,8 @@ export async function Insights({
 
   const pctMovers = byPct(movers);
   const sealed = byPct(movers.filter((m) => productClass(m.product) === 'sealed'));
-  const withPl = items.filter((s) => s.unrealizedJpy !== null && s.unrealizedJpy !== 0);
-  const plRow = (s: (typeof items)[number]): Row => ({
+  const withPl = investments.filter((s) => s.unrealizedJpy !== null && s.unrealizedJpy !== 0);
+  const plRow = (s: (typeof investments)[number]): Row => ({
     product: s.product,
     main: signedJpy(s.unrealizedJpy!),
     sub:

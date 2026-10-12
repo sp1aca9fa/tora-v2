@@ -207,6 +207,13 @@ export async function createHoldingAction(
       acquiredFrom: d.acquiredFrom ?? null,
       notes: d.notes ?? null,
       orderId: d.orderId ?? null,
+      // Portfolio tracking (S8): both on unless unticked in the form.
+      ...(formData.get('tracking') === 'shown'
+        ? {
+            countInCost: formData.get('countInCost') === 'on',
+            countInValue: formData.get('countInValue') === 'on',
+          }
+        : {}),
     }),
   );
   if (!result.ok) return result.state;

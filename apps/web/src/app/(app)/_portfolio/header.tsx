@@ -67,7 +67,7 @@ export async function PortfolioHeader({
           <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
           <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
           <p className="text-xs text-muted-foreground">
-            {t('portfolio.itemsValue', { units: totals.units, lots: totals.total })}
+            {t('portfolio.itemsValue', { units: totals.units, lots: totals.lots })}
           </p>
           {totals.openedCostJpy > 0 && (
             <p className="amount text-xs text-muted-foreground">

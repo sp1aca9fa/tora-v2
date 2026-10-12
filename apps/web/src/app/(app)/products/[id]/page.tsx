@@ -11,6 +11,7 @@ import {
   savedBucketValues,
   valueHoldings,
 } from '@tora/db';
+import { trackingMode } from '@tora/core';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -66,15 +67,21 @@ export default async function ProductPage({ params }: Params) {
   ]);
   const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueJpy ?? null]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
-  // Opened items keep their cost (their value moved to the pulls logged from them).
-  const openedCost = lots
-    .filter((h) => h.status === 'consumed')
-    .reduce((n, h) => n + h.costTotalJpy, 0);
-  const spent = owned.reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
-  const valued = owned.filter((h) => values.get(h.id) != null);
+  // By each lot's tracking switches (S8): spent counts lots counted in cost, value those counted
+  // in value, P/L those counted in both. Opened items keep their cost (their value moved to the
+  // pulls logged from them).
+  const opened = lots.filter((h) => h.status === 'consumed' && h.countInCost);
+  const openedCost = opened.reduce((n, h) => n + h.costTotalJpy, 0);
+  const spent =
+    owned.filter((h) => h.countInCost).reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
+  const valued = owned.filter((h) => h.countInValue && values.get(h.id) != null);
   const value = valued.reduce((n, h) => n + values.get(h.id)!, 0);
-  const valuedCost = valued.reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
-  const pl = valued.length || openedCost ? value - valuedCost : null;
+  const inPl = valued.filter((h) => h.countInCost);
+  const openedInPl = opened.filter((h) => h.countInValue).reduce((n, h) => n + h.costTotalJpy, 0);
+  const pl =
+    inPl.length || openedInPl
+      ? inPl.reduce((n, h) => n + values.get(h.id)! - h.costTotalJpy, 0) - openedInPl
+      : null;
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
 
@@ -163,6 +170,11 @@ export default async function ProductPage({ params }: Params) {
                           {h.status !== 'owned' && (
                             <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
                               {t(`status.${h.status}`)}
+                            </span>
+                          )}
+                          {trackingMode(h) !== 'investment' && (
+                            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
+                              {t(`tracking.short.${trackingMode(h)}`)}
                             </span>
                           )}
                           {h.reviewPending && (

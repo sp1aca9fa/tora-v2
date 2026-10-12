@@ -1,3 +1,4 @@
+import type { TrackingMode } from '@tora/core';
 import type { Holding, Product, ProductSummary } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
@@ -13,9 +14,12 @@ import { signedJpy } from '../_portfolio/header';
  */
 export async function ItemCard({
   summary: s,
+  mode = 'investment',
   version,
 }: {
   summary: ProductSummary<{ holding: Holding; product: Product }>;
+  /** Its lots' tracking group (S8): what the card shows besides the item. */
+  mode?: TrackingMode;
   version: string | undefined;
 }) {
   const t = await getTranslations();
@@ -57,26 +61,39 @@ export async function ItemCard({
           <p className="truncate text-xs text-muted-foreground">{lotsLine}</p>
         </div>
         <div className="shrink-0 text-right text-sm md:mt-auto md:flex md:items-baseline md:justify-between md:gap-2 md:border-t md:pt-2 md:text-left">
-          {s.valuedLots > 0 ? (
+          {mode === 'untracked' ? (
+            <p className="text-xs text-muted-foreground">{t('tracking.short.untracked')}</p>
+          ) : mode === 'cost_only' ? (
+            <>
+              <p className="tabular-nums">{formatJpy(s.spentJpy)}</p>
+              <p className="text-xs text-muted-foreground">{t('tracking.short.cost_only')}</p>
+            </>
+          ) : s.valuedLots > 0 ? (
             <>
               <p className="font-medium tabular-nums">{formatJpy(s.valueJpy)}</p>
               <div className="md:text-right">
-                {pl !== null && (
-                  <p className="text-xs tabular-nums">
-                    {signedJpy(pl)}
-                    {s.valuedCostJpy > 0 && (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
-                      </span>
+                {mode === 'value_only' ? (
+                  <p className="text-xs text-muted-foreground">{t('tracking.short.value_only')}</p>
+                ) : (
+                  <>
+                    {pl !== null && (
+                      <p className="text-xs tabular-nums">
+                        {signedJpy(pl)}
+                        {s.valuedCostJpy > 0 && (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
+                          </span>
+                        )}
+                      </p>
                     )}
-                  </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {s.valuedLots < s.lots.length
+                        ? t('portfolio.lotsValued', { valued: s.valuedLots, total: s.lots.length })
+                        : t('portfolio.spentShort', { amount: formatJpy(s.spentJpy) })}
+                    </p>
+                  </>
                 )}
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {s.valuedLots < s.lots.length
-                    ? t('portfolio.lotsValued', { valued: s.valuedLots, total: s.lots.length })
-                    : t('portfolio.spentShort', { amount: formatJpy(s.spentJpy) })}
-                </p>
               </div>
             </>
           ) : (
