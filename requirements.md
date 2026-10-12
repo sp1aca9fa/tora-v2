@@ -108,6 +108,7 @@
 - 2026-10-12: SNKRDUNK matching treated "206" and "206/165" as different cards, so cards typed without the set size (e.g. エリカの招待 SV2a 206, from an import) never got a SNKRDUNK suggestion while TCGplayer (which compares the leading number) did. Numbers now match when one side leaves out the set size. Home market and currency per user noted as a future idea (user).
 - 2026-10-12: New phase S9 at the user's request: a watchlist of items not owned yet, with help finding a good price to buy at from price behaviour (the reason Tora v1 was started). After S6; starts with a design session. First ideas written down in S9, all open. "Price alerts" (future ideas) folds into it.
 - 2026-10-12: SNKRDUNK is also the main source for sealed TCG product (boxes, packs, decks, special sets; user); 駿河屋 stays a second source for them and the main one for games, consoles, supplies and other items over ¥3,000. The 駿河屋 results parser looked for an item's link only 400 characters before its title and skipped items with longer markup (the regular 30th CELEBRATION box was missed, leaving only the FUTURISTIC BOX); it now looks back to the previous item.
+- 2026-10-12: Card sleeves named デッキシールド were imported as a deck (sealed, so SNKRDUNK was asked for); the Mercari importer and the import-ai prompt now file sleeves, deck shields, deck cases, playmats and loaders as `supply`. Fixed in production for the one such item (デッキシールド ピカチュウの贈り物: kind supply, its lot's sealed packaging carried over as condition new/unused).
 
 ---
 
