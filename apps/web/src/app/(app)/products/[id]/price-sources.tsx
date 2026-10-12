@@ -6,6 +6,7 @@ import {
   listProductSources,
   QUERY_SOURCE_ID,
   recentObservations,
+  stableSourceFor,
 } from '@tora/db';
 import type { Product } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
@@ -32,9 +33,12 @@ export async function PriceSources({
   db,
   product,
   bucket,
+  ownedCostJpy,
 }: {
   db: Db;
   product: Product;
+  /** What the user paid for the lots they own (decides whether a 駿河屋 page is expected). */
+  ownedCostJpy: number;
   /** The bucket most of the user's lots are in (highlighted). */
   bucket: string | null;
 }) {
@@ -61,6 +65,11 @@ export async function PriceSources({
   // Suggestions from a source this product has no listing of yet are shown open; the rest
   // (e.g. a no-shrink variant of a linked SNKRDUNK listing) wait under "Add another listing".
   const linked = new Set(active.map((s) => s.source));
+  // The item's main source (SNKRDUNK for cards, 駿河屋 for other items over ¥3,000) is still
+  // missing: say so and keep the paste box open, whatever else is linked.
+  const stable = stableSourceFor(product, ownedCostJpy);
+  const missing = stable && !linked.has(stable) ? stable : null;
+  const pasteUp = !!missing && !candidates.some((c) => c.source === missing);
   const open = candidates.filter((c) => !linked.has(c.source));
   const more = candidates.filter((c) => linked.has(c.source));
 
@@ -197,6 +206,14 @@ export async function PriceSources({
           </ul>
         )}
 
+        {missing && active.length > 0 && (
+          <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <p className="text-sm">
+              {t('sources.missingStable', { source: sourceLabel(missing) })}
+            </p>
+            {pasteUp && paste}
+          </div>
+        )}
         {suggestions(open)}
         {active.length === 0 && candidates.length === 0 && (
           <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
@@ -212,7 +229,7 @@ export async function PriceSources({
             </summary>
             <div className="mt-3 space-y-4">
               {suggestions(more)}
-              {paste}
+              {!pasteUp && paste}
             </div>
           </details>
         )}

@@ -840,6 +840,18 @@ export async function addSourceReference(
 /** Non-card items costing more than this should be linked to a store page (user, 2026-10-12). */
 export const STORE_LINK_MIN_COST = 3000;
 
+/**
+ * The stable, product-level source an item should be linked to: SNKRDUNK for cards, 駿河屋 for
+ * other items costing more than ¥3,000 (what the user paid for the lots they own); else none.
+ */
+export function stableSourceFor(
+  product: Pick<Product, 'category' | 'kind'>,
+  costJpy: number,
+): 'snkrdunk' | 'surugaya' | null {
+  if (product.category === 'tcg' && product.kind === 'single') return 'snkrdunk';
+  return costJpy > STORE_LINK_MIN_COST ? 'surugaya' : null;
+}
+
 export interface MissingSource {
   product: Product;
   /** The stable source this item should be linked to. */
@@ -869,15 +881,8 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
     )
     .groupBy(products.id);
   const wanted = owned.flatMap(({ product, cost }) => {
-    const card = product.category === 'tcg' && product.kind === 'single';
-    if (!card && Number(cost) <= STORE_LINK_MIN_COST) return [];
-    return [
-      {
-        product,
-        costJpy: Number(cost),
-        source: card ? ('snkrdunk' as const) : ('surugaya' as const),
-      },
-    ];
+    const source = stableSourceFor(product, Number(cost));
+    return source ? [{ product, costJpy: Number(cost), source }] : [];
   });
   if (wanted.length === 0) return [];
   const ids = wanted.map((w) => w.product.id);

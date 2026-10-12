@@ -192,7 +192,12 @@ export default async function ProductPage({ params }: Params) {
 
       <MarketCompare product={product} market={market} mainBucket={mainBucket} foreign={foreign} />
 
-      <PriceSources db={db} product={product} bucket={mainBucket} />
+      <PriceSources
+        db={db}
+        product={product}
+        bucket={mainBucket}
+        ownedCostJpy={owned.reduce((n, h) => n + h.costTotalJpy, 0)}
+      />
     </div>
   );
 }

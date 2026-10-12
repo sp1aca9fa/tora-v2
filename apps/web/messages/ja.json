@@ -368,6 +368,7 @@
     "reject": "いいえ",
     "score": "一致度 {score}%",
     "noneYet": "未リンクです。次回の収集で探します（カードはスニダンとTCGplayer、その他は駿河屋）。リンクを下に貼り付けることもできます。",
+    "missingStable": "{source}に未リンクです（この商品の主な価格ソース）。下の候補を確定するか、リンクを貼り付けてください。",
     "pasteUrl": "スニダンまたはTCGplayerの商品リンクを貼り付け",
     "pasteUrlItem": "駿河屋・スニダン・TCGplayerの商品リンクを貼り付け",
     "link": "リンク",
