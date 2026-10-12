@@ -1,8 +1,8 @@
 // `pnpm demo <username>`: fills (or resets) a demo account with sample lots, to show Tora without
-// showing anyone's real collection. Only accounts named demo* are touched; their lots, notices and
-// settings are replaced. Items are real products (so the collectors give them real prices) and
-// are kept across resets, with their price sources: create the account first (`pnpm user create
-// demo`), run this, then a collect for the prices.
+// showing anyone's real collection. Only accounts named demo* are touched; their lots and notices
+// are replaced (settings such as notice levels are kept). Items are real products (so the
+// collectors give them real prices) and are kept across resets, with their price sources: create
+// the account first (`pnpm user create demo`), run this, then a collect for the prices.
 //
 // Price sources are found like for any item: the collectors' matching runs, then each item is
 // settled by the state it is meant to show: "complete" items get their best suggestion of each
@@ -32,7 +32,6 @@ import {
   schema,
   sellHolding,
   setManualPrice,
-  setNoticeLevels,
   setSourceWarningDismissed,
   stableSourceFor,
 } from '@tora/db';
@@ -92,7 +91,6 @@ await db.delete(suggestions).where(eq(suggestions.userId, uid));
 await db.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.userId, uid));
 await db.delete(manualPrices).where(eq(manualPrices.userId, uid));
 await db.delete(cancelledOrders).where(eq(cancelledOrders.userId, uid));
-await setNoticeLevels(db, uid, null);
 console.log(`reset: ${lotIds.length} lot(s) removed`);
 
 // --- items ------------------------------------------------------------------------------------
