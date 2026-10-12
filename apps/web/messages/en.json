@@ -63,7 +63,18 @@
     "lotsUnits": "{lots, plural, one {# lot} other {# lots}}, {units, plural, one {# unit} other {# units}}",
     "spentShort": "spent {amount}",
     "lotsValued": "{valued} of {total} lots valued",
-    "inclOpened": "incl. {amount} in opened items"
+    "inclOpened": "incl. {amount} in opened items",
+    "tab": {
+      "summary": "Summary",
+      "items": "Items"
+    },
+    "units": "{count, plural, one {# unit} other {# units}}",
+    "itemCount": "{count, plural, one {# item} other {# items}}",
+    "movers": {
+      "title": "Top movers, last 30 days",
+      "up": "Rising",
+      "down": "Falling"
+    }
   },
   "inventory": {
     "search": "Search name, set, card number",

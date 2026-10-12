@@ -1,285 +1,141 @@
-import {
-  CATEGORIES,
-  type Category,
-  HOLDING_STATUSES,
-  type HoldingStatus,
-  type ProductKind,
-  kindsFor,
-} from '@tora/core';
-import {
-  type Db,
-  actionTotal,
-  cardGradeCounts,
-  imageVersions,
-  listInventory,
-  portfolioSeries,
-  portfolioValuation,
-  summarizeByProduct,
-} from '@tora/db';
-import { ChevronRight, Plus } from 'lucide-react';
+import { CATEGORIES, type Category } from '@tora/core';
+import { type Db, imageVersions, portfolioSeries, portfolioValuation, topMovers } from '@tora/db';
+import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
 import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { ProductImage } from '@/components/product-image';
-import { Button } from '@/components/ui/button';
-import { LEVEL_STYLE } from '@/components/notice-level';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
-import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
 import { cn, formatJpy } from '@/lib/utils';
-import { InventoryFilters } from './inventory-filters';
+import { PortfolioHeader, signedJpy } from './_portfolio/header';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
 }
 
-type SearchParams = Promise<{ q?: string; type?: string; status?: string }>;
+const card = 'rounded-xl border bg-card px-4 py-3';
 
-/** `type` is a category (`tcg`) or category:kind (`tcg:booster_box`). */
-function parseType(type: string | undefined): { category?: Category; kind?: ProductKind } {
-  const [c, k] = (type ?? '').split(':');
-  if (!CATEGORIES.includes(c as Category)) return {};
-  const category = c as Category;
-  return kindsFor(category).includes(k as ProductKind)
-    ? { category, kind: k as ProductKind }
-    : { category };
-}
-
-export default async function PortfolioPage({ searchParams }: { searchParams: SearchParams }) {
+/** Portfolio, Summary tab (requirements S8): how the collection is doing, at a glance. */
+export default async function SummaryPage() {
   const { db, user } = await authed();
-  const sp = await searchParams;
-  const { category, kind } = parseType(sp.type);
-  const status =
-    sp.status === 'all' || HOLDING_STATUSES.includes(sp.status as HoldingStatus)
-      ? (sp.status as HoldingStatus | 'all')
-      : 'owned';
-  const q = sp.q?.trim().slice(0, 100) || undefined;
-
-  const [rows, portfolio, actions, grades, t] = await Promise.all([
-    listInventory(db, user.id, { category, kind, status, q }),
+  const [portfolio, actions, t] = await Promise.all([
     portfolioValuation(db, user.id),
     userActions(),
-    cardGradeCounts(db, user.id),
     getTranslations(),
   ]);
-  const { totals } = portfolio;
-  const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
-  const summaries = summarizeByProduct(rows, valuations);
-  const images = await imageVersions(
-    db,
-    summaries.map((s) => s.product.id),
-  );
-  const pl = totals.unrealizedJpy;
   const maxBreakdown = Math.max(
     1,
     ...portfolio.breakdown.map((b) => Math.max(b.valueJpy, b.costJpy)),
   );
-  const filtered = Boolean(category || q || status !== 'owned');
+  // Per category: units, value and P/L of the valued lots.
+  const categories = new Map<
+    Category,
+    { units: number; valueJpy: number; costJpy: number; valuedCostJpy: number }
+  >();
+  for (const { holding, product, valuation } of portfolio.rows) {
+    const c = categories.get(product.category) ?? {
+      units: 0,
+      valueJpy: 0,
+      costJpy: 0,
+      valuedCostJpy: 0,
+    };
+    c.units += holding.quantity;
+    c.costJpy += holding.costTotalJpy;
+    if (valuation.valueJpy !== null) {
+      c.valueJpy += valuation.valueJpy;
+      c.valuedCostJpy += holding.costTotalJpy;
+    }
+    categories.set(product.category, c);
+  }
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('portfolio.title')}</h1>
-        <Button asChild size="sm" className="hidden md:inline-flex">
-          <Link href="/add">
-            <Plus /> {t('nav.add')}
-          </Link>
-        </Button>
-      </header>
+      <PortfolioHeader totals={portfolio.totals} actions={actions} tab="summary" />
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
-          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.valueJpy)}</p>
-          <p className="text-xs text-muted-foreground">
-            {t('portfolio.valuedOf', { valued: totals.valued, total: totals.total })}
-          </p>
-        </div>
-        <div className="rounded-xl border bg-card px-4 py-3">
-          <p className="text-xs text-muted-foreground">{t('portfolio.unrealized')}</p>
-          <p className="text-xl font-semibold tabular-nums">
-            {pl > 0 ? '▲ +' : pl < 0 ? '▼ ' : ''}
-            {formatJpy(pl)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {totals.valuedCostJpy > 0
-              ? t('portfolio.vsCost', {
-                  pct: Math.round((pl / totals.valuedCostJpy) * 1000) / 10,
-                  cost: formatJpy(totals.valuedCostJpy),
-                })
-              : '-'}
-          </p>
-        </div>
-        <div className="col-span-2 rounded-xl border bg-card px-4 py-3 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
-          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
-          <p className="text-xs text-muted-foreground">
-            {t('portfolio.itemsValue', { units: totals.units, lots: totals.total })}
-          </p>
-          {totals.openedCostJpy > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {t('portfolio.inclOpened', { amount: formatJpy(totals.openedCostJpy) })}
-            </p>
-          )}
-        </div>
+      <section className="grid gap-3 sm:grid-cols-2">
+        {CATEGORIES.filter((c) => categories.has(c)).map((c) => {
+          const s = categories.get(c)!;
+          const pl = s.valueJpy - s.valuedCostJpy;
+          return (
+            <Link
+              key={c}
+              href={`/items?type=${c}`}
+              className={cn(card, 'flex items-center gap-3 transition-colors hover:bg-accent/50')}
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{t(`category.${c}`)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('portfolio.units', { count: s.units })} ·{' '}
+                  {t('portfolio.spentShort', { amount: formatJpy(s.costJpy) })}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-semibold tabular-nums">{formatJpy(s.valueJpy)}</p>
+                {s.valuedCostJpy > 0 && (
+                  <p className="text-xs tabular-nums">
+                    {signedJpy(pl)}{' '}
+                    <span className="text-muted-foreground">
+                      ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
+                    </span>
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Link>
+          );
+        })}
       </section>
 
-      <Suspense
-        fallback={<div className="h-64 animate-pulse rounded-xl border bg-card" aria-hidden />}
-      >
-        <ValueOverTime db={db} userId={user.id} />
-      </Suspense>
-
-      {portfolio.breakdown.length > 1 && (
-        <details className="rounded-xl border bg-card px-4 py-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            {t('portfolio.breakdown')}
-          </summary>
-          <ul className="mt-3 space-y-2 text-sm">
-            {portfolio.breakdown.map((b) => (
-              <li key={`${b.category}:${b.kind}`} className="space-y-1">
-                <div className="flex justify-between gap-3">
-                  <span>
-                    {t(`kind.${b.kind}`)} <span className="text-muted-foreground">× {b.count}</span>
-                  </span>
-                  <span className="tabular-nums">
-                    {formatJpy(b.valueJpy)}{' '}
-                    <span className="text-xs text-muted-foreground">/ {formatJpy(b.costJpy)}</span>
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-muted" aria-hidden>
-                  <div
-                    className="h-1.5 rounded-full bg-[#2a78d6] dark:bg-[#3987e5]"
-                    style={{ width: `${(b.valueJpy / maxBreakdown) * 100}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-muted-foreground">{t('portfolio.breakdownHint')}</p>
-        </details>
-      )}
-
-      {actions.length > 0 && (
-        <Link
-          href="/actions"
-          className={cn(
-            'flex items-center justify-between rounded-xl border px-4 py-3 text-sm',
-            LEVEL_STYLE[actions[0]!.level].banner,
-          )}
-        >
-          <span>{t('actions.banner', { count: actionTotal(actions) })}</span>
-          <ChevronRight className="size-4" />
-        </Link>
-      )}
-
-      <Suspense>
-        <InventoryFilters />
-      </Suspense>
-
-      {summaries.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          {filtered ? t('inventory.emptyFiltered') : t('portfolio.empty')}
-          {!filtered && (
-            <div className="mt-4">
-              <Button asChild size="sm">
-                <Link href="/add">{t('inventory.addFirst')}</Link>
-              </Button>
-            </div>
-          )}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <Suspense
+            fallback={<div className="h-72 animate-pulse rounded-xl border bg-card" aria-hidden />}
+          >
+            <ValueOverTime db={db} userId={user.id} />
+          </Suspense>
         </div>
-      ) : (
-        <ul className="divide-y rounded-xl border bg-card">
-          {summaries.map((s) => {
-            const { product } = s;
-            const details = [
-              t(`kind.${product.kind}`),
-              franchiseLabel(product.franchise, t),
-              product.region && product.region !== 'jp' && t(`region.${product.region}`),
-            ].filter(Boolean);
-            // Units per condition, e.g. "PSA 10 ×2 · Raw A ×5".
-            const conditions = new Map<string, number>();
-            for (const { holding } of s.lots) {
-              const label = lotConditionLabel(holding, product, t);
-              if (label) conditions.set(label, (conditions.get(label) ?? 0) + holding.quantity);
-            }
-            const lotsLine = [
-              t('portfolio.lotsUnits', { lots: s.lots.length, units: s.units }),
-              ...[...conditions].map(([label, n]) => (n > 1 ? `${label} ×${n}` : label)),
-            ].join(' · ');
-            const statuses = [...new Set(s.lots.map((l) => l.holding.status))];
-            const pl = s.unrealizedJpy;
-            return (
-              <li key={product.id}>
-                <Link
-                  href={`/products/${product.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/50"
-                >
-                  <ProductImage
-                    product={product}
-                    version={images.get(product.id)}
-                    className="size-12"
-                  />
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="truncate font-medium">{product.name}</p>
-                    <p className="truncate text-sm text-muted-foreground">{details.join(' · ')}</p>
-                    <p className="truncate text-xs text-muted-foreground">{lotsLine}</p>
-                  </div>
-                  <div className="shrink-0 text-right text-sm">
-                    {s.valuedLots > 0 ? (
-                      <>
-                        <p className="font-medium tabular-nums">{formatJpy(s.valueJpy)}</p>
-                        {pl !== null && (
-                          <p className="text-xs tabular-nums">
-                            {pl > 0 ? '▲ +' : pl < 0 ? '▼ ' : ''}
-                            {formatJpy(pl)}
-                            {s.valuedCostJpy > 0 && (
-                              <span className="text-muted-foreground">
-                                {' '}
-                                ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
-                              </span>
-                            )}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {t('portfolio.spentShort', { amount: formatJpy(s.spentJpy) })}
-                        </p>
-                        {s.valuedLots < s.lots.length && (
-                          <p className="text-xs text-muted-foreground">
-                            {t('portfolio.lotsValued', {
-                              valued: s.valuedLots,
-                              total: s.lots.length,
-                            })}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="tabular-nums">{formatJpy(s.spentJpy)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {statuses.length === 1 && statuses[0] !== 'owned'
-                            ? t(`status.${statuses[0]}`)
-                            : t('valuation.short.none')}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {grades.cards > 0 && grades.ungraded === 0 && (
-        <p className="text-right text-sm">
-          <Link href="/holdings/grades" className="text-muted-foreground hover:text-foreground">
-            {t('grades.link')}
-          </Link>
-        </p>
-      )}
+        {portfolio.breakdown.length > 0 && (
+          <section className={cn(card, 'space-y-3')}>
+            <h2 className="text-sm font-medium">{t('portfolio.breakdown')}</h2>
+            <ul className="space-y-2.5 text-sm">
+              {portfolio.breakdown.map((b) => (
+                <li key={`${b.category}:${b.kind}`}>
+                  <Link href={`/items?type=${b.category}:${b.kind}`} className="block space-y-1">
+                    <div className="flex justify-between gap-3">
+                      <span>
+                        {t(`kind.${b.kind}`)}{' '}
+                        <span className="text-muted-foreground">× {b.count}</span>
+                      </span>
+                      <span className="tabular-nums">
+                        {formatJpy(b.valueJpy)}{' '}
+                        <span className="text-xs text-muted-foreground">
+                          / {formatJpy(b.costJpy)}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-muted" aria-hidden>
+                      <div
+                        className="h-1.5 rounded-full bg-[#2a78d6] dark:bg-[#3987e5]"
+                        style={{ width: `${(b.valueJpy / maxBreakdown) * 100}%` }}
+                      />
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">{t('portfolio.breakdownHint')}</p>
+          </section>
+        )}
+      </div>
+
+      <Suspense
+        fallback={<div className="h-40 animate-pulse rounded-xl border bg-card" aria-hidden />}
+      >
+        <Movers db={db} userId={user.id} />
+      </Suspense>
     </div>
   );
 }
@@ -296,9 +152,60 @@ async function ValueOverTime({ db, userId }: { db: Db; userId: string }) {
     estimatedJpy: Number(s.estimatedJpy),
   }));
   return (
-    <section className="space-y-2 rounded-xl border bg-card px-4 py-3">
+    <section className={cn(card, 'space-y-2')}>
       <h2 className="text-sm font-medium">{t('portfolio.overTime')}</h2>
       <PortfolioChart points={points} />
+    </section>
+  );
+}
+
+/** Items whose value rose or fell most over the last 30 days. */
+async function Movers({ db, userId }: { db: Db; userId: string }) {
+  const [{ up, down }, t] = await Promise.all([topMovers(db, userId, 30), getTranslations()]);
+  if (up.length + down.length === 0) return null;
+  const images = await imageVersions(
+    db,
+    [...up, ...down].map((m) => m.product.id),
+  );
+  const list = (title: string, movers: typeof up) =>
+    movers.length > 0 && (
+      <div className="space-y-2">
+        <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+        <ul className="space-y-1">
+          {movers.map((m) => (
+            <li key={m.product.id}>
+              <Link
+                href={`/products/${m.product.id}`}
+                className="flex items-center gap-3 rounded-md p-1.5 hover:bg-accent/50"
+              >
+                <ProductImage
+                  product={m.product}
+                  version={images.get(m.product.id)}
+                  className="size-10"
+                />
+                <span className="min-w-0 flex-1 truncate text-sm">{m.product.name}</span>
+                <span className="shrink-0 text-right text-sm tabular-nums">
+                  <span className="block font-medium">
+                    {m.pct > 0 ? '+' : ''}
+                    {m.pct}%
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {signedJpy(m.changeJpy)}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  return (
+    <section className={cn(card, 'space-y-3')}>
+      <h2 className="text-sm font-medium">{t('portfolio.movers.title')}</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        {list(t('portfolio.movers.up'), up)}
+        {list(t('portfolio.movers.down'), down)}
+      </div>
     </section>
   );
 }

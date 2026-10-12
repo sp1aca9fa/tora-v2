@@ -574,6 +574,7 @@ Design plan (user + Claude, 2026-10-12; the revamp of S8):
   - Items: category chips (All / TCG / Games, with count and value) and kind chips filter in one tap; the list is grouped under slim sticky headers per kind (count, value). Phone: row cards of today's size with bigger pictures (about 72 px) and names on up to two lines in a slightly larger font. Half and full screen: vertical cards (about 200 px wide: big picture on top, name up to 3 lines, kind, value and P/L), as many columns as fit (about 4 at half screen, 7 at full).
 - Item page next: Overview (value, lots) / Market (chart, Japan vs US, sources) / History; two columns on wide screens. Actions: two columns of cards on wide screens. Then the rest in the same visual language (spacing and type scale, cards, badges, level colours).
 - Order: layout shell, Portfolio, item page, the other screens.
+- Built (2026-10-12): layout shell (icon rail at 768-1279 px, labelled sidebar from 1280 px, wide pages use the full width: Portfolio, Items, Actions) and the Portfolio split (Summary at /, Items at /items, top movers from the daily snapshots). Next: the user's review, then the item page.
 
 Acceptance:
 - User review on phone and on a wide desktop screen.

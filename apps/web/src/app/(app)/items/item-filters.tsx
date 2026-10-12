@@ -1,6 +1,6 @@
 'use client';
 
-import { CATEGORIES, HOLDING_STATUSES, kindsFor } from '@tora/core';
+import { HOLDING_STATUSES } from '@tora/core';
 import { Search } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -8,8 +8,8 @@ import { useEffect, useState, useTransition } from 'react';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 
-/** Search + type + status filters, kept in the URL so they survive reloads and back. */
-export function InventoryFilters() {
+/** Search + status filters (the type is the chips), kept in the URL for reloads and back. */
+export function ItemFilters() {
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
@@ -32,7 +32,7 @@ export function InventoryFilters() {
   }, [q]);
 
   return (
-    <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+    <div className="grid grid-cols-[1fr_auto] gap-2">
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -44,37 +44,18 @@ export function InventoryFilters() {
           aria-label={t('inventory.search')}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:contents">
-        <NativeSelect
-          aria-label={t('fields.type')}
-          value={params.get('type') ?? ''}
-          onChange={(e) => update('type', e.target.value)}
-        >
-          <option value="">{t('inventory.allTypes')}</option>
-          {CATEGORIES.map((c) => (
-            <optgroup key={c} label={t(`category.${c}`)}>
-              <option value={c}>{t('inventory.allOf', { category: t(`category.${c}`) })}</option>
-              {kindsFor(c).map((k) => (
-                <option key={k} value={`${c}:${k}`}>
-                  {t(`kind.${k}`)}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          aria-label={t('fields.status')}
-          value={params.get('status') ?? 'owned'}
-          onChange={(e) => update('status', e.target.value)}
-        >
-          {HOLDING_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(`status.${s}`)}
-            </option>
-          ))}
-          <option value="all">{t('inventory.allStatuses')}</option>
-        </NativeSelect>
-      </div>
+      <NativeSelect
+        aria-label={t('fields.status')}
+        value={params.get('status') ?? 'owned'}
+        onChange={(e) => update('status', e.target.value)}
+      >
+        {HOLDING_STATUSES.map((s) => (
+          <option key={s} value={s}>
+            {t(`status.${s}`)}
+          </option>
+        ))}
+        <option value="all">{t('inventory.allStatuses')}</option>
+      </NativeSelect>
     </div>
   );
 }

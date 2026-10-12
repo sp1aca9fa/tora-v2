@@ -1,5 +1,6 @@
 import { actionTotal } from '@tora/db';
 import { Nav } from '@/components/nav';
+import { PageWidth } from '@/components/page-width';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 
@@ -15,10 +16,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <Nav badges={badges} />
-      <div className="md:pl-56">
-        <main className="mx-auto max-w-3xl px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10">
-          {children}
-        </main>
+      <div className="md:pl-16 xl:pl-56">
+        <PageWidth>{children}</PageWidth>
       </div>
     </>
   );

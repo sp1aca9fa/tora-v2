@@ -63,7 +63,18 @@
     "lotsUnits": "{lots}件・{units}点",
     "spentShort": "取得額 {amount}",
     "lotsValued": "{total}件中{valued}件を評価",
-    "inclOpened": "うち開封済み {amount}"
+    "inclOpened": "うち開封済み {amount}",
+    "tab": {
+      "summary": "サマリー",
+      "items": "アイテム"
+    },
+    "units": "{count}点",
+    "itemCount": "{count}アイテム",
+    "movers": {
+      "title": "直近30日の値動き",
+      "up": "上昇",
+      "down": "下落"
+    }
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",

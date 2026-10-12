@@ -1199,3 +1199,84 @@ export async function estimatedPullCosts(
     pulls.map((p, i) => [p.holding.id, Math.round((parent.costTotalJpy * weights[i]!) / total)]),
   );
 }
+
+export interface Mover {
+  product: Product;
+  /** Value of the lots held now, today and `days` ago (same lots, from the daily snapshots). */
+  nowJpy: number;
+  thenJpy: number;
+  changeJpy: number;
+  pct: number;
+}
+
+/**
+ * Items whose market value moved most over the last `days` (requirements S8, Summary): the
+ * lots still owned, valued on the latest snapshot day and on the day `days` before; items worth
+ * under ¥1,000 then are left out (noise). Largest rises and falls, `limit` each.
+ */
+export async function topMovers(db: Db, userId: string, days = 30, limit = 3) {
+  const [latest] = await db
+    .select({ date: sql<string | null>`max(${valuationSnapshots.date})` })
+    .from(valuationSnapshots)
+    .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
+    .where(eq(holdings.userId, userId));
+  if (!latest?.date) return { up: [] as Mover[], down: [] as Mover[] };
+  const then = tokyoDate(new Date(Date.parse(`${latest.date}T12:00:00+09:00`) - days * DAY));
+  const rows = await db
+    .select({
+      product: products,
+      holdingId: holdings.id,
+      date: valuationSnapshots.date,
+      valueJpy: valuationSnapshots.valueJpy,
+    })
+    .from(valuationSnapshots)
+    .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.status, 'owned'),
+        inArray(valuationSnapshots.date, [latest.date, then]),
+      ),
+    );
+  // Per lot both days must have a value, so a lot bought since (or valued since) does not count.
+  const byLot = new Map<string, { product: Product; now?: number; then?: number }>();
+  for (const r of rows) {
+    if (r.valueJpy === null) continue;
+    const lot = byLot.get(r.holdingId) ?? { product: r.product };
+    if (r.date === latest.date) lot.now = r.valueJpy;
+    else lot.then = r.valueJpy;
+    byLot.set(r.holdingId, lot);
+  }
+  const byProduct = new Map<string, Mover>();
+  for (const lot of byLot.values()) {
+    if (lot.now === undefined || lot.then === undefined) continue;
+    const m = byProduct.get(lot.product.id) ?? {
+      product: lot.product,
+      nowJpy: 0,
+      thenJpy: 0,
+      changeJpy: 0,
+      pct: 0,
+    };
+    m.nowJpy += lot.now;
+    m.thenJpy += lot.then;
+    byProduct.set(lot.product.id, m);
+  }
+  const movers = [...byProduct.values()]
+    .filter((m) => m.thenJpy >= 1_000 && m.nowJpy !== m.thenJpy)
+    .map((m) => ({
+      ...m,
+      changeJpy: m.nowJpy - m.thenJpy,
+      pct: Math.round(((m.nowJpy - m.thenJpy) / m.thenJpy) * 1000) / 10,
+    }));
+  return {
+    up: movers
+      .filter((m) => m.pct > 0)
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, limit),
+    down: movers
+      .filter((m) => m.pct < 0)
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, limit),
+  };
+}

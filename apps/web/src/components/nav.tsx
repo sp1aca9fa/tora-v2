@@ -49,39 +49,48 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 hidden w-56 flex-col border-r bg-card px-3 py-6 md:flex">
-        <div className="flex items-center justify-between gap-2 px-3 pb-6">
+      {/* Desktop: an icon rail at half-screen widths, a sidebar with labels from 1280 px. */}
+      <aside className="fixed inset-y-0 left-0 hidden w-16 flex-col border-r bg-card px-2 py-6 md:flex xl:w-56 xl:px-3">
+        <div className="flex items-center justify-center gap-2 pb-6 xl:justify-between xl:px-3">
           <Link href="/" className="text-lg font-semibold tracking-tight">
-            {t('app.name')}
+            <span className="xl:hidden">{t('app.name').slice(0, 1)}</span>
+            <span className="hidden xl:inline">{t('app.name')}</span>
           </Link>
-          <LocaleToggle />
+          <LocaleToggle className="hidden xl:inline-flex" />
         </div>
         <nav className="flex flex-col gap-1">
           {ITEMS.map(({ href, key, icon: Icon }) => (
             <Link
               key={href}
               href={href}
+              title={t(`nav.${key}`)}
               aria-current={isActive(pathname, href) ? 'page' : undefined}
               className={cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+                'relative flex items-center justify-center gap-3 rounded-md py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground xl:justify-start xl:px-3 xl:py-2',
                 isActive(pathname, href) && 'bg-accent font-medium text-accent-foreground',
               )}
             >
-              <Icon className="size-4" />
-              <span className="flex-1">{t(`nav.${key}`)}</span>
-              <Badge counts={badges} item={key} />
+              <Icon className="size-5 xl:size-4" />
+              <span className="sr-only flex-1 xl:not-sr-only">{t(`nav.${key}`)}</span>
+              <span className="absolute top-0.5 right-0.5 xl:static">
+                <Badge counts={badges} item={key} />
+              </span>
             </Link>
           ))}
         </nav>
-        <form action={logout} className="mt-auto">
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <LogOut className="size-4" />
-            {t('settings.logout')}
-          </button>
-        </form>
+        <div className="mt-auto flex flex-col items-center gap-2 xl:items-stretch">
+          <LocaleToggle className="flex-col xl:hidden" />
+          <form action={logout}>
+            <button
+              type="submit"
+              title={t('settings.logout')}
+              className="flex w-full items-center justify-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground xl:justify-start"
+            >
+              <LogOut className="size-5 xl:size-4" />
+              <span className="sr-only xl:not-sr-only">{t('settings.logout')}</span>
+            </button>
+          </form>
+        </div>
       </aside>
 
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
