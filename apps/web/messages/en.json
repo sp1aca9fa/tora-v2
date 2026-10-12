@@ -637,7 +637,8 @@
     "us": "US",
     "noJapan": "No Japanese price",
     "spread": "{pct}% vs Japan",
-    "converted": "{price} at ¥{rate} per dollar ({date})"
+    "converted": "{price} at ¥{rate} per dollar ({date})",
+    "asks": "median ask of {count, plural, one {# listing} other {# listings}}"
   },
   "coverage": {
     "title": "Price sources to link",

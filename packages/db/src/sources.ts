@@ -710,6 +710,14 @@ export async function createQuerySource(
  * Saves an edited query. Sales collected under the old query are dropped (the next run fetches
  * again under the new one), except the ones the user excluded by hand.
  */
+/** A collector filled in the search it runs (e.g. keywords built from a linked listing's title). */
+export async function setSourceQuery(db: Db, sourceId: string, query: SourceQuery): Promise<void> {
+  await db
+    .update(productSources)
+    .set({ query, updatedAt: toTokyoIso() })
+    .where(eq(productSources.id, sourceId));
+}
+
 export async function updateSourceQuery(
   db: Db,
   sourceId: string,

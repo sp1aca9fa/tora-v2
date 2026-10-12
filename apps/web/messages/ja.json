@@ -637,7 +637,8 @@
     "us": "米国",
     "noJapan": "日本の価格なし",
     "spread": "日本比 {pct}%",
-    "converted": "{price}（1ドル {rate}円、{date}）"
+    "converted": "{price}（1ドル {rate}円、{date}）",
+    "asks": "出品{count}件の中央値"
   },
   "coverage": {
     "title": "リンクする価格ソース",

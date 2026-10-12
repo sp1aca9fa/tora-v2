@@ -24,6 +24,8 @@ export interface CollectorContext {
    * it points to or is named after); null when unknown.
    */
   setOf?: (product: Product) => Promise<{ code: string | null; releaseDate: string | null } | null>;
+  /** The product's active listings on other sources (e.g. TCGplayer's English title). */
+  linkedListings?: (productId: string) => Promise<{ source: string; title: string | null }[]>;
 }
 
 export interface CollectResult {
@@ -37,6 +39,8 @@ export interface CollectResult {
   recentSales?: RecentSale[];
   /** The listing's picture (stored on the listing; the product shows its first listing's). */
   imageUrl?: string | null;
+  /** Search-based sources: the search actually run, when the collector filled it in. */
+  query?: SourceQuery;
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

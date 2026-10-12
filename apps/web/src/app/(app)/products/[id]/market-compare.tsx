@@ -30,11 +30,11 @@ export async function MarketCompare({
   const bucket = compareBucket(product, mainBucket);
   if (!bucket || foreign.length === 0) return null;
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
-  const jp: Valuation = valueUnit({
-    bucket,
-    observations: market.observations.get(product.id) ?? [],
-  });
-  const graded = mainBucket?.startsWith('graded:');
+  const observations = market.observations.get(product.id) ?? [];
+  const jpOf = (b: string): Valuation => valueUnit({ bucket: b, observations });
+  const jp = jpOf(bucket);
+  // A graded foreign price (eBay "PSA 10") is compared with the same grade in Japan.
+  const graded = mainBucket?.startsWith('graded:') && !foreign.some((f) => f.bucket === mainBucket);
   const money = (n: number, currency: string) =>
     format.number(n, { style: 'currency', currency, maximumFractionDigits: 2 });
   return (
@@ -81,6 +81,7 @@ export async function MarketCompare({
                         sourceLabel(f.source)
                       )}
                       {f.variant && ` · ${f.variant}`}
+                      {f.count !== null && ` · ${t('compare.asks', { count: f.count })}`}
                     </span>
                   </span>
                   <span className="text-right tabular-nums">

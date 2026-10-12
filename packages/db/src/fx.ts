@@ -77,8 +77,12 @@ export interface ForeignPrice {
   fxRate: number | null;
   fxDate: string | null;
   observedAt: string;
-  /** E.g. TCGplayer's printing ("Holofoil"). */
+  /** E.g. TCGplayer's printing ("Holofoil") or eBay's condition group ("PSA 10"). */
   variant: string | null;
+  /** The condition it prices (e.g. `graded:PSA:10`); null: ungraded / sealed as sold new. */
+  bucket: string | null;
+  /** How many listings the price summarizes (eBay asks), when it is a summary. */
+  count: number | null;
 }
 
 /** Newest price per foreign listing of a product (e.g. TCGplayer), from the last `days`. */
@@ -104,7 +108,7 @@ export async function foreignPrices(
   const seen = new Set<string>();
   const out: ForeignPrice[] = [];
   for (const o of rows) {
-    const raw = (o.raw ?? {}) as { subType?: string; fxDate?: string };
+    const raw = (o.raw ?? {}) as { subType?: string; fxDate?: string; count?: number };
     const key = `${o.source}|${o.url}|${raw.subType ?? ''}`;
     if (seen.has(key) || o.priceOriginal === null || !o.currency) continue;
     seen.add(key);
@@ -119,6 +123,8 @@ export async function foreignPrices(
       fxDate: raw.fxDate ?? null,
       observedAt: o.observedAt,
       variant: raw.subType ?? null,
+      bucket: o.bucket,
+      count: raw.count ?? null,
     });
   }
   return out;

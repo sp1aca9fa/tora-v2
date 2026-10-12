@@ -5,6 +5,8 @@ import {
   createQuerySource,
   heldBuckets,
   finishRun,
+  listProductSources,
+  setSourceQuery,
   fxRateOn,
   insertObservations,
   productSetInfo,
@@ -73,6 +75,10 @@ export async function runCollector(
     },
     fx: (pair, date) => fxRateOn(db, pair, date),
     setOf: (product) => productSetInfo(db, product),
+    linkedListings: async (productId) =>
+      (await listProductSources(db, productId))
+        .filter((s) => s.active)
+        .map((s) => ({ source: s.source, title: s.title })),
   };
   const runId = await startRun(db, collector.source);
   // Progress: items (products to match + listings to collect) done before the current one.
@@ -179,6 +185,7 @@ export async function runCollector(
             ctx,
             await heldBuckets(db, product.id),
           );
+          if (result.query) await setSourceQuery(db, link.id, result.query);
           await updateSourceProgress(db, link.id, {
             state: result.state,
             success: true,

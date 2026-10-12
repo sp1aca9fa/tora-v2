@@ -176,8 +176,15 @@ Settings shows each source's last run, items waiting for confirmation, listings 
 - **US prices**: TCGplayer market prices through TCGCSV (public files, updated daily), for
   Japanese and English Pokemon cards and sealed product. Converted with that day's USD/JPY rate
   (Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
-  US**, never counted in the value. TCGplayer only prices ungraded cards; eBay (graded cards) is
-  not built yet because eBay blocks requests from the home PC.
+  US**, never counted in the value. TCGplayer only prices ungraded cards.
+- **eBay asks**: eBay's official Browse API (active listings only; eBay closed its sold data to new
+  developers and blocks scraping). Each collect stores, per condition (ungraded, PSA 10, ...), the
+  median asking price, the lowest and how many are listed, and the listing IDs seen, so prices can
+  be followed over time and listings that vanish early read as probable sales. Shown in Japan vs
+  US next to the same grade in Japan. Needs a production keyset from developer.ebay.com in the
+  root `.env` (`EBAY_CLIENT_ID` = App ID, `EBAY_CLIENT_SECRET` = Cert ID); without it the
+  collector is skipped. The search starts from the item's TCGplayer title (English) and can be
+  edited on the item page.
 - **Stable sources**: every card and sealed TCG product (box, pack, deck, special set) should be
   linked to SNKRDUNK, and every other item costing more than ¥3,000 to a 駿河屋 page (store and 買取 prices). Missing ones show under Imports > Needs you
   and on the portfolio; the list links to each item's price sources.
