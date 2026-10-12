@@ -112,8 +112,13 @@ it('finds a card by set code and number, and a box by its catalog set', async ()
 
   const box = product({ kind: 'booster_box', setName: 'バトルパートナーズ' });
   const list = await tcgcsv.findCandidates(box, ctx);
-  expect(list[0]).toMatchObject({ externalId: '12', score: 0.8 });
-  expect(list.map((c) => c.externalId)).not.toContain('11');
+  // The box only: not its packs, nor the cards.
+  expect(list).toEqual([expect.objectContaining({ externalId: '12', score: 0.8 })]);
+  const pack = await tcgcsv.findCandidates(
+    product({ kind: 'booster_pack', setName: 'バトルパートナーズ' }),
+    ctx,
+  );
+  expect(pack.map((c) => c.externalId)).toEqual(['13']);
 });
 
 it('saves the market price in dollars and yen, finding the set from the listing link', async () => {

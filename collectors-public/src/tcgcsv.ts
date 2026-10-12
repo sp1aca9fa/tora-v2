@@ -78,12 +78,12 @@ export const groupSlug = (name: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-/** Words in sealed product names per kind, to rank a set's sealed products. */
-const SEALED_WORDS: Record<string, RegExp> = {
-  booster_box: /booster box/i,
-  booster_pack: /booster pack/i,
-  deck: /deck/i,
-  special_set: /box|set|collection/i,
+/** Whether a sealed product's name fits a kind (a box is not its packs, nor a case of boxes). */
+const SEALED_FITS: Record<string, (name: string) => boolean> = {
+  booster_box: (n) => /booster box|booster display/i.test(n) && !/case/i.test(n),
+  booster_pack: (n) => /\bpack\b/i.test(n) && !/box|case|bundle/i.test(n),
+  deck: (n) => /deck/i.test(n) && !/sleeve|shield|deck (box|case)/i.test(n),
+  special_set: (n) => /box|set|collection/i.test(n) && !/booster (box|pack)|deck|case/i.test(n),
 };
 
 const days = (a: string, b: string) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
@@ -118,7 +118,7 @@ export const tcgcsv: Collector = {
   async findCandidates(product, ctx) {
     const cat = CATEGORIES[product.region!]!;
     const groups = await groupsOf(ctx.http, cat);
-    const found: { p: TcgProduct; group: Group; score: number }[] = [];
+    let found: { p: TcgProduct; group: Group; score: number; fit?: boolean }[] = [];
     for (const { group, byCode } of await candidateGroups(product, ctx, groups)) {
       const items = await productsOf(ctx.http, cat, group.groupId);
       if (product.kind === 'single') {
@@ -127,13 +127,16 @@ export const tcgcsv: Collector = {
         const same = items.filter((p) => leading(numberOf(p)) === want);
         for (const p of same) found.push({ p, group, score: same.length === 1 ? 0.9 : 0.7 });
       } else {
-        const words = SEALED_WORDS[product.kind];
+        const fits = SEALED_FITS[product.kind];
         for (const p of items.filter((p) => !numberOf(p))) {
-          const fits = words?.test(p.name) ?? false;
-          found.push({ p, group, score: (byCode ? 0.6 : 0.4) + (fits ? 0.2 : 0) });
+          const fit = fits?.(p.name) ?? false;
+          found.push({ p, group, score: (byCode ? 0.6 : 0.4) + (fit ? 0.2 : 0), fit });
         }
       }
     }
+    // Sealed: only products of the same kind (the box, not its packs), across all the candidate
+    // sets; the others only when none fits.
+    if (found.some((f) => f.fit)) found = found.filter((f) => f.fit !== false);
     return found
       .sort((a, b) => b.score - a.score)
       .map(({ p, group, score }) => ({
