@@ -1,5 +1,6 @@
 import {
   canEditProduct,
+  dismissedSourceWarnings,
   foreignPrices,
   getProduct,
   holdingBucket,
@@ -38,13 +39,14 @@ export default async function ProductPage({ params }: Params) {
   const { db, user } = await authed();
   const [product, lots] = await Promise.all([getProduct(db, id), productLots(db, user.id, id)]);
   if (!product || lots.length === 0) notFound();
-  const [t, format, market, history, images, foreign] = await Promise.all([
+  const [t, format, market, history, images, foreign, dismissed] = await Promise.all([
     getTranslations(),
     getFormatter(),
     loadMarketData(db, user.id, [product.id]),
     priceHistory(db, product.id, 365),
     imageVersions(db, [product.id]),
     foreignPrices(db, product.id),
+    dismissedSourceWarnings(db, user.id),
   ]);
 
   const owned = lots.filter((h) => h.status === 'owned');
@@ -197,6 +199,7 @@ export default async function ProductPage({ params }: Params) {
         product={product}
         bucket={mainBucket}
         ownedCostJpy={owned.reduce((n, h) => n + h.costTotalJpy, 0)}
+        warningDismissed={dismissed.has(product.id)}
       />
     </div>
   );

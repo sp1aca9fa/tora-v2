@@ -24,6 +24,7 @@ import {
   rejectCandidateAction,
   unlinkSourceAction,
 } from './source-actions';
+import { setSourceWarningAction } from '../../imports/sources/actions';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for
@@ -34,11 +35,14 @@ export async function PriceSources({
   product,
   bucket,
   ownedCostJpy,
+  warningDismissed,
 }: {
   db: Db;
   product: Product;
   /** What the user paid for the lots they own (decides whether a 駿河屋 page is expected). */
   ownedCostJpy: number;
+  /** The user turned the "not linked" warning off for this item. */
+  warningDismissed: boolean;
   /** The bucket most of the user's lots are in (highlighted). */
   bucket: string | null;
 }) {
@@ -68,7 +72,7 @@ export async function PriceSources({
   // The item's main source (SNKRDUNK for cards, 駿河屋 for other items over ¥3,000) is still
   // missing: say so and keep the paste box open, whatever else is linked.
   const stable = stableSourceFor(product, ownedCostJpy);
-  const missing = stable && !linked.has(stable) ? stable : null;
+  const missing = stable && !linked.has(stable) && !warningDismissed ? stable : null;
   const pasteUp = !!missing && !candidates.some((c) => c.source === missing);
   const open = candidates.filter((c) => !linked.has(c.source));
   const more = candidates.filter((c) => linked.has(c.source));
@@ -212,6 +216,11 @@ export async function PriceSources({
               {t('sources.missingStable', { source: sourceLabel(missing) })}
             </p>
             {pasteUp && paste}
+            <form action={setSourceWarningAction.bind(null, product.id, true)}>
+              <Button variant="ghost" size="sm" className="text-xs">
+                {t('coverage.dismiss')}
+              </Button>
+            </form>
           </div>
         )}
         {suggestions(open)}

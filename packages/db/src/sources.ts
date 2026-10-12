@@ -32,6 +32,7 @@ import {
   productSources,
   products,
   sourceCandidates,
+  sourceWarningDismissals,
 } from './schema';
 
 // ---------------------------------------------------------------------------------------------
@@ -904,12 +905,43 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
       .groupBy(sourceCandidates.productId, sourceCandidates.source),
   ]);
   const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
+  const dismissed = await dismissedSourceWarnings(db, userId);
   return wanted
-    .filter((w) => !has.has(`${w.product.id}|${w.source}`))
+    .filter((w) => !has.has(`${w.product.id}|${w.source}`) && !dismissed.has(w.product.id))
     .map((w) => ({
       ...w,
       suggestions:
         pending.find((p) => p.productId === w.product.id && p.source === w.source)?.n ?? 0,
     }))
     .sort((a, b) => b.costJpy - a.costJpy);
+}
+
+/** Items the user asked not to be warned about (no stable source expected). */
+export async function dismissedSourceWarnings(db: Db, userId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ productId: sourceWarningDismissals.productId })
+    .from(sourceWarningDismissals)
+    .where(eq(sourceWarningDismissals.userId, userId));
+  return new Set(rows.map((r) => r.productId));
+}
+
+/** Stops (or, with `dismiss` false, restarts) the "not linked" warning for an item. */
+export async function setSourceWarningDismissed(
+  db: Db,
+  userId: string,
+  productId: string,
+  dismiss: boolean,
+): Promise<void> {
+  if (dismiss) {
+    await db.insert(sourceWarningDismissals).values({ userId, productId }).onConflictDoNothing();
+  } else {
+    await db
+      .delete(sourceWarningDismissals)
+      .where(
+        and(
+          eq(sourceWarningDismissals.userId, userId),
+          eq(sourceWarningDismissals.productId, productId),
+        ),
+      );
+  }
 }

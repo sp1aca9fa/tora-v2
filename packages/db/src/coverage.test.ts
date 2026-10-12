@@ -13,6 +13,7 @@ import {
   missingPriceSources,
   pendingMatchesForUser,
   saveCandidates,
+  setSourceWarningDismissed,
 } from './sources';
 import { createUser } from './users';
 import { loadMarketData } from './valuation';
@@ -79,6 +80,16 @@ it('lists cards without SNKRDUNK and items over ¥3,000 without 駿河屋', asyn
   expect((await pendingMatchesForUser(db, userId)).map((r) => r.product.name)).toEqual([
     'ASTRAL CHAIN',
   ]);
+
+  // Turned off for one item, then on again.
+  await setSourceWarningDismissed(db, userId, card.product.id, true);
+  expect((await missingPriceSources(db, userId)).map((m) => m.product.name)).not.toContain(
+    'ピカチュウ',
+  );
+  await setSourceWarningDismissed(db, userId, card.product.id, false);
+  expect((await missingPriceSources(db, userId)).map((m) => m.product.name)).toContain(
+    'ピカチュウ',
+  );
 
   await linkSource(db, game.product.id, { source: 'surugaya', externalId: '109000490' });
   await linkSource(db, card.product.id, { source: 'snkrdunk', externalId: '1' });

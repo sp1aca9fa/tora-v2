@@ -410,6 +410,25 @@ export const suggestions = sqliteTable(
   ],
 );
 
+/**
+ * Items the user does not expect a stable price source for (e.g. a limited watch no shop lists):
+ * no "not linked" warning for them (requirements S7).
+ */
+export const sourceWarningDismissals = sqliteTable(
+  'source_warning_dismissals',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('source_warning_dismissals_uq').on(t.userId, t.productId)],
+);
+
 export const holdingEvents = sqliteTable(
   'holding_events',
   {

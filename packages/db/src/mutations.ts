@@ -42,6 +42,7 @@ import {
   productSources,
   products,
   sourceCandidates,
+  sourceWarningDismissals,
   tcgSets,
   valuationSnapshots,
 } from './schema';
@@ -1017,6 +1018,7 @@ export async function mergeProducts(
       }
     }
     await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, fromId));
+    await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));
     await tx.delete(productImages).where(eq(productImages.productId, fromId));
     await tx.delete(products).where(eq(products.id, fromId));
     return into;
@@ -1038,6 +1040,9 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await tx.delete(priceObservations).where(eq(priceObservations.productId, productId));
     await tx.delete(manualPrices).where(eq(manualPrices.productId, productId));
     await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, productId));
+    await tx
+      .delete(sourceWarningDismissals)
+      .where(eq(sourceWarningDismissals.productId, productId));
     await tx.delete(productSources).where(eq(productSources.productId, productId));
     await tx.delete(productImages).where(eq(productImages.productId, productId));
     await tx.delete(products).where(eq(products.id, productId));

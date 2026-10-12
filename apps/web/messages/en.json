@@ -641,7 +641,7 @@
   },
   "coverage": {
     "title": "Price sources to link",
-    "intro": "Items without their stable price source. The home PC looks for matches on each collect; confirm one on the item page or paste a link.",
+    "intro": "Items without their stable price source. The home PC looks for matches on each collect; confirm one on the item page or paste a link. For items no shop lists (e.g. a limited watch), turn the warning off.",
     "banner": "{count, plural, one {# item has} other {# items have}} no stable price source linked",
     "snkrdunk": {
       "title": "Cards and sealed product not linked to SNKRDUNK ({count})",
@@ -653,6 +653,9 @@
     },
     "suggestions": "{count, plural, one {# suggestion to confirm} other {# suggestions to confirm}}",
     "noSuggestion": "No match found yet: paste a link",
-    "none": "Every item has its price source linked."
+    "none": "Every item has its price source linked.",
+    "dismiss": "Don't warn",
+    "dismissed": "{count, plural, one {# item} other {# items}} without warnings",
+    "warnAgain": "Warn again"
   }
 }

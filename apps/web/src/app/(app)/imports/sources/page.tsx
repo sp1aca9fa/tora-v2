@@ -1,10 +1,18 @@
-import { type MissingSource, STORE_LINK_MIN_COST, missingPriceSources } from '@tora/db';
+import {
+  type MissingSource,
+  STORE_LINK_MIN_COST,
+  dismissedSourceWarnings,
+  getProduct,
+  missingPriceSources,
+} from '@tora/db';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { Button } from '@/components/ui/button';
 import { authed } from '@/lib/auth/guard';
 import { formatJpy } from '@/lib/utils';
+import { setSourceWarningAction } from './actions';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('coverage'))('title') };
@@ -17,7 +25,14 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function CoveragePage() {
   const { db, user } = await authed();
-  const [rows, t] = await Promise.all([missingPriceSources(db, user.id), getTranslations()]);
+  const [rows, dismissedIds, t] = await Promise.all([
+    missingPriceSources(db, user.id),
+    dismissedSourceWarnings(db, user.id),
+    getTranslations(),
+  ]);
+  const dismissed = (await Promise.all([...dismissedIds].map((id) => getProduct(db, id)))).filter(
+    (p) => p !== null,
+  );
   const section = (source: MissingSource['source'], list: MissingSource[]) =>
     list.length > 0 && (
       <section className="space-y-2">
@@ -27,10 +42,10 @@ export default async function CoveragePage() {
         </p>
         <ul className="divide-y rounded-xl border bg-card">
           {list.map((m) => (
-            <li key={m.product.id}>
+            <li key={m.product.id} className="flex items-center">
               <Link
                 href={`/products/${m.product.id}#sources`}
-                className="flex items-center gap-3 px-4 py-3 text-sm transition-colors hover:bg-accent/50"
+                className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 text-sm transition-colors hover:bg-accent/50"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.product.name}</p>
@@ -47,6 +62,11 @@ export default async function CoveragePage() {
                 </span>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </Link>
+              <form action={setSourceWarningAction.bind(null, m.product.id, true)} className="px-2">
+                <Button variant="ghost" size="sm" className="text-xs">
+                  {t('coverage.dismiss')}
+                </Button>
+              </form>
             </li>
           ))}
         </ul>
@@ -80,6 +100,30 @@ export default async function CoveragePage() {
             rows.filter((r) => r.source === 'surugaya'),
           )}
         </>
+      )}
+      {dismissed.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-muted-foreground">
+            {t('coverage.dismissed', { count: dismissed.length })}
+          </summary>
+          <ul className="mt-2 divide-y rounded-xl border bg-card">
+            {dismissed.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 py-2 pl-4">
+                <Link
+                  href={`/products/${p.id}#sources`}
+                  className="min-w-0 truncate hover:underline"
+                >
+                  {p.name}
+                </Link>
+                <form action={setSourceWarningAction.bind(null, p.id, false)} className="px-2">
+                  <Button variant="ghost" size="sm" className="text-xs">
+                    {t('coverage.warnAgain')}
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
