@@ -113,9 +113,10 @@ The first account is an admin. If the database has data from before accounts exi
 account you create takes it over.
 
 A demo account shows the app without anyone's real collection: `pnpm user create demo`, then
-`pnpm demo demo` fills it with sample lots of every kind and every kind of notice (run it again
-to reset it; only accounts named `demo*` are touched), then `pnpm collect` gives the items real
-prices.
+`pnpm demo demo` fills it with sample lots of every kind and every kind of notice, finds their
+price sources with the collectors' matching and settles each item to show a state (complete, to
+confirm, missing). Run it again to reset it; only accounts named `demo*` are touched. Then
+`pnpm collect` gives the items real prices.
 
 ### Auth notes
 

@@ -20,8 +20,7 @@
     "studio": "drizzle-kit studio",
     "user": "tsx src/scripts/user.ts",
     "catalog:sync": "tsx src/scripts/catalog-sync.ts",
-    "valuate": "tsx src/scripts/valuate.ts",
-    "demo": "tsx src/scripts/demo.ts"
+    "valuate": "tsx src/scripts/valuate.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

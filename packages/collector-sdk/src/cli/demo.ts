@@ -2,26 +2,47 @@
 // showing anyone's real collection. Only accounts named demo* are touched; their lots, notices and
 // settings are replaced. Items are real products (so the collectors give them real prices) and
 // are kept across resets, with their price sources: create the account first (`pnpm user create
-// demo`), run this, then a collect.
+// demo`), run this, then a collect for the prices.
+//
+// Price sources are found like for any item: the collectors' matching runs, then each item is
+// settled by the state it is meant to show: "complete" items get their best suggestion of each
+// source confirmed (when it scores high), "confirm" items keep theirs waiting, "missing" items
+// have their main source's suggestions rejected (the "paste a link" notice).
 //
 // The mix shows the whole app: graded and raw cards, sealed boxes (one opened, with pulls), decks,
 // games, a console, sold lots, and every kind of notice (no grade, no condition, main source
 // missing or to confirm, import review, a failed link, a data review suggestion, a "don't warn").
 import { toTokyoIso } from '@tora/core';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { createDb } from '../client';
-import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '../env';
-import { exitIfUnmigrated } from '../migrate';
 import {
   type HoldingInput,
   type ProductInput,
   addPull,
+  addPurchaseLinks,
+  confirmCandidate,
+  createDb,
   createHolding,
+  getProduct,
+  getUserByUsername,
+  listPendingCandidates,
+  listProductSources,
   markOpened,
+  refreshBucketValues,
+  rejectCandidate,
+  runSnapshots,
+  schema,
   sellHolding,
-} from '../mutations';
-import { addPurchaseLinks } from '../purchase-links';
-import {
+  setManualPrice,
+  setNoticeLevels,
+  setSourceWarningDismissed,
+  stableSourceFor,
+} from '@tora/db';
+import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
+import { exitIfUnmigrated } from '@tora/db/migrate';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { loadCollectors } from '../registry';
+import { runCollector } from '../runner';
+
+const {
   cancelledOrders,
   holdingEvents,
   holdings,
@@ -32,10 +53,7 @@ import {
   sourceWarningDismissals,
   suggestions,
   valuationSnapshots,
-} from '../schema';
-import { setSourceWarningDismissed } from '../sources';
-import { getUserByUsername, setNoticeLevels } from '../users';
-import { refreshBucketValues, runSnapshots, setManualPrice } from '../valuation';
+} = schema;
 
 loadRootEnv();
 const config = dbConfigFromEnv();
@@ -130,13 +148,27 @@ async function productRef(p: ProductInput) {
   return found ? { productId: found.id } : { product: p };
 }
 
-async function lot(p: ProductInput, input: Omit<HoldingInput, 'acquiredAt'> & { days: number }) {
-  const { days, ...rest } = input;
-  return createHolding(db, uid, await productRef(p), {
+/** What each item should look like once settled (see the header). */
+type State = 'complete' | 'confirm' | 'missing';
+const states = new Map<string, { state: State; costJpy: number }>();
+
+async function lot(
+  p: ProductInput,
+  input: Omit<HoldingInput, 'acquiredAt'> & { days: number; state?: State },
+) {
+  const { days, state = 'complete', ...rest } = input;
+  const made = await createHolding(db, uid, await productRef(p), {
     acquiredFrom: p.category === 'tcg' ? 'SNKRDUNK' : 'メルカリ',
     ...rest,
     acquiredAt: ago(days),
   });
+  const had = states.get(made.product.id);
+  states.set(made.product.id, {
+    // Another lot of the item (e.g. one in the import review) keeps the item's state.
+    state: had ? had.state : state,
+    costJpy: (had?.costJpy ?? 0) + rest.costTotalJpy,
+  });
+  return made;
 }
 
 const graded = (grade: string) => ({ grading: 'graded' as const, grader: 'PSA' as const, grade });
@@ -158,6 +190,7 @@ await lot(card('ミュウex', 'SV2a', S151, '205/165', 'SAR'), {
 await lot(card('フシギバナex', 'SV2a', S151, '200/165', 'SAR'), {
   quantity: 1,
   costTotalJpy: 12_500,
+  state: 'confirm',
   days: 210,
   ...raw('A'),
 });
@@ -193,12 +226,14 @@ const marnie = await lot(card('マリィ', 'S1H', '拡張パック「シール�
 await lot(card('ピカチュウex', 'SV8', '拡張パック「超電ブレイカー」', '132/106', 'SAR'), {
   quantity: 1,
   costTotalJpy: 42_000,
+  state: 'missing',
   days: 60,
   ...raw('A'),
 });
 await lot(card('ブラッキーex', 'SV8a', TERA, '217/187', 'SAR'), {
   quantity: 1,
   costTotalJpy: 29_000,
+  state: 'confirm',
   days: 45,
 });
 await lot(card('ニンフィアex', 'SV8a', TERA, '212/187', 'SAR'), {
@@ -292,6 +327,7 @@ await lot(
   {
     quantity: 1,
     costTotalJpy: 16_500,
+    state: 'confirm',
     days: 430,
     packagingState: 'sealed_shrink',
   },
@@ -305,6 +341,7 @@ await lot(
   {
     quantity: 2,
     costTotalJpy: 11_000,
+    state: 'missing',
     days: 150,
     packagingState: 'sealed_shrink',
   },
@@ -342,6 +379,7 @@ await lot(
   {
     quantity: 1,
     costTotalJpy: 5_500,
+    state: 'confirm',
     days: 95,
     packagingState: 'sealed_shrink',
   },
@@ -369,6 +407,7 @@ await lot(game('software', 'スプラトゥーン3', 'switch'), {
 await lot(game('software', 'ポケットモンスター スカーレット', 'switch'), {
   quantity: 1,
   costTotalJpy: 4_200,
+  state: 'confirm',
   days: 280,
 });
 await lot(game('software', 'マリオカート8 デラックス', 'switch'), {
@@ -380,11 +419,13 @@ await lot(game('software', 'マリオカート8 デラックス', 'switch'), {
 await lot(game('software', '大乱闘スマッシュブラザーズ SPECIAL', 'switch'), {
   quantity: 1,
   costTotalJpy: 4_000,
+  state: 'confirm',
   days: 240,
 });
 await lot(game('software', 'ELDEN RING エルデンリング', 'ps5'), {
   quantity: 1,
   costTotalJpy: 3_900,
+  state: 'missing',
   days: 220,
   condition: 'like_new',
 });
@@ -425,6 +466,7 @@ await lot(
 const watch = await lot(game('other', 'ポケモン ピカチュウ 腕時計 (非売品)', null), {
   quantity: 1,
   costTotalJpy: 8_000,
+  state: 'missing',
   days: 200,
   condition: 'like_new',
 });
@@ -508,8 +550,43 @@ await db.insert(suggestions).values([
 const count = (await db.select({ id: holdings.id }).from(holdings).where(eq(holdings.userId, uid)))
   .length;
 console.log(`demo: ${count} lot(s) created`);
+
+// --- price sources: match like any item, then settle each by its state -----------------------
+const { collectors } = await loadCollectors();
+for (const collector of collectors) {
+  // Every item without a listing of this source (the account's new ones, and any other).
+  const s = await runCollector(db, collector, {
+    matchOnly: true,
+    log: (m) => console.log(`[${collector.source}] ${m}`),
+  });
+  console.log(`${s.source}: ${s.status}, ${s.candidates} new suggestion(s)`);
+}
+/** A suggestion is confirmed for a complete item only when it scores at least this. */
+const CONFIRM_MIN = 0.85;
+for (const [productId, { state, costJpy }] of states) {
+  const product = await getProduct(db, productId);
+  if (!product) continue;
+  const linked = new Set(
+    (await listProductSources(db, productId)).filter((l) => l.active).map((l) => l.source),
+  );
+  const main = stableSourceFor(product, costJpy);
+  const bySource = new Map<string, Awaited<ReturnType<typeof listPendingCandidates>>>();
+  for (const c of await listPendingCandidates(db, productId)) {
+    if (!linked.has(c.source)) bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);
+  }
+  for (const [source, list] of bySource) {
+    const best = list[0]!;
+    if (state === 'complete' && best.score >= CONFIRM_MIN) {
+      await confirmCandidate(db, best.id);
+      console.log(`confirmed ${source} for "${product.name}": ${best.title} (${best.score})`);
+    } else if (state === 'missing' && source === main) {
+      for (const c of list) await rejectCandidate(db, c.id);
+      console.log(`rejected ${list.length} ${source} suggestion(s) for "${product.name}"`);
+    }
+  }
+}
 const snap = await runSnapshots(db);
 const values = await refreshBucketValues(db);
 console.log(`snapshots: ${snap.rows} row(s); values: ${values.values} saved`);
-console.log('Next: pnpm collect (finds and collects price sources for the new items).');
+console.log('Next: pnpm collect (prices and sales history of the linked items).');
 process.exit(0);
