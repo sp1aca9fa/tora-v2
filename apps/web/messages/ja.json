@@ -625,7 +625,12 @@
     "unitsOwned": "所有数",
     "lots": "登録した取引",
     "toReview": "確認待ち",
-    "cost": "取得額"
+    "cost": "取得額",
+    "tab": {
+      "overview": "概要",
+      "market": "相場",
+      "sources": "価格ソース"
+    }
   },
   "merge": {
     "hint": "登録済みの商品と同じですか？選ぶとその商品に統合できます：",

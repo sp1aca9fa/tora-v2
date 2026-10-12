@@ -152,7 +152,7 @@ export async function PriceSources({
   );
 
   return (
-    <Card id="sources" className="scroll-mt-20">
+    <Card>
       <CardHeader>
         <CardTitle>{t('sources.title')}</CardTitle>
         <CardDescription>{t('sources.info')}</CardDescription>

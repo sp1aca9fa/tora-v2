@@ -199,7 +199,7 @@ export function ActionsList({ cards }: { cards: ActionCardView[] }) {
                   />
                 </button>
                 {sectionOpen && (
-                  <ul className="space-y-2">
+                  <ul className="grid gap-2 xl:grid-cols-2 xl:items-start">
                     {list.map((c) => (
                       <ActionCard
                         key={c.key}

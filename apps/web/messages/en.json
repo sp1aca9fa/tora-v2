@@ -625,7 +625,12 @@
     "unitsOwned": "Units owned",
     "lots": "Your lots",
     "toReview": "to review",
-    "cost": "cost"
+    "cost": "cost",
+    "tab": {
+      "overview": "Overview",
+      "market": "Market",
+      "sources": "Sources"
+    }
   },
   "merge": {
     "hint": "Is this the same item as one already registered? Pick it to merge this one into it:",
