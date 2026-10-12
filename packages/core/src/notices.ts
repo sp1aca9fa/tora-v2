@@ -39,3 +39,21 @@ export const DEFAULT_NOTICE_LEVELS: Record<NoticeType, NoticeLevel> = {
 };
 
 export const noticeRank = (level: NoticeLevel) => NOTICE_LEVELS.indexOf(level);
+
+/** A user's choices: types not listed keep their default level. */
+export type NoticeLevels = Partial<Record<NoticeType, NoticeLevel>>;
+
+/** The level of each type for a user: their choice, else the default. */
+export function noticeLevelsFor(
+  chosen: NoticeLevels | null | undefined,
+): Record<NoticeType, NoticeLevel> {
+  const out = { ...DEFAULT_NOTICE_LEVELS };
+  for (const type of NOTICE_TYPES) {
+    const level = chosen?.[type];
+    if (level && (NOTICE_LEVELS as readonly string[]).includes(level)) out[type] = level;
+  }
+  return out;
+}
+
+/** Grey notices are quiet: listed on the Actions page, not counted in the badge. */
+export const countsInBadge = (level: NoticeLevel) => level !== 'grey';

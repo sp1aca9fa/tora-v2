@@ -97,7 +97,12 @@ export default async function ActionsPage() {
     <div className="space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{t('nav.actions')}</h1>
-        <p className="text-sm text-muted-foreground">{t('actions.intro')}</p>
+        <p className="text-sm text-muted-foreground">
+          {t('actions.intro')}{' '}
+          <Link href="/settings#notices" className="underline">
+            {t('actions.levels')}
+          </Link>
+        </p>
       </header>
       <ActionsList cards={cards} />
       {dismissed.length > 0 && (

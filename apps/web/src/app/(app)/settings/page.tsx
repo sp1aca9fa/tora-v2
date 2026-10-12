@@ -4,6 +4,7 @@ import {
   listDevices,
   listRecentCollectorRuns,
 } from '@tora/db';
+import { noticeLevelsFor } from '@tora/core';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { logout, revokeDeviceAction } from '@/app/actions';
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
+import { NoticeLevelsForm } from './notice-levels-form';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
@@ -43,6 +45,16 @@ export default async function SettingsPage() {
           <form action={logout}>
             <Button variant="outline">{t('settings.logout')}</Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card id="notices" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle>{t('notices.title')}</CardTitle>
+          <CardDescription>{t('notices.info')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <NoticeLevelsForm levels={noticeLevelsFor(user.noticeLevels)} />
         </CardContent>
       </Card>
 

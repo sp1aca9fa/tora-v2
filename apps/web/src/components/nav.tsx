@@ -1,10 +1,11 @@
 'use client';
 
-import { Inbox, LayoutGrid, ListChecks, PlusCircle, Settings } from 'lucide-react';
+import { Inbox, LayoutGrid, ListChecks, LogOut, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { logout } from '@/app/actions';
 import { LocaleToggle } from '@/components/locale-toggle';
 import { cn } from '@/lib/utils';
 
@@ -72,13 +73,33 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
             </Link>
           ))}
         </nav>
+        <form action={logout} className="mt-auto">
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            <LogOut className="size-4" />
+            {t('settings.logout')}
+          </button>
+        </form>
       </aside>
 
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-card/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur md:hidden">
         <Link href="/" className="py-3 font-semibold tracking-tight">
           {t('app.name')}
         </Link>
-        <LocaleToggle />
+        <div className="flex items-center gap-1">
+          <LocaleToggle />
+          <form action={logout}>
+            <button
+              type="submit"
+              aria-label={t('settings.logout')}
+              className="rounded-md p-2 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </form>
+        </div>
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">

@@ -1,5 +1,11 @@
 // Accounts and login devices (requirements section 3, Auth).
-import { toTokyoIso } from '@tora/core';
+import {
+  DEFAULT_NOTICE_LEVELS,
+  NOTICE_TYPES,
+  type NoticeLevels,
+  noticeLevelsFor,
+  toTokyoIso,
+} from '@tora/core';
 import { and, asc, count, eq, isNull, lt, ne, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { holdings, type User, type UserDevice, userDevices, users } from './schema';
@@ -195,4 +201,16 @@ export async function revokeAllDevices(db: Db, userId: string): Promise<number> 
     .where(and(eq(userDevices.userId, userId), isNull(userDevices.revokedAt)))
     .returning({ id: userDevices.id });
   return rows.length;
+}
+
+/** Saves the user's notice levels (only the types that differ from the defaults are kept). */
+export async function setNoticeLevels(db: Db, userId: string, chosen: NoticeLevels | null) {
+  const levels = noticeLevelsFor(chosen);
+  const changed = Object.fromEntries(
+    NOTICE_TYPES.filter((t) => levels[t] !== DEFAULT_NOTICE_LEVELS[t]).map((t) => [t, levels[t]]),
+  ) as NoticeLevels;
+  await db
+    .update(users)
+    .set({ noticeLevels: Object.keys(changed).length ? changed : null, updatedAt: toTokyoIso() })
+    .where(eq(users.id, userId));
 }

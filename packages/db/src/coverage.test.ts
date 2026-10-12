@@ -16,7 +16,7 @@ import {
   saveCandidates,
   setSourceWarningDismissed,
 } from './sources';
-import { createUser } from './users';
+import { createUser, getUserById, setNoticeLevels } from './users';
 import { loadMarketData } from './valuation';
 
 let db: Db;
@@ -168,4 +168,31 @@ it('lists actions as cards by level: main sources and grades red, games and seco
   const first = items[0]!;
   expect(first.kind === 'source' && first.candidates.map((c) => c.score)).toEqual([0.95, 0.9]);
   expect(actionTotal(items)).toBe(4);
+});
+
+it("follows the user's notice levels; quiet ones are listed but not counted", async () => {
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'single', name: 'ピカチュウ' } },
+    { ...lot(500), grading: 'raw', rawGrade: 'A' },
+  );
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'game', kind: 'software', name: 'ASTRAL CHAIN' } },
+    lot(1000),
+  );
+  await setNoticeLevels(db, userId, { game_condition: 'red', tcg_main_source: 'grey' });
+  const user = await getUserById(db, userId);
+  // Only the differences from the defaults are kept.
+  expect(user?.noticeLevels).toEqual({ game_condition: 'red', tcg_main_source: 'grey' });
+  const items = await pendingActions(db, userId, user?.noticeLevels);
+  expect(items.map((i) => [i.level, i.type])).toEqual([
+    ['red', 'game_condition'],
+    ['grey', 'tcg_main_source'],
+  ]);
+  expect(actionTotal(items)).toBe(1);
+  await setNoticeLevels(db, userId, null);
+  expect((await getUserById(db, userId))?.noticeLevels).toBeNull();
 });

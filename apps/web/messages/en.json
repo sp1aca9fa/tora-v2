@@ -183,7 +183,8 @@
     "moreSuggestions": "{count, plural, one {# more suggestion} other {# more suggestions}}",
     "paste": "Or paste the {source} page of this item:",
     "openItem": "Open item",
-    "openLot": "Open lot"
+    "openLot": "Open lot",
+    "levels": "Change levels"
   },
   "pulls": {
     "mode": {
@@ -678,5 +679,29 @@
     "dismiss": "Don't warn",
     "dismissed": "{count, plural, one {# item} other {# items}} without warnings",
     "warnAgain": "Warn again"
+  },
+  "notices": {
+    "title": "Notice levels",
+    "info": "How urgent each kind of notice is: its colour and place on the Actions page. Quiet notices stay listed but are not counted in the badge.",
+    "level": {
+      "red": "Urgent (red)",
+      "orange": "High (orange)",
+      "yellow": "Medium (yellow)",
+      "blue": "Low (blue)",
+      "grey": "Quiet (grey)"
+    },
+    "type": {
+      "tcg_main_source": "TCG item without its main price source (SNKRDUNK)",
+      "game_main_source": "Game or other item without its main price source (駿河屋)",
+      "second_source": "Suggestions from another price source (e.g. TCGplayer)",
+      "card_grade": "Card without a grade",
+      "game_condition": "Game without a condition",
+      "import_review": "Imported lots to review",
+      "failed_link": "Purchase links that failed",
+      "data_review": "Data review suggestions"
+    },
+    "default": "Default: {level}",
+    "reset": "Back to defaults",
+    "saved": "Saved."
   }
 }

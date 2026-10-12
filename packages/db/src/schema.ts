@@ -20,6 +20,7 @@ import {
   VALUATION_CONFIDENCES,
   newId,
   toTokyoIso,
+  type NoticeLevels,
 } from '@tora/core';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -86,6 +87,8 @@ export const users = sqliteTable(
       .default([]),
     role: text('role', { enum: USER_ROLES }).notNull().default('member'),
     disabledAt: text('disabled_at'),
+    /** Notice levels the user chose per notice type (S8); types not listed use the defaults. */
+    noticeLevels: text('notice_levels', { mode: 'json' }).$type<NoticeLevels>(),
     ...timestamps,
   },
   (t) => [

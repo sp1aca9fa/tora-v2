@@ -183,7 +183,8 @@
     "moreSuggestions": "他の候補 {count}件",
     "paste": "またはこのアイテムの{source}のページを貼り付け:",
     "openItem": "アイテムを開く",
-    "openLot": "ロットを開く"
+    "openLot": "ロットを開く",
+    "levels": "レベルを変更"
   },
   "pulls": {
     "mode": {
@@ -678,5 +679,29 @@
     "dismiss": "警告しない",
     "dismissed": "警告オフの商品（{count}件）",
     "warnAgain": "警告を戻す"
+  },
+  "notices": {
+    "title": "通知レベル",
+    "info": "通知の種類ごとの緊急度。「対応」ページでの色と並び順が決まります。「静か」の通知は一覧に残りますがバッジの数には入りません。",
+    "level": {
+      "red": "緊急(赤)",
+      "orange": "高(オレンジ)",
+      "yellow": "中(黄)",
+      "blue": "低(青)",
+      "grey": "静か(グレー)"
+    },
+    "type": {
+      "tcg_main_source": "メイン価格ソース(スニダン)がないTCGアイテム",
+      "game_main_source": "メイン価格ソース(駿河屋)がないゲーム・その他",
+      "second_source": "他の価格ソースの候補(TCGplayerなど)",
+      "card_grade": "グレードのないカード",
+      "game_condition": "状態のないゲーム",
+      "import_review": "確認待ちのインポート",
+      "failed_link": "失敗した購入リンク",
+      "data_review": "データレビューの提案"
+    },
+    "default": "初期値: {level}",
+    "reset": "初期値に戻す",
+    "saved": "保存しました。"
   }
 }

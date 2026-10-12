@@ -2,10 +2,12 @@
 // confirm and price sources to link, lots without a grade or condition, and links to the import
 // pages. Each card has a notice type and its level.
 import {
-  DEFAULT_NOTICE_LEVELS,
   NOTICE_TYPES,
   type NoticeLevel,
+  type NoticeLevels,
   type NoticeType,
+  countsInBadge,
+  noticeLevelsFor,
   noticeRank,
 } from '@tora/core';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
@@ -61,9 +63,14 @@ export type ActionItem = ActionBase &
     | { kind: 'count'; count: number }
   );
 
-/** Every pending action of the user, most urgent level first. */
-export async function pendingActions(db: Db, userId: string): Promise<ActionItem[]> {
-  const level = (type: NoticeType) => DEFAULT_NOTICE_LEVELS[type];
+/** Every pending action of the user, most urgent level first (levels: the user's choices). */
+export async function pendingActions(
+  db: Db,
+  userId: string,
+  chosen?: NoticeLevels | null,
+): Promise<ActionItem[]> {
+  const levels = noticeLevelsFor(chosen);
+  const level = (type: NoticeType) => levels[type];
   const [owned, lots, toReview, failedLinks, dataReview, dismissed] = await Promise.all([
     db
       .select({
@@ -220,6 +227,11 @@ export async function pendingActions(db: Db, userId: string): Promise<ActionItem
   );
 }
 
-/** How many things wait for the user (the nav badge): a count card counts its rows. */
+/**
+ * How many things wait for the user (the nav badge): a count card counts its rows; quiet (grey)
+ * notices are not counted.
+ */
 export const actionTotal = (items: ActionItem[]) =>
-  items.reduce((n, i) => n + (i.kind === 'count' ? i.count : 1), 0);
+  items
+    .filter((i) => countsInBadge(i.level))
+    .reduce((n, i) => n + (i.kind === 'count' ? i.count : 1), 0);
