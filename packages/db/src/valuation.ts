@@ -36,6 +36,27 @@ import {
 } from './schema';
 
 const DAY = 86_400_000;
+
+/**
+ * A batch write that can safely run twice (an upsert or a delete), tried again when the
+ * connection drops: big rebuilds (e.g. a year of snapshots for new lots) send many batches.
+ */
+async function retried<T>(write: () => Promise<T>, tries = 3): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await write();
+    } catch (error) {
+      if (
+        attempt >= tries ||
+        !/fetch failed|socket|ECONNRESET|other side closed/i.test(
+          String(error) + String((error as { cause?: unknown }).cause),
+        )
+      )
+        throw error;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
 /** Valuation looks back 180 days; snapshot backfill adds 90 more. */
 /** Sales loaded for a valuation: the year-long fallback window, plus a margin for charts. */
 const LOOKBACK_DAYS = LONG_WINDOW + 90;
@@ -341,24 +362,26 @@ async function saveBucketValues(
 ) {
   const at = toTokyoIso(now);
   for (let i = 0; i < rows.length; i += 100) {
-    await db
-      .insert(bucketValues)
-      .values(
-        rows.slice(i, i + 100).map((r) => ({
-          productId: r.productId,
-          bucket: r.bucket ?? '',
-          computedAt: at,
-          value: r.value,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [bucketValues.productId, bucketValues.bucket],
-        set: {
-          computedAt: sql`excluded.computed_at`,
-          value: sql`excluded.value`,
-          updatedAt: at,
-        },
-      });
+    await retried(() =>
+      db
+        .insert(bucketValues)
+        .values(
+          rows.slice(i, i + 100).map((r) => ({
+            productId: r.productId,
+            bucket: r.bucket ?? '',
+            computedAt: at,
+            value: r.value,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [bucketValues.productId, bucketValues.bucket],
+          set: {
+            computedAt: sql`excluded.computed_at`,
+            value: sql`excluded.value`,
+            updatedAt: at,
+          },
+        }),
+    );
   }
 }
 
@@ -967,26 +990,28 @@ export async function runSnapshots(db: Db, now = new Date()) {
   }
   const changed = [...wanted.entries()].filter(([k]) => !unchanged.has(k)).map(([, r]) => r);
   for (let i = 0; i < changed.length; i += 100) {
-    await db
-      .insert(valuationSnapshots)
-      .values(changed.slice(i, i + 100))
-      .onConflictDoUpdate({
-        target: [valuationSnapshots.date, valuationSnapshots.holdingId],
-        set: {
-          valueJpy: sql`excluded.value_jpy`,
-          method: sql`excluded.method`,
-          source: sql`excluded.source`,
-          sampleSize: sql`excluded.sample_size`,
-          confidence: sql`excluded.confidence`,
-          quantityInferred: sql`excluded.quantity_inferred`,
-          updatedAt: sql`excluded.updated_at`,
-        },
-      });
+    await retried(() =>
+      db
+        .insert(valuationSnapshots)
+        .values(changed.slice(i, i + 100))
+        .onConflictDoUpdate({
+          target: [valuationSnapshots.date, valuationSnapshots.holdingId],
+          set: {
+            valueJpy: sql`excluded.value_jpy`,
+            method: sql`excluded.method`,
+            source: sql`excluded.source`,
+            sampleSize: sql`excluded.sample_size`,
+            confidence: sql`excluded.confidence`,
+            quantityInferred: sql`excluded.quantity_inferred`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        }),
+    );
   }
   for (let i = 0; i < stale.length; i += 500) {
-    await db
-      .delete(valuationSnapshots)
-      .where(inArray(valuationSnapshots.id, stale.slice(i, i + 500)));
+    await retried(() =>
+      db.delete(valuationSnapshots).where(inArray(valuationSnapshots.id, stale.slice(i, i + 500))),
+    );
   }
   return { days: days.length, rows: changed.length, removed: stale.length };
 }
