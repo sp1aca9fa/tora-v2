@@ -2,7 +2,7 @@
 
 ## How to use this file (Claude Code: read first)
 
-- This file is split into **Core** (sections 1-7) and **Sessions** (S1-S7).
+- This file is split into **Core** (sections 1-7) and **Sessions** (S1-S9).
 - Every session: read **Core** fully, then read **only the current session** (first one not marked done in the Status table).
 - Do **not** read or start the next session until the current one meets its acceptance criteria and the user confirms.
 - At the end of a session: update the Status table, note any decisions or deviations under "Decision log", commit.
@@ -27,6 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built (eBay deferred); acceptance waits on the user confirming TCGplayer / 駿河屋 suggestions |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed) | todo |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
+| S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 
 ### Decision log
 
@@ -105,6 +106,7 @@
 - 2026-10-12: S7 scope (user): TCGCSV and eBay sold for US prices; 駿河屋 for non-card items only (games, consoles, controllers, supplies, boxes, decks; cards stay on SNKRDUNK + Mercari); the "not linked to 駿河屋" warning only for non-card items costing more than ¥3,000 (changeable later). eBay answered 403 to every request from the home PC (search, home and item pages, plain fetch and headless Chrome) and PriceCharting / 130point sit behind Cloudflare challenges, so eBay is deferred (user): S7 ships without it and PSA cards have no US price yet. US prices never feed the valuation (JP market value); they are shown side by side.
 - 2026-10-12: S7 build: US prices are stored as `listing` observations in dollars and loaded nowhere in the valuation (which now takes yen prices only); 駿河屋 asking prices became the valuation's last market fallback (`store` method) as section 6 planned; first matching run: 36 TCGplayer and 36 駿河屋 suggestions (a first 駿河屋 pass made 74, mostly related goods, and was redone with a tighter rule before the user saw it).
 - 2026-10-12: SNKRDUNK matching treated "206" and "206/165" as different cards, so cards typed without the set size (e.g. エリカの招待 SV2a 206, from an import) never got a SNKRDUNK suggestion while TCGplayer (which compares the leading number) did. Numbers now match when one side leaves out the set size. Home market and currency per user noted as a future idea (user).
+- 2026-10-12: New phase S9 at the user's request: a watchlist of items not owned yet, with help finding a good price to buy at from price behaviour (the reason Tora v1 was started). After S6; starts with a design session. First ideas written down in S9, all open. "Price alerts" (future ideas) folds into it.
 
 ---
 
@@ -551,6 +553,36 @@ Build:
 Acceptance:
 - User review on phone and on a wide desktop screen.
 
+## S9: Watchlist and buy timing
+
+Added at the user's request (2026-10-12): the reason Tora v1 was started. Today the user asks Claude in a browser chat what to buy and at what price; Tora should do this with its own data. Add items (cards and games) the user does not own yet to a watchlist, collect their prices like owned items, and help find a good moment and price to buy. Everything below is first ideas, to be reconsidered in a design session (strategy, which signals, automatic vs Claude); new ideas welcome then.
+
+Foundations (needed whatever the strategy):
+- Watchlist: products followed without a lot (per user, with an optional target price and condition, e.g. raw A or PSA 10, sealed). Collectors match and collect watched products like owned ones (today they only look at owned or opened items).
+- More market data than sales: today's lowest ask and number of active listings (supply), SNKRDUNK asks / bids if readable, trades per week (liquidity), 駿河屋 store and 買取 prices (S7), Japan vs US (S7).
+- History long enough to judge: backfill sales on adding to the watchlist (the SNKRDUNK sweep already does this).
+
+Signal ideas (deterministic, computed daily at the end of a collect, every number explained in the app):
+- Where today's price sits in the item's own history: percentile over 90 / 180 / 365 days, distance from the rolling median (z-score on log prices), recent low.
+- Trend and momentum: slope of log price over 2 / 4 / 12 weeks, moving average crossings; "falling knife" guard (do not call a falling price a buy until the slope flattens).
+- Lifecycle of sealed product and new-set singles: prices indexed to the release date, compared with earlier sets of the same kind (typical pattern to verify on data: release hype, a dip in the following weeks or months, recovery once out of print). "Day N after release vs similar sets at day N".
+- Supply and liquidity: listings count rising = more sellers = pressure down; few trades = signals are noisy, lower confidence.
+- Spreads: lowest ask vs recent sales (a listing well under the market is a deal right now), Japan vs US, raw vs PSA 10 premium (grading worth it?), 駿河屋 買取 as a floor.
+- Calendar: new set release weeks (people sell to fund the next set), year-end and bonus seasons, reprint announcements (the last only via news, see below).
+- A fair value with a band, and a buy zone under it (e.g. "fair ¥26,000, buy under ¥22,000"), adjusted for fees and shipping. Target price set by the user wins.
+- Alerts: price entered the buy zone, a listing under the target appeared (needs active-listing checks a few times a day, not only the daily collect), a sharp drop.
+
+Automatic, Claude, or both (to decide; first thought: both, layered):
+- Rules and statistics first: cheap, repeatable, explainable, testable. Backtest each rule on the collected history before trusting it ("had we bought when it said buy, how did prices move after 30 / 90 days?").
+- A model on top, like S4d: Haiku / Sonnet via `claude -p` reads the signals plus things rules cannot (news, reprint rumours, tournament results, anime / game releases), writes a short weekly digest per watched item, and flags when the rules look wrong. Suggestions only, the user decides.
+- MCP tools (read-only) so a Claude chat can discuss the watchlist with the real numbers (e.g. "watchlist_signals", "compare_to_similar_sets"), replacing the browser conversations.
+
+Open questions: how much to trust thin data (a card with 3 sales a month); one strategy for all or per kind (sealed vs singles vs games); whether to store signals daily (for backtests) or compute on view; notifications (push, email) and how often; how to avoid looking like financial advice (show reasons and uncertainty, never a sure thing).
+
+Acceptance (draft): add an item not owned to the watchlist; after the next collects it shows its price history, where today's price sits, a buy zone with the reasons, and the user can set a target price that triggers an alert.
+
+---
+
 ## Out of scope for v1 (future ideas, do not build)
 
 - Markets screen: JP vs US arbitrage table after fees and shipping
@@ -558,6 +590,6 @@ Acceptance:
 - Photos and receipt attachments
 - JAN barcode scan when registering
 - Realized gains report per year (tax)
-- Price alerts
+- Price alerts (now part of S9)
 - Home market and currency per user (user, 2026-10-12). A card's language (the product's region) is not the market it is priced in: a Japanese card has a Japan price (SNKRDUNK, Mercari, 駿河屋) and a US price (TCGplayer's Pokemon Japan category, eBay). Today Japan is the fixed home market: the value counts yen prices only, other markets are shown beside it. Cheap step: each source declares its market, the user picks a home market, the value uses that market's sources, the others are secondary, and missing-source warnings follow the home market (SNKRDUNK for Japan, TCGplayer for the US). Expensive step: a home currency other than yen (costs, totals and P/L in dollars), since every amount is stored in yen today; purchases would keep the currency paid and convert everywhere.
 - Mixed bundles split into their items (user, 2026-10-12, undecided: maybe later, maybe never). A purchase of several different items in one listing (e.g. Mercari "ポケカWCS2023 ヨコハマ限定 デッキシールド、デッキケース" and "ピカチュウ ポケカ 公式 デッキシールド 4個セット" of different designs) is imported as one lot of one item, so it cannot be valued per item. Ideal: one lot per item, cost divided. Hard part: listing titles rarely name each item; the listing's photos and description would have to be read (a model could list the items it sees, the user confirms), and the cost split is a guess (equal, or by each item's market value). A cheap step first: a "split this lot" action in the app where the user names the items and the cost is divided.
