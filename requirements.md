@@ -612,6 +612,13 @@ Acceptance (draft): add an item not owned to the watchlist; after the next colle
 
 ---
 
+## Open issues (to plan later)
+
+Logged at the user's request (2026-10-13): known gaps to come back to with a plan of their own. Not scheduled yet.
+
+- Partial items: the user owns only part of an item, but the item's price sources track the whole package. Example: ゼルダの伝説 ムジュラの仮面 (N64), cartridge only (箱・説明書なし), valued as a complete boxed copy, so the value is clearly too high. Editing the item by hand to "cartridge only" is easy; the hard part is recognising a partial item during the import (Mercari / 駿河屋 / SNKRDUNK titles and receipts: ソフトのみ, 箱なし, 箱説なし, 本体のみ, カードのみ...) without AI interpretation, and then matching and valuing it as that partial item (its own product or a "completeness" attribute of the lot, with buckets / search words to match, e.g. 駿河屋 lists 箱説なし copies separately). To decide: product vs lot attribute, which words mark completeness per category, how the import review shows it.
+- Bundles: one purchase of several items in one listing (see "Mixed bundles" below for the idea so far). Needs a plan: how an import recognises a bundle, splitting into one lot per item, how the cost is divided, and what happens to the items' price sources.
+
 ## Out of scope for v1 (future ideas, do not build)
 
 - Markets screen: JP vs US arbitrage table after fees and shipping
