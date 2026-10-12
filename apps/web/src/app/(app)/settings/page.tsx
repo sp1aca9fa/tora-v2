@@ -4,7 +4,7 @@ import {
   listDevices,
   listRecentCollectorRuns,
 } from '@tora/db';
-import { noticeLevelsFor } from '@tora/core';
+import { noticeLevelsFor, summaryPrefs } from '@tora/core';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { logout, revokeDeviceAction } from '@/app/actions';
@@ -14,6 +14,7 @@ import { authed } from '@/lib/auth/guard';
 import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { NoticeLevelsForm } from './notice-levels-form';
+import { SummaryForm } from './summary-form';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
@@ -55,6 +56,16 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <NoticeLevelsForm levels={noticeLevelsFor(user.noticeLevels)} />
+        </CardContent>
+      </Card>
+
+      <Card id="summary" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle>{t('summaryPrefs.title')}</CardTitle>
+          <CardDescription>{t('summaryPrefs.info')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SummaryForm {...summaryPrefs(user.preferences)} />
         </CardContent>
       </Card>
 

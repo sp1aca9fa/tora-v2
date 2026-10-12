@@ -4,6 +4,7 @@ import {
   NOTICE_TYPES,
   type NoticeLevels,
   noticeLevelsFor,
+  type UserPreferences,
   toTokyoIso,
 } from '@tora/core';
 import { and, asc, count, eq, isNull, lt, ne, or } from 'drizzle-orm';
@@ -212,5 +213,17 @@ export async function setNoticeLevels(db: Db, userId: string, chosen: NoticeLeve
   await db
     .update(users)
     .set({ noticeLevels: Object.keys(changed).length ? changed : null, updatedAt: toTokyoIso() })
+    .where(eq(users.id, userId));
+}
+
+/** Saves the user's display preferences (a section replaces the stored one). */
+export async function setPreferences(db: Db, userId: string, patch: UserPreferences) {
+  const [user] = await db
+    .select({ preferences: users.preferences })
+    .from(users)
+    .where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ preferences: { ...user?.preferences, ...patch }, updatedAt: toTokyoIso() })
     .where(eq(users.id, userId));
 }

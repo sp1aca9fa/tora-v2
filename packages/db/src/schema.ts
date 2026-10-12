@@ -21,6 +21,7 @@ import {
   newId,
   toTokyoIso,
   type NoticeLevels,
+  type UserPreferences,
 } from '@tora/core';
 import { type SQL, sql } from 'drizzle-orm';
 import {
@@ -89,6 +90,8 @@ export const users = sqliteTable(
     disabledAt: text('disabled_at'),
     /** Notice levels the user chose per notice type (S8); types not listed use the defaults. */
     noticeLevels: text('notice_levels', { mode: 'json' }).$type<NoticeLevels>(),
+    /** Display choices (S8), e.g. the Portfolio Summary's rotating card. */
+    preferences: text('preferences', { mode: 'json' }).$type<UserPreferences>(),
     ...timestamps,
   },
   (t) => [

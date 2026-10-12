@@ -1210,17 +1210,17 @@ export interface Mover {
 }
 
 /**
- * Items whose market value moved most over the last `days` (requirements S8, Summary): the
- * lots still owned, valued on the latest snapshot day and on the day `days` before; items worth
- * under ¥1,000 then are left out (noise). Largest rises and falls, `limit` each.
+ * How each item's market value moved over the last `days` (requirements S8, Summary): the lots
+ * still owned, valued on the latest snapshot day and on the day `days` before; items worth under
+ * ¥1,000 then are left out (noise), and so are items that did not move.
  */
-export async function topMovers(db: Db, userId: string, days = 30, limit = 3) {
+export async function valueMovers(db: Db, userId: string, days = 30): Promise<Mover[]> {
   const [latest] = await db
     .select({ date: sql<string | null>`max(${valuationSnapshots.date})` })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
     .where(eq(holdings.userId, userId));
-  if (!latest?.date) return { up: [] as Mover[], down: [] as Mover[] };
+  if (!latest?.date) return [];
   const then = tokyoDate(new Date(Date.parse(`${latest.date}T12:00:00+09:00`) - days * DAY));
   const rows = await db
     .select({
@@ -1262,21 +1262,32 @@ export async function topMovers(db: Db, userId: string, days = 30, limit = 3) {
     m.thenJpy += lot.then;
     byProduct.set(lot.product.id, m);
   }
-  const movers = [...byProduct.values()]
+  return [...byProduct.values()]
     .filter((m) => m.thenJpy >= 1_000 && m.nowJpy !== m.thenJpy)
     .map((m) => ({
       ...m,
       changeJpy: m.nowJpy - m.thenJpy,
       pct: Math.round(((m.nowJpy - m.thenJpy) / m.thenJpy) * 1000) / 10,
     }));
-  return {
-    up: movers
-      .filter((m) => m.pct > 0)
-      .sort((a, b) => b.pct - a.pct)
-      .slice(0, limit),
-    down: movers
-      .filter((m) => m.pct < 0)
-      .sort((a, b) => a.pct - b.pct)
-      .slice(0, limit),
-  };
+}
+
+/** The user's owned items with the most sales on the sources over the last `days`. */
+export async function mostTraded(db: Db, userId: string, days = 30, limit = 5) {
+  const since = toTokyoIso(new Date(Date.now() - days * DAY));
+  const rows = await db
+    .select({ product: products, sales: sql<number>`count(*)` })
+    .from(priceObservations)
+    .innerJoin(products, eq(products.id, priceObservations.productId))
+    .where(
+      and(
+        sql`${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.userId} = ${userId} and ${holdings.status} = 'owned')`,
+        eq(priceObservations.observationType, 'sold'),
+        eq(priceObservations.excluded, false),
+        gte(priceObservations.observedAt, since),
+      ),
+    )
+    .groupBy(priceObservations.productId)
+    .orderBy(sql`count(*) desc`)
+    .limit(limit);
+  return rows.map((r) => ({ product: r.product, sales: Number(r.sales) }));
 }

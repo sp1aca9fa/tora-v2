@@ -13,6 +13,7 @@ import {
   estimatedPullCosts,
   clearManualPrice,
   loadMarketData,
+  mostTraded,
   portfolioSeries,
   portfolioValuation,
   priceHistory,
@@ -270,5 +271,17 @@ describe('saved bucket values (S8 speed)', () => {
     const later = new Date();
     const withManual = await valueHoldings(db, uid, await owned(), later);
     expect(withManual.get(mew.holding.id)).toMatchObject({ method: 'manual', valueJpy: 3_000 });
+  });
+});
+
+describe('most traded (Summary insights)', () => {
+  it('counts the last 30 days of sales of owned items, most first', async () => {
+    const { pika, mew } = await scenario();
+    // The opened box is not owned any more; ピカチュウ's sale 40 days before is too old.
+    const traded = await mostTraded(db, uid, 30, 5);
+    expect(traded.map((r) => [r.product.id, r.sales])).toEqual([
+      [mew.product.id, 5],
+      [pika.product.id, 3],
+    ]);
   });
 });

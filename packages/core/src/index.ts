@@ -10,3 +10,4 @@ export * from './market';
 export * from './valuation';
 export * from './lot-size';
 export * from './notices';
+export * from './preferences';

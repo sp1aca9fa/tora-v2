@@ -70,8 +70,22 @@
     },
     "units": "{count, plural, one {# unit} other {# units}}",
     "itemCount": "{count, plural, one {# item} other {# items}}",
-    "movers": {
-      "title": "Top movers, last 30 days",
+    "insights": {
+      "previous": "Previous",
+      "next": "Next",
+      "pause": "Pause",
+      "play": "Play",
+      "sales": "{count, plural, one {# sale} other {# sales}}",
+      "gainsUp": "Gains",
+      "gainsDown": "Losses",
+      "title": {
+        "movers_pct": "Top movers (%), last 30 days",
+        "movers_jpy": "Top movers (¥), last 30 days",
+        "movers_sealed": "Sealed product movers (%), last 30 days",
+        "most_traded": "Most traded, last 30 days",
+        "gains": "Biggest gains and losses since purchase",
+        "most_valuable": "Most valuable items"
+      },
       "up": "Rising",
       "down": "Falling"
     }
@@ -303,7 +317,8 @@
     "noneSelected": "Select at least one card",
     "noneGraded": "Pick a grade for at least one card",
     "noLinks": "No links found.",
-    "tooManyLinks": "Up to 200 links at a time."
+    "tooManyLinks": "Up to 200 links at a time.",
+    "nonePicked": "Pick at least one panel."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -717,5 +732,14 @@
       "blue": "Low",
       "grey": "Quiet"
     }
+  },
+  "summaryPrefs": {
+    "title": "Portfolio summary",
+    "info": "The insights card on the Summary tab: cycle through its panels, or show the ones you pick side by side.",
+    "rotate": "Rotate the panels",
+    "every": "Every",
+    "seconds": "{count} s",
+    "panelsRotate": "Panels to cycle through",
+    "panelsShown": "Panels to show"
   }
 }

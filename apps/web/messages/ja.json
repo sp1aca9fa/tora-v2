@@ -70,8 +70,22 @@
     },
     "units": "{count}点",
     "itemCount": "{count}アイテム",
-    "movers": {
-      "title": "直近30日の値動き",
+    "insights": {
+      "previous": "前へ",
+      "next": "次へ",
+      "pause": "一時停止",
+      "play": "再生",
+      "sales": "{count}件の取引",
+      "gainsUp": "含み益",
+      "gainsDown": "含み損",
+      "title": {
+        "movers_pct": "値動き(%)、直近30日",
+        "movers_jpy": "値動き(円)、直近30日",
+        "movers_sealed": "未開封品の値動き(%)、直近30日",
+        "most_traded": "取引の多いアイテム、直近30日",
+        "gains": "購入時からの含み益・含み損",
+        "most_valuable": "評価額の高いアイテム"
+      },
       "up": "上昇",
       "down": "下落"
     }
@@ -303,7 +317,8 @@
     "noneSelected": "カードを1枚以上選んでください",
     "noneGraded": "カードのグレードを1つ以上選んでください",
     "noLinks": "リンクが見つかりません。",
-    "tooManyLinks": "一度に追加できるのは200件までです。"
+    "tooManyLinks": "一度に追加できるのは200件までです。",
+    "nonePicked": "パネルを1つ以上選んでください。"
   },
   "acquisitionType": {
     "purchase": "購入",
@@ -717,5 +732,14 @@
       "blue": "低",
       "grey": "静か"
     }
+  },
+  "summaryPrefs": {
+    "title": "ポートフォリオのサマリー",
+    "info": "サマリータブのインサイトカード。パネルを自動で切り替えるか、選んだパネルを並べて表示します。",
+    "rotate": "パネルを自動で切り替える",
+    "every": "間隔",
+    "seconds": "{count}秒",
+    "panelsRotate": "切り替えるパネル",
+    "panelsShown": "表示するパネル"
   }
 }
