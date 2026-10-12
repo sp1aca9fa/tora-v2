@@ -5,6 +5,7 @@ import { estimateLotSize } from '@tora/core';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { priceObservations } from './schema';
+import { clearBucketValues } from './valuation';
 
 const DAY = 86_400_000;
 /** Trades this many days before or after count as "around the same time". */
@@ -19,6 +20,7 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
   ).map((r) => r.id);
   let checked = 0;
   const updates: { id: string; priceJpy: number }[] = [];
+  const changed = new Set<string>();
   for (let i = 0; i < productIds.length; i += 50) {
     const rows = await db
       .select({
@@ -67,7 +69,10 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
         for (let j = from; j < to; j++) if (j !== index) references.push(trades[j]!.reference);
         const units = estimateLotSize(trade.priceOriginal, references);
         const priceJpy = Math.round(trade.priceOriginal / units);
-        if (priceJpy !== trade.priceJpy) updates.push({ id: trade.id, priceJpy });
+        if (priceJpy !== trade.priceJpy) {
+          updates.push({ id: trade.id, priceJpy });
+          changed.add(trade.productId);
+        }
       }
     }
   }
@@ -87,5 +92,6 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
         ),
       );
   }
+  await clearBucketValues(db, [...changed]);
   return { checked, updated: updates.length };
 }

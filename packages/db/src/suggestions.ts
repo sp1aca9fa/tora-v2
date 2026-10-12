@@ -14,6 +14,7 @@ import {
 } from './schema';
 import { setObservationExcluded, updateSourceQuery, userHoldsProduct } from './sources';
 import type { User } from './schema';
+import { clearBucketValues } from './valuation';
 
 export type SuggestionKind = 'exclude_sale' | 'exclude_word' | 'fix_product';
 /** Verdicts kept only so the same thing is not judged again. */
@@ -144,6 +145,7 @@ async function applySuggestion(
       .update(products)
       .set({ ...set, updatedAt: toTokyoIso() })
       .where(eq(products.id, product.id));
+    await clearBucketValues(db, [product.id]);
     // Searches judge their sales by these details: fetch them again on the next collect.
     const searches = await db
       .select()

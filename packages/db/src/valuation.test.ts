@@ -12,13 +12,20 @@ import {
   boxView,
   estimatedPullCosts,
   clearManualPrice,
+  loadMarketData,
   portfolioSeries,
   portfolioValuation,
   priceHistory,
   runSnapshots,
   summarizeByProduct,
   setManualPrice,
+  refreshBucketValues,
+  valueHolding,
+  valueHoldings,
 } from './valuation';
+import { holdings, priceObservations, products } from './schema';
+import { and, eq } from 'drizzle-orm';
+import { setObservationExcluded } from './sources';
 
 let db: Db;
 let uid: string;
@@ -216,5 +223,52 @@ describe('portfolio (scenario 7)', () => {
     const points = await priceHistory(db, mew.product.id, 365, now);
     expect(points).toHaveLength(5);
     expect(points.every((p) => p.bucket === 'raw:A' && p.count === 1)).toBe(true);
+  });
+});
+
+describe('saved bucket values (S8 speed)', () => {
+  const owned = () =>
+    db
+      .select({ holding: holdings, product: products })
+      .from(holdings)
+      .innerJoin(products, eq(products.id, holdings.productId))
+      .where(and(eq(holdings.userId, uid), eq(holdings.status, 'owned')));
+  const full = async () => {
+    const rows = await owned();
+    const market = await loadMarketData(db, uid, [...new Set(rows.map((r) => r.product.id))], now);
+    return new Map(
+      rows.map((r) => [r.holding.id, valueHolding(r.holding, r.product, market, now)]),
+    );
+  };
+
+  it('values holdings as a full valuation does, saved or not', async () => {
+    await scenario();
+    const expected = await full();
+    // Valued live and saved, then read back from the saved rows.
+    expect(await valueHoldings(db, uid, await owned(), now)).toEqual(expected);
+    expect(await valueHoldings(db, uid, await owned(), now)).toEqual(expected);
+    expect((await refreshBucketValues(db, now)).values).toBe(3);
+    expect(await valueHoldings(db, uid, await owned(), now)).toEqual(expected);
+  });
+
+  it('forgets a product once its sales change; manual prices apply on top', async () => {
+    const { mew } = await scenario();
+    await refreshBucketValues(db, now);
+    const [outlier] = await db
+      .select()
+      .from(priceObservations)
+      .where(
+        and(eq(priceObservations.productId, mew.product.id), eq(priceObservations.priceJpy, 1_000)),
+      );
+    await setObservationExcluded(db, outlier!.id, true);
+    const values = await valueHoldings(db, uid, await owned(), now);
+    expect(values).toEqual(await full());
+    // 800, 900, 950 (20,000 dropped as an outlier)
+    expect(values.get(mew.holding.id)?.valueJpy).toBe(900 * 2);
+
+    await setManualPrice(db, uid, mew.product.id, 'raw:A', 1_500);
+    const later = new Date();
+    const withManual = await valueHoldings(db, uid, await owned(), later);
+    expect(withManual.get(mew.holding.id)).toMatchObject({ method: 'manual', valueJpy: 3_000 });
   });
 });

@@ -7,6 +7,7 @@ import {
   kindsFor,
 } from '@tora/core';
 import {
+  type Db,
   cardGradeCounts,
   imageVersions,
   importReviewCount,
@@ -57,18 +58,16 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, series, matches, grades, toReview, failedLinks, missing, t] =
-    await Promise.all([
-      listInventory(db, user.id, { category, kind, status, q }),
-      portfolioValuation(db, user.id),
-      portfolioSeries(db, user.id),
-      pendingMatchesForUser(db, user.id),
-      cardGradeCounts(db, user.id),
-      importReviewCount(db, user.id),
-      failedPurchaseLinkCount(db, user.id),
-      missingPriceSources(db, user.id),
-      getTranslations(),
-    ]);
+  const [rows, portfolio, matches, grades, toReview, failedLinks, missing, t] = await Promise.all([
+    listInventory(db, user.id, { category, kind, status, q }),
+    portfolioValuation(db, user.id),
+    pendingMatchesForUser(db, user.id),
+    cardGradeCounts(db, user.id),
+    importReviewCount(db, user.id),
+    failedPurchaseLinkCount(db, user.id),
+    missingPriceSources(db, user.id),
+    getTranslations(),
+  ]);
   const { totals } = portfolio;
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
   const summaries = summarizeByProduct(rows, valuations);
@@ -77,13 +76,6 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
     summaries.map((s) => s.product.id),
   );
   const pl = totals.unrealizedJpy;
-  const chartPoints = series.map((s) => ({
-    date: s.date,
-    valueJpy: Number(s.valueJpy),
-    costJpy: Number(s.costJpy),
-    atCostJpy: Number(s.atCostJpy),
-    estimatedJpy: Number(s.estimatedJpy),
-  }));
   const maxBreakdown = Math.max(
     1,
     ...portfolio.breakdown.map((b) => Math.max(b.valueJpy, b.costJpy)),
@@ -138,12 +130,11 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         </div>
       </section>
 
-      {chartPoints.length >= 2 && (
-        <section className="space-y-2 rounded-xl border bg-card px-4 py-3">
-          <h2 className="text-sm font-medium">{t('portfolio.overTime')}</h2>
-          <PortfolioChart points={chartPoints} />
-        </section>
-      )}
+      <Suspense
+        fallback={<div className="h-64 animate-pulse rounded-xl border bg-card" aria-hidden />}
+      >
+        <ValueOverTime db={db} userId={user.id} />
+      </Suspense>
 
       {portfolio.breakdown.length > 1 && (
         <details className="rounded-xl border bg-card px-4 py-3">
@@ -331,5 +322,24 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Se
         </p>
       )}
     </div>
+  );
+}
+
+/** The value-over-time chart, loaded after the rest of the page (it reads every snapshot). */
+async function ValueOverTime({ db, userId }: { db: Db; userId: string }) {
+  const [series, t] = await Promise.all([portfolioSeries(db, userId), getTranslations()]);
+  if (series.length < 2) return null;
+  const points = series.map((s) => ({
+    date: s.date,
+    valueJpy: Number(s.valueJpy),
+    costJpy: Number(s.costJpy),
+    atCostJpy: Number(s.atCostJpy),
+    estimatedJpy: Number(s.estimatedJpy),
+  }));
+  return (
+    <section className="space-y-2 rounded-xl border bg-card px-4 py-3">
+      <h2 className="text-sm font-medium">{t('portfolio.overTime')}</h2>
+      <PortfolioChart points={points} />
+    </section>
   );
 }

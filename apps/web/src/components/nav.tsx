@@ -2,6 +2,7 @@
 
 import { Inbox, LayoutGrid, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
+import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { LocaleToggle } from '@/components/locale-toggle';
@@ -18,8 +19,19 @@ function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname.startsWith(href);
 }
 
-/** A count of what needs the user, on a nav item. */
-function Badge({ count }: { count: number }) {
+type Counts = Partial<Record<(typeof ITEMS)[number]['key'], number>>;
+
+/** A count of what needs the user, on a nav item (shown once counted: pages do not wait). */
+function Badge({ counts, item }: { counts: Promise<Counts>; item: keyof Counts }) {
+  return (
+    <Suspense fallback={null}>
+      <Count counts={counts} item={item} />
+    </Suspense>
+  );
+}
+
+function Count({ counts, item }: { counts: Promise<Counts>; item: keyof Counts }) {
+  const count = use(counts)[item] ?? 0;
   if (count <= 0) return null;
   return (
     <span className="min-w-5 rounded-full bg-amber-500 px-1.5 text-center text-[10px] leading-5 font-medium text-white">
@@ -29,11 +41,7 @@ function Badge({ count }: { count: number }) {
 }
 
 /** Bottom tab bar on mobile, side nav on desktop. `badges`: counts per item key. */
-export function Nav({
-  badges = {},
-}: {
-  badges?: Partial<Record<(typeof ITEMS)[number]['key'], number>>;
-}) {
+export function Nav({ badges }: { badges: Promise<Counts> }) {
   const t = useTranslations();
   const pathname = usePathname();
 
@@ -59,7 +67,7 @@ export function Nav({
             >
               <Icon className="size-4" />
               <span className="flex-1">{t(`nav.${key}`)}</span>
-              <Badge count={badges[key] ?? 0} />
+              <Badge counts={badges} item={key} />
             </Link>
           ))}
         </nav>
@@ -87,7 +95,7 @@ export function Nav({
               <span className="relative">
                 <Icon className="size-5" />
                 <span className="absolute -top-1.5 left-3.5">
-                  <Badge count={badges[key] ?? 0} />
+                  <Badge counts={badges} item={key} />
                 </span>
               </span>
               {t(`nav.${key}`)}

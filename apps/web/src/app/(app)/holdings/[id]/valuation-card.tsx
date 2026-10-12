@@ -1,4 +1,4 @@
-import { type Db, type Holding, type Product, loadMarketData, valueHolding } from '@tora/db';
+import { type Db, type Holding, type Product, valueHoldings } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,12 +24,12 @@ export async function ValuationCard({
   product: Product;
   bucket: string | null;
 }) {
-  const [t, format, market] = await Promise.all([
+  const [t, format, values] = await Promise.all([
     getTranslations('valuation'),
     getFormatter(),
-    loadMarketData(db, userId, [product.id]),
+    valueHoldings(db, userId, [{ holding, product }]),
   ]);
-  const v = valueHolding(holding, product, market);
+  const v = values.get(holding.id)!;
   const now = new Date();
   /** "~5 hours ago" for recent (approximate) trades, else the date. */
   const when = (iso: string, approximate: boolean) => {

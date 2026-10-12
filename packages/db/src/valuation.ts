@@ -6,6 +6,7 @@ import {
   type Valuation,
   type ValuationObservation,
   LONG_WINDOW,
+  ageDays,
   bucketFamily,
   buylistFloor,
   deriveBucket,
@@ -24,6 +25,7 @@ import {
   type Holding,
   type HoldingEvent,
   type Product,
+  bucketValues,
   holdingEvents,
   holdings,
   manualPrices,
@@ -120,6 +122,410 @@ export async function loadMarketData(
     }
   }
   return { observations, recent, manual };
+}
+
+/** Yen sales a valuation may use (the filters of `loadMarketData`). */
+const yenSales = () =>
+  and(
+    eq(priceObservations.observationType, 'sold'),
+    or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
+    eq(priceObservations.excluded, false),
+  );
+
+/**
+ * Market data for valuing holdings today, with only the sales their valuation can reach: the
+ * same results as `loadMarketData` for these buckets, a fraction of the rows (popular boxes sell
+ * hundreds a month, and graded sales of grades not held are never used). Sales are counted per
+ * product, source and bucket first; each held bucket then loads from the shortest window that
+ * decides its value and confidence (see `valueUnit`): 30 days with 5+ sales, 180 with 3+ in 180
+ * days, a year with 3+ in a year, else everything, its similar conditions included.
+ */
+export async function loadHoldingsMarketData(
+  db: Db,
+  /** Whose manual prices to load; null for none. */
+  userId: string | null,
+  wanted: { productId: string; bucket: string | null }[],
+  now = new Date(),
+): Promise<MarketData> {
+  const productIds = [...new Set(wanted.map((w) => w.productId))];
+  const observations = new Map<string, ValuationObservation[]>();
+  const recent = new Map<string, RecentSaleInput[]>();
+  const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
+  if (productIds.length === 0) return { observations, recent, manual };
+  // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
+  // window are never used, so extra is safe).
+  const exact = (days: number) => toTokyoIso(new Date(now.getTime() - days * DAY));
+  const ago = (days: number) => toTokyoIso(new Date(now.getTime() - (days + 1) * DAY));
+  const since = ago(LOOKBACK_DAYS);
+  const [c30, c180, c365] = [ago(30), ago(180), ago(LONG_WINDOW)];
+  const add = (rows: (ValuationObservation & { productId: string })[]) => {
+    for (const { productId, ...o } of rows) {
+      const list = observations.get(productId);
+      if (list) list.push(o);
+      else observations.set(productId, [o]);
+    }
+  };
+  const columns = {
+    id: priceObservations.id,
+    productId: priceObservations.productId,
+    source: priceObservations.source,
+    bucket: priceObservations.bucket,
+    priceJpy: priceObservations.priceJpy,
+    observedAt: priceObservations.observedAt,
+    observationType: priceObservations.observationType,
+    excluded: priceObservations.excluded,
+    quantityInferred: priceObservations.quantityInferred,
+  };
+
+  const counts: {
+    productId: string;
+    source: string;
+    bucket: string | null;
+    n30: number;
+    n180: number;
+    n365: number;
+  }[] = [];
+  for (let i = 0; i < productIds.length; i += 200) {
+    const ids = productIds.slice(i, i + 200);
+    const within = (from: string) =>
+      sql<number>`sum(case when ${priceObservations.observedAt} >= ${from} then 1 else 0 end)`;
+    counts.push(
+      ...(await db
+        .select({
+          productId: priceObservations.productId,
+          source: priceObservations.source,
+          bucket: priceObservations.bucket,
+          n30: within(exact(30)),
+          n180: within(exact(180)),
+          n365: within(exact(LONG_WINDOW)),
+        })
+        .from(priceObservations)
+        .where(
+          and(
+            inArray(priceObservations.productId, ids),
+            yenSales(),
+            gte(priceObservations.observedAt, since),
+          ),
+        )
+        .groupBy(priceObservations.productId, priceObservations.source, priceObservations.bucket)),
+    );
+    // Shops' asking and buy prices are used for 30 days only.
+    add(
+      await db
+        .select(columns)
+        .from(priceObservations)
+        .where(
+          and(
+            inArray(priceObservations.productId, ids),
+            inArray(priceObservations.observationType, ['buylist', 'listing']),
+            or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
+            eq(priceObservations.excluded, false),
+            gte(priceObservations.observedAt, c30),
+          ),
+        ),
+    );
+  }
+
+  // Oldest sale needed per product + source + bucket.
+  const from = new Map<string, { productId: string; source: string; bucket: string; at: string }>();
+  const need = (productId: string, source: string, bucket: string, at: string) => {
+    const key = `${productId}|${source}|${bucket}`;
+    const had = from.get(key);
+    if (!had || at < had.at) from.set(key, { productId, source, bucket, at });
+  };
+  for (const { productId, bucket } of wanted) {
+    if (!bucket) continue;
+    const family = bucketFamily(bucket);
+    const ofProduct = counts.filter((c) => c.productId === productId && c.bucket !== null);
+    for (const source of new Set(ofProduct.map((c) => c.source))) {
+      const own = ofProduct.find((c) => c.source === source && c.bucket === bucket);
+      const [n30, n180, n365] = [
+        Number(own?.n30 ?? 0),
+        Number(own?.n180 ?? 0),
+        Number(own?.n365 ?? 0),
+      ];
+      const at = n30 >= 5 ? c30 : n180 >= 3 ? c180 : n365 >= 3 ? c365 : since;
+      if (own) need(productId, source, bucket, at);
+      // No own window holds 3 sales: similar conditions are pooled.
+      if (at === since && family !== null) {
+        for (const c of ofProduct) {
+          if (c.source === source && bucketFamily(c.bucket!) === family) {
+            need(productId, source, c.bucket!, since);
+          }
+        }
+      }
+    }
+  }
+  const byStart = new Map<string, { productId: string; source: string; bucket: string }[]>();
+  for (const { at, ...key } of from.values()) byStart.set(at, [...(byStart.get(at) ?? []), key]);
+  for (const [at, keys] of byStart) {
+    for (let i = 0; i < keys.length; i += 300) {
+      const rows = sql.join(
+        keys.slice(i, i + 300).map((k) => sql`(${k.productId}, ${k.source}, ${k.bucket})`),
+        sql`, `,
+      );
+      add(
+        await db
+          .select(columns)
+          .from(priceObservations)
+          .where(
+            and(
+              sql`(${priceObservations.productId}, ${priceObservations.source}, ${priceObservations.bucket}) in (values ${rows})`,
+              yenSales(),
+              gte(priceObservations.observedAt, at),
+            ),
+          ),
+      );
+    }
+  }
+
+  for (let i = 0; i < productIds.length; i += 200) {
+    const ids = productIds.slice(i, i + 200);
+    if (userId) {
+      const prices = await db
+        .select()
+        .from(manualPrices)
+        .where(and(eq(manualPrices.userId, userId), inArray(manualPrices.productId, ids)));
+      for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
+    }
+    const links = await db
+      .select({
+        productId: productSources.productId,
+        source: productSources.source,
+        recentSales: productSources.recentSales,
+      })
+      .from(productSources)
+      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
+    for (const l of links) {
+      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
+      recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
+    }
+  }
+  return { observations, recent, manual };
+}
+
+// ---------------------------------------------------------------------------------------------
+// saved bucket values (S8 speed)
+
+/** What `bucket_values` keeps: a bucket's valuation from sales, before the user's manual price. */
+export interface BucketValue {
+  valuation: Valuation;
+  last: LastSale | null;
+  buylist: HoldingValuation['buylist'];
+  sources: SourceSummary[];
+}
+
+/** Saved values older than this are valued again (windows slide even without new sales). */
+const BUCKET_VALUE_MAX_AGE_DAYS = 3;
+
+function bucketValueOf(
+  product: Product,
+  bucket: string | null,
+  market: MarketData,
+  now: Date,
+): BucketValue {
+  const observations = market.observations.get(product.id) ?? [];
+  const recent = market.recent.get(product.id) ?? [];
+  return {
+    valuation: valueUnit({ bucket, observations, retailPriceJpy: product.retailPriceJpy, now }),
+    last: lastSale(observations, recent, bucket, undefined, now),
+    buylist: buylistFloor(observations, bucket, now),
+    sources: sourceSummaries(observations, recent, bucket, now),
+  };
+}
+
+async function saveBucketValues(
+  db: Db,
+  rows: { productId: string; bucket: string | null; value: BucketValue }[],
+  now: Date,
+) {
+  const at = toTokyoIso(now);
+  for (let i = 0; i < rows.length; i += 100) {
+    await db
+      .insert(bucketValues)
+      .values(
+        rows.slice(i, i + 100).map((r) => ({
+          productId: r.productId,
+          bucket: r.bucket ?? '',
+          computedAt: at,
+          value: r.value,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [bucketValues.productId, bucketValues.bucket],
+        set: {
+          computedAt: sql`excluded.computed_at`,
+          value: sql`excluded.value`,
+          updatedAt: at,
+        },
+      });
+  }
+}
+
+/** Forget the saved values of products whose sales or details changed. */
+export async function clearBucketValues(db: Pick<Db, 'delete'>, productIds: string[]) {
+  for (let i = 0; i < productIds.length; i += 500) {
+    await db
+      .delete(bucketValues)
+      .where(inArray(bucketValues.productId, productIds.slice(i, i + 500)));
+  }
+}
+
+/**
+ * Values every product + bucket held by anyone and saves them (end of a collect); values no
+ * longer held are removed.
+ */
+export async function refreshBucketValues(db: Db, now = new Date()) {
+  const rows = await db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(eq(holdings.status, 'owned'));
+  const wanted = new Map<string, { product: Product; bucket: string | null }>();
+  for (const { holding, product } of rows) {
+    const bucket = holdingBucket(holding, product);
+    wanted.set(`${product.id}|${bucket ?? ''}`, { product, bucket });
+  }
+  const market = await loadHoldingsMarketData(
+    db,
+    null,
+    [...wanted.values()].map((w) => ({ productId: w.product.id, bucket: w.bucket })),
+    now,
+  );
+  await saveBucketValues(
+    db,
+    [...wanted.values()].map(({ product, bucket }) => ({
+      productId: product.id,
+      bucket,
+      value: bucketValueOf(product, bucket, market, now),
+    })),
+    now,
+  );
+  const stale = (
+    await db
+      .select({
+        id: bucketValues.id,
+        productId: bucketValues.productId,
+        bucket: bucketValues.bucket,
+      })
+      .from(bucketValues)
+  ).filter((r) => !wanted.has(`${r.productId}|${r.bucket}`));
+  for (let i = 0; i < stale.length; i += 500) {
+    await db.delete(bucketValues).where(
+      inArray(
+        bucketValues.id,
+        stale.slice(i, i + 500).map((r) => r.id),
+      ),
+    );
+  }
+  return { values: wanted.size, removed: stale.length };
+}
+
+/** Key of a product + bucket in `savedBucketValues`. */
+export const bucketValueKey = (productId: string, bucket: string | null) =>
+  `${productId}|${bucket ?? ''}`;
+
+/**
+ * Today's values of product + bucket pairs (by `bucketValueKey`), from all sales and without
+ * manual prices: read from the saved rows; pairs without a recent saved value are valued from
+ * their sales and saved.
+ */
+export async function savedBucketValues(
+  db: Db,
+  wanted: { product: Product; bucket: string | null }[],
+  now = new Date(),
+): Promise<Map<string, BucketValue>> {
+  const saved = new Map<string, BucketValue>();
+  const productIds = [...new Set(wanted.map((w) => w.product.id))];
+  const oldest = toTokyoIso(new Date(now.getTime() - BUCKET_VALUE_MAX_AGE_DAYS * DAY));
+  const at = toTokyoIso(now);
+  for (let i = 0; i < productIds.length; i += 200) {
+    const rows = await db
+      .select()
+      .from(bucketValues)
+      .where(inArray(bucketValues.productId, productIds.slice(i, i + 200)));
+    for (const v of rows) {
+      if (v.computedAt >= oldest && v.computedAt <= at) {
+        saved.set(bucketValueKey(v.productId, v.bucket || null), v.value as BucketValue);
+      }
+    }
+  }
+  const missing = new Map<string, { product: Product; bucket: string | null }>();
+  for (const w of wanted) {
+    const key = bucketValueKey(w.product.id, w.bucket);
+    if (!saved.has(key)) missing.set(key, w);
+  }
+  if (missing.size > 0) {
+    const market = await loadHoldingsMarketData(
+      db,
+      null,
+      [...missing.values()].map((m) => ({ productId: m.product.id, bucket: m.bucket })),
+      now,
+    );
+    const fresh = [...missing.values()].map(({ product, bucket }) => ({
+      productId: product.id,
+      bucket,
+      value: bucketValueOf(product, bucket, market, now),
+    }));
+    for (const f of fresh) saved.set(bucketValueKey(f.productId, f.bucket), f.value);
+    await saveBucketValues(db, fresh, now);
+  }
+  return saved;
+}
+
+/**
+ * Today's valuation of each holding (by holding id): the same as `valueHolding` on all sales,
+ * from the saved bucket values, with the user's manual prices on top.
+ */
+export async function valueHoldings(
+  db: Db,
+  userId: string,
+  rows: { holding: Holding; product: Product }[],
+  now = new Date(),
+): Promise<Map<string, HoldingValuation>> {
+  const out = new Map<string, HoldingValuation>();
+  const productIds = [...new Set(rows.map((r) => r.product.id))];
+  if (productIds.length === 0) return out;
+  const wanted = rows.map((r) => ({ ...r, bucket: holdingBucket(r.holding, r.product) }));
+  const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
+  const [saved] = await Promise.all([
+    savedBucketValues(db, wanted, now),
+    (async () => {
+      for (let i = 0; i < productIds.length; i += 200) {
+        const prices = await db
+          .select()
+          .from(manualPrices)
+          .where(
+            and(
+              eq(manualPrices.userId, userId),
+              inArray(manualPrices.productId, productIds.slice(i, i + 200)),
+            ),
+          );
+        for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
+      }
+    })(),
+  ]);
+  for (const { holding, product, bucket } of wanted) {
+    const value = saved.get(bucketValueKey(product.id, bucket))!;
+    const own = valueUnit({ bucket, observations: [], manualPrices: manual.get(product.id), now });
+    const v =
+      own.method === 'manual'
+        ? own
+        : {
+            ...value.valuation,
+            ageDays: value.valuation.newestAt ? ageDays(value.valuation.newestAt, now) : null,
+          };
+    out.set(holding.id, {
+      ...v,
+      bucket,
+      valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
+      buylist: value.buylist,
+      last: value.last,
+      trendPct: v.method === 'median' ? trend(value.last?.priceJpy, v.unitJpy) : null,
+      sources: value.sources,
+    });
+  }
+  return out;
 }
 
 /** Valuation buckets of a product's owned holdings, across users (what collectors should cover). */
@@ -234,15 +640,10 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
   // lives in the pulls logged from them, which carry no cost of their own.
   const opened = rows.filter((r) => r.holding.status === 'consumed');
   const ownedRows = rows.filter((r) => r.holding.status === 'owned');
-  const market = await loadMarketData(
-    db,
-    userId,
-    [...new Set(ownedRows.map((r) => r.product.id))],
-    now,
-  );
+  const values = await valueHoldings(db, userId, ownedRows, now);
   const valued: PortfolioRow[] = ownedRows.map((r) => ({
     ...r,
-    valuation: valueHolding(r.holding, r.product, market, now),
+    valuation: values.get(r.holding.id)!,
   }));
 
   const totals = {

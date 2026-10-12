@@ -19,6 +19,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { Db } from './client';
+import { clearBucketValues } from './valuation';
 import {
   type NewPriceObservation,
   type Product,
@@ -169,7 +170,13 @@ export async function getProductSource(db: Db, id: string) {
 
 /** Stops collecting from a listing; its observations are kept. */
 export async function unlinkSource(db: Db, sourceId: string): Promise<void> {
-  await db.update(productSources).set({ active: false }).where(eq(productSources.id, sourceId));
+  const [link] = await db
+    .update(productSources)
+    .set({ active: false })
+    .where(eq(productSources.id, sourceId))
+    .returning({ productId: productSources.productId });
+  // Its recent sales no longer count.
+  if (link) await clearBucketValues(db, [link.productId]);
 }
 
 /**
@@ -417,6 +424,9 @@ export async function insertObservations(db: Db, rows: NewPriceObservation[]): P
       .returning({ id: priceObservations.id });
     added += inserted.length;
   }
+  if (added > 0 || vouched.length > 0) {
+    await clearBucketValues(db, [...new Set([...vouched, ...rows].map((r) => r.productId))]);
+  }
   return added;
 }
 
@@ -469,7 +479,7 @@ export async function updateSourceProgress(
     imageUrl?: string | null;
   },
 ): Promise<void> {
-  await db
+  const [link] = await db
     .update(productSources)
     .set({
       ...(patch.state !== undefined ? { state: patch.state } : {}),
@@ -479,7 +489,9 @@ export async function updateSourceProgress(
       ...(patch.recentSales ? { recentSales: patch.recentSales } : {}),
       ...(patch.imageUrl ? { imageUrl: patch.imageUrl } : {}),
     })
-    .where(eq(productSources.id, sourceId));
+    .where(eq(productSources.id, sourceId))
+    .returning({ productId: productSources.productId });
+  if (link && patch.recentSales) await clearBucketValues(db, [link.productId]);
 }
 
 /** A run still "running" after this long was interrupted (runs take about half an hour). */
@@ -742,6 +754,7 @@ export async function updateSourceQuery(
           ),
         ),
       );
+    await clearBucketValues(tx, [link.productId]);
   });
 }
 
@@ -766,12 +779,18 @@ export async function setObservationExcluded(
     .set({ excluded, excludedReason: excluded ? 'manual' : null })
     .where(eq(priceObservations.id, observationId))
     .returning({ productId: priceObservations.productId });
+  if (row) await clearBucketValues(db, [row.productId]);
   return row ?? null;
 }
 
 /** Turns a source back on (e.g. a search the user had switched off). */
 export async function reactivateSource(db: Db, sourceId: string): Promise<void> {
-  await db.update(productSources).set({ active: true }).where(eq(productSources.id, sourceId));
+  const [link] = await db
+    .update(productSources)
+    .set({ active: true })
+    .where(eq(productSources.id, sourceId))
+    .returning({ productId: productSources.productId });
+  if (link) await clearBucketValues(db, [link.productId]);
 }
 
 /** One collected observation (to check who may change it). */

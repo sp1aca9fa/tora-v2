@@ -4,11 +4,12 @@ import {
   foreignPrices,
   getProduct,
   holdingBucket,
+  bucketValueKey,
   imageVersions,
-  loadMarketData,
   priceHistory,
   productLots,
-  valueHolding,
+  savedBucketValues,
+  valueHoldings,
 } from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -22,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel, productMeta, sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
-import { MarketCompare } from './market-compare';
+import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
 
 type Params = { params: Promise<{ id: string }> };
@@ -39,18 +40,30 @@ export default async function ProductPage({ params }: Params) {
   const { db, user } = await authed();
   const [product, lots] = await Promise.all([getProduct(db, id), productLots(db, user.id, id)]);
   if (!product || lots.length === 0) notFound();
-  const [t, format, market, history, images, foreign, dismissed] = await Promise.all([
+  const owned = lots.filter((h) => h.status === 'owned');
+  // The chart starts on the condition most of the owned units are in.
+  const unitsByBucket = new Map<string, number>();
+  for (const h of owned) {
+    const b = holdingBucket(h, product);
+    if (b) unitsByBucket.set(b, (unitsByBucket.get(b) ?? 0) + h.quantity);
+  }
+  const mainBucket = [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const usBucket = compareBucket(product, mainBucket);
+  const [t, format, valuations, japan, history, images, foreign, dismissed] = await Promise.all([
     getTranslations(),
     getFormatter(),
-    loadMarketData(db, user.id, [product.id]),
+    valueHoldings(
+      db,
+      user.id,
+      owned.map((holding) => ({ holding, product })),
+    ),
+    usBucket ? savedBucketValues(db, [{ product, bucket: usBucket }]) : null,
     priceHistory(db, product.id, 365),
     imageVersions(db, [product.id]),
     foreignPrices(db, product.id),
     dismissedSourceWarnings(db, user.id),
   ]);
-
-  const owned = lots.filter((h) => h.status === 'owned');
-  const values = new Map(owned.map((h) => [h.id, valueHolding(h, product, market).valueJpy]));
+  const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueJpy ?? null]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
   // Opened items keep their cost (their value moved to the pulls logged from them).
   const openedCost = lots
@@ -61,13 +74,6 @@ export default async function ProductPage({ params }: Params) {
   const value = valued.reduce((n, h) => n + values.get(h.id)!, 0);
   const valuedCost = valued.reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
   const pl = valued.length || openedCost ? value - valuedCost : null;
-  // The chart starts on the condition most of the owned units are in.
-  const unitsByBucket = new Map<string, number>();
-  for (const h of owned) {
-    const b = holdingBucket(h, product);
-    if (b) unitsByBucket.set(b, (unitsByBucket.get(b) ?? 0) + h.quantity);
-  }
-  const mainBucket = [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
 
@@ -192,7 +198,14 @@ export default async function ProductPage({ params }: Params) {
         </CardContent>
       </Card>
 
-      <MarketCompare product={product} market={market} mainBucket={mainBucket} foreign={foreign} />
+      {usBucket && (
+        <MarketCompare
+          bucket={usBucket}
+          japan={japan?.get(bucketValueKey(product.id, usBucket))?.valuation ?? null}
+          mainBucket={mainBucket}
+          foreign={foreign}
+        />
+      )}
 
       <PriceSources
         db={db}

@@ -91,7 +91,7 @@ export function withoutOutliers(values: number[]): number[] {
   return s.filter((v) => v >= q1 - 1.5 * iqr && v <= q3 + 1.5 * iqr);
 }
 
-const ageDays = (iso: string, now: Date) =>
+export const ageDays = (iso: string, now: Date) =>
   Math.max(0, Math.floor((now.getTime() - Date.parse(iso)) / DAY));
 
 function sourceOrder(sources: string[]): string[] {

@@ -529,6 +529,27 @@ export const valuationSnapshots = sqliteTable(
   ],
 );
 
+/**
+ * Market value of a product in one bucket ('' for none) as of `computedAt`, without the user's
+ * manual prices: the valuation's result from all sales, saved at the end of each collect so pages
+ * read one row instead of every sale (S8 speed). Rows are deleted when the product's sales or
+ * details change; a missing or old row is valued live and saved again.
+ */
+export const bucketValues = sqliteTable(
+  'bucket_values',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    bucket: text('bucket').notNull(),
+    computedAt: text('computed_at').notNull(),
+    value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('bucket_values_product_bucket_uq').on(t.productId, t.bucket)],
+);
+
 export const fxRates = sqliteTable(
   'fx_rates',
   {

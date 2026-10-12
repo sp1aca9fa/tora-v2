@@ -1,5 +1,5 @@
-import { type Valuation, valueUnit } from '@tora/core';
-import type { ForeignPrice, MarketData, Product } from '@tora/db';
+import type { Valuation } from '@tora/core';
+import type { ForeignPrice, Product } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { sourceLabel } from '@/lib/product-display';
@@ -17,22 +17,23 @@ export function compareBucket(product: Product, mainBucket: string | null): stri
 
 /** Japan vs US: the Japanese market value next to foreign prices converted to yen (S7). */
 export async function MarketCompare({
-  product,
-  market,
+  bucket,
+  japan,
   mainBucket,
   foreign,
 }: {
-  product: Product;
-  market: MarketData;
+  /** See `compareBucket`. */
+  bucket: string;
+  /** The Japanese market value in that bucket. */
+  japan: Valuation | null;
   mainBucket: string | null;
   foreign: ForeignPrice[];
 }) {
-  const bucket = compareBucket(product, mainBucket);
-  if (!bucket || foreign.length === 0) return null;
+  if (foreign.length === 0) return null;
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
-  const observations = market.observations.get(product.id) ?? [];
-  const jpOf = (b: string): Valuation => valueUnit({ bucket: b, observations });
-  const jp = jpOf(bucket);
+  // A market comparison: a retail price is no market value.
+  const jp =
+    japan && japan.method !== 'retail' ? japan : { unitJpy: null, source: null, method: 'none' };
   // A graded foreign price (eBay "PSA 10") is compared with the same grade in Japan.
   const graded = mainBucket?.startsWith('graded:') && !foreign.some((f) => f.bucket === mainBucket);
   const money = (n: number, currency: string) =>

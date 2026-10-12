@@ -1,7 +1,7 @@
 // `pnpm collect [--source x] [--product id] [--match-only] [--collect-only] [--review]`
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
-import { createDb, inferLotSizes, listUsers, runSnapshots } from '@tora/db';
+import { createDb, inferLotSizes, listUsers, refreshBucketValues, runSnapshots } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -105,8 +105,11 @@ const lots = await inferLotSizes(db);
 log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
 progress.update('pictures, lot sizes, chart', 0.5);
 const snap = await runSnapshots(db);
+// Today's value of everything held, read by the pages instead of every sale.
+const saved = await refreshBucketValues(db);
 progress.done();
 console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
+console.log(`values: ${saved.values} saved, ${saved.removed} removed`);
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }
