@@ -46,7 +46,21 @@ export interface SourceInfo {
   orderIds?: { pattern?: string; hint?: string };
   /** A shop purchases come from, not a price source. */
   shopOnly?: boolean;
+  /**
+   * Its terms forbid giving its data to AI models: left out of the data review, the MCP tools
+   * (Claude) and anything else that would feed it to a model.
+   */
+  noAi?: boolean;
+  /**
+   * Its terms allow copies only while needed: listing details kept with a price (`raw.ids`,
+   * `raw.listings`) are dropped after this many days; the day's aggregate stays.
+   */
+  detailsDays?: number;
 }
+
+/** Sources whose data may not reach an AI model. */
+export const noAiSources = (registry: SourceRegistry) =>
+  registry.sources.filter((s) => s.noAi).map((s) => s.key);
 
 /**
  * How a supporting source compares with its class's reference (quality gate): `agrees`,

@@ -3,6 +3,7 @@
 // scripts/collect-cron.sh.
 import {
   checkSourceQuality,
+  pruneSourceDetails,
   clearAllBucketValues,
   createDb,
   inferLotSizes,
@@ -124,6 +125,9 @@ const lots = await inferLotSizes(db);
 log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
 progress.update('pictures, lot sizes, chart', 0.5);
 // The quality gate first: a supporting source that disagrees with the reference is not valued.
+// Listing details some sources may keep only for a while (e.g. eBay's listing IDs).
+const pruned = await pruneSourceDetails(db);
+if (pruned) log(`listing details dropped: ${pruned} row(s)`);
 const quality = await checkSourceQuality(db);
 if (quality.length) {
   log(`source quality changed: ${quality.join(', ')}`);

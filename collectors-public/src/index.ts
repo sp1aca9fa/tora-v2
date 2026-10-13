@@ -42,6 +42,9 @@ export const sources: SourceInfo[] = [
     priceKinds: ['listing'],
     roles: { card: 'comparison', sealed: 'comparison' },
     priority: 50,
+    // eBay's API terms: no eBay data in AI models; copies only as long as needed.
+    noAi: true,
+    detailsDays: 14,
   },
   // Shops purchases come from (not price sources).
   {

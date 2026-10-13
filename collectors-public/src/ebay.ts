@@ -6,8 +6,9 @@ import type { NewPriceObservation, Product } from '@tora/db';
  * eBay asking prices through eBay's official Browse API (active listings only: sold data is closed
  * to new developers). US market, for comparison only: never in the valuation. One search per
  * product per run; each day stores, per condition (ungraded, PSA 10, ...), the median ask, the
- * lowest and how many are listed, plus the IDs seen, so listings that vanish early can later be
- * read as probable sales (requirements S7).
+ * lowest and how many are listed, plus the IDs seen for 14 days, so listings that vanish early can
+ * be read as probable sales (requirements S7). eBay's terms: no data to AI models (the source is
+ * marked `noAi`), copies only while needed (no titles or links stored, IDs dropped after 14 days).
  *
  * Needs EBAY_CLIENT_ID and EBAY_CLIENT_SECRET (a production keyset) in the root .env.
  */
@@ -182,18 +183,10 @@ export const ebay: Collector = {
           count: list.length,
           min: Math.min(...prices),
           fxDate: fx.date,
-          // Every listing seen today: those gone tomorrow before their end may have sold.
+          // Every listing seen today (kept 14 days, see the source description): those gone
+          // before their end may have sold. No titles or links are kept (eBay's terms allow
+          // copies only while needed).
           ids: list.map((i) => i.itemId),
-          listings: list
-            .toSorted((a, b) => Number(a.price!.value) - Number(b.price!.value))
-            .slice(0, 10)
-            .map((i) => ({
-              id: i.itemId,
-              title: i.title,
-              usd: Number(i.price!.value),
-              url: i.itemWebUrl,
-              from: i.itemLocation?.country,
-            })),
         },
       });
     }

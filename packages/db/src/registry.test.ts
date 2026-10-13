@@ -10,9 +10,11 @@ import {
   checkSourceQuality,
   dismissSourceQuality,
   loadSourceRegistry,
+  pruneSourceDetails,
   saveSourceInfos,
 } from './registry';
 import { insertObservations } from './sources';
+import * as schema from './schema';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
 
@@ -104,4 +106,37 @@ it('keeps a dismissed notice dismissed while the source keeps disagreeing', asyn
   expect(registry.quality?.mercari?.card?.dismissedAt).toBeTruthy();
   // Still comparison only: dismissing hides the notice, it does not change the role.
   expect(registry.roles.mercari?.card).toBe('comparison');
+});
+
+it('drops listing details of sources that keep them only for a while', async () => {
+  await saveSourceInfos(db, [{ key: 'asks', label: 'Asks', detailsDays: 14 }]);
+  const { product } = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'single', name: 'X', cardNumber: '1' } },
+    {
+      quantity: 1,
+      costTotalJpy: 1,
+      acquiredAt: new Date().toISOString(),
+      grading: 'raw',
+      rawGrade: 'A',
+    },
+  );
+  const ask = (days: number) => ({
+    productId: product.id,
+    source: 'asks',
+    observationType: 'listing' as const,
+    bucket: null,
+    priceJpy: 100,
+    observedAt: new Date(Date.now() - days * 86_400_000).toISOString(),
+    fetchedAt: new Date().toISOString(),
+    externalRef: `a${days}`,
+    raw: { count: 3, ids: ['1', '2', '3'] },
+  });
+  await insertObservations(db, [ask(20), ask(2)]);
+  expect(await pruneSourceDetails(db)).toBe(1);
+  const rows = await db.select().from(schema.priceObservations);
+  const raw = (ref: string) => rows.find((r) => r.externalRef === ref)!.raw;
+  expect(raw('a20')).toEqual({ count: 3 });
+  expect(raw('a2')).toEqual({ count: 3, ids: ['1', '2', '3'] });
 });

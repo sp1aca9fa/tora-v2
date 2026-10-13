@@ -169,3 +169,28 @@ export async function dismissSourceQuality(db: Db, key: string, cls: ProductClas
   await db.update(sources).set({ quality }).where(eq(sources.key, key));
   cache = new WeakMap();
 }
+
+/**
+ * Drops the listing details of sources that keep them only for a while (`detailsDays`): the
+ * per-listing IDs and listings saved with a day's aggregate. Run at the end of each collect.
+ */
+export async function pruneSourceDetails(db: Db, now = new Date()): Promise<number> {
+  let pruned = 0;
+  for (const s of (await loadSourceRegistry(db)).sources) {
+    if (!s.detailsDays) continue;
+    const before = toTokyoIso(new Date(now.getTime() - s.detailsDays * 86_400_000));
+    const rows = await db
+      .update(priceObservations)
+      .set({ raw: sql`json_remove(${priceObservations.raw}, '$.ids', '$.listings')` })
+      .where(
+        and(
+          eq(priceObservations.source, s.key),
+          sql`${priceObservations.observedAt} < ${before}`,
+          sql`(json_extract(${priceObservations.raw}, '$.ids') is not null or json_extract(${priceObservations.raw}, '$.listings') is not null)`,
+        ),
+      )
+      .returning({ id: priceObservations.id });
+    pruned += rows.length;
+  }
+  return pruned;
+}

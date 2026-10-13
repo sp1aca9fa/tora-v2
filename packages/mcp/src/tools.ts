@@ -1,7 +1,7 @@
 // Read-only views of one user's data for Claude (requirements S4b). Plain functions over the
 // database, so the MCP server (server.ts) and the tests share them. Results are compact JSON:
 // yen as integers, dates as ISO strings, lists limited.
-import { productClass } from '@tora/core';
+import { noAiSources, productClass } from '@tora/core';
 import {
   type Db,
   type Holding,
@@ -29,8 +29,9 @@ import {
   schema,
   summarizeByProduct,
   valueHolding,
+  loadSourceRegistry,
 } from '@tora/db';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
 
 const { holdings, products, priceObservations, productImages, productSources } = schema;
 
@@ -240,6 +241,7 @@ export async function sales(
   filter: { source?: string; status?: 'kept' | 'excluded' | 'all'; limit?: number } = {},
 ) {
   const limit = Math.min(filter.limit ?? 50, 300);
+  const noAi = noAiSources(await loadSourceRegistry(db));
   const rows = await db
     .select()
     .from(priceObservations)
@@ -247,6 +249,8 @@ export async function sales(
       and(
         eq(priceObservations.productId, productId),
         filter.source ? eq(priceObservations.source, filter.source) : undefined,
+        // Sources whose terms forbid giving their data to AI models (this is read by Claude).
+        noAi.length ? notInArray(priceObservations.source, noAi) : undefined,
         filter.status === 'kept'
           ? eq(priceObservations.excluded, false)
           : filter.status === 'excluded'
@@ -434,8 +438,9 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       ),
     );
   const weak: unknown[] = [];
+  const noAiKeys = noAiSources(await loadSourceRegistry(db));
   for (const { source, product } of searches) {
-    if (!source.lastSuccessAt) continue;
+    if (!source.lastSuccessAt || noAiKeys.includes(source.source)) continue;
     const obs = await db
       .select({ excluded: priceObservations.excluded })
       .from(priceObservations)
@@ -591,15 +596,76 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
  * One read-only SELECT (or WITH ... SELECT), run in a read transaction (writes fail) with a row
  * limit. Not scoped to the user: the database holds this household's data only.
  */
+const SQL_WORDS = new Set([
+  'where',
+  'join',
+  'left',
+  'right',
+  'inner',
+  'outer',
+  'cross',
+  'on',
+  'group',
+  'order',
+  'limit',
+  'union',
+  'except',
+  'intersect',
+  'having',
+  'window',
+  'natural',
+  'using',
+  'as',
+]);
+
+/**
+ * The query with each read of `price_observations` replaced by its rows without the given
+ * sources (keeping the alias). Refused when the table is reached another way (a schema prefix).
+ */
+export function withoutSources(
+  text: string,
+  sources: string[],
+): { sql: string } | { error: string } {
+  if (sources.length === 0) return { sql: text };
+  if (/\b\w+\s*\.\s*price_observations\b|["`[]price_observations/i.test(text)) {
+    return { error: 'Read price_observations by its plain name.' };
+  }
+  const list = sources.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
+  let rewrote = false;
+  const sql = text.replace(
+    /\b(from|join)\s+price_observations\b(?:\s+(?:as\s+)?(\w+))?/gi,
+    (_m, kw: string, alias?: string) => {
+      rewrote = true;
+      const keep = alias && !SQL_WORDS.has(alias.toLowerCase());
+      const name = keep ? alias : 'price_observations';
+      return `${kw} (select * from price_observations where source not in (${list})) as ${name}${keep ? '' : alias ? ` ${alias}` : ''}`;
+    },
+  );
+  if (
+    /\bprice_observations\b/i.test(
+      sql.replace(/\(select \* from price_observations where source not in \([^)]*\)\)/g, ''),
+    ) &&
+    !rewrote
+  ) {
+    return { error: 'Read price_observations in a FROM or JOIN.' };
+  }
+  return { sql };
+}
+
 export async function querySql(db: Db, sql: string, limit = 200) {
   const text = sql.trim().replace(/;\s*$/, '');
   if (!/^(select|with)\b/i.test(text) || text.includes(';')) {
     return { error: 'Only one SELECT (or WITH ... SELECT) statement is allowed.' };
   }
+  // Sources whose terms forbid giving their data to AI models: every read of their sales goes
+  // through a version of the table without them.
+  const noAi = noAiSources(await loadSourceRegistry(db));
+  const guarded = withoutSources(text, noAi);
+  if ('error' in guarded) return guarded;
   const tx = await db.$client.transaction('read');
   try {
     const rs = await tx.execute(
-      `select * from (${text}) limit ${Math.min(Math.max(1, limit), 1000)}`,
+      `select * from (${guarded.sql}) limit ${Math.min(Math.max(1, limit), 1000)}`,
     );
     return {
       columns: rs.columns,

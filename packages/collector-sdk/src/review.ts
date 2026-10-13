@@ -1,3 +1,4 @@
+import { noAiSources } from '@tora/core';
 // Automated data review (requirements S4d). The checks flag what looks off (sales far from the
 // value, searches that keep little of what they find); a cheap model (Haiku) judges only those,
 // the cases it is unsure about go to a stronger one (Sonnet), and what they find is filed as
@@ -16,6 +17,7 @@ import {
   oddSales,
   schema,
   valueHolding,
+  loadSourceRegistry,
 } from '@tora/db';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 
@@ -218,10 +220,13 @@ export async function buildReviewCases(
     });
   }
 
-  // Searches that keep little of what they find, unless judged fine lately.
+  // Searches that keep little of what they find, unless judged fine lately. Sources whose terms
+  // forbid giving their data to AI models are left out.
   const byId = new Map(rows.map((r) => [r.product.id, r.product]));
+  const noAi = noAiSources(await loadSourceRegistry(db));
   for (const link of searches) {
     if (out.searches.length >= limits.searches) break;
+    if (noAi.includes(link.source)) continue;
     if (!link.lastSuccessAt || !link.query?.keywords?.length) continue;
     const last = judged.get(`search_ok|${link.id}`);
     if (last && now.getTime() - Date.parse(last) < SEARCH_RECHECK_DAYS * DAY) continue;
