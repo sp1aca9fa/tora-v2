@@ -18,7 +18,7 @@ import {
   planImport,
   reviewFlags,
 } from '../purchases';
-import { loadCollectors } from '../registry';
+import { loadAndRegister } from '../registry';
 import type { PurchaseReceipt, ReceiptMail } from '../types';
 
 const { values, positionals } = parseArgs({
@@ -40,7 +40,7 @@ if (!user) {
   console.error(`No user "${values.user}".`);
   process.exit(1);
 }
-const { importers, missing } = await loadCollectors();
+const { importers, missing } = await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const selected = importers.filter(
   (i) => i.parse && i.matchesHeader && (!values.source || i.source === values.source),

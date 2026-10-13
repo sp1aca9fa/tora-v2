@@ -1,3 +1,4 @@
+import type { SourceInfo } from '@tora/core';
 import type { Collector, RateSource } from '@tora/collector-sdk';
 import { ebay } from './ebay';
 import { usdJpy } from './fx';
@@ -9,3 +10,65 @@ export const collectors: Collector[] = [
   ...(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET ? [ebay] : []),
 ];
 export const rates: RateSource[] = [usdJpy];
+
+/**
+ * How the app should use these (requirements S8, sources with roles; part of the "Japan
+ * collectibles" preset): US prices for comparison only, and the shops purchases come from.
+ */
+export const sources: SourceInfo[] = [
+  {
+    key: 'tcgcsv',
+    label: 'TCGplayer',
+    badge: 'T',
+    market: 'us',
+    currency: 'USD',
+    priceKinds: ['listing'],
+    roles: { card: 'comparison', sealed: 'comparison' },
+    priority: 40,
+    // The set is read from the rest of the path, so the link is kept as pasted.
+    links: [
+      {
+        pattern: 'tcgplayer\\.com/product/(\\d+)(/[\\w-]*)?',
+        url: 'https://www.tcgplayer.com/product/{id}{rest}',
+      },
+    ],
+  },
+  {
+    key: 'ebay',
+    label: 'eBay',
+    badge: 'e',
+    market: 'us',
+    currency: 'USD',
+    priceKinds: ['listing'],
+    roles: { card: 'comparison', sealed: 'comparison' },
+    priority: 50,
+  },
+  // Shops purchases come from (not price sources).
+  {
+    key: 'amazon',
+    label: 'Amazon',
+    shopOnly: true,
+    aliases: ['amazon', 'アマゾン'],
+    orderIds: { hint: '注文番号 like 503-1234567-1234567' },
+  },
+  {
+    key: 'yahoo',
+    label: 'Yahoo',
+    shopOnly: true,
+    aliases: ['yahoo', 'ヤフオク', 'ヤフー', 'paypay'],
+    singleItemOrders: true,
+  },
+  { key: 'yodobashi', label: 'Yodobashi', shopOnly: true, aliases: ['yodobashi', 'ヨドバシ'] },
+  {
+    key: 'biccamera',
+    label: 'Bic Camera',
+    shopOnly: true,
+    aliases: ['bic camera', 'biccamera', 'ビックカメラ'],
+  },
+  {
+    key: 'pokemoncenter',
+    label: 'Pokemon Center',
+    shopOnly: true,
+    aliases: ['pokemon center', 'ポケモンセンター'],
+  },
+];

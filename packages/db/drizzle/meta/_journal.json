@@ -141,6 +141,13 @@
       "when": 1791821172397,
       "tag": "0019_lot_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791894444258,
+      "tag": "0020_sources",
+      "breakpoints": true
     }
   ]
 }

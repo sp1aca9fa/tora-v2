@@ -1,4 +1,6 @@
 import { mkdtemp, rm } from 'node:fs/promises';
+import { saveSourceInfos } from './registry';
+import { TEST_SOURCES } from './testing';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
@@ -27,6 +29,7 @@ beforeEach(async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tora-coverage-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
   await migrateDb(db);
+  await saveSourceInfos(db, TEST_SOURCES);
   userId = (
     await createUser(db, 'a', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
   ).user.id;

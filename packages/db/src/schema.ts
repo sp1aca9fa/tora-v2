@@ -21,6 +21,9 @@ import {
   newId,
   toTokyoIso,
   type NoticeLevels,
+  type ProductClass,
+  type SourceInfo,
+  type SourceRole,
   type UserPreferences,
 } from '@tora/core';
 import { type SQL, sql } from 'drizzle-orm';
@@ -562,6 +565,19 @@ export const bucketValues = sqliteTable(
   },
   (t) => [uniqueIndex('bucket_values_product_bucket_uq').on(t.productId, t.bucket)],
 );
+
+/**
+ * Price sources and shops as their plug-ins describe them (requirements S8, sources with roles),
+ * saved by the collectors on each run so the app can read them. `roles` is the admin's choice
+ * per item class (null: the plug-in's suggestion); `quality` is the last quality check.
+ */
+export const sources = sqliteTable('sources', {
+  key: text('key').primaryKey(),
+  info: text('info', { mode: 'json' }).notNull().$type<SourceInfo>(),
+  roles: text('roles', { mode: 'json' }).$type<Partial<Record<ProductClass, SourceRole>>>(),
+  quality: text('quality', { mode: 'json' }).$type<unknown>(),
+  ...timestamps,
+});
 
 export const fxRates = sqliteTable(
   'fx_rates',

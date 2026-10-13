@@ -1,4 +1,6 @@
 import { tokyoDate } from '@tora/core';
+import { saveSourceInfos } from './registry';
+import { TEST_SOURCES } from './testing';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,6 +46,7 @@ beforeEach(async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tora-val-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
   await migrateDb(db);
+  await saveSourceInfos(db, TEST_SOURCES);
   uid = (
     await createUser(db, 'alice', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
   ).user.id;

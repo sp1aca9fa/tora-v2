@@ -1,3 +1,4 @@
+import { sourceInfo } from '@tora/core';
 // Import through Claude (S4c), second half: the rows Claude read go through the same import plan
 // as receipt emails, per shop. Nothing is asked: a likely match with an entry added by hand is
 // the same purchase (its ID is attached when there is one), a conflict keeps what is registered,
@@ -7,6 +8,7 @@ import {
   type PurchaseLink,
   finishImportRun,
   holdingsWithProducts,
+  loadSourceRegistry,
   purchaseLinksOf,
   resolvePurchaseLink,
   startImportRun,
@@ -63,24 +65,25 @@ export async function planAiImport(
       if (r.row.orderId) cancels.push(r.row);
     } else kept.push(r);
   }
-  // A file named after the item's ID ("m12345678901.png") gives the ID the page does not show.
+  // A file named after the item's ID (a shop's ID shape, e.g. "m12345678901.png") gives the ID the
+  // page does not show.
+  const registry = await loadSourceRegistry(db);
   for (const r of kept) {
-    const id = r.row.file.match(/\bm\d{10,12}\b/)?.[0];
+    const pattern = sourceInfo(registry, shopKey(r.row.shop, registry))?.orderIds?.pattern;
+    const id = pattern ? r.row.file.match(new RegExp(pattern))?.[0] : undefined;
     const alone = kept.filter((k) => k.row.file === r.row.file).length === 1;
-    if (!r.row.orderId && id && alone && shopKey(r.row.shop) === 'mercari') {
-      r.row = { ...r.row, orderId: id };
-    }
+    if (!r.row.orderId && id && alone) r.row = { ...r.row, orderId: id };
   }
   const rows = toReceipts(kept, fallbackDate);
   const shops: ShopPlan[] = [];
-  for (const shop of new Set(rows.map((r) => shopKey(r.row.shop)))) {
-    const mine = rows.filter((r) => shopKey(r.row.shop) === shop);
-    const importer = aiImporter(shop, mine, products);
+  for (const shop of new Set(rows.map((r) => shopKey(r.row.shop, registry)))) {
+    const mine = rows.filter((r) => shopKey(r.row.shop, registry) === shop);
+    const importer = aiImporter(shop, mine, products, registry);
     const mails: ReceiptMail[] = [
       ...mine.map((r) => ({ kind: 'purchase' as const, receipt: r.receipt })),
       // A cancelled order already registered is reported (never removed).
       ...cancels
-        .filter((c) => shopKey(c.shop) === shop)
+        .filter((c) => shopKey(c.shop, registry) === shop)
         .map((c) => ({ kind: 'cancel' as const, orderId: c.orderId! })),
     ];
     const plan = await planImport(db, userId, importer, gatherReceipts(mails));

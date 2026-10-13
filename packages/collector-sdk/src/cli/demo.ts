@@ -25,6 +25,7 @@ import {
   getUserByUsername,
   listPendingCandidates,
   listProductSources,
+  loadSourceRegistry,
   markOpened,
   refreshBucketValues,
   rejectCandidate,
@@ -38,7 +39,7 @@ import {
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { loadCollectors } from '../registry';
+import { loadAndRegister } from '../registry';
 import { runCollector } from '../runner';
 
 const {
@@ -550,7 +551,8 @@ const count = (await db.select({ id: holdings.id }).from(holdings).where(eq(hold
 console.log(`demo: ${count} lot(s) created`);
 
 // --- price sources: match like any item, then settle each by its state -----------------------
-const { collectors } = await loadCollectors();
+const { collectors } = await loadAndRegister(db);
+const registry = await loadSourceRegistry(db);
 for (const collector of collectors) {
   // Every item without a listing of this source (the account's new ones, and any other).
   const s = await runCollector(db, collector, {
@@ -567,7 +569,7 @@ for (const [productId, { state, costJpy }] of states) {
   const linked = new Set(
     (await listProductSources(db, productId)).filter((l) => l.active).map((l) => l.source),
   );
-  const main = stableSourceFor(product, costJpy);
+  const main = stableSourceFor(product, costJpy, registry);
   const bySource = new Map<string, Awaited<ReturnType<typeof listPendingCandidates>>>();
   for (const c of await listPendingCandidates(db, productId)) {
     if (!linked.has(c.source)) bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);

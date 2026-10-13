@@ -33,18 +33,6 @@ export function productMeta(
     .join(' · ');
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  snkrdunk: 'SNKRDUNK',
-  mercari: 'Mercari',
-  surugaya: '駿河屋',
-  tcgcsv: 'TCGplayer',
-  ebay: 'eBay',
-};
-
-export function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source;
-}
-
 /** A lot's condition in a few words: "PSA 10", "Raw A", "Shrink-wrapped", "No grade". */
 export function lotConditionLabel(
   holding: Pick<

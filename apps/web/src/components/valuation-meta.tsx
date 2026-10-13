@@ -1,6 +1,5 @@
 import type { HoldingValuation } from '@tora/db';
 import { useTranslations } from 'next-intl';
-import { sourceLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
 
 /** Confidence as a label (never color alone) with a 3-dot meter. */
@@ -26,16 +25,25 @@ export function ConfidenceBadge({ confidence }: { confidence: HoldingValuation['
   );
 }
 
-/** "SNKRDUNK · 12 sales / 30d · 5d old · ●●○ Medium" (or Manual / Retail price / No data). */
-export function ValuationMeta({ v, className }: { v: HoldingValuation; className?: string }) {
+/** "<source> · 12 sales / 30d · 5d old · ●●○ Medium" (or Manual / Retail price / No data). */
+export function ValuationMeta({
+  v,
+  source,
+  className,
+}: {
+  v: HoldingValuation;
+  /** The name of the source valued from. */
+  source: string;
+  className?: string;
+}) {
   const t = useTranslations('valuation');
   const parts: React.ReactNode[] = [];
   if (v.method === 'manual') parts.push(t('manual'));
   else if (v.method === 'retail') parts.push(t('retail'));
-  else if (v.method === 'store') parts.push(t('store', { source: sourceLabel(v.source ?? '') }));
+  else if (v.method === 'store') parts.push(t('store', { source }));
   else if (v.method === 'none') parts.push(t('noData'));
   else {
-    parts.push(sourceLabel(v.source ?? ''));
+    parts.push(source);
     parts.push(t('samples', { count: v.sampleSize, days: v.windowDays ?? 0 }));
     if (v.pooled) parts.push(t('pooled'));
   }

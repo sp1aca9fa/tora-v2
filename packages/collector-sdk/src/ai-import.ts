@@ -8,14 +8,25 @@
 import { createHash } from 'node:crypto';
 import {
   type Category,
+  EMPTY_REGISTRY,
   type Grader,
   GRADERS,
   PRODUCT_KINDS,
   type ProductKind,
   REGIONS,
   type Region,
+  type SourceRegistry,
+  shopOf,
+  sourceName,
 } from '@tora/core';
-import { type Db, type Product, type ProductInput, holdingsWithProducts, schema } from '@tora/db';
+import {
+  type Db,
+  type Product,
+  type ProductInput,
+  holdingsWithProducts,
+  loadSourceRegistry,
+  schema,
+} from '@tora/db';
 import { desc, eq } from 'drizzle-orm';
 import type { ClaudeResult, ModelAlias } from './claude';
 import { termCoverage } from './match';
@@ -147,12 +158,32 @@ const PAIRS_SCHEMA = {
   required: ['pairs'],
 };
 
+/** "snkrdunk (スニダン), ..., " from the described shops' aliases, for the reader's prompt. */
+function shopList(registry: SourceRegistry): string {
+  const shops = registry.sources.filter((s) => s.aliases?.length);
+  return shops
+    .map((s) => {
+      const names = (s.aliases ?? []).filter((a) => a.toLowerCase() !== s.key);
+      return `${s.key}${names.length ? ` (${names.join(' / ')})` : ''}, `;
+    })
+    .join('');
+}
+
+/** "; SNKRDUNK: 取引ID ..." from the described shops' ID hints. */
+function idHints(registry: SourceRegistry): string {
+  return registry.sources
+    .filter((s) => s.orderIds?.hint)
+    .map((s) => `; ${s.label}: ${s.orderIds!.hint}`)
+    .join('');
+}
+
 export const EXTRACT_SYSTEM = `You read a collector's purchase history from Japanese shops (screenshots of order lists or order pages, PDFs, CSV or copied text) and list every item they bought, as JSON. You never invent data: a field that is not shown is null.`;
 
 export function extractPrompt(
   files: string[],
   products: ProductLine[],
   hints?: { rows: ExtractedRow[]; flags: Record<string, string[]> },
+  registry: SourceRegistry = EMPTY_REGISTRY,
 ): string {
   return `Open each of these files with the Read tool (they are in the current folder) and list every item bought in them:
 ${files.map((f) => `- ${f}`).join('\n')}
@@ -164,8 +195,8 @@ One file may hold several purchases (an order list): one row each. One purchase 
 One row per distinct item in an order. Several of the same item are one row with quantity: a set of N of the same item (N個セット, N枚セット, ×N, N点 of one item) has quantity N and the item's name without the count. For each row:
 - file: the file it is in.
 - samePurchase, sameConfidence: see above; null when the purchase is shown in one file only.
-- shop: mercari, amazon, yahoo (ヤフオク / Yahoo!フリマ), snkrdunk, surugaya, or the shop's name in lowercase.
-- orderId: exactly as shown (Mercari 商品ID like m12345678901 or 取引ID; Amazon 注文番号 like 503-1234567-1234567); null when none is shown.
+- shop: ${shopList(registry)}or the shop's name in lowercase.
+- orderId: exactly as shown (an order number, transaction ID or item ID${idHints(registry)}); null when none is shown.
 - title: the item's title as shown. url: when shown.
 - priceJpy: what was paid for this item: item price plus shipping and fees when charged separately, minus coupons and discounts (クーポン利用, 割引). Points or balance used to pay (メルペイ残高, ポイント利用, PayPay) are a way of paying, not a discount. The item price when that is all there is. Several items in one order: each item's own price.
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
@@ -235,6 +266,8 @@ export interface CheckContext {
   orderIds: Set<string>;
   /** Unit value of each product the user holds (latest snapshot), for "price far from value". */
   unitValue: Map<string, number>;
+  /** Shops and sources the plug-ins describe (names, aliases, ID shapes). */
+  registry?: SourceRegistry;
 }
 
 const fold = (s: string) => s.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
@@ -302,28 +335,16 @@ export async function checkContext(db: Db, userId: string): Promise<CheckContext
       }
     }
   }
-  return { products, orderIds, unitValue };
+  return { products, orderIds, unitValue, registry: await loadSourceRegistry(db) };
 }
 
 // ---------------------------------------------------------------------------------------------
 // Rows -> the import plan
 
-const SHOP_LABELS: Record<string, string> = {
-  mercari: 'Mercari',
-  amazon: 'Amazon',
-  yahoo: 'Yahoo',
-  snkrdunk: 'SNKRDUNK',
-  surugaya: '駿河屋',
-};
-
-export function shopKey(shop: string): string {
+/** The shop a row names: a described shop's key (its aliases), else the name normalized. */
+export function shopKey(shop: string, registry: SourceRegistry = EMPTY_REGISTRY): string {
   const s = shop.normalize('NFKC').toLowerCase().trim();
-  if (/mercari|メルカリ/.test(s)) return 'mercari';
-  if (/amazon|アマゾン/.test(s)) return 'amazon';
-  if (/yahoo|ヤフ|paypay/.test(s)) return 'yahoo';
-  if (/snkrdunk|スニダン|スニーカーダンク/.test(s)) return 'snkrdunk';
-  if (/surugaya|駿河屋/.test(s)) return 'surugaya';
-  return s.replace(/\s+/g, '_') || 'other';
+  return shopOf(registry, s) ?? (s.replace(/\s+/g, '_') || 'other');
 }
 
 /** The rows that become purchases, each with the key the plan knows it by. */
@@ -387,11 +408,12 @@ export function aiImporter(
   shop: string,
   rows: ImportRow[],
   products: Map<string, Product>,
+  registry: SourceRegistry = EMPTY_REGISTRY,
 ): PurchaseImporter {
   const byKey = new Map(rows.map((r) => [r.receipt.orderId, r.row]));
   return {
     source: shop,
-    label: SHOP_LABELS[shop] ?? shop,
+    label: sourceName(registry, shop),
     productFor: (receipt) => {
       const row = byKey.get(receipt.orderId);
       if (!row) return null;
@@ -505,8 +527,8 @@ const titleCore = (t: string) =>
 const sameDay = (a: string | null, b: string | null) => !a || !b || a === b;
 
 /** Nothing in two rows says they are different purchases. */
-function compatible(a: ExtractedRow, b: ExtractedRow): boolean {
-  if (shopKey(a.shop) !== shopKey(b.shop)) return false;
+function compatible(a: ExtractedRow, b: ExtractedRow, registry: SourceRegistry): boolean {
+  if (shopKey(a.shop, registry) !== shopKey(b.shop, registry)) return false;
   if (a.priceJpy && b.priceJpy && a.priceJpy !== b.priceJpy) return false;
   if (a.orderId && b.orderId && a.orderId !== b.orderId) return false;
   // A guessed date says nothing against another page's date.
@@ -528,6 +550,7 @@ export function mergeRows(
   /** The model's answer on a look-alike pair it was asked about separately. */
   judged: (a: ExtractedRow, b: ExtractedRow) => { same: boolean; confidence: number } | null = () =>
     null,
+  registry: SourceRegistry = EMPTY_REGISTRY,
 ): {
   rows: ExtractedRow[];
   merged: string[][];
@@ -562,7 +585,7 @@ export function mergeRows(
       out.find((o) => o.samePurchase === row.samePurchase && distinctFiles(o, row));
     if (tagged) {
       const sure = Math.min(tagged.sameConfidence ?? 0, row.sameConfidence ?? 0) >= SAME_SURE;
-      if (sure && compatible(tagged, row)) {
+      if (sure && compatible(tagged, row, registry)) {
         const joined = join(tagged, row);
         out[out.indexOf(tagged)] = joined;
         for (const p of pairs) for (let k = 0; k < 2; k++) if (p[k] === tagged) p[k] = joined;
@@ -578,7 +601,7 @@ export function mergeRows(
       if (!distinctFiles(o, row) || !o.priceJpy || o.priceJpy !== row.priceJpy) return false;
       if (o.status === 'not_purchase' || row.status === 'not_purchase') return false;
       const [a, b] = [titleCore(o.title), titleCore(row.title)].sort((x, y) => x.length - y.length);
-      return a!.length >= 6 && b!.startsWith(a!) && compatible(o, row);
+      return a!.length >= 6 && b!.startsWith(a!) && compatible(o, row, registry);
     });
     const verdict = alike ? judged(alike, row) : null;
     if (alike && verdict?.same && verdict.confidence >= SAME_SURE) {
@@ -630,7 +653,7 @@ export async function readPurchases(
     const r = await ask<{ rows: ExtractedRow[] }>({
       model,
       system: EXTRACT_SYSTEM,
-      prompt: extractPrompt(batch, products, hints),
+      prompt: extractPrompt(batch, products, hints, ctx.registry),
       schema: ROWS_SCHEMA,
       readDir: dir,
     });
@@ -678,7 +701,7 @@ export async function readPurchases(
   // Rows of all files, one purchase shown in several files joined, then checked.
   const assemble = () => {
     const all = files.flatMap((f) => cache.files[f.hash]!.rows);
-    return mergeRows(all);
+    return mergeRows(all, undefined, ctx.registry);
   };
   const modelOf = (name: string) => cache.files[files.find((f) => f.name === name)!.hash]!.model;
 
@@ -754,6 +777,7 @@ export async function readPurchases(
   const { rows, merged, pairs } = mergeRows(
     files.flatMap((f) => cache.files[f.hash]!.rows),
     (a, b) => cache_pairs[pairKey(a, b)] ?? null,
+    ctx.registry,
   );
   result.merged = merged;
   for (const row of rows) {

@@ -1,6 +1,13 @@
 // Price sources: links between products and source listings, match candidates, observations,
 // collector runs and health. Products and market data are shared by all users.
-import { type CollectorRunStatus, median, productClass, toTokyoIso } from '@tora/core';
+import {
+  type CollectorRunStatus,
+  type SourceRegistry,
+  median,
+  productClass,
+  referenceSource,
+  toTokyoIso,
+} from '@tora/core';
 import {
   and,
   asc,
@@ -19,6 +26,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { Db } from './client';
+import { loadSourceRegistry } from './registry';
 import { clearBucketValues } from './valuation';
 import {
   type NewPriceObservation,
@@ -865,27 +873,28 @@ export async function addSourceReference(
   return true;
 }
 
-/** Non-card items costing more than this should be linked to a store page (user, 2026-10-12). */
+/** Other items (not cards or sealed TCG) are expected to have their main source only above this. */
 export const STORE_LINK_MIN_COST = 3000;
 
 /**
- * The stable, product-level source an item should be linked to: SNKRDUNK for cards and sealed
- * product (boxes, packs, decks, special sets), 駿河屋 for other items costing more than ¥3,000 (what
- * the user paid for the lots they own); else none.
+ * The main source an item should be linked to: its class's reference source in the registry
+ * (e.g. the trusted card market for cards and sealed product); for other items only when they
+ * cost more than ¥3,000 (what the user paid for the lots they own). Null when none.
  */
 export function stableSourceFor(
   product: Pick<Product, 'category' | 'kind'>,
   costJpy: number,
-): 'snkrdunk' | 'surugaya' | null {
+  registry: SourceRegistry,
+): string | null {
   const cls = productClass(product);
-  if (cls === 'card' || cls === 'sealed') return 'snkrdunk';
-  return costJpy > STORE_LINK_MIN_COST ? 'surugaya' : null;
+  if (cls === 'item' && costJpy <= STORE_LINK_MIN_COST) return null;
+  return referenceSource(registry, cls);
 }
 
 export interface MissingSource {
   product: Product;
-  /** The stable source this item should be linked to. */
-  source: 'snkrdunk' | 'surugaya';
+  /** The main source this item should be linked to. */
+  source: string;
   /** What the user paid for the lots they own. */
   costJpy: number;
   /** Suggestions from that source waiting for confirmation. */
@@ -893,9 +902,8 @@ export interface MissingSource {
 }
 
 /**
- * Owned items without their stable, product-level price source (requirements S7): cards and
- * sealed product not linked to SNKRDUNK (Mercari searches are a plus, not a replacement), and
- * other items costing more than ¥3,000 not linked to a 駿河屋 page. Lots still in the import review are left out.
+ * Owned items without their main price source (requirements S7; see `stableSourceFor`). Lots
+ * still in the import review are left out.
  */
 export async function missingPriceSources(db: Db, userId: string): Promise<MissingSource[]> {
   const owned = await db
@@ -910,8 +918,9 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
       ),
     )
     .groupBy(products.id);
+  const registry = await loadSourceRegistry(db);
   const wanted = owned.flatMap(({ product, cost }) => {
-    const source = stableSourceFor(product, Number(cost));
+    const source = stableSourceFor(product, Number(cost), registry);
     return source ? [{ product, costJpy: Number(cost), source }] : [];
   });
   if (wanted.length === 0) return [];

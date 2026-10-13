@@ -12,6 +12,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { parseArgs } from 'node:util';
 import { FILE_TYPES, checkContext, fileHash, readPurchases } from '../ai-import';
+import { loadAndRegister } from '../registry';
 import { applyAiImport, planAiImport } from '../ai-import-plan';
 import { askClaude } from '../claude';
 
@@ -60,6 +61,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// The plug-ins' shops (names, aliases, ID shapes) for reading purchases.
+await loadAndRegister(db);
 const user = await getUserByUsername(db, values.user.trim().toLowerCase());
 if (!user) {
   console.error(`No user "${values.user}".`);
@@ -178,7 +181,7 @@ console.log(
     .map(([k, n]) => `${n} ${k}`)
     .join(
       ', ',
-    )}${outcome.linksResolved ? `; ${outcome.linksResolved} failed Mercari link(s) resolved` : ''}. Check the new lots in Imports > Review.`,
+    )}${outcome.linksResolved ? `; ${outcome.linksResolved} failed purchase link(s) resolved` : ''}. Check the new lots in Imports > Review.`,
 );
 for (const f of outcome.failed) console.log(`  failed ${f.orderId}: ${f.error}`);
 process.exit(0);

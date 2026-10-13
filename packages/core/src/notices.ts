@@ -8,11 +8,11 @@ export const NOTICE_LEVELS = ['red', 'orange', 'yellow', 'blue', 'grey'] as cons
 export type NoticeLevel = (typeof NOTICE_LEVELS)[number];
 
 export const NOTICE_TYPES = [
-  /** A card or sealed TCG item without its main price source (SNKRDUNK). */
+  /** A card or sealed TCG item without its main price source (its class's reference source). */
   'tcg_main_source',
-  /** A game or other item without its main price source (駿河屋). */
+  /** A game or other item without its main price source. */
   'game_main_source',
-  /** Suggested listings of another source (e.g. TCGplayer for a card linked to SNKRDUNK). */
+  /** Suggested listings of another source (e.g. a foreign market for a card already linked). */
   'second_source',
   /** A card lot without a grade: not valued. */
   'card_grade',

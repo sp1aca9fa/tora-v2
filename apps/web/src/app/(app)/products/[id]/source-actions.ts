@@ -1,6 +1,6 @@
 'use server';
 
-import { parseSourceUrl } from '@tora/core';
+import { parseListingUrl } from '@tora/core';
 import {
   type SourceQuery,
   confirmCandidate,
@@ -18,6 +18,7 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
+import { getRegistry } from '@/lib/sources';
 import type { FormState } from '@/lib/form';
 
 /** Price sources belong to shared products; any user holding the product may manage them. */
@@ -54,8 +55,19 @@ export async function linkUrlAction(
 ): Promise<FormState> {
   const db = await allowed(productId);
   if (!db) return { error: 'not_found' };
-  const parsed = parseSourceUrl(String(formData.get('url') ?? ''));
-  if (!parsed) return { error: 'badSourceUrl' };
+  const registry = await getRegistry();
+  const parsed = parseListingUrl(registry, String(formData.get('url') ?? ''));
+  if (!parsed) {
+    return {
+      error: 'badSourceUrl',
+      values: {
+        sources: registry.sources
+          .filter((s) => s.links?.length)
+          .map((s) => s.label)
+          .join(', '),
+      },
+    };
+  }
   await linkSource(db, productId, parsed);
   // Also the Actions page and the badges (a main source may be linked now).
   revalidatePath('/', 'layout');

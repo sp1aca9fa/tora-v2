@@ -9,15 +9,13 @@ import { tokyoDate } from '@tora/core';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { getRegistry, sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { sourceLabel } from '@/lib/product-display';
 import { AddFlow } from './add-flow';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('add'))('title') };
 }
-
-const STORES = ['Yodobashi', 'Bic Camera', 'Amazon', 'Mercari', 'SNKRDUNK', 'Pokemon Center'];
 
 /** `?product=<id>` starts from an existing product (e.g. "add another" on a holding). */
 export default async function AddPage({
@@ -25,6 +23,11 @@ export default async function AddPage({
 }: {
   searchParams: Promise<{ product?: string; link?: string }>;
 }) {
+  const sourceLabel = await sourceLabels();
+  // Shops and price sources the plug-ins describe, as suggestions for "bought at".
+  const registryShops = (await getRegistry()).sources
+    .filter((s) => s.shopOnly || s.aliases?.length)
+    .map((s) => s.label);
   const { db, user } = await authed();
   const { product: productId, link: linkId } = await searchParams;
   // `?link=<id>`: a purchase link that could not be imported, added by hand.
@@ -57,7 +60,7 @@ export default async function AddPage({
       </header>
       <AddFlow
         today={tokyoDate()}
-        fromSuggestions={[...new Set([...fromHistory, ...STORES])].sort((a, b) =>
+        fromSuggestions={[...new Set([...fromHistory, ...registryShops])].sort((a, b) =>
           a.localeCompare(b, 'ja'),
         )}
         franchiseSuggestions={[...franchises].sort((a, b) => a.localeCompare(b, 'ja'))}

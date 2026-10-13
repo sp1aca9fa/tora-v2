@@ -42,8 +42,6 @@ export interface Valuation {
   pooled: boolean;
 }
 
-/** Market sources in fallback order; sources not listed come after these. */
-export const SOURCE_PRIORITY = ['snkrdunk', 'mercari', 'surugaya'];
 export const WINDOWS = [30, 90, 180] as const;
 /** A shop's asking price older than this is not used. */
 export const STORE_DAYS = 30;
@@ -94,9 +92,18 @@ export function withoutOutliers(values: number[]): number[] {
 export const ageDays = (iso: string, now: Date) =>
   Math.max(0, Math.floor((now.getTime() - Date.parse(iso)) / DAY));
 
-function sourceOrder(sources: string[]): string[] {
-  const known = SOURCE_PRIORITY.filter((s) => sources.includes(s));
-  return [...known, ...sources.filter((s) => !SOURCE_PRIORITY.includes(s)).sort()];
+/**
+ * Sources in valuation order: the given order (references, then supporting sources; see
+ * `valuationOrder`) and only those; without one, every source alphabetically.
+ */
+function sourceOrder(present: string[], order?: readonly string[]): string[] {
+  return order ? order.filter((s) => present.includes(s)) : present.toSorted();
+}
+
+/** Sources shown side by side: the valued ones in order, then the others. */
+function displayOrder(present: string[], order?: readonly string[]): string[] {
+  const valued = sourceOrder(present, order);
+  return [...valued, ...present.filter((s) => !valued.includes(s)).sort()];
 }
 
 /**
@@ -110,6 +117,8 @@ export function valueUnit(input: {
   manualPrices?: readonly ManualPriceInput[];
   retailPriceJpy?: number | null;
   now?: Date;
+  /** Sources valued from, best first (the registry's order for the item's class). */
+  sources?: readonly string[];
 }): Valuation {
   const now = input.now ?? new Date();
   const none: Valuation = {
@@ -162,7 +171,7 @@ export function valueUnit(input: {
         : []),
     ];
     let fallback: Valuation | null = null;
-    for (const source of sourceOrder([...new Set(sold.map((o) => o.source))])) {
+    for (const source of sourceOrder([...new Set(sold.map((o) => o.source))], input.sources)) {
       const ofSource = sold.filter((o) => o.source === source);
       const take = (step: { days: number; pooled: boolean }) =>
         ofSource.filter(
@@ -213,6 +222,7 @@ export function valueUnit(input: {
           o.observationType === 'listing' &&
           !o.excluded &&
           o.bucket === input.bucket &&
+          (!input.sources || input.sources.includes(o.source)) &&
           timeOf(o) <= now.getTime() &&
           now.getTime() - timeOf(o) <= STORE_DAYS * DAY,
       )
@@ -327,6 +337,8 @@ export function sourceSummaries(
   recent: readonly RecentSaleInput[],
   bucket: string | null,
   now: Date = new Date(),
+  /** The valuation order (see `valueUnit`). */
+  order?: readonly string[],
 ): SourceSummary[] {
   if (!bucket) return [];
   const sources = new Set([
@@ -335,7 +347,7 @@ export function sourceSummaries(
       .map((o) => o.source),
     ...recent.filter((r) => r.bucket === bucket).map((r) => r.source),
   ]);
-  return sourceOrder([...sources]).map((source) => {
+  return displayOrder([...sources], order).map((source) => {
     const v = valueUnit({
       bucket,
       observations: observations.filter((o) => o.source === source),

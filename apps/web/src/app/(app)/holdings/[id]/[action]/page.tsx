@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { authed } from '@/lib/auth/guard';
+import { getRegistry } from '@/lib/sources';
 import {
   conditionAction,
   cancelOrderAction,
@@ -45,16 +46,6 @@ const ACTIONS = {
 } as const;
 type ActionKey = keyof typeof ACTIONS;
 
-const PLATFORMS = [
-  'Card shop',
-  'eBay',
-  'Mercari',
-  'SNKRDUNK',
-  'Yahoo Auctions',
-  'Yahoo Flea Market',
-  '駿河屋',
-].sort((a, b) => a.localeCompare(b, 'ja'));
-
 export default async function HoldingActionPage({
   params,
 }: {
@@ -68,6 +59,11 @@ export default async function HoldingActionPage({
   if (!detail) notFound();
   const { holding, product, events } = detail;
   const t = await getTranslations();
+  // Where it may be sold: the shops and sources the plug-ins describe, and a card shop.
+  const PLATFORMS = [
+    t('holding.cardShop'),
+    ...(await getRegistry()).sources.filter((s) => s.aliases?.length).map((s) => s.label),
+  ].sort((a, b) => a.localeCompare(b, 'ja'));
   const today = tokyoDate();
   const cls = productClass(product);
   const fields = holdingFieldsFor(cls);

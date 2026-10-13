@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { userActions } from '@/lib/actions';
+import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { sourceLabel } from '@/lib/product-display';
 import { removeLinkAction, retryLinkAction } from './actions';
 import { LinksForm } from './links-form';
 
@@ -16,6 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Imports hub (requirements S5d): what needs you, ways to import, and what each import did. */
 export default async function ImportsPage() {
+  const sourceLabel = await sourceLabels();
   const { db, user } = await authed();
   const [actions, links, runs, t, format] = await Promise.all([
     userActions(),

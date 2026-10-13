@@ -2,8 +2,8 @@ import type { Valuation } from '@tora/core';
 import type { ForeignPrice, Product } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
+import { sourceLabels } from '@/lib/sources';
 
 /**
  * The condition US prices are quoted in: TCGplayer prices ungraded near-mint cards and sealed
@@ -29,6 +29,7 @@ export async function MarketCompare({
   mainBucket: string | null;
   foreign: ForeignPrice[];
 }) {
+  const sourceLabel = await sourceLabels();
   if (foreign.length === 0) return null;
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
   // A market comparison: a retail price is no market value.

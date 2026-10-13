@@ -109,7 +109,10 @@ server.registerTool(
     inputSchema: {
       productId: z.string(),
       bucket: z.string().optional(),
-      source: z.string().optional().describe('snkrdunk, mercari, ...'),
+      source: z
+        .string()
+        .optional()
+        .describe('A source key (see the sources the collectors describe)'),
       days: z.number().int().min(1).max(1100).optional().describe('default 365'),
     },
   },

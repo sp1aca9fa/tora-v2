@@ -1,9 +1,6 @@
 // Enumerations shared by the schema, domain logic and UI (requirements section 5).
 // Product taxonomy (category, kind, region) lives in taxonomy.ts.
 
-export const SOURCES = ['snkrdunk', 'mercari', 'surugaya', 'tcgcsv', 'ebay', 'manual'] as const;
-export type Source = (typeof SOURCES)[number];
-
 export const ACQUISITION_TYPES = ['purchase', 'pull', 'gift', 'trade'] as const;
 export type AcquisitionType = (typeof ACQUISITION_TYPES)[number];
 

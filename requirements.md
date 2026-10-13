@@ -27,7 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
-| S10 | Reliability and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
+| S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 
 ### Decision log
@@ -569,7 +569,7 @@ Build:
 - Built (2026-10-12): saved bucket values, nav badge and portfolio chart streamed, loading placeholder; Actions page first version with default notice levels (see Decision log). Notice levels in Settings and a nav Sign out built. Next: per-lot cost/value switches, then the wide-screen layout and visual pass.
 - Speed: the portfolio page shows nothing until every number is loaded. Measure where the time goes, then show the page at once and let the slow parts (chart, per-product list) fill in as they load (streaming with placeholders), and precompute what can be (e.g. at the end of a collect).
 - Sources with roles ("bring your own sources"; user + Claude, 2026-10-13; replaces "source names out of the public code"). Two kinds of store: price sources (collectors: they decide values) and purchase shops (imports: they only create lots, checked in the import review). Steps, all in S8:
-  1. Registry: each plug-in package declares its sources and shops (key, label, badge, colour, market, currency, price kinds, a suggested role per item class: reference / supporting / comparison, a priority, listing URL patterns, shop aliases, one item per order). Collectors save them to the database on each run; the app reads them there (it cannot load private plug-ins). Valuation: sales of reference then supporting sources (by priority), then shops' asking prices, then retail; comparison sources are shown, never valued. The main-source warning asks for the class's reference source. The suggested roles of our sources are the "Japan collectibles" preset (SNKRDUNK reference for cards and sealed, Mercari supporting, 駿河屋 reference for other items, TCGplayer and eBay comparison). Roles are deployment-wide (admin, Settings), not per user. Built-in lists naming shops in the public code go away. Values must stay identical (checked on production before / after).
+  1. (Built 2026-10-13: `sources` table, migration 0020; values checked identical on production for all 133 lots, main sources too; Settings > Price sources shows the roles, admins change them.) Registry: each plug-in package declares its sources and shops (key, label, badge, colour, market, currency, price kinds, a suggested role per item class: reference / supporting / comparison, a priority, listing URL patterns, shop aliases, one item per order). Collectors save them to the database on each run; the app reads them there (it cannot load private plug-ins). Valuation: sales of reference then supporting sources (by priority), then shops' asking prices, then retail; comparison sources are shown, never valued. The main-source warning asks for the class's reference source. The suggested roles of our sources are the "Japan collectibles" preset (SNKRDUNK reference for cards and sealed, Mercari supporting, 駿河屋 reference for other items, TCGplayer and eBay comparison). Roles are deployment-wide (admin, Settings), not per user. Built-in lists naming shops in the public code go away. Values must stay identical (checked on production before / after).
   2. Quality gates: a source's trust is earned from data. Sales of a supporting source are compared with the reference's on the same items and conditions (like for like: sold vs sold); a source that disagrees (e.g. median gap over 15% on 10+ items) drops to comparison until it agrees again, with a notice. A source that cannot be compared (e.g. no reference sales for that class) shows as unverified and keeps its role.
   3. README: sources and roles, the Japan preset, how to write a plug-in; no responsibility for others' sources and imports.
   4. Yahoo Auctions closed listings (落札相場) as the first new source through the registry (supporting, for rare and event-only items no shop lists).
@@ -587,10 +587,13 @@ Design plan (user + Claude, 2026-10-12; the revamp of S8):
 Acceptance:
 - User review on phone and on a wide desktop screen.
 
-## S10: Reliability and function review
+## S10: Reliability, consistency, efficacy and function review
 
 Added at the user's request (2026-10-13). A review of the whole app before buy timing builds on its data. Pain points are two-fold: reliability (the data is right) and usability (a clear path to reliable data).
 
+- Concepts and requirements: is the app achieving what it intended to?
+- Efficacy: is the app doing so in an efficient way?
+- Challenges, risks, potential blockers
 - Data: no duplicated data (sales stored twice across sources or runs, lots imported twice, products registered twice), each value uses the best data available (sources, windows, conditions), the numbers on every screen agree.
 - Function: every flow from setup to daily use works and is practical (setup, adding and importing, matching, collecting, valuing, actions, review).
 - A full setup in another market: rebuild the app from scratch for e.g. France as the main market and China as the second (instead of Japan + US), with the sources and roles system, and see whether a user would get reliable data and a clear path to it. Findings decide what the README and the setup flow need.

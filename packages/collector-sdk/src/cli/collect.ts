@@ -9,7 +9,7 @@ import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
-import { loadCollectors } from '../registry';
+import { loadAndRegister } from '../registry';
 import { runCollector } from '../runner';
 import { claudeJudge } from '../claude';
 import { Progress } from './progress';
@@ -33,12 +33,13 @@ if (process.env.VERCEL || process.env.CI) {
 
 loadRootEnv();
 const config = dbConfigFromEnv();
-const { collectors, importers, rates, missing } = await loadCollectors();
-for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
-const selected = collectors.filter((c) => !values.source || c.source === values.source);
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// The plug-ins' source descriptions are saved first: the app reads them.
+const { collectors, importers, rates, missing } = await loadAndRegister(db);
+for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
+const selected = collectors.filter((c) => !values.source || c.source === values.source);
 let exitCode = 0;
 const withLinks = !values.product && importers.some((i) => i.readLink);
 const withRates = !values.product && !values.source && rates.length > 0;

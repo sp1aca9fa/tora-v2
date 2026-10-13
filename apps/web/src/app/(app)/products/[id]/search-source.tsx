@@ -2,7 +2,6 @@ import { valueUnit } from '@tora/core';
 import { type Db, type ProductSource, keptObservations, sourceObservations } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
-import { sourceLabel } from '@/lib/product-display';
 import { cn, formatJpy } from '@/lib/utils';
 import { QueryForm } from './query-form';
 import { ReferenceForm } from './reference-form';
@@ -11,6 +10,7 @@ import {
   removeReferenceAction,
   unlinkSourceAction,
 } from './source-actions';
+import { sourceLabels } from '@/lib/sources';
 
 interface ReferenceInfo {
   name: string;
@@ -24,6 +24,7 @@ interface ReferenceInfo {
  * an item was left out and buttons to exclude or include one by hand.
  */
 export async function SearchSource({ db, link }: { db: Db; link: ProductSource }) {
+  const sourceLabel = await sourceLabels();
   const [t, format, sales, kept] = await Promise.all([
     getTranslations(),
     getFormatter(),

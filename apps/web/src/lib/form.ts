@@ -5,6 +5,8 @@ import { z } from 'zod';
 export interface FormState {
   error?: string;
   fields?: string[];
+  /** Values the error message names (e.g. the price sources a link may come from). */
+  values?: Record<string, string>;
 }
 
 const trimmed = (v: unknown) => {

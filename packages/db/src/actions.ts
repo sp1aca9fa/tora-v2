@@ -25,6 +25,7 @@ import {
   purchaseLinks,
   sourceCandidates,
 } from './schema';
+import { loadSourceRegistry } from './registry';
 import { dismissedSourceWarnings, stableSourceFor } from './sources';
 import { openSuggestions } from './suggestions';
 
@@ -53,7 +54,7 @@ export type ActionItem = ActionBase &
         product: Product;
         imageVersion: string | null;
         source: string;
-        /** The item's main source (SNKRDUNK for TCG, 駿河屋 for other items over ¥3,000). */
+        /** The item's main source (its class's reference source; see `stableSourceFor`). */
         main: boolean;
         /** What the user paid for the lots they own, and how many units. */
         costJpy: number;
@@ -148,6 +149,7 @@ export async function pendingActions(
             ),
         ]);
   const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
+  const registry = await loadSourceRegistry(db);
   const known = await linkedListingImages(
     db,
     pending.filter((c) => !c.imageUrl).map((c) => ({ source: c.source, externalId: c.externalId })),
@@ -157,7 +159,7 @@ export async function pendingActions(
   const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
   for (const { product, cost, units } of owned) {
     const costJpy = Number(cost);
-    const main = stableSourceFor(product, costJpy);
+    const main = stableSourceFor(product, costJpy, registry);
     // Suggestions of sources the item has no listing of yet (variants of a linked listing wait
     // on the item page).
     const bySource = new Map<string, typeof pending>();

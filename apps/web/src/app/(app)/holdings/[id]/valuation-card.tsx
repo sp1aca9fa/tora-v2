@@ -5,10 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { SourceBadge } from '@/components/source-badge';
 import { Trend } from '@/components/trend';
 import { ValuationMeta } from '@/components/valuation-meta';
-import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { ManualPriceForm } from './manual-price-form';
 import { clearManualPriceAction, setManualPriceAction } from './valuation-actions';
+import { sourceLabels } from '@/lib/sources';
 
 /** Current value of the holding: how it was computed, P/L, buylist floor, manual override. */
 export async function ValuationCard({
@@ -24,6 +24,7 @@ export async function ValuationCard({
   product: Product;
   bucket: string | null;
 }) {
+  const sourceLabel = await sourceLabels();
   const [t, format, values] = await Promise.all([
     getTranslations('valuation'),
     getFormatter(),
@@ -80,7 +81,7 @@ export async function ValuationCard({
             )}
           </p>
         )}
-        <ValuationMeta v={v} />
+        <ValuationMeta v={v} source={sourceLabel(v.source ?? '')} />
         {v.method === 'median' && v.estimatedSamples > 0 && (
           <p className="rounded-md bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             {t('estimatedSamples', { count: v.estimatedSamples, total: v.sampleSize })}

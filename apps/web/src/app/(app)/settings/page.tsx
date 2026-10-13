@@ -10,11 +10,12 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { logout, revokeDeviceAction } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getRegistry, sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { setAmountsVisibleAction } from './actions';
 import { NoticeLevelsForm } from './notice-levels-form';
+import { SourcesForm } from './sources-form';
 import { SummaryForm } from './summary-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,6 +23,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SettingsPage() {
+  const sourceLabel = await sourceLabels();
+  const registry = await getRegistry();
   const { db, user, device: current } = await authed();
   const [runs, health, devices, t, format] = await Promise.all([
     listRecentCollectorRuns(db, 10),
@@ -61,6 +64,22 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <NoticeLevelsForm levels={noticeLevelsFor(user.noticeLevels)} />
+          </CardContent>
+        </Card>
+
+        <Card id="sources" className="scroll-mt-20">
+          <CardHeader>
+            <CardTitle>{t('sourceRoles.title')}</CardTitle>
+            <CardDescription>
+              {t('sourceRoles.info')} {user.role !== 'admin' && t('sourceRoles.adminOnly')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SourcesForm
+              sources={registry.sources}
+              roles={registry.roles}
+              editable={user.role === 'admin'}
+            />
           </CardContent>
         </Card>
 

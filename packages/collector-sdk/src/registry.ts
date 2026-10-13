@@ -1,3 +1,5 @@
+import type { SourceInfo } from '@tora/core';
+import { type Db, saveSourceInfos } from '@tora/db';
 import { findRepoRoot } from '@tora/db/env';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,6 +19,7 @@ export interface LoadedCollectors {
   collectors: Collector[];
   importers: PurchaseImporter[];
   rates: RateSource[];
+  sources: SourceInfo[];
   missing: string[];
 }
 
@@ -24,6 +27,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const collectors: Collector[] = [];
   const importers: PurchaseImporter[] = [];
   const rates: RateSource[] = [];
+  const sources: SourceInfo[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -35,6 +39,17 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     collectors.push(...mod.collectors);
     importers.push(...(mod.importers ?? []));
     rates.push(...(mod.rates ?? []));
+    sources.push(...(mod.sources ?? []));
   }
-  return { collectors, importers, rates, missing };
+  return { collectors, importers, rates, sources, missing };
+}
+
+/**
+ * Loads the collector packages and saves their source descriptions for the app (every command
+ * that runs collectors or imports starts with this).
+ */
+export async function loadAndRegister(db: Db, root?: string): Promise<LoadedCollectors> {
+  const loaded = await loadCollectors(root);
+  await saveSourceInfos(db, loaded.sources);
+  return loaded;
 }

@@ -1,4 +1,6 @@
 import { deriveBucket, pendingGrading, productClass } from '@tora/core';
+import { saveSourceInfos } from './registry';
+import { TEST_SOURCES } from './testing';
 import { eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -47,6 +49,7 @@ beforeEach(async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tora-mut-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
   await migrateDb(db);
+  await saveSourceInfos(db, TEST_SOURCES);
   uid = (await createUser(db, 'alice', creds)).user.id;
   return () => rm(dir, { recursive: true, force: true });
 });

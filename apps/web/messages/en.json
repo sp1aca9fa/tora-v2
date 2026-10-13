@@ -120,7 +120,7 @@
       "existing": "Existing",
       "source": "From sites"
     },
-    "sourceSearchSoon": "Searching SNKRDUNK and other sites comes in a later update.",
+    "sourceSearchSoon": "Searching the price sources' sites comes in a later update.",
     "searchPlaceholder": "Search items you already registered",
     "noResults": "No match. Use \"New item\" to create it.",
     "change": "Change",
@@ -142,14 +142,14 @@
     "released": "Released {date}",
     "notInList": "Not in the list? Enter it manually",
     "variantPlaceholder": "e.g. Collector",
-    "orderIdHint": "Optional. e.g. SNKRDUNK 取引ID or Mercari transaction ID; used to catch duplicates and imports.",
+    "orderIdHint": "Optional. The shop's order or transaction ID; used to catch duplicates and imports.",
     "existingHint": "Already registered? Pick it to add this under the same item:",
     "linked": "linked",
     "onRelease": "Acquired on release day ({date})",
     "onReleaseUnknown": "Acquired on release day (enter a full release date first)",
     "unknownFrom": "Unknown",
     "costFromRetail": "Left blank: the retail price x quantity ({amount}) is used.",
-    "fromLinks": "Bought on Mercari? Paste the links instead",
+    "fromLinks": "Bought on a marketplace app? Paste the links instead",
     "fromLink": "Adding by hand a purchase whose link could not be imported (saving marks the link as done):"
   },
   "holding": {
@@ -178,7 +178,8 @@
     "marketData": "Market prices, chart and price sources",
     "estimatedCost": "Estimated cost",
     "referenceOnly": "reference only",
-    "estimatedCostNote": "Pulled from \"{name}\". That item keeps its cost; this estimate splits it across the {count, plural, one {# pull} other {# pulls}} logged from it by market value. It is not counted in any total."
+    "estimatedCostNote": "Pulled from \"{name}\". That item keeps its cost; this estimate splits it across the {count, plural, one {# pull} other {# pulls}} logged from it by market value. It is not counted in any total.",
+    "cardShop": "Card shop"
   },
   "actions": {
     "intro": "Everything waiting for you, most urgent first. Settle each card here; open the item when a card is not enough.",
@@ -322,8 +323,8 @@
     "no_change": "Nothing changed.",
     "has_dependents": "Other entries depend on this one (pulls or splits), so it cannot be deleted.",
     "forbidden": "Only the person who created this item can change it.",
-    "badSourceUrl": "That is not a SNKRDUNK product link (https://snkrdunk.com/apparels/…).",
-    "duplicate_order": "This transaction ID is already registered (each SNKRDUNK / Mercari transaction is one item).",
+    "badSourceUrl": "That is not a product link of a price source ({sources}).",
+    "duplicate_order": "This transaction ID is already registered (each transaction at this shop is one item).",
     "noneSelected": "Select at least one card",
     "noneGraded": "Pick a grade for at least one card",
     "noLinks": "No links found.",
@@ -419,10 +420,9 @@
     "confirm": "Yes, link",
     "reject": "No",
     "score": "{score}% match",
-    "noneYet": "Not linked yet. The next collector run looks for this item (SNKRDUNK and TCGplayer for cards, 駿河屋 for other items), or paste its link below.",
+    "noneYet": "Not linked yet. The next collector run looks for this item on its price sources, or paste its link below.",
     "missingStable": "Not linked to {source} yet: it is this item's main price source. Confirm a suggestion below or paste its link.",
-    "pasteUrl": "Paste a SNKRDUNK or TCGplayer product link",
-    "pasteUrlItem": "Paste a 駿河屋, SNKRDUNK or TCGplayer product link",
+    "pasteUrl": "Paste a product link from a price source ({sources})",
     "link": "Link",
     "last30": "Last 30 days",
     "median": "Median",
@@ -431,7 +431,7 @@
     "yours": "yours",
     "recentTrades": "Recent trades",
     "matchesTitle": "Matches to confirm",
-    "matchesInfo": "The collector found possible SNKRDUNK listings for these items. Open one to confirm the right match.",
+    "matchesInfo": "The collector found possible listings for these items. Open one to confirm the right match.",
     "noMatches": "Nothing to confirm.",
     "banner": "{count, plural, one {# item has} other {# items have}} a price source to confirm",
     "addAnother": "Add another listing ({count, plural, =0 {paste a link} one {# suggestion} other {# suggestions}})",
@@ -563,7 +563,7 @@
     "purchasedOn": "Purchased on",
     "links": {
       "title": "Add purchases by link",
-      "intro": "For shops that send no receipt email (Mercari): paste the links of things you bought, one per line (Mercari app: 購入した商品 > the item > share > copy link). The home PC reads them on the next collect; collectibles then show up above for review, other things are skipped.",
+      "intro": "For shops that send no receipt email: paste the links of things you bought, one per line (in the shop's app: your purchases > the item > share > copy link). The home PC reads them on the next collect; collectibles then show up above for review, other things are skipped.",
       "label": "Purchase links",
       "add": "Add links",
       "added": "{count, plural, one {# link added} other {# links added}}",
@@ -690,7 +690,7 @@
   "compare": {
     "title": "Japan vs US",
     "info": "Same condition on both sides ({bucket}). US prices are shown for comparison only and never count in the value.",
-    "graded": "TCGplayer only prices ungraded cards, so your graded cards are compared at this condition.",
+    "graded": "The foreign prices are for ungraded cards, so your graded cards are compared at this condition.",
     "japan": "Japan",
     "us": "US",
     "noJapan": "No Japanese price",
@@ -699,20 +699,6 @@
     "asks": "median ask of {count, plural, one {# listing} other {# listings}}"
   },
   "coverage": {
-    "title": "Price sources to link",
-    "intro": "Items without their stable price source. The home PC looks for matches on each collect; confirm one on the item page or paste a link. For items no shop lists (e.g. a limited watch), turn the warning off.",
-    "banner": "{count, plural, one {# item has} other {# items have}} no stable price source linked",
-    "snkrdunk": {
-      "title": "Cards and sealed product not linked to SNKRDUNK ({count})",
-      "intro": "SNKRDUNK is the stable source for cards, boxes, decks and special sets; Mercari searches are a plus."
-    },
-    "surugaya": {
-      "title": "Items not linked to 駿河屋 ({count})",
-      "intro": "Games, consoles, supplies and other items that cost more than {amount}: a 駿河屋 page gives store and buy-back prices."
-    },
-    "suggestions": "{count, plural, one {# suggestion to confirm} other {# suggestions to confirm}}",
-    "noSuggestion": "No match found yet: paste a link",
-    "none": "Every item has its price source linked.",
     "dismiss": "Don't warn",
     "dismissed": "{count, plural, one {# item} other {# items}} without warnings",
     "warnAgain": "Warn again"
@@ -728,9 +714,9 @@
       "grey": "Quiet (grey)"
     },
     "type": {
-      "tcg_main_source": "TCG item without its main price source (SNKRDUNK)",
-      "game_main_source": "Game or other item without its main price source (駿河屋)",
-      "second_source": "Suggestions from another price source (e.g. TCGplayer)",
+      "tcg_main_source": "TCG item without its main price source",
+      "game_main_source": "Game or other item without its main price source",
+      "second_source": "Suggestions from another price source",
       "card_grade": "Card without a grade",
       "game_condition": "Game without a condition",
       "import_review": "Imported lots to review",
@@ -792,5 +778,28 @@
     "allLots": "Apply to every lot of this item",
     "saved": "Saved.",
     "save": "Save"
+  },
+  "sourceRoles": {
+    "title": "Price sources",
+    "info": "Where values come from, per kind of item: a reference source is valued first and is the source items should be linked to; supporting sources are used when the reference has too few sales; comparison sources are shown beside the value, never in it. The roles come from the sources' plug-ins (suggested) and apply to every account.",
+    "adminOnly": "Only an admin can change them.",
+    "source": "Source",
+    "suggested": "suggested",
+    "class": {
+      "card": "Cards",
+      "sealed": "Sealed TCG",
+      "item": "Games & other"
+    },
+    "role": {
+      "reference": "Reference",
+      "supporting": "Supporting",
+      "comparison": "Comparison",
+      "off": "Off"
+    },
+    "kind": {
+      "sold": "sales",
+      "listing": "asking prices",
+      "buylist": "buy prices"
+    }
   }
 }

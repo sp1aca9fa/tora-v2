@@ -4,8 +4,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { lotConditionLabel, sourceLabel } from '@/lib/product-display';
+import { lotConditionLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -14,6 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** One import run: what it did, the lots it created and the links it read. */
 export default async function ImportRunPage({ params }: { params: Promise<{ id: string }> }) {
+  const sourceLabel = await sourceLabels();
   const { id } = await params;
   const { db, user } = await authed();
   const [detail, t, format] = await Promise.all([

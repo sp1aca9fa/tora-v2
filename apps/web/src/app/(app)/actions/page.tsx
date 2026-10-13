@@ -5,8 +5,9 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { userActions } from '@/lib/actions';
+import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { lotConditionLabel, productMeta, sourceLabel } from '@/lib/product-display';
+import { lotConditionLabel, productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { setSourceWarningAction } from './actions';
 import { reviewItemOf } from '../imports/review/review-item';
@@ -22,6 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * settle it here, most urgent level first.
  */
 export default async function ActionsPage() {
+  const sourceLabel = await sourceLabels();
   const { db, user } = await authed();
   const [items, dismissedIds, t, format] = await Promise.all([
     userActions(),

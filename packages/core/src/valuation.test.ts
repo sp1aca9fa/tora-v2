@@ -268,7 +268,7 @@ describe('last sale and per-source summaries', () => {
   });
 
   it('summarizes each source with its median and the last sale trend', () => {
-    const s = sourceSummaries(obs, recent, 'sealed:shrink', now);
+    const s = sourceSummaries(obs, recent, 'sealed:shrink', now, ['snkrdunk', 'mercari']);
     expect(s.map((x) => x.source)).toEqual(['snkrdunk', 'mercari']);
     expect(s[0]).toMatchObject({
       medianJpy: 10_000,

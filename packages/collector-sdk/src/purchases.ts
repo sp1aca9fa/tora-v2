@@ -17,6 +17,7 @@ import {
   linkSource,
   listingsOf,
   suggestFromKnownProducts,
+  loadSourceRegistry,
 } from '@tora/db';
 import { termCoverage } from './match';
 import type { PurchaseImporter, PurchaseReceipt, ReceiptMail } from './types';
@@ -188,6 +189,7 @@ export async function planImport(
   options: { exportedAt?: string | null } = {},
 ): Promise<PlanEntry[]> {
   const owned = await holdingsWithProducts(db, userId);
+  const registry = await loadSourceRegistry(db);
   // Receipts may carry no listing link; a listing's title is what the receipt shows.
   const byListingId = new Map<string, Product>();
   const byListingTitle = new Map<string, Product>();
@@ -256,7 +258,7 @@ export async function planImport(
           !claimed.has(holding.id) &&
           holding.acquisitionType === 'purchase' &&
           (!holding.acquiredFrom?.trim() ||
-            orderSourceOf(holding.acquiredFrom) === importer.source) &&
+            orderSourceOf(registry, holding.acquiredFrom) === importer.source) &&
           holding.quantity === receipt.quantity &&
           paidAmounts(receipt).includes(holding.costTotalJpy) &&
           daysApart(holding.acquiredAt, receipt.orderedAt) <= DATE_TOLERANCE_DAYS &&
@@ -318,6 +320,7 @@ export async function applyImport(
   options: { importRunId?: string | null } = {},
 ): Promise<ImportOutcome> {
   const outcome: ImportOutcome = { created: 0, updated: 0, attached: 0, flagged: 0, failed: [] };
+  const registry = await loadSourceRegistry(db);
 
   // A product bought several times is created once.
   const createdProducts = new Map<string, Product>();
@@ -390,7 +393,9 @@ export async function applyImport(
         const from = entry.existing.acquiredFrom;
         await editHolding(db, userId, entry.existing.id, {
           orderId: receipt.orderId,
-          ...(orderSourceOf(from) === importer.source ? {} : { acquiredFrom: importer.label }),
+          ...(orderSourceOf(registry, from) === importer.source
+            ? {}
+            : { acquiredFrom: importer.label }),
         });
         outcome.attached++;
       } else if (entry.type === 'likely' && decision === 'different' && entry.ref) {

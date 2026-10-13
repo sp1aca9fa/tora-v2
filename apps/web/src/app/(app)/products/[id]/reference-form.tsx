@@ -21,7 +21,7 @@ export function ReferenceForm({ sourceId }: { sourceId: string }) {
           name="url"
           type="url"
           required
-          placeholder="https://jp.mercari.com/item/m…"
+          placeholder="https://…"
           aria-label={t('referenceUrl')}
         />
         <Button type="submit" variant="outline" size="sm" disabled={pending}>

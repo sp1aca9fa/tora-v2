@@ -1,4 +1,6 @@
+import { TEST_SOURCES } from '@tora/db/testing';
 import {
+  saveSourceInfos,
   type Db,
   createDb,
   createHolding,
@@ -26,6 +28,7 @@ beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'tora-purchases-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
   await migrateDb(db);
+  await saveSourceInfos(db, TEST_SOURCES);
   userId = (
     await createUser(db, 'alice', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
   ).user.id;

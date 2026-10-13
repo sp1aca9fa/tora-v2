@@ -5,9 +5,9 @@ import { getTranslations } from 'next-intl/server';
 import type { getTranslations as GetT } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { sourceLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { decideSuggestionAction } from './actions';
+import { sourceLabels } from '@/lib/sources';
 
 /**
  * One data review suggestion: what it would change, why, and Accept / Dismiss with a note
@@ -23,6 +23,7 @@ export async function SuggestionCard({
   /** The item's name and link (the Actions card already shows them). */
   showProduct?: boolean;
 }) {
+  const sourceLabel = await sourceLabels();
   const t = await getTranslations();
   const fieldLabel = (f: string) => (t.has(`fields.${f}`) ? t(`fields.${f}`) : f);
   const empty = (v: unknown) => (v === null || v === undefined || v === '' ? '-' : String(v));

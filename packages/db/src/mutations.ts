@@ -14,10 +14,10 @@ import {
   type Region,
   catalogProductName,
   isConsumedAfterOpening,
-  SINGLE_ITEM_ORDER_SOURCES,
   kindsFor,
   kindsForSetType,
   orderSourceOf,
+  singleItemOrders,
   openedStatesFor,
   pendingGrading,
   productClass,
@@ -27,6 +27,7 @@ import {
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
+import { loadSourceRegistry } from './registry';
 import { clearBucketValues } from './valuation';
 import {
   type Holding,
@@ -266,7 +267,8 @@ export async function findHoldingByOrder(
 
 /**
  * Normalizes the order fields and refuses a second registration of a single-item transaction
- * (SNKRDUNK / Mercari / Yahoo IDs are one item each). `exceptId` skips the holding being edited.
+ * (shops whose orders hold one item each, per the source registry). `exceptId` skips the holding
+ * being edited.
  */
 async function checkOrder(
   tx: Tx,
@@ -276,8 +278,9 @@ async function checkOrder(
   exceptId?: string,
 ): Promise<{ orderSource: string | null; orderId: string | null }> {
   const id = orderId?.normalize('NFKC').trim() || null;
-  const source = id ? orderSourceOf(acquiredFrom) : null;
-  if (id && source && SINGLE_ITEM_ORDER_SOURCES.includes(source)) {
+  const registry = await loadSourceRegistry(tx);
+  const source = id ? orderSourceOf(registry, acquiredFrom) : null;
+  if (id && source && singleItemOrders(registry, source)) {
     const existing = await findHoldingByOrder(tx, userId, source, id);
     if (existing && existing.id !== exceptId) {
       throw new DomainError('duplicate_order', existing.id);

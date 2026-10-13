@@ -13,7 +13,6 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { sourceLabel } from '@/lib/product-display';
 import { cn, formatJpy } from '@/lib/utils';
 import { LinkUrlForm } from './link-url-form';
 import { SearchSource } from './search-source';
@@ -25,6 +24,7 @@ import {
   unlinkSourceAction,
 } from './source-actions';
 import { setSourceWarningAction } from '../../actions/actions';
+import { getRegistry, sourceLabels } from '@/lib/sources';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for
@@ -39,13 +39,14 @@ export async function PriceSources({
 }: {
   db: Db;
   product: Product;
-  /** What the user paid for the lots they own (decides whether a 駿河屋 page is expected). */
+  /** What the user paid for the lots they own (decides whether a main source is expected). */
   ownedCostJpy: number;
   /** The user turned the "not linked" warning off for this item. */
   warningDismissed: boolean;
   /** The bucket most of the user's lots are in (highlighted). */
   bucket: string | null;
 }) {
+  const sourceLabel = await sourceLabels();
   const [t, format, sources, candidates, stats, recent] = await Promise.all([
     getTranslations(),
     getFormatter(),
@@ -71,7 +72,13 @@ export async function PriceSources({
   const linked = new Set(active.map((s) => s.source));
   // The item's main source (SNKRDUNK for cards, 駿河屋 for other items over ¥3,000) is still
   // missing: say so and keep the paste box open, whatever else is linked.
-  const stable = stableSourceFor(product, ownedCostJpy);
+  const registry = await getRegistry();
+  const stable = stableSourceFor(product, ownedCostJpy, registry);
+  // Sources whose product links can be pasted here.
+  const linkable = registry.sources
+    .filter((s) => s.links?.length)
+    .map((s) => s.label)
+    .join(', ');
   const missing = stable && !linked.has(stable) && !warningDismissed ? stable : null;
   const pasteUp = !!missing && !candidates.some((c) => c.source === missing);
   const open = candidates.filter((c) => !linked.has(c.source));
@@ -141,11 +148,7 @@ export async function PriceSources({
   const paste = (
     <div className="space-y-1">
       <p className="text-xs text-muted-foreground">
-        {t(
-          product.category === 'tcg' && product.kind === 'single'
-            ? 'sources.pasteUrl'
-            : 'sources.pasteUrlItem',
-        )}
+        {t('sources.pasteUrl', { sources: linkable })}
       </p>
       <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
     </div>

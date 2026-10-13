@@ -1,3 +1,4 @@
+import type { SourceInfo } from '@tora/core';
 import type {
   CandidateInput,
   HoldingInput,
@@ -175,4 +176,9 @@ export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
   rates?: RateSource[];
+  /**
+   * The package's price sources and shops, described for the app (label, role per item class,
+   * links, aliases...; requirements S8, sources with roles). Saved to the database on each run.
+   */
+  sources?: SourceInfo[];
 }

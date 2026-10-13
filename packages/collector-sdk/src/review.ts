@@ -332,7 +332,7 @@ export const ANSWER_SCHEMA = {
   required: ['verdicts', 'fixes'],
 };
 
-export const SYSTEM_PROMPT = `You check data for a collectibles price tracker in Japan (trading cards, sealed boxes, video games). Sales are collected automatically from Mercari and SNKRDUNK by searching for each product, and a filter keeps the listings that look like the product. You judge only the cases given and reply with the requested JSON.`;
+export const SYSTEM_PROMPT = `You check data for a collectibles price tracker in Japan (trading cards, sealed boxes, video games). Sales are collected automatically from marketplaces by searching for each product, and a filter keeps the listings that look like the product. You judge only the cases given and reply with the requested JSON.`;
 
 export const INSTRUCTIONS = `Below are cases flagged by automatic checks, as JSON.
 

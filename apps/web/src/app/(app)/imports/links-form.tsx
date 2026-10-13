@@ -13,13 +13,7 @@ export function LinksForm() {
   const [state, formAction, pending] = useActionState<LinksState, FormData>(addLinksAction, {});
   return (
     <form action={formAction} className="space-y-2">
-      <Textarea
-        name="links"
-        required
-        rows={3}
-        placeholder="https://jp.mercari.com/item/m…"
-        aria-label={t('label')}
-      />
+      <Textarea name="links" required rows={3} placeholder="https://…" aria-label={t('label')} />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {t('add')}

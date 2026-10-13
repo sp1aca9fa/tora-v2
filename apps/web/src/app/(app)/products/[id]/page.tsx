@@ -21,8 +21,9 @@ import { PriceChart } from '@/components/charts/price-chart';
 import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { lotConditionLabel, productMeta, sourceLabel } from '@/lib/product-display';
+import { lotConditionLabel, productMeta } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
 import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
@@ -38,6 +39,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /** One product: what it is worth, every lot of it the user registered, and its market data. */
 export default async function ProductPage({ params }: Params) {
+  const sourceLabel = await sourceLabels();
   const { id } = await params;
   const { db, user } = await authed();
   const [product, lots] = await Promise.all([getProduct(db, id), productLots(db, user.id, id)]);

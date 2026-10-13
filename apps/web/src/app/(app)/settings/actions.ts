@@ -5,11 +5,20 @@ import {
   NOTICE_TYPES,
   type NoticeLevel,
   type NoticeLevels,
+  type ProductClass,
   ROTATE_SECONDS,
+  SOURCE_ROLES,
+  type SourceRole,
   SUMMARY_PANELS,
   type SummaryPanel,
 } from '@tora/core';
-import { setNoticeLevels, setPreferences } from '@tora/db';
+import {
+  clearAllBucketValues,
+  loadSourceRegistry,
+  setNoticeLevels,
+  setPreferences,
+  setSourceRoles,
+} from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { AMOUNTS_COOKIE } from '@/lib/amounts';
@@ -69,5 +78,19 @@ export async function setAmountsVisibleAction(visible: boolean) {
   const { db, user } = await authed();
   await setPreferences(db, user.id, { amountsVisible: visible });
   (await cookies()).delete(AMOUNTS_COOKIE);
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * A source's role for one item class (admins; the whole deployment): values and the main-source
+ * notices follow it. Saved values are valued again on the next page view or collect.
+ */
+export async function setSourceRoleAction(key: string, cls: ProductClass, role: SourceRole) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !(SOURCE_ROLES as readonly string[]).includes(role)) return;
+  const registry = await loadSourceRegistry(db);
+  if (!registry.sources.some((s) => s.key === key)) return;
+  await setSourceRoles(db, key, { ...registry.roles[key], [cls]: role });
+  await clearAllBucketValues(db);
   revalidatePath('/', 'layout');
 }

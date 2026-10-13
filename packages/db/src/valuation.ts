@@ -11,16 +11,19 @@ import {
   buylistFloor,
   deriveBucket,
   median,
+  type ProductClass,
   productClass,
   tokyoDate,
   toTokyoIso,
   lastSale,
   sourceSummaries,
   trend,
+  valuationOrder,
   valueUnit,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
+import { loadSourceRegistry } from './registry';
 import {
   type Holding,
   type HoldingEvent,
@@ -78,6 +81,22 @@ export interface MarketData {
   observations: Map<string, ValuationObservation[]>;
   recent: Map<string, RecentSaleInput[]>;
   manual: Map<string, { bucket: string; priceJpy: number; setAt: string }[]>;
+  /**
+   * Sources valued per item class, best first (the source registry's roles); empty when no
+   * source is described yet (then every source counts).
+   */
+  order: Partial<Record<ProductClass, string[]>>;
+}
+
+/** The registry's valuation order per item class. */
+async function orderByClass(db: Db): Promise<Partial<Record<ProductClass, string[]>>> {
+  const registry = await loadSourceRegistry(db);
+  if (registry.sources.length === 0) return {};
+  return {
+    card: valuationOrder(registry, 'card'),
+    sealed: valuationOrder(registry, 'sealed'),
+    item: valuationOrder(registry, 'item'),
+  };
 }
 
 /** Observations (sold + buylist) and the user's manual prices for a set of products. */
@@ -92,7 +111,8 @@ export async function loadMarketData(
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
-  if (productIds.length === 0) return { observations, recent, manual };
+  if (productIds.length === 0)
+    return { observations, recent, manual, order: await orderByClass(db) };
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
     const rows = await db
@@ -142,7 +162,7 @@ export async function loadMarketData(
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }
-  return { observations, recent, manual };
+  return { observations, recent, manual, order: await orderByClass(db) };
 }
 
 /** Yen sales a valuation may use (the filters of `loadMarketData`). */
@@ -172,7 +192,8 @@ export async function loadHoldingsMarketData(
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
-  if (productIds.length === 0) return { observations, recent, manual };
+  if (productIds.length === 0)
+    return { observations, recent, manual, order: await orderByClass(db) };
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
   // window are never used, so extra is safe).
   const exact = (days: number) => toTokyoIso(new Date(now.getTime() - days * DAY));
@@ -322,7 +343,7 @@ export async function loadHoldingsMarketData(
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }
-  return { observations, recent, manual };
+  return { observations, recent, manual, order: await orderByClass(db) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -348,10 +369,22 @@ function bucketValueOf(
   const observations = market.observations.get(product.id) ?? [];
   const recent = market.recent.get(product.id) ?? [];
   return {
-    valuation: valueUnit({ bucket, observations, retailPriceJpy: product.retailPriceJpy, now }),
+    valuation: valueUnit({
+      bucket,
+      observations,
+      retailPriceJpy: product.retailPriceJpy,
+      now,
+      sources: market.order[productClass(product)],
+    }),
     last: lastSale(observations, recent, bucket, undefined, now),
     buylist: buylistFloor(observations, bucket, now),
-    sources: sourceSummaries(observations, recent, bucket, now),
+    sources: sourceSummaries(
+      observations,
+      recent,
+      bucket,
+      now,
+      market.order[productClass(product)],
+    ),
   };
 }
 
@@ -580,6 +613,7 @@ export function valueHolding(
     manualPrices: market.manual.get(product.id),
     retailPriceJpy: product.retailPriceJpy,
     now,
+    sources: market.order[productClass(product)],
   });
   const recent = market.recent.get(product.id) ?? [];
   const last = lastSale(observations, recent, bucket, undefined, now);
@@ -590,7 +624,13 @@ export function valueHolding(
     buylist: buylistFloor(observations, bucket, now),
     last,
     trendPct: v.method === 'median' ? trend(last?.priceJpy, v.unitJpy) : null,
-    sources: sourceSummaries(observations, recent, bucket, now),
+    sources: sourceSummaries(
+      observations,
+      recent,
+      bucket,
+      now,
+      market.order[productClass(product)],
+    ),
   };
 }
 
@@ -947,6 +987,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
         manualPrices: markets.get(userId)!.manual.get(product.id),
         retailPriceJpy: product.retailPriceJpy,
         now: at,
+        sources: markets.get(userId)!.order[productClass(product)],
       });
       unitCache.set(key, v);
     }
@@ -1365,4 +1406,9 @@ export async function tradeCounts(db: Db, userId: string, periods: readonly numb
       sales: new Map(periods.map((days) => [days, Number(row[`d${days}`] ?? 0)])),
     };
   });
+}
+
+/** Forget every saved value (a source's role changed: every item is valued again). */
+export async function clearAllBucketValues(db: Db) {
+  await db.delete(bucketValues);
 }
