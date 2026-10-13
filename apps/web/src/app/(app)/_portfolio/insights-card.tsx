@@ -81,7 +81,7 @@ export function InsightsCard({
     return (
       <div className="space-y-3">
         {panels.some((p) => p.bodies) && <div className="flex justify-end">{periodChips}</div>}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {panels.map((p) => (
             <section key={p.id} className={cn(card, 'space-y-3')}>
               <h2 className="text-sm font-medium">{title(p)}</h2>
@@ -133,7 +133,7 @@ export function InsightsCard({
         )}
       </div>
       {/* All panels share one cell, so the card keeps the tallest one's height (no jumping). */}
-      <div className="grid">
+      <div className="grid grid-cols-[minmax(0,1fr)]">
         {panels.map((p, i) => (
           <div
             key={p.id}

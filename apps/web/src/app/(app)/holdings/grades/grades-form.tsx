@@ -68,7 +68,7 @@ export function GradesForm({ cards }: { cards: GradeRow[] }) {
             </label>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {grading === 'raw' ? (
             // Keyed: otherwise React reuses the grader <select> and "PSA" falls back to "S".
             <Field key="raw" label={t('fields.rawGrade')} htmlFor="g-raw">

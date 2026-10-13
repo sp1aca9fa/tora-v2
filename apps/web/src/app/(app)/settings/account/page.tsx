@@ -19,7 +19,7 @@ export default async function AccountSettingsPage() {
   ]);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.account')}</CardTitle>

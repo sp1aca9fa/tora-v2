@@ -54,7 +54,7 @@ export default async function ActionsPage() {
           cls: t(`sourceRoles.class.${i.cls}`),
         }),
         image: null,
-        href: '/settings/sources',
+        href: '/settings/admin/sources',
         source: i.source,
         qualityClass: i.cls,
       };

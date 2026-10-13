@@ -106,7 +106,7 @@ export default async function HoldingActionPage({
   switch (key) {
     case 'edit':
       body = (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <input type="hidden" name="originalDate" value={holding.acquiredAt.slice(0, 10)} />
           <Field label={t('fields.acquiredAt')} htmlFor="acquiredAt">
             <Input
@@ -233,7 +233,7 @@ export default async function HoldingActionPage({
       body = (
         <>
           {quantityField(1)}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('fields.grader')} htmlFor="grader">
               <NativeSelect id="grader" name="grader" defaultValue="PSA">
                 {GRADERS.map((g) => (
@@ -257,7 +257,7 @@ export default async function HoldingActionPage({
     case 'grade-return': {
       const pending = pendingGrading(events);
       body = (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('fields.grader')} htmlFor="grader">
             <NativeSelect id="grader" name="grader" defaultValue={pending?.grader ?? 'PSA'}>
               {GRADERS.map((g) => (
@@ -289,7 +289,7 @@ export default async function HoldingActionPage({
       body = (
         <>
           {quantityField()}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t('fields.priceJpy')} htmlFor="priceJpy" hint={t('actions.priceHint')}>
               {yenInput('priceJpy')}
             </Field>
@@ -313,7 +313,7 @@ export default async function HoldingActionPage({
       body = (
         <>
           {quantityField()}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {fields.grading && holding.grading !== 'graded' && (
               <Field label={t('fields.rawGrade')} htmlFor="rawGrade">
                 <NativeSelect id="rawGrade" name="rawGrade" defaultValue={holding.rawGrade ?? 'A'}>

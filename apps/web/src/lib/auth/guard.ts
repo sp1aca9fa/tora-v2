@@ -9,7 +9,7 @@ import {
   touchDevice,
 } from '@tora/db';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import {
   SESSION_COOKIE,
@@ -55,5 +55,12 @@ export const currentSession = cache(async (): Promise<Session | null> => {
 export async function authed(): Promise<Session> {
   const session = await currentSession();
   if (!session) redirect('/login');
+  return session;
+}
+
+/** The session of an admin; any other user gets a 404 (admin pages are not even listed). */
+export async function adminOnly(): Promise<Session> {
+  const session = await authed();
+  if (session.user.role !== 'admin') notFound();
   return session;
 }

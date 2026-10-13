@@ -24,7 +24,7 @@ export function MarketsForm({
   const label = (key: string | null) =>
     key ? (markets.find((m) => m.key === key)?.label ?? key) : t('none');
   return (
-    <div className={cn('grid gap-4 sm:grid-cols-2', pending && 'opacity-60')}>
+    <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2', pending && 'opacity-60')}>
       {(['primary', 'secondary'] as const).map((which) => {
         const value = which === 'primary' ? primary : secondary;
         return (

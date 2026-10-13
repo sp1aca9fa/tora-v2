@@ -74,7 +74,7 @@ export function PullLogger({
       </div>
 
       {mode === 'new' ? (
-        <div className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr_1fr]">
           <Field label={t('pulls.name')} htmlFor="pull-name" hint={t('pulls.nameHint')}>
             <Input
               id="pull-name"

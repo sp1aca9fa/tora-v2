@@ -207,7 +207,7 @@ export function ActionsList({ cards }: { cards: ActionCardView[] }) {
                   />
                 </button>
                 {sectionOpen && (
-                  <ul className="grid gap-2 xl:grid-cols-2 xl:items-start">
+                  <ul className="grid grid-cols-1 gap-2 xl:grid-cols-2 xl:items-start">
                     {list.map((c) => (
                       <ActionCard
                         key={c.key}
@@ -302,7 +302,7 @@ function ActionCard({
             </div>
           )}
           {c.kind !== 'link' && c.kind !== 'quality' && (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex gap-3 rounded-md border p-2">
                 <Thumb src={c.image} className="size-16" />
                 <div className="min-w-0 space-y-0.5 text-sm">

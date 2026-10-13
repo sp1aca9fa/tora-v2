@@ -10,7 +10,7 @@ const WIDE = [
   /^\/actions$/,
   /^\/products\/[^/]+$/,
   /^\/holdings\/(?!grades$)[^/]+$/,
-  /^\/settings$/,
+  /^\/settings(\/.*)?$/,
   /^\/imports$/,
 ];
 

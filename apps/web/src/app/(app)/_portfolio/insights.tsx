@@ -241,7 +241,7 @@ export async function Insights({
             .map((rows) => ({ rows, label: undefined }))
         : filled;
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {parts.map((c, i) => (
           <div key={i} className="space-y-2">
             {c.label && <h3 className="text-xs font-medium text-muted-foreground">{c.label}</h3>}

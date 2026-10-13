@@ -58,7 +58,7 @@ export default async function SummaryPage() {
     <div className="space-y-4">
       <PortfolioHeader totals={portfolio.totals} actions={actions} tab="summary" />
 
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CATEGORIES.filter((c) => categories.has(c)).map((c) => {
           const s = categories.get(c)!;
           const pl = s.plValueJpy - s.valuedCostJpy;
@@ -92,7 +92,7 @@ export default async function SummaryPage() {
         })}
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Suspense
             fallback={<div className="h-72 animate-pulse rounded-xl border bg-card" aria-hidden />}

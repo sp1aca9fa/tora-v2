@@ -1,11 +1,45 @@
-import { Bell, Eye, Plug, Store, User } from 'lucide-react';
+import { Bell, Eye, Fingerprint, Globe, Plug, ShieldCheck, Store, User } from 'lucide-react';
 
-/** Settings sections, each its own page (requirements S8: Settings in sub-pages). */
-export const SETTINGS_SECTIONS = [
-  { key: 'account', icon: User },
-  { key: 'display', icon: Eye },
-  { key: 'notices', icon: Bell },
-  { key: 'sources', icon: Store },
-  { key: 'collectors', icon: Plug },
-] as const;
-export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]['key'];
+export interface SettingsEntry {
+  key: string;
+  href: string;
+  icon: typeof User;
+  /** Shown to admins only (the page refuses others too). */
+  admin?: boolean;
+  children?: SettingsEntry[];
+}
+
+/** Settings sections, each its own page (S8); admin preferences group the whole-app settings. */
+export const SETTINGS_SECTIONS: SettingsEntry[] = [
+  { key: 'account', href: '/settings/account', icon: User },
+  { key: 'display', href: '/settings/display', icon: Eye },
+  { key: 'notices', href: '/settings/notices', icon: Bell },
+  { key: 'collectors', href: '/settings/collectors', icon: Plug },
+  {
+    key: 'admin',
+    href: '/settings/admin',
+    icon: ShieldCheck,
+    admin: true,
+    children: [
+      { key: 'markets', href: '/settings/admin/markets', icon: Globe, admin: true },
+      { key: 'sources', href: '/settings/admin/sources', icon: Store, admin: true },
+      { key: 'identity', href: '/settings/admin/identity', icon: Fingerprint, admin: true },
+    ],
+  },
+];
+
+/** The sections a user sees. */
+export const sectionsFor = (admin: boolean) => SETTINGS_SECTIONS.filter((s) => admin || !s.admin);
+
+/** The section open at a path, and the one it belongs to (for a way back). */
+export function sectionAt(
+  pathname: string,
+): { entry: SettingsEntry; parent: SettingsEntry | null } | null {
+  for (const s of SETTINGS_SECTIONS) {
+    for (const c of s.children ?? []) {
+      if (pathname.startsWith(c.href)) return { entry: c, parent: s };
+    }
+    if (pathname.startsWith(s.href)) return { entry: s, parent: null };
+  }
+  return null;
+}

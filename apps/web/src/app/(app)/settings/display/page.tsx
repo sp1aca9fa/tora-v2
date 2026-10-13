@@ -15,7 +15,7 @@ export default async function DisplaySettingsPage() {
   const { user } = await authed();
   const t = await getTranslations();
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>{t('amounts.title')}</CardTitle>

@@ -23,7 +23,7 @@ export default async function CollectorSettingsPage() {
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>{t('settings.collectors')}</CardTitle>

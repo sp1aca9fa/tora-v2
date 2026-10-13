@@ -88,7 +88,7 @@ export async function ValuationCard({
           </p>
         )}
         {v.sources.length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {v.sources.map((src) => (
               <div key={src.source} className="space-y-1 rounded-md border px-3 py-2 text-sm">
                 <div className="flex items-center justify-between gap-2">

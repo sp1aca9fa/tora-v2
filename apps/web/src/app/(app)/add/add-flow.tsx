@@ -473,7 +473,7 @@ export function AddFlow({
         className="space-y-4"
       >
         {summary && <p className="text-sm font-medium">{summary}</p>}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('fields.acquiredAt')} htmlFor="acquiredAt">
             <Input
               id="acquiredAt"
