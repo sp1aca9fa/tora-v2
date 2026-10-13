@@ -8,6 +8,7 @@ import {
   type SourceQuality,
   type SourceRole,
 } from '@tora/core';
+import { Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -37,7 +38,8 @@ export function SourcesForm({
   const [pending, startTransition] = useTransition();
   const priced = sources.filter((s) => !s.shopOnly);
   return (
-    <div className={cn('overflow-x-auto', pending && 'opacity-60')}>
+    <div className={cn('space-y-2 overflow-x-auto', pending && 'opacity-60')}>
+      <p className="text-xs text-muted-foreground">{t('perClass')}</p>
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-muted-foreground">
@@ -95,8 +97,12 @@ export function SourcesForm({
                       </span>
                     )}
                     {role !== suggested && (
-                      <span className="mt-1 block text-xs text-muted-foreground">
+                      <span
+                        className="mt-1 inline-flex cursor-help items-center gap-1 text-xs text-muted-foreground"
+                        title={t('suggestedWhy')}
+                      >
                         {t('suggestedRole', { role: t(`role.${suggested}`) })}
+                        <Info className="size-3" aria-label={t('suggestedWhy')} />
                       </span>
                     )}
                     {q && (

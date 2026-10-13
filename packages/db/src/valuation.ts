@@ -493,7 +493,10 @@ export async function savedBucketValues(
 ): Promise<Map<string, BucketValue>> {
   const saved = new Map<string, BucketValue>();
   const productIds = [...new Set(wanted.map((w) => w.product.id))];
-  const oldest = toTokyoIso(new Date(now.getTime() - BUCKET_VALUE_MAX_AGE_DAYS * DAY));
+  // Values saved before the sources' roles last changed were valued with other roles.
+  const changedAt = (await loadSourceRegistry(db)).changedAt ?? '';
+  const ageLimit = toTokyoIso(new Date(now.getTime() - BUCKET_VALUE_MAX_AGE_DAYS * DAY));
+  const oldest = changedAt > ageLimit ? changedAt : ageLimit;
   const at = toTokyoIso(now);
   for (let i = 0; i < productIds.length; i += 200) {
     const rows = await db

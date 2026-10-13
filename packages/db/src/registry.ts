@@ -21,7 +21,15 @@ import { priceObservations, products, sources } from './schema';
 /** Saves the plug-ins' descriptions (collectors, at the start of a run); roles chosen stay. */
 export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void> {
   const at = toTokyoIso();
+  const known = new Map(
+    (await db.select({ key: sources.key, info: sources.info }).from(sources)).map((r) => [
+      r.key,
+      JSON.stringify(r.info),
+    ]),
+  );
   for (const info of infos) {
+    // Unchanged descriptions are left alone: a change makes saved values stale (`changedAt`).
+    if (known.get(info.key) === JSON.stringify(info)) continue;
     await db
       .insert(sources)
       .values({ key: info.key, info })
@@ -33,9 +41,10 @@ export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void
   cache = new WeakMap();
 }
 
-// Read on most pages and every valuation: kept for a minute per connection.
+// Read on most pages and every valuation: kept a few seconds per connection (other servers see
+// a role change within that; values saved before the change are not used, see `changedAt`).
 let cache = new WeakMap<object, { at: number; registry: SourceRegistry }>();
-const TTL_MS = 60_000;
+const TTL_MS = 5_000;
 
 /** The registry: every described source with its role per class (chosen, else suggested). */
 export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<SourceRegistry> {
@@ -55,6 +64,7 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     ),
     declared,
     quality,
+    changedAt: rows.reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), ''),
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;

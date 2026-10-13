@@ -77,6 +77,8 @@ export interface SourceRegistry {
   declared?: Record<string, Partial<Record<ProductClass, SourceRole>>>;
   /** The last quality check per source and class. */
   quality?: Record<string, Partial<Record<ProductClass, SourceQuality>>>;
+  /** When a source's description or roles last changed (values saved before are stale). */
+  changedAt?: string;
 }
 
 export const EMPTY_REGISTRY: SourceRegistry = { sources: [], roles: {} };

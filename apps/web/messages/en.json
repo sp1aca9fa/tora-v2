@@ -843,6 +843,8 @@
       "above": "above",
       "dismissed": "notice dismissed"
     },
-    "suggestedRole": "Suggested: {role}"
+    "suggestedRole": "Suggested: {role}",
+    "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup (the Japan collectibles preset), not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
+    "perClass": "Each column is its own kind of item: a change under Cards applies to cards only (sealed product and games keep their own roles). Values and the value history follow a change within seconds."
   }
 }
