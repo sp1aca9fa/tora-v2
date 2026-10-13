@@ -41,6 +41,22 @@ export default async function ActionsPage() {
 
   const cards: ActionCardView[] = items.map((i): ActionCardView => {
     const base = { key: i.key, type: i.type, level: i.level, kind: i.kind };
+    if (i.kind === 'quality') {
+      const pct = Math.round(Math.abs(i.quality.bias ?? i.quality.gap ?? 0) * 100);
+      return {
+        ...base,
+        title: sourceLabel(i.source),
+        meta: t(`sourceRoles.class.${i.cls}`),
+        summary: t((i.quality.bias ?? 0) < 0 ? 'actions.quality.below' : 'actions.quality.above', {
+          pct,
+          reference: sourceLabel(i.quality.against ?? ''),
+          count: i.quality.pairs,
+          cls: t(`sourceRoles.class.${i.cls}`),
+        }),
+        image: null,
+        href: '/settings#sources',
+      };
+    }
     if (i.kind === 'link') {
       return {
         ...base,

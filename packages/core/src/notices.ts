@@ -24,6 +24,8 @@ export const NOTICE_TYPES = [
   'failed_link',
   /** Data review suggestions waiting for a decision. */
   'data_review',
+  /** A price source whose sales disagree with the reference: valued as comparison only (admins). */
+  'source_quality',
 ] as const;
 export type NoticeType = (typeof NOTICE_TYPES)[number];
 
@@ -33,6 +35,7 @@ export const DEFAULT_NOTICE_LEVELS: Record<NoticeType, NoticeLevel> = {
   import_review: 'orange',
   failed_link: 'yellow',
   data_review: 'yellow',
+  source_quality: 'yellow',
   game_main_source: 'blue',
   game_condition: 'blue',
   second_source: 'blue',

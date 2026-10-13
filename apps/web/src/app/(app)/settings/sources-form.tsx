@@ -5,6 +5,7 @@ import {
   type ProductClass,
   SOURCE_ROLES,
   type SourceInfo,
+  type SourceQuality,
   type SourceRole,
 } from '@tora/core';
 import { useTranslations } from 'next-intl';
@@ -20,10 +21,16 @@ import { setSourceRoleAction } from './actions';
 export function SourcesForm({
   sources,
   roles,
+  quality,
+  labels,
   editable,
 }: {
   sources: SourceInfo[];
+  /** The declared roles (what the admin set or the plug-in suggested). */
   roles: Record<string, Partial<Record<ProductClass, SourceRole>>>;
+  /** The quality gate's last check per source and class. */
+  quality: Record<string, Partial<Record<ProductClass, SourceQuality>>>;
+  labels: Record<string, string>;
   editable: boolean;
 }) {
   const t = useTranslations('sourceRoles');
@@ -60,8 +67,10 @@ export function SourcesForm({
               {ITEM_CLASSES.map((cls) => {
                 const role = roles[s.key]?.[cls] ?? 'off';
                 const suggested = s.roles?.[cls] ?? 'off';
+                const q = role === 'supporting' ? quality[s.key]?.[cls] : undefined;
+                const pct = Math.round(Math.abs(q?.bias ?? 0) * 100);
                 return (
-                  <td key={cls} className="py-2 pr-3">
+                  <td key={cls} className="py-2 pr-3 align-top">
                     {editable ? (
                       <NativeSelect
                         value={role}
@@ -84,6 +93,23 @@ export function SourcesForm({
                     ) : (
                       <span className={role === 'off' ? 'text-muted-foreground' : undefined}>
                         {t(`role.${role}`)}
+                      </span>
+                    )}
+                    {q && (
+                      <span
+                        className={cn(
+                          'mt-1 block text-xs',
+                          q.status === 'disagrees'
+                            ? 'text-amber-700 dark:text-amber-400'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {t(`quality.${q.status}`, {
+                          pct,
+                          direction: t((q.bias ?? 0) < 0 ? 'quality.below' : 'quality.above'),
+                          reference: labels[q.against ?? ''] ?? q.against ?? '',
+                          count: q.pairs,
+                        })}
                       </span>
                     )}
                   </td>

@@ -209,14 +209,21 @@
       "game_condition": "状態のないゲーム {count}件",
       "import_review": "確認待ちのインポート {count}件",
       "failed_link": "インポートできなかった購入リンク {count}件",
-      "data_review": "判断待ちのデータレビュー提案 {count}件"
+      "data_review": "判断待ちのデータレビュー提案 {count}件",
+      "source_quality": "比較のみになった価格ソース {count}件"
     },
     "all": "すべて",
     "openReview": "インポート確認を開く(2つのロットをまとめる等)",
     "openImports": "インポートを開く",
     "openDataReview": "データレビューを開く",
     "confirmLot": "確認",
-    "removeLot": "削除"
+    "removeLot": "削除",
+    "quality": {
+      "below": "{reference}より{pct}%低い取引({cls}、{count}アイテム):比較のみに使用",
+      "above": "{reference}より{pct}%高い取引({cls}、{count}アイテム):比較のみに使用",
+      "explain": "同じアイテム・状態での取引価格が基準ソースから離れすぎているため、評価には使いません。比較としては表示されます。収集のたびに再確認します。管理者は設定でソースの役割を変更できます。"
+    },
+    "openSettings": "設定の価格ソースを開く"
   },
   "pulls": {
     "mode": {
@@ -721,7 +728,8 @@
       "game_condition": "状態のないゲーム",
       "import_review": "確認待ちのインポート",
       "failed_link": "失敗した購入リンク",
-      "data_review": "データレビューの提案"
+      "data_review": "データレビューの提案",
+      "source_quality": "基準と食い違う価格ソース(管理者)"
     },
     "default": "初期値: {level}",
     "reset": "初期値に戻す",
@@ -800,6 +808,13 @@
       "sold": "取引価格",
       "listing": "販売価格",
       "buylist": "買取価格"
+    },
+    "quality": {
+      "agrees": "{reference}と一致:{pct}% {direction}、{count}アイテム",
+      "disagrees": "{reference}より{pct}% {direction}({count}アイテム):比較のみ",
+      "unverified": "未確認:{reference}と共通のアイテム {count}件(10件必要)",
+      "below": "低い",
+      "above": "高い"
     }
   }
 }

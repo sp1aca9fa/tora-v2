@@ -1,7 +1,15 @@
 // `pnpm collect [--source x] [--product id] [--match-only] [--collect-only] [--review]`
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
-import { createDb, inferLotSizes, listUsers, refreshBucketValues, runSnapshots } from '@tora/db';
+import {
+  checkSourceQuality,
+  clearAllBucketValues,
+  createDb,
+  inferLotSizes,
+  listUsers,
+  refreshBucketValues,
+  runSnapshots,
+} from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -105,6 +113,12 @@ progress.update('pictures, lot sizes, chart', 0.3);
 const lots = await inferLotSizes(db);
 log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
 progress.update('pictures, lot sizes, chart', 0.5);
+// The quality gate first: a supporting source that disagrees with the reference is not valued.
+const quality = await checkSourceQuality(db);
+if (quality.length) {
+  log(`source quality changed: ${quality.join(', ')}`);
+  await clearAllBucketValues(db);
+}
 const snap = await runSnapshots(db);
 // Today's value of everything held, read by the pages instead of every sale.
 const saved = await refreshBucketValues(db);

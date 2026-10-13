@@ -39,7 +39,7 @@ export interface ActionCardView {
   key: string;
   type: NoticeType;
   level: NoticeLevel;
-  kind: 'source' | 'lot' | 'link' | 'suggestion';
+  kind: 'source' | 'lot' | 'link' | 'suggestion' | 'quality';
   title: string;
   /** Kind, set, number... */
   meta: string;
@@ -247,7 +247,9 @@ function ActionCard({
           ? t('actions.openLot')
           : c.kind === 'link'
             ? t('actions.openImports')
-            : t('actions.openDataReview');
+            : c.kind === 'quality'
+              ? t('actions.openSettings')
+              : t('actions.openDataReview');
 
   return (
     <li
@@ -278,7 +280,10 @@ function ActionCard({
 
       {open && (
         <div className="space-y-3 border-t px-3 py-3">
-          {c.kind !== 'link' && (
+          {c.kind === 'quality' && (
+            <p className="text-sm text-muted-foreground">{t('actions.quality.explain')}</p>
+          )}
+          {c.kind !== 'link' && c.kind !== 'quality' && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex gap-3 rounded-md border p-2">
                 <Thumb src={c.image} className="size-16" />

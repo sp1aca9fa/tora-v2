@@ -6,6 +6,8 @@ import {
   type NoticeLevel,
   type NoticeLevels,
   type NoticeType,
+  type ProductClass,
+  type SourceQuality,
   countsInBadge,
   noticeLevelsFor,
   noticeRank,
@@ -71,6 +73,8 @@ export type ActionItem = ActionBase &
         product: Product | null;
         imageVersion: string | null;
       }
+    /** A source the quality gate lowered to comparison for a class (admins). */
+    | { kind: 'quality'; source: string; cls: ProductClass; quality: SourceQuality }
   );
 
 /** Every pending action of the user, most urgent level first (levels: the user's choices). */
@@ -78,6 +82,8 @@ export async function pendingActions(
   db: Db,
   userId: string,
   chosen?: NoticeLevels | null,
+  /** Admins also see what concerns the whole app (sources' quality). */
+  options: { admin?: boolean } = {},
 ): Promise<ActionItem[]> {
   const levels = noticeLevelsFor(chosen);
   const level = (type: NoticeType) => levels[type];
@@ -247,6 +253,23 @@ export async function pendingActions(
       product,
       imageVersion: null,
     });
+  }
+
+  if (options.admin) {
+    for (const [source, byClass] of Object.entries(registry.quality ?? {})) {
+      for (const [cls, quality] of Object.entries(byClass)) {
+        if (quality?.status !== 'disagrees') continue;
+        items.push({
+          key: `quality:${source}:${cls}`,
+          type: 'source_quality',
+          level: level('source_quality'),
+          kind: 'quality',
+          source,
+          cls: cls as ProductClass,
+          quality,
+        });
+      }
+    }
   }
 
   const productOf = (i: ActionItem) => ('product' in i ? i.product : null);

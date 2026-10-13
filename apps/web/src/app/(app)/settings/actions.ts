@@ -90,7 +90,7 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   if (user.role !== 'admin' || !(SOURCE_ROLES as readonly string[]).includes(role)) return;
   const registry = await loadSourceRegistry(db);
   if (!registry.sources.some((s) => s.key === key)) return;
-  await setSourceRoles(db, key, { ...registry.roles[key], [cls]: role });
+  await setSourceRoles(db, key, { ...(registry.declared ?? registry.roles)[key], [cls]: role });
   await clearAllBucketValues(db);
   revalidatePath('/', 'layout');
 }

@@ -77,7 +77,9 @@ export default async function SettingsPage() {
           <CardContent>
             <SourcesForm
               sources={registry.sources}
-              roles={registry.roles}
+              roles={registry.declared ?? registry.roles}
+              quality={registry.quality ?? {}}
+              labels={Object.fromEntries(registry.sources.map((s) => [s.key, s.label]))}
               editable={user.role === 'admin'}
             />
           </CardContent>

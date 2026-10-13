@@ -48,13 +48,56 @@ export interface SourceInfo {
   shopOnly?: boolean;
 }
 
+/**
+ * How a supporting source compares with its class's reference (quality gate): `agrees`,
+ * `disagrees` (then valued as comparison only), or `unverified` (too few items both cover).
+ */
+export interface SourceQuality {
+  status: 'agrees' | 'disagrees' | 'unverified';
+  /** Items (and conditions) both sources sold enough of. */
+  pairs: number;
+  /** Median gap with the reference (absolute) and its direction (negative: below), as fractions. */
+  gap: number | null;
+  bias: number | null;
+  /** The reference it was compared with. */
+  against: string | null;
+  checkedAt: string;
+}
+
 export interface SourceRegistry {
   sources: SourceInfo[];
-  /** Each source's role per class: its suggestion, or the admin's choice (Settings). */
+  /**
+   * Each source's role per class as valuation uses it: its suggestion, or the admin's choice
+   * (Settings), with supporting sources that disagree with the reference lowered to comparison.
+   */
   roles: Record<string, Partial<Record<ProductClass, SourceRole>>>;
+  /** The roles before the quality gate (what the admin set or the plug-in suggested). */
+  declared?: Record<string, Partial<Record<ProductClass, SourceRole>>>;
+  /** The last quality check per source and class. */
+  quality?: Record<string, Partial<Record<ProductClass, SourceQuality>>>;
 }
 
 export const EMPTY_REGISTRY: SourceRegistry = { sources: [], roles: {} };
+
+/** A supporting source whose sales stray this far from the reference's (median) is not valued. */
+export const QUALITY_MAX_GAP = 0.15;
+/** Fewer items covered by both than this: not enough to judge. */
+export const QUALITY_MIN_PAIRS = 10;
+
+/** Roles as valuation uses them: supporting sources that disagree count as comparison. */
+export function effectiveRoles(
+  declared: Partial<Record<ProductClass, SourceRole>>,
+  quality: Partial<Record<ProductClass, SourceQuality>> | undefined,
+): Partial<Record<ProductClass, SourceRole>> {
+  return Object.fromEntries(
+    Object.entries(declared).map(([cls, role]) => [
+      cls,
+      role === 'supporting' && quality?.[cls as ProductClass]?.status === 'disagrees'
+        ? 'comparison'
+        : role,
+    ]),
+  );
+}
 
 export function roleOf(registry: SourceRegistry, key: string, cls: ProductClass): SourceRole {
   return registry.roles[key]?.[cls] ?? 'off';
