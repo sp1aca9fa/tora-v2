@@ -108,6 +108,14 @@ export function SourcesForm({
                       <Info className="size-3" aria-label={t('suggestedWhy')} />
                     </span>
                   )}
+                  {/* Asking or store prices only (e.g. eBay, 駿河屋): usable, but not sales. */}
+                  {(role === 'reference' || role === 'supporting') &&
+                    !!s.priceKinds?.length &&
+                    !s.priceKinds.includes('sold') && (
+                      <span className="mt-1 block w-full text-xs text-amber-700 dark:text-amber-400">
+                        {t('asksOnly')}
+                      </span>
+                    )}
                   {q && (
                     <span
                       className={cn(

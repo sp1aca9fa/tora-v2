@@ -1,4 +1,4 @@
-import { valueUnit } from '@tora/core';
+import { sourceInfo, valueUnit } from '@tora/core';
 import { type Db, type ProductSource, keptObservations, sourceObservations } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   removeReferenceAction,
   unlinkSourceAction,
 } from './source-actions';
-import { sourceLabels } from '@/lib/sources';
+import { getRegistry, sourceLabels } from '@/lib/sources';
 
 interface ReferenceInfo {
   name: string;
@@ -21,10 +21,13 @@ interface ReferenceInfo {
 
 /**
  * A search-based source (e.g. Mercari): its query, and the latest sold items it found, with why
- * an item was left out and buttons to exclude or include one by hand.
+ * an item was left out and buttons to exclude or include one by hand. A source of asking prices
+ * (e.g. eBay: listings still for sale, a day's median per condition) says so: nothing it finds
+ * is a sale, and a listing that ends may have sold or been withdrawn.
  */
 export async function SearchSource({ db, link }: { db: Db; link: ProductSource }) {
-  const sourceLabel = await sourceLabels();
+  const [sourceLabel, registry] = await Promise.all([sourceLabels(), getRegistry()]);
+  const asks = !sourceInfo(registry, link.source)?.priceKinds?.includes('sold');
   const [t, format, sales, kept] = await Promise.all([
     getTranslations(),
     getFormatter(),
@@ -69,7 +72,10 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
           </p>
           <p className="text-xs text-muted-foreground">
             {link.lastSuccessAt
-              ? t('sources.search.found', { kept: keptCount, total: sales.length })
+              ? t(asks ? 'sources.search.foundAsks' : 'sources.search.found', {
+                  kept: keptCount,
+                  total: sales.length,
+                })
               : t('sources.waiting')}
           </p>
         </div>
@@ -79,6 +85,11 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
           </Button>
         </form>
       </div>
+      {asks && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+          {t('sources.search.asksNote', { source: sourceLabel(link.source) })}
+        </p>
+      )}
 
       {summary.length > 0 && (
         <div className="overflow-x-auto">
@@ -87,8 +98,12 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
               <tr>
                 <th className="py-1 font-normal">{t('holding.bucket')}</th>
                 <th className="py-1 text-right font-normal">{t('sources.median')}</th>
-                <th className="py-1 text-right font-normal">{t('sources.search.used')}</th>
-                <th className="py-1 text-right font-normal">{t('valuation.lastSale')}</th>
+                <th className="py-1 text-right font-normal">
+                  {t(asks ? 'sources.search.usedAsks' : 'sources.search.used')}
+                </th>
+                <th className="py-1 text-right font-normal">
+                  {t(asks ? 'sources.search.lastAsk' : 'valuation.lastSale')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -116,45 +131,48 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
         </div>
       )}
 
-      <details className="text-sm" open={references.length > 0 || undefined}>
-        <summary className="cursor-pointer text-muted-foreground">
-          {t('sources.search.references', { count: references.length })}
-        </summary>
-        <div className="mt-2 space-y-2">
-          {references.length > 0 && (
-            <ul className="divide-y">
-              {references.map((url) => {
-                const info = infoFor(url);
-                return (
-                  <li key={url} className="flex items-center gap-3 py-1.5">
-                    <div className="min-w-0 flex-1 text-xs">
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="line-clamp-1 hover:underline"
-                      >
-                        {info?.name ?? url}
-                      </a>
-                      <p className="amount text-muted-foreground">
-                        {info
-                          ? `${formatJpy(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
-                          : t('sources.search.readNext')}
-                      </p>
-                    </div>
-                    <form action={removeReferenceAction.bind(null, link.id, url)}>
-                      <Button variant="ghost" size="sm">
-                        {t('sources.search.remove')}
-                      </Button>
-                    </form>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <ReferenceForm sourceId={link.id} />
-        </div>
-      </details>
+      {/* Listings added by hand are read by sold-items searches only (e.g. Mercari). */}
+      {!asks && (
+        <details className="text-sm" open={references.length > 0 || undefined}>
+          <summary className="cursor-pointer text-muted-foreground">
+            {t('sources.search.references', { count: references.length })}
+          </summary>
+          <div className="mt-2 space-y-2">
+            {references.length > 0 && (
+              <ul className="divide-y">
+                {references.map((url) => {
+                  const info = infoFor(url);
+                  return (
+                    <li key={url} className="flex items-center gap-3 py-1.5">
+                      <div className="min-w-0 flex-1 text-xs">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="line-clamp-1 hover:underline"
+                        >
+                          {info?.name ?? url}
+                        </a>
+                        <p className="amount text-muted-foreground">
+                          {info
+                            ? `${formatJpy(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
+                            : t('sources.search.readNext')}
+                        </p>
+                      </div>
+                      <form action={removeReferenceAction.bind(null, link.id, url)}>
+                        <Button variant="ghost" size="sm">
+                          {t('sources.search.remove')}
+                        </Button>
+                      </form>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <ReferenceForm sourceId={link.id} />
+          </div>
+        </details>
+      )}
 
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">
@@ -168,7 +186,9 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
       {sales.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer text-muted-foreground">
-            {t('sources.search.latest', { count: sales.length })}
+            {t(asks ? 'sources.search.latestAsks' : 'sources.search.latest', {
+              count: sales.length,
+            })}
           </summary>
           <ul className="mt-2 divide-y">
             {sales.map((s) => {

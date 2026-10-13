@@ -34,6 +34,7 @@ export default async function IdentitySettingsPage() {
             <span className="block">{t('identity.what')}</span>
             <span className="block">{t('identity.why')}</span>
             <span className="block">{t('identity.how')}</span>
+            <span className="block">{t('identity.notListed')}</span>
           </CardDescription>
         </CardHeader>
       </Card>
