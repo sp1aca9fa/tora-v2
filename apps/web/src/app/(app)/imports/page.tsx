@@ -1,4 +1,13 @@
-import { type PurchaseLink, actionTotal, importRunsOf, purchaseLinksOf } from '@tora/db';
+import {
+  type PurchaseLink,
+  UPLOAD_MAX_BYTES,
+  UPLOAD_MAX_FILES,
+  actionTotal,
+  importRunsOf,
+  purchaseLinksOf,
+  uploadBatchesOf,
+} from '@tora/db';
+import { claudeApiAvailable } from '@tora/collector-sdk/uploads';
 import { ChevronRight, RotateCw, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -9,24 +18,31 @@ import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { removeLinkAction, retryLinkAction } from './actions';
 import { LinksForm } from './links-form';
+import { UploadForm } from './upload-form';
+import { retryUploadsAction } from './upload-actions';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('imports') };
 }
 
 /** Imports hub (requirements S5d): what needs you, ways to import, and what each import did. */
+/** Reading uploads in the app (Claude API) runs after the answer, within this time. */
+export const maxDuration = 300;
+
 export default async function ImportsPage() {
   const sourceLabel = await sourceLabels();
   const { db, user } = await authed();
-  const [actions, links, runs, t, format] = await Promise.all([
+  const [actions, links, runs, uploads, t, format] = await Promise.all([
     userActions(),
     purchaseLinksOf(db, user.id, 200),
     importRunsOf(db, user.id),
+    uploadBatchesOf(db, user.id, 5),
     getTranslations(),
     getFormatter(),
   ]);
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' });
+  const apiKey = claudeApiAvailable();
   const failed = links.filter((l) => l.status === 'failed');
   // Imports shows its own things; the rest waits on the Actions page.
   const toReview = actionTotal(actions.filter((a) => a.type === 'import_review'));
@@ -155,6 +171,58 @@ export default async function ImportsPage() {
                 </summary>
                 <ul className="mt-2 divide-y rounded-lg border">{others.map(linkRow)}</ul>
               </details>
+            )}
+          </div>
+
+          <div id="upload" className="scroll-mt-20 space-y-2 rounded-xl border bg-card px-4 py-3">
+            <h3 className="font-medium">{t('imports.upload.title')}</h3>
+            <p className="text-sm text-muted-foreground">
+              {apiKey ? t('imports.upload.introApi') : t('imports.upload.introPc')}
+            </p>
+            <UploadForm maxFiles={UPLOAD_MAX_FILES} maxMb={UPLOAD_MAX_BYTES / 1024 / 1024} />
+            {uploads.length > 0 && (
+              <ul className="divide-y rounded-lg border text-sm">
+                {uploads.map((b) => (
+                  <li key={b.batchId} className="flex items-start gap-2 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate">
+                        {t('imports.upload.files', { count: b.files.length })} ·{' '}
+                        {dateTime(b.createdAt)}
+                      </p>
+                      <p
+                        className={
+                          b.status === 'failed'
+                            ? 'text-xs text-destructive'
+                            : 'text-xs text-muted-foreground'
+                        }
+                      >
+                        {t(`imports.upload.status.${b.status}`)}
+                        {b.message ? ` · ${b.message}` : ''}
+                        {b.importRunId && (
+                          <>
+                            {' · '}
+                            <Link href={`/imports/runs/${b.importRunId}`} className="underline">
+                              {t('imports.upload.open')}
+                            </Link>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    {b.status === 'failed' && (
+                      <form action={retryUploadsAction.bind(null, b.batchId)}>
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={t('imports.links.retry')}
+                        >
+                          <RotateCw className="size-4" />
+                        </Button>
+                      </form>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

@@ -636,7 +636,33 @@
     "removeLot": "Remove this lot (not one of my purchases)",
     "sameAs": "Same purchase as",
     "sameAsNone": "(a separate purchase)",
-    "sameAsHint": "This lot is merged into the one chosen: that one stays, taking this one's order ID, price or date where it has none."
+    "sameAsHint": "This lot is merged into the one chosen: that one stays, taking this one's order ID, price or date where it has none.",
+    "upload": {
+      "title": "Upload screenshots or files",
+      "introPc": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them on the home PC's next run (with its Claude login) and the purchases wait in Review.",
+      "introApi": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them right away and the purchases wait in Review.",
+      "send": "Upload",
+      "sending": "Uploading {done} of {total}...",
+      "limits": "Up to {files} files, {mb} MB each: images, PDF, text. One purchase may span several files (a listing and its order page).",
+      "readNow": "Uploaded. Claude is reading them now: the purchases show up in Review in a minute or two.",
+      "waiting": "Uploaded. They are read on the home PC's next run; the purchases then show up in Review.",
+      "notSent": "Not uploaded: {files}",
+      "files": "{count, plural, one {# file} other {# files}}",
+      "open": "Open the import",
+      "status": {
+        "uploading": "Uploading",
+        "waiting": "Waiting to be read",
+        "reading": "Being read",
+        "done": "Read",
+        "failed": "Could not be read"
+      },
+      "error": {
+        "uploadType": "not an image, PDF or text",
+        "uploadTooBig": "over {mb} MB",
+        "uploadTooMany": "too many files",
+        "invalid_input": "not readable"
+      }
+    }
   },
   "product": {
     "unitsOwned": "Units owned",

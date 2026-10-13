@@ -16,3 +16,4 @@ export * as schema from './schema';
 export type * from './schema';
 export * from './actions';
 export * from './registry';
+export * from './uploads';

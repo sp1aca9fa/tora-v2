@@ -19,7 +19,8 @@ import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
 import { loadAndRegister } from '../registry';
 import { runCollector } from '../runner';
-import { claudeJudge } from '../claude';
+import { readWaitingUploads } from '../ai-import-run';
+import { askClaude, claudeJudge } from '../claude';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
 
@@ -81,6 +82,15 @@ if (withLinks) {
     log(
       `purchase links: ${imported} imported (see Review import), ${matched} matched, ${duplicate} already registered, ${skipped} skipped, ${failed} failed${links.left ? `, ${links.left} left for next time` : ''}`,
     );
+  }
+}
+// Purchase files uploaded in the app and not read yet (no Claude API key on the app).
+if (!values.product && !values.source) {
+  try {
+    const read = await readWaitingUploads(db, askClaude, { log: (m) => log(`[uploads] ${m}`) });
+    if (read) log(`uploads: ${read} batch(es) read (see Imports > Review)`);
+  } catch (error) {
+    log(`uploads: stopped (${errorText(error)})`);
   }
 }
 if (selected.length === 0) console.log('No collectors registered.');

@@ -283,9 +283,21 @@ date, a match the title does not support, a price far from the item's value, the
 and Sonnet reads again the files with flagged rows plus a 10 % sample (`--sample`). The plan is
 the same as for order emails: already registered purchases are recognised (by order ID, or by
 item, price and date when there is none), non-collectibles and cancelled orders are left out, and
-nothing is written before you confirm. New lots wait in **Imports > Review**; failed Mercari links
-whose item it imported are marked as resolved. Readings are cached in the folder
+nothing is written before you confirm. New lots wait in **Imports > Review**; failed purchase
+links whose item it imported are marked as resolved. Readings are cached in the folder
 (`.tora-import.json`), so running again only reads new files.
+
+**From the app** (Imports > Upload screenshots or files): the same import, without a terminal.
+Files are uploaded one by one (up to 30, 4 MB each) and read in one of two ways:
+
+- **On the home PC** (default, no extra cost with a Claude plan): `pnpm collect` reads waiting
+  uploads with the home PC's Claude login, and so does `pnpm import-uploads`, which is quick when
+  nothing waits and can be scheduled every few minutes (see Daily schedule).
+- **Right away by the app**: with an `ANTHROPIC_API_KEY` in Vercel's environment, the app reads
+  each upload as soon as it is sent (Claude API: Haiku 5.5, Sonnet 5.5 for flagged files; a few
+  cents per batch of screenshots, billed to that key).
+
+Either way the purchases wait in **Imports > Review**, and an upload that failed can be tried again.
 
 ### Data review
 
@@ -337,6 +349,7 @@ Remove it with `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora
 ```bash
 crontab -e
 0 * * * * /home/<user>/code/<path>/tora-v2/scripts/collect-cron.sh   # hourly; runs once a day
+*/5 * * * * cd /home/<user>/code/<path>/tora-v2 && pnpm import-uploads   # optional: files uploaded in the app
 ```
 
 Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./uploads": "./src/uploads-entry.ts"
   },
   "scripts": {
     "build": "tsc -p .",
@@ -13,9 +14,11 @@
     "purchases": "tsx src/cli/purchases.ts",
     "review": "tsx src/cli/review.ts",
     "demo": "tsx src/cli/demo.ts",
-    "import-ai": "tsx src/cli/import-ai.ts"
+    "import-ai": "tsx src/cli/import-ai.ts",
+    "import-uploads": "tsx src/cli/import-uploads.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@tora/core": "workspace:*",
     "@tora/db": "workspace:*",
     "mailparser": "3.9.28",

@@ -579,6 +579,36 @@ export const sources = sqliteTable('sources', {
   ...timestamps,
 });
 
+/**
+ * Purchase files uploaded in the app for the import through Claude (requirements S8 step 5):
+ * screenshots, PDFs, text. Read right away by the app when it has a Claude API key, else by the
+ * home PC on its next run; the file's data is dropped once read.
+ */
+export const importUploads = sqliteTable(
+  'import_uploads',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** Files uploaded together are read together (one purchase may span several files). */
+    batchId: text('batch_id').notNull(),
+    name: text('name').notNull(),
+    size: integer('size').notNull(),
+    /** Base64; emptied once read. */
+    data: text('data').notNull(),
+    /** uploading | waiting | reading | done | failed */
+    status: text('status').notNull().default('waiting'),
+    message: text('message'),
+    importRunId: text('import_run_id'),
+    ...timestamps,
+  },
+  (t) => [
+    index('import_uploads_batch_idx').on(t.batchId),
+    index('import_uploads_user_idx').on(t.userId, t.status),
+  ],
+);
+
 export const fxRates = sqliteTable(
   'fx_rates',
   {

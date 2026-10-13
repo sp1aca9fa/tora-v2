@@ -479,6 +479,8 @@ export type AskClaude = <T>(options: {
   prompt: string;
   schema: object;
   readDir?: string;
+  /** The files of `readDir` the question is about (attached when the model cannot open them). */
+  files?: string[];
 }) => Promise<ClaudeResult<T>>;
 
 export interface ReadCache {
@@ -656,6 +658,7 @@ export async function readPurchases(
       prompt: extractPrompt(batch, products, hints, ctx.registry),
       schema: ROWS_SCHEMA,
       readDir: dir,
+      files: batch,
     });
     result.calls.push({ model: r.modelName, costUsd: r.costUsd, tokens: r.tokens });
     // Same-purchase tags mean something within one answer only.

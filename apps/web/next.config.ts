@@ -10,7 +10,9 @@ const rootEnv = path.join(repoRoot, '.env');
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@tora/core', '@tora/db'],
+  transpilePackages: ['@tora/core', '@tora/db', '@tora/collector-sdk'],
+  // Purchase files are uploaded one per request (Vercel caps a request near 4.5 MB).
+  experimental: { serverActions: { bodySizeLimit: '5mb' } },
   serverExternalPackages: ['@libsql/client', 'libsql'],
   outputFileTracingRoot: repoRoot,
   poweredByHeader: false,
