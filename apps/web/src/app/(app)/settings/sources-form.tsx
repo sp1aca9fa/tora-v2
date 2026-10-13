@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
-import { setSourceRoleAction } from './actions';
+import { setIdentitySourceAction, setSourceRoleAction } from './actions';
 
 /**
  * Each price source and its role per item class (requirements S8, sources with roles). The
@@ -25,6 +25,7 @@ export function SourcesForm({
   quality,
   labels,
   editable,
+  identity,
 }: {
   sources: SourceInfo[];
   /** The declared roles (what the admin set or the plug-in suggested). */
@@ -33,6 +34,12 @@ export function SourcesForm({
   quality: Record<string, Partial<Record<ProductClass, SourceQuality>>>;
   labels: Record<string, string>;
   editable: boolean;
+  /** The market's identity source per class, and the sources that can be one (S11). */
+  identity: {
+    market: string;
+    chosen: Partial<Record<ProductClass, string | null>>;
+    choices: string[];
+  };
 }) {
   const t = useTranslations('sourceRoles');
   const [pending, startTransition] = useTransition();
@@ -129,6 +136,45 @@ export function SourcesForm({
             </tr>
           ))}
         </tbody>
+        <tfoot className="border-t-2">
+          <tr>
+            <td className="py-2 pr-3 align-top">
+              <span className="font-medium">{t('identity')}</span>
+              <span className="block text-xs text-muted-foreground">{t('identityInfo')}</span>
+            </td>
+            {ITEM_CLASSES.map((cls) => {
+              const chosen = identity.chosen[cls] ?? null;
+              return (
+                <td key={cls} className="py-2 pr-3 align-top">
+                  {editable ? (
+                    <NativeSelect
+                      value={chosen ?? ''}
+                      disabled={pending}
+                      onChange={(e) =>
+                        startTransition(() =>
+                          setIdentitySourceAction(identity.market, cls, e.target.value || null),
+                        )
+                      }
+                      aria-label={`${t('identity')} · ${t(`class.${cls}`)}`}
+                      className="h-9 w-36"
+                    >
+                      {identity.choices.map((key) => (
+                        <option key={key} value={key}>
+                          {labels[key] ?? key}
+                        </option>
+                      ))}
+                      <option value="">{t('identityNone')}</option>
+                    </NativeSelect>
+                  ) : (
+                    <span className={chosen ? undefined : 'text-muted-foreground'}>
+                      {chosen ? (labels[chosen] ?? chosen) : t('identityNone')}
+                    </span>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        </tfoot>
       </table>
     </div>
   );

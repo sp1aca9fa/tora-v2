@@ -183,10 +183,23 @@ export async function pendingActions(
     if (main && !dismissed.has(product.id)) {
       bySource.set(main, bySource.get(main) ?? []);
     }
+    // The same in the secondary market (S11), as its own notice type.
+    const abroad = identityFor(product, costJpy, registry, registry.markets?.secondary ?? null);
+    const second =
+      registry.markets?.secondary &&
+      abroad &&
+      !abroad.accepted.some((source) => has.has(`${product.id}|${source}`))
+        ? abroad.preferred
+        : null;
+    if (second && !dismissed.has(product.id)) {
+      bySource.set(second, bySource.get(second) ?? []);
+    }
     for (const [source, candidates] of bySource) {
       const isMain = source === main;
       const type: NoticeType = !isMain
-        ? 'second_source'
+        ? source === second
+          ? 'secondary_identity'
+          : 'second_source'
         : product.category === 'tcg'
           ? 'tcg_main_source'
           : 'game_main_source';
@@ -198,7 +211,8 @@ export async function pendingActions(
         product,
         imageVersion: null,
         source,
-        main: isMain,
+        // An identity link asked for (either market): the card stays until linked or dismissed.
+        main: isMain || source === second,
         costJpy,
         units: Number(units),
         candidates: candidates

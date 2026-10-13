@@ -26,7 +26,7 @@ import {
   unlinkSourceAction,
 } from './source-actions';
 import { setSourceWarningAction } from '../../actions/actions';
-import { getRegistry, sourceLabels } from '@/lib/sources';
+import { getRegistry, marketLabels, sourceLabels } from '@/lib/sources';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for
@@ -157,24 +157,26 @@ export async function PriceSources({
   );
 
   // A tab per source that applies to this kind of item or has something for it, grouped by
-  // market; the market of the class's first valued source comes first.
+  // market: the primary market, then the secondary one (S11).
   const cls = productClass(product);
   const order = valuationOrder(registry, cls);
   const hasAny = (key: string) =>
     sources.some((x) => x.source === key) ||
     candidates.some((c) => c.source === key) ||
     stats.some((x) => x.source === key);
+  const marketKeys = [registry.markets?.primary, registry.markets?.secondary].filter(
+    (m): m is string => !!m,
+  );
   const tabSources = registry.sources
     .filter(
-      (x) => x.market && !x.shopOnly && (roleOf(registry, x.key, cls) !== 'off' || hasAny(x.key)),
+      (x) =>
+        x.market &&
+        marketKeys.includes(x.market) &&
+        !x.shopOnly &&
+        (roleOf(registry, x.key, cls) !== 'off' || hasAny(x.key)),
     )
     .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key));
-  const firstMarket = tabSources.find((x) => x.key === order[0])?.market;
-  const marketKeys = [...new Set(tabSources.map((x) => x.market!))].toSorted(
-    (a, b) => Number(b === firstMarket) - Number(a === firstMarket) || a.localeCompare(b),
-  );
-  const marketLabel = (m: string) =>
-    t.has(`sources.market.${m}`) ? t(`sources.market.${m}`) : m.toUpperCase();
+  const marketLabel = await marketLabels();
 
   const panel = (key: string) => {
     const label = sourceLabel(key);

@@ -205,6 +205,7 @@
       "tcg_main_source": "{count, plural, one {# TCG item} other {# TCG items}} without an identity link",
       "game_main_source": "{count, plural, one {# game or item} other {# games and items}} without an identity link",
       "second_source": "{count, plural, one {# suggestion} other {# suggestions}} from another price source",
+      "secondary_identity": "{count, plural, one {# item} other {# items}} without an identity link in the secondary market",
       "card_grade": "{count, plural, one {# card} other {# cards}} without a grade",
       "game_condition": "{count, plural, one {# game} other {# games}} without a condition",
       "import_review": "{count, plural, one {# imported lot} other {# imported lots}} to review",
@@ -273,7 +274,29 @@
     "stale": "Not collected for 3+ days:",
     "never": "never",
     "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
-    "recentRuns": "Recent runs"
+    "recentRuns": "Recent runs",
+    "section": {
+      "account": {
+        "title": "Account",
+        "info": "Sign out and the devices signed in."
+      },
+      "display": {
+        "title": "Display",
+        "info": "Amounts hidden or shown, the Summary insights card."
+      },
+      "notices": {
+        "title": "Notices",
+        "info": "The colour and order of each kind of action."
+      },
+      "sources": {
+        "title": "Markets and price sources",
+        "info": "Primary and secondary markets, each source's role, identity pages."
+      },
+      "collectors": {
+        "title": "Collectors",
+        "info": "Status of the daily collect on the home PC."
+      }
+    }
   },
   "fields": {
     "type": "Type",
@@ -432,7 +455,10 @@
     "missingStable": "No identity link yet: link this item to {source} (a stable product page that identifies it). Confirm a suggestion below or paste its link.",
     "pasteOne": "Paste a {source} product link",
     "nothingYet": "Nothing from {source} for this item yet. The next collector run looks for it.",
-    "market": { "jp": "Japan", "us": "US" },
+    "market": {
+      "jp": "Japan",
+      "us": "US"
+    },
     "pasteUrl": "Paste a product link from a price source ({sources})",
     "link": "Link",
     "last30": "Last 30 days",
@@ -725,14 +751,12 @@
     }
   },
   "compare": {
-    "title": "Japan vs US",
-    "info": "Same condition on both sides ({bucket}). US prices are shown for comparison only and never count in the value.",
+    "title": "{primary} vs {secondary}",
+    "info": "Same condition on both sides ({bucket}). {secondary} prices are shown for comparison only and never count in the value.",
     "graded": "The foreign prices are for ungraded cards, so your graded cards are compared at this condition.",
-    "japan": "Japan",
-    "us": "US",
-    "noJapan": "No Japanese price",
-    "spread": "{pct}% vs Japan",
-    "converted": "{price} at ¥{rate} per dollar ({date})",
+    "noJapan": "No {primary} price",
+    "spread": "{pct}% vs {primary}",
+    "converted": "{price} at ¥{rate} per {currency} ({date})",
     "asks": "median ask of {count, plural, one {# listing} other {# listings}}",
     "middleOf": "middle of {count} prices (printings or listings)"
   },
@@ -755,6 +779,7 @@
       "tcg_main_source": "TCG item without an identity link",
       "game_main_source": "Game or other item without an identity link",
       "second_source": "Suggestions from another price source",
+      "secondary_identity": "Item without an identity link in the secondary market",
       "card_grade": "Card without a grade",
       "game_condition": "Game without a condition",
       "import_review": "Imported lots to review",
@@ -849,6 +874,18 @@
     },
     "suggestedRole": "Suggested: {role}",
     "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup (the Japan collectibles preset), not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
-    "perClass": "Each column is its own kind of item: a change under Cards applies to cards only (sealed product and games keep their own roles). Values and the value history follow a change within seconds."
+    "perClass": "Each column is its own kind of item: a change under Cards applies to cards only (sealed product and games keep their own roles). Values and the value history follow a change within seconds.",
+    "identity": "Identity page",
+    "identityInfo": "The product page that says exactly what the item is; a link from another source with product pages in this market also counts.",
+    "identityNone": "None"
+  },
+  "markets": {
+    "title": "Markets",
+    "info": "The value counts the primary market's sources only. The secondary market gives one price per item to compare with (the reference source's, else a supporting one's). Applies to every account.",
+    "primary": "Primary market",
+    "secondary": "Secondary market",
+    "primaryInfo": "Where values come from.",
+    "secondaryInfo": "Shown beside the value, never in it.",
+    "none": "None"
   }
 }

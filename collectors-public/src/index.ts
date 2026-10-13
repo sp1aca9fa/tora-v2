@@ -23,7 +23,9 @@ export const sources: SourceInfo[] = [
     market: 'us',
     currency: 'USD',
     priceKinds: ['listing'],
-    roles: { card: 'comparison', sealed: 'comparison' },
+    // The secondary market's price (S11): its own market, never the primary value.
+    roles: { card: 'reference', sealed: 'reference' },
+    identity: ['card', 'sealed'],
     priority: 40,
     // The set is read from the rest of the path, so the link is kept as pasted.
     links: [
@@ -40,7 +42,7 @@ export const sources: SourceInfo[] = [
     market: 'us',
     currency: 'USD',
     priceKinds: ['listing'],
-    roles: { card: 'comparison', sealed: 'comparison' },
+    roles: { card: 'supporting', sealed: 'supporting' },
     priority: 50,
     // eBay's API terms: no eBay data in AI models; copies only as long as needed.
     noAi: true,

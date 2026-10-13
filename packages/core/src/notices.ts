@@ -8,10 +8,12 @@ export const NOTICE_LEVELS = ['red', 'orange', 'yellow', 'blue', 'grey'] as cons
 export type NoticeLevel = (typeof NOTICE_LEVELS)[number];
 
 export const NOTICE_TYPES = [
-  /** A card or sealed TCG item without its main price source (its class's reference source). */
+  /** A card or sealed TCG item without an identity link (in the primary market). */
   'tcg_main_source',
-  /** A game or other item without its main price source. */
+  /** A game or other item without an identity link (in the primary market). */
   'game_main_source',
+  /** An item without an identity link in the secondary market (S11). */
+  'secondary_identity',
   /** Suggested listings of another source (e.g. a foreign market for a card already linked). */
   'second_source',
   /** A card lot without a grade: not valued. */
@@ -39,6 +41,7 @@ export const DEFAULT_NOTICE_LEVELS: Record<NoticeType, NoticeLevel> = {
   game_main_source: 'blue',
   game_condition: 'blue',
   second_source: 'blue',
+  secondary_identity: 'blue',
 };
 
 export const noticeRank = (level: NoticeLevel) => NOTICE_LEVELS.indexOf(level);

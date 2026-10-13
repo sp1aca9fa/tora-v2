@@ -174,18 +174,27 @@ pnpm valuate                         # only refresh valuation snapshots (collect
 Settings shows each source's last run, items waiting for confirmation, listings not collected for
 3+ days and big median moves.
 
-### Sources and roles
+### Markets, sources and roles
 
-Every price source a plug-in brings has a **role** per kind of item (cards, sealed TCG, games and
+Every source belongs to a **market** (Japan, US, ...). An admin picks two in **Settings > Markets
+and price sources** (they apply to every account): the **primary market** makes the value; the
+**secondary market** gives one price per item to compare with, shown on the item page (e.g.
+**Japan vs US**), never counted in the value. Sources of other markets are not used.
+
+Within each market, every source has a **role** per kind of item (cards, sealed TCG, games and
 other items):
 
-- **Reference**: the trusted market for that kind of item. Valued first, and the source each item
-  should be linked to (items without it show under **Actions**; other items only when they cost
-  more than ¥3,000).
+- **Reference**: the trusted source for that kind of item. Valued first (in the secondary market:
+  its price is the one compared).
 - **Supporting**: used when the reference has too few sales (fewer than 3 in the windows the
   valuation tries).
-- **Comparison**: shown next to the value (e.g. a foreign market), never counted in it.
+- **Comparison**: shown on the item page's price sources, never counted.
 - **Off**: not used for that kind of item.
+
+Each market also has an **identity page** per kind of item: the source whose product page says
+exactly what the item is (name, set, number, picture), used to find the same item elsewhere. Items
+without one show under **Actions** (other items only when they cost more than ¥3,000); a product
+page from another source of that market that has them counts too. It need not be the reference.
 
 A value is the median of the reference's sales (30 days, widened to 90 / 180 / 365 when there are
 fewer than 3), else a supporting source's, else a shop's asking price in the same condition (at
@@ -193,18 +202,19 @@ most 30 days old), else the retail price. Only prices in yen count.
 
 Each plug-in suggests its sources' roles; an admin can change them in **Settings > Price
 sources** (they apply to every account). The suggestions of the author's plug-ins make the
-**Japan collectibles** setup this app is built and tested with:
+**Japan collectibles** setup this app is built and tested with (primary market Japan, secondary
+US):
 
-| Source             | Cards      | Sealed TCG | Games & other | What it gives                                               |
-| ------------------ | ---------- | ---------- | ------------- | ----------------------------------------------------------- |
-| SNKRDUNK           | reference  | reference  | -             | verified trades, raw grades and slabs apart                 |
-| Mercari            | supporting | supporting | supporting    | sold listings (searched; bundles, parts and fakes filtered) |
-| 駿河屋             | -          | supporting | reference     | store and buy-back prices (no sales)                        |
-| TCGplayer (TCGCSV) | comparison | comparison | -             | US market prices, converted to yen                          |
-| eBay               | comparison | comparison | -             | US asking prices (official API)                             |
+| Source             | Market | Cards      | Sealed TCG | Games & other | Identity page | What it gives                                               |
+| ------------------ | ------ | ---------- | ---------- | ------------- | ------------- | ----------------------------------------------------------- |
+| SNKRDUNK           | Japan  | reference  | reference  | -             | cards, sealed | verified trades, raw grades and slabs apart                 |
+| Mercari            | Japan  | supporting | supporting | supporting    | -             | sold listings (searched; bundles, parts and fakes filtered) |
+| 駿河屋             | Japan  | -          | supporting | reference     | sealed, games | store and buy-back prices (no sales)                        |
+| TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices, converted to yen                          |
+| eBay               | US     | supporting | supporting | -             | -             | US asking prices (official API)                             |
 
 **Trust is earned, not declared.** After each collect, each supporting source's sales are compared
-with the reference's on the same items and conditions (the last 90 days, 3+ sales on each side). On
+with its market's reference's on the same items and conditions (the last 90 days, 3+ sales on each side). On
 10+ items, a median gap over 15% means it disagrees: it is valued as comparison only until it agrees
 again, admins get a notice, and Settings shows the gap. With fewer items in common it is
 "unverified" and keeps its role. (For example, Mercari card sales run about 15% below SNKRDUNK's,
@@ -233,8 +243,10 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 - `key`, `label`, `badge`: how it is stored and shown;
 - `market`, `currency`, `priceKinds`: where its prices are from and what they are (sales, asking
   prices, buy-back prices);
-- `roles` (per item class) and `priority`: its suggested role, and its order among sources of the
-  same role;
+- `roles` (per item class) and `priority`: its suggested role in its market, and its order among
+  sources of the same role;
+- `identity`: the item classes it has one stable product page per item for (it can be an item's
+  identity page);
 - `links`: the shape of its product links (pasting one on an item links that listing);
 - `aliases`, `singleItemOrders`, `orderIds`: how purchases from it are recognised in imports (its
   names, whether an order ID is one item, the shape of its IDs);

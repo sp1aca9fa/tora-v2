@@ -880,16 +880,18 @@ export const STORE_LINK_MIN_COST = 3000;
  * The identity link an item is expected to have (requirements S8): a product page of one of its
  * class's identity sources (see `identitySources`), whatever the price roles; for other items
  * only when they cost more than ¥3,000 (what the user paid for the lots they own). The preferred
- * source (to look for and suggest) and every source whose page counts. Null when none applies.
+ * source (to look for and suggest) and every source whose page counts, in a market (default:
+ * the primary one, S11). Null when none applies.
  */
 export function identityFor(
   product: Pick<Product, 'category' | 'kind'>,
   costJpy: number,
   registry: SourceRegistry,
+  market: string | null | undefined = registry.markets?.primary,
 ): { preferred: string; accepted: string[] } | null {
   const cls = productClass(product);
   if (cls === 'item' && costJpy <= STORE_LINK_MIN_COST) return null;
-  const accepted = identitySources(registry, cls);
+  const accepted = identitySources(registry, cls, market);
   return accepted.length ? { preferred: accepted[0]!, accepted } : null;
 }
 

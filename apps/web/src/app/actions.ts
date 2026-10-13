@@ -31,5 +31,5 @@ export async function revokeDeviceAction(deviceId: string) {
   if (!session) redirect('/login');
   if (deviceId === session.device.id) return logout();
   await revokeDevice(session.db, session.user.id, deviceId);
-  revalidatePath('/settings');
+  revalidatePath('/settings/account');
 }

@@ -1,4 +1,4 @@
-import { valuationOrder } from '@tora/core';
+import { identitySources, valuationOrder } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +12,8 @@ import {
   loadSourceRegistry,
   pruneSourceDetails,
   saveSourceInfos,
+  setMarketSettings,
+  setSourceRoles,
 } from './registry';
 import { identityFor, insertObservations } from './sources';
 import * as schema from './schema';
@@ -152,4 +154,26 @@ it('accepts a link from any identity source, best first', async () => {
   expect(identityFor(game, 10000, registry)?.accepted).toEqual(['surugaya']);
   // Cheap items are not asked for one.
   expect(identityFor(game, 2000, registry)).toBeNull();
+});
+
+it('values each market with its own sources and identity choice', async () => {
+  // A US source made the reference stays out of the primary (Japanese) value.
+  await setSourceRoles(db, 'tcgcsv', { card: 'reference' });
+  let registry = await loadSourceRegistry(db);
+  expect(registry.markets).toMatchObject({ primary: 'jp', secondary: 'us' });
+  expect(valuationOrder(registry, 'card')).toEqual(['snkrdunk', 'mercari']);
+  expect(valuationOrder(registry, 'card', 'us')).toEqual(['tcgcsv']);
+  // The admin's identity source comes first; none means none asked for.
+  await setMarketSettings(db, {
+    primary: 'jp',
+    secondary: 'us',
+    identity: { jp: { sealed: 'surugaya', item: null } },
+  });
+  registry = await loadSourceRegistry(db);
+  expect(identitySources(registry, 'sealed')).toEqual(['surugaya', 'snkrdunk']);
+  expect(identitySources(registry, 'item')).toEqual([]);
+  // Swapping the markets swaps what the value counts.
+  await setMarketSettings(db, { primary: 'us', secondary: 'jp' });
+  registry = await loadSourceRegistry(db);
+  expect(valuationOrder(registry, 'card')).toEqual(['tcgcsv']);
 });

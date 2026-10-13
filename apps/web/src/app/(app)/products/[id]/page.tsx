@@ -229,6 +229,7 @@ export default async function ProductPage({ params }: Params) {
             <MarketCompare
               bucket={usBucket}
               japan={japan?.get(bucketValueKey(product.id, usBucket))?.valuation ?? null}
+              product={product}
               mainBucket={mainBucket}
               foreign={foreign}
             />

@@ -85,8 +85,52 @@ export interface SourceQuality {
   dismissedAt?: string | null;
 }
 
+/**
+ * The markets the app uses (requirements S11), set by an admin for the whole app: the primary
+ * market's sources make the value, the secondary market's give one price to compare with.
+ */
+export interface MarketSettings {
+  primary: string | null;
+  secondary: string | null;
+  /**
+   * Per market and item class, the identity source the admin chose (null: none asked for);
+   * not set: the first source declaring it.
+   */
+  identity?: Record<string, Partial<Record<ProductClass, string | null>>>;
+}
+
+/** Markets the sources belong to, best first (by their best source's priority). */
+export function marketsOf(sources: SourceInfo[]): string[] {
+  return [
+    ...new Set(
+      sources
+        .filter((s) => s.market && !s.shopOnly)
+        .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key))
+        .map((s) => s.market!),
+    ),
+  ];
+}
+
+/** The settings with what is not set filled in: the first two markets, by their sources. */
+export function resolveMarkets(
+  sources: SourceInfo[],
+  saved: Partial<MarketSettings> | null | undefined,
+): MarketSettings {
+  const all = marketsOf(sources);
+  const primary = saved?.primary && all.includes(saved.primary) ? saved.primary : (all[0] ?? null);
+  const secondary =
+    saved?.secondary === null
+      ? null
+      : saved?.secondary && saved.secondary !== primary && all.includes(saved.secondary)
+        ? saved.secondary
+        : (all.find((m) => m !== primary) ?? null);
+  return { primary, secondary, identity: saved?.identity ?? {} };
+}
+
 export interface SourceRegistry {
   sources: SourceInfo[];
+  /** The markets (see `MarketSettings`); none: every source counts as one market. */
+  markets?: MarketSettings;
   /**
    * Each source's role per class as valuation uses it: its suggestion, or the admin's choice
    * (Settings), with supporting sources that disagree with the reference lowered to comparison.
@@ -128,10 +172,22 @@ export function roleOf(registry: SourceRegistry, key: string, cls: ProductClass)
 
 const rank = (role: SourceRole) => (role === 'reference' ? 0 : role === 'supporting' ? 1 : 2);
 
-/** Sources valued for a class, best first: references, then supporting ones, by priority. */
-export function valuationOrder(registry: SourceRegistry, cls: ProductClass): string[] {
+/** Whether a source belongs to a market (no market set: every source does). */
+const inMarket = (s: SourceInfo, market: string | null | undefined) =>
+  !market || s.market === market;
+
+/**
+ * Sources valued for a class in a market (default: the primary one), best first: references,
+ * then supporting ones, by priority.
+ */
+export function valuationOrder(
+  registry: SourceRegistry,
+  cls: ProductClass,
+  market: string | null | undefined = registry.markets?.primary,
+): string[] {
   return registry.sources
     .filter((s) => {
+      if (!inMarket(s, market)) return false;
       const role = roleOf(registry, s.key, cls);
       return role === 'reference' || role === 'supporting';
     })
@@ -144,20 +200,42 @@ export function valuationOrder(registry: SourceRegistry, cls: ProductClass): str
     .map((s) => s.key);
 }
 
-/** The class's main source (its first reference), which items of the class should be linked to. */
-export function referenceSource(registry: SourceRegistry, cls: ProductClass): string | null {
-  const first = valuationOrder(registry, cls)[0];
+/** The class's main source in a market (its first reference; default: the primary market). */
+export function referenceSource(
+  registry: SourceRegistry,
+  cls: ProductClass,
+  market: string | null | undefined = registry.markets?.primary,
+): string | null {
+  const first = valuationOrder(registry, cls, market)[0];
   return first && roleOf(registry, first, cls) === 'reference' ? first : null;
 }
 
 /**
- * Sources whose product pages can be an item's identity link, best first (by priority): a link
- * from any of them identifies the item.
+ * Sources whose product pages can be an item's identity link in a market (default: the primary
+ * one), the one to look for first: the admin's choice, else those declaring it by priority. A
+ * link from any of them identifies the item. Empty when the admin chose none.
  */
-export function identitySources(registry: SourceRegistry, cls: ProductClass): string[] {
-  return registry.sources
-    .filter((s) => s.identity?.includes(cls))
+export function identitySources(
+  registry: SourceRegistry,
+  cls: ProductClass,
+  market: string | null | undefined = registry.markets?.primary,
+): string[] {
+  const declared = registry.sources
+    .filter((s) => s.identity?.includes(cls) && inMarket(s, market))
     .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key))
+    .map((s) => s.key);
+  const chosen = market ? registry.markets?.identity?.[market]?.[cls] : undefined;
+  if (chosen === null) return [];
+  const linkable = registry.sources.some(
+    (s) => s.key === chosen && s.links?.length && inMarket(s, market),
+  );
+  return chosen && linkable ? [chosen, ...declared.filter((k) => k !== chosen)] : declared;
+}
+
+/** Sources that can be chosen as a market's identity source: those with product pages. */
+export function identityChoices(registry: SourceRegistry, market: string | null): string[] {
+  return registry.sources
+    .filter((s) => s.links?.length && !s.shopOnly && inMarket(s, market))
     .map((s) => s.key);
 }
 

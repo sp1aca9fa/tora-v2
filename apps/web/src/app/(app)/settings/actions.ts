@@ -5,8 +5,11 @@ import {
   NOTICE_TYPES,
   type NoticeLevel,
   type NoticeLevels,
+  ITEM_CLASSES,
   type ProductClass,
   ROTATE_SECONDS,
+  identityChoices,
+  marketsOf,
   SOURCE_ROLES,
   type SourceRole,
   SUMMARY_PANELS,
@@ -19,6 +22,7 @@ import {
   loadSourceRegistry,
   setNoticeLevels,
   setPreferences,
+  setMarketSettings,
   setSourceRoles,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
@@ -98,6 +102,53 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   // The value-over-time history follows too (about 10 s), right after answering.
   after(async () => {
     await runSnapshots(db);
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * The primary and secondary markets (admins; the whole app, S11): the value counts the primary
+ * market's sources, so values and their history are rebuilt as for a role change.
+ */
+export async function setMarketsAction(primary: string, secondary: string | null) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const registry = await loadSourceRegistry(db);
+  const all = marketsOf(registry.sources);
+  if (!all.includes(primary) || (secondary !== null && !all.includes(secondary))) return;
+  await setMarketSettings(db, {
+    primary,
+    secondary: secondary === primary ? null : secondary,
+    identity: registry.markets?.identity ?? {},
+  });
+  await clearAllBucketValues(db);
+  after(async () => {
+    await runSnapshots(db);
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+}
+
+/** A market's identity source for an item class (admins; null: none asked for). */
+export async function setIdentitySourceAction(
+  market: string,
+  cls: ProductClass,
+  key: string | null,
+) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !(ITEM_CLASSES as readonly string[]).includes(cls)) return;
+  const registry = await loadSourceRegistry(db);
+  const markets = registry.markets;
+  if (!markets || (key !== null && !identityChoices(registry, market).includes(key))) return;
+  await setMarketSettings(db, {
+    ...markets,
+    identity: { ...markets.identity, [market]: { ...markets.identity?.[market], [cls]: key } },
+  });
+  // Saved values carry the settings' date: saved again so pages keep using them.
+  after(async () => {
     await refreshBucketValues(db);
     revalidatePath('/', 'layout');
   });

@@ -1,253 +1,35 @@
-import {
-  MAX_ACTIVE_DEVICES,
-  collectorHealth,
-  listDevices,
-  listRecentCollectorRuns,
-} from '@tora/db';
-import { noticeLevelsFor, summaryPrefs } from '@tora/core';
+import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
-import { getFormatter, getTranslations } from 'next-intl/server';
-import { logout, revokeDeviceAction } from '@/app/actions';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { getRegistry, sourceLabels } from '@/lib/sources';
-import { authed } from '@/lib/auth/guard';
-import { formatJpy } from '@/lib/utils';
-import { setAmountsVisibleAction } from './actions';
-import { NoticeLevelsForm } from './notice-levels-form';
-import { SourcesForm } from './sources-form';
-import { SummaryForm } from './summary-form';
+import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
+import { SETTINGS_SECTIONS } from './sections';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
 }
 
-/** A role change rebuilds the value history after answering, within this time. */
-export const maxDuration = 120;
-
+/** Settings menu: one entry per section. */
 export default async function SettingsPage() {
-  const sourceLabel = await sourceLabels();
-  const registry = await getRegistry();
-  const { db, user, device: current } = await authed();
-  const [runs, health, devices, t, format] = await Promise.all([
-    listRecentCollectorRuns(db, 10),
-    collectorHealth(db),
-    listDevices(db, user.id),
-    getTranslations(),
-    getFormatter(),
-  ]);
-  const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
-  const dateTime = (iso: string) =>
-    format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
-
+  const t = await getTranslations('settings');
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('settings.title')}</h1>
-
-      {/* Wide screens: the cards flow in two columns. */}
-      <div className="space-y-4 lg:columns-2 lg:gap-4 lg:space-y-0 lg:[&>*]:mb-4 lg:[&>*]:break-inside-avoid">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.account')}</CardTitle>
-            <CardDescription>
-              {t('settings.signedInAs', { username: user.username })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={logout}>
-              <Button variant="outline">{t('settings.logout')}</Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card id="notices" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>{t('notices.title')}</CardTitle>
-            <CardDescription>{t('notices.info')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <NoticeLevelsForm levels={noticeLevelsFor(user.noticeLevels)} />
-          </CardContent>
-        </Card>
-
-        <Card id="sources" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>{t('sourceRoles.title')}</CardTitle>
-            <CardDescription>
-              {t('sourceRoles.info')} {user.role !== 'admin' && t('sourceRoles.adminOnly')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SourcesForm
-              sources={registry.sources}
-              roles={registry.declared ?? registry.roles}
-              quality={registry.quality ?? {}}
-              labels={Object.fromEntries(registry.sources.map((s) => [s.key, s.label]))}
-              editable={user.role === 'admin'}
-            />
-          </CardContent>
-        </Card>
-
-        <Card id="amounts" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>{t('amounts.title')}</CardTitle>
-            <CardDescription>{t('amounts.info')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form
-              action={setAmountsVisibleAction.bind(null, !user.preferences?.amountsVisible)}
-              className="flex flex-wrap items-center gap-3 text-sm"
-            >
-              <span>
-                {user.preferences?.amountsVisible
-                  ? t('amounts.alwaysShown')
-                  : t('amounts.hiddenFirst')}
+    <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {SETTINGS_SECTIONS.map(({ key, icon: Icon }) => (
+        <li key={key}>
+          <Link
+            href={`/settings/${key}`}
+            className="flex h-full items-center gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent/50"
+          >
+            <Icon className="size-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">{t(`section.${key}.title`)}</span>
+              <span className="block text-sm text-muted-foreground">
+                {t(`section.${key}.info`)}
               </span>
-              <Button variant="outline" size="sm">
-                {user.preferences?.amountsVisible
-                  ? t('amounts.makeHidden')
-                  : t('amounts.makeShown')}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card id="summary" className="scroll-mt-20">
-          <CardHeader>
-            <CardTitle>{t('summaryPrefs.title')}</CardTitle>
-            <CardDescription>{t('summaryPrefs.info')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SummaryForm {...summaryPrefs(user.preferences)} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {t('settings.devices', { count: devices.length, max: MAX_ACTIVE_DEVICES })}
-            </CardTitle>
-            <CardDescription>{t('settings.devicesInfo')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y text-sm">
-              {devices.map((d) => (
-                <li key={d.id} className="flex items-center justify-between gap-3 py-2.5">
-                  <div>
-                    <p className="font-medium">
-                      {d.label ?? '-'}
-                      {d.id === current.id && (
-                        <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">
-                          {t('settings.thisDevice')}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t('settings.deviceDates', {
-                        since: date(d.createdAt),
-                        seen: date(d.lastSeenAt),
-                      })}
-                    </p>
-                  </div>
-                  <form action={revokeDeviceAction.bind(null, d.id)}>
-                    <Button variant="outline" size="sm">
-                      {d.id === current.id ? t('settings.logout') : t('settings.revoke')}
-                    </Button>
-                  </form>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.collectors')}</CardTitle>
-            <CardDescription>{t('settings.collectorsInfo')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {health.map((h) => (
-              <div key={h.source} className="space-y-2 rounded-md border p-3 text-sm">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-medium">{sourceLabel(h.source)}</p>
-                  {h.lastRun && (
-                    <span
-                      className={
-                        h.lastRun.status === 'ok'
-                          ? 'text-xs text-muted-foreground'
-                          : 'text-xs font-medium text-destructive'
-                      }
-                    >
-                      {t(`runStatus.${h.lastRun.status}`)} · {dateTime(h.lastRun.startedAt)}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {t('settings.sourceCounts', { linked: h.linked, pending: h.pending })}
-                  {h.lastRun &&
-                    ` · ${t('settings.lastRunCounts', { requests: h.lastRun.requests, added: h.lastRun.observationsAdded })}`}
-                </p>
-                {h.lastRun?.error && (
-                  <pre className="overflow-x-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap">
-                    {h.lastRun.error}
-                  </pre>
-                )}
-                {h.stale.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-destructive">{t('settings.stale')}</p>
-                    <ul className="text-xs text-muted-foreground">
-                      {h.stale.map((s) => (
-                        <li key={s.product.id}>
-                          {s.product.name} ·{' '}
-                          {s.lastSuccessAt ? dateTime(s.lastSuccessAt) : t('settings.never')}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {h.jumps.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-destructive">{t('settings.jumps')}</p>
-                    <ul className="text-xs text-muted-foreground">
-                      {h.jumps.map((j) => (
-                        <li key={`${j.product.id}-${j.bucket}`}>
-                          {j.product.name} <code>{j.bucket ?? '-'}</code>:{' '}
-                          {formatJpy(Math.round(j.before))} → {formatJpy(Math.round(j.recent))}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ))}
-            {runs.length === 0 ? (
-              <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                {t('settings.noRuns')}
-              </p>
-            ) : (
-              <details className="text-sm">
-                <summary className="cursor-pointer text-muted-foreground">
-                  {t('settings.recentRuns')}
-                </summary>
-                <ul className="mt-2 divide-y">
-                  {runs.map((run) => (
-                    <li key={run.id} className="flex justify-between gap-4 py-2">
-                      <span>{sourceLabel(run.source)}</span>
-                      <span className="text-muted-foreground">
-                        {t(`runStatus.${run.status}`)} · {dateTime(run.startedAt)} ·{' '}
-                        {t('settings.lastRunCounts', {
-                          requests: run.requests,
-                          added: run.observationsAdded,
-                        })}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+            </span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }

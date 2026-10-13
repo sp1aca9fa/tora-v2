@@ -54,7 +54,7 @@ export default async function ActionsPage() {
           cls: t(`sourceRoles.class.${i.cls}`),
         }),
         image: null,
-        href: '/settings#sources',
+        href: '/settings/sources',
         source: i.source,
         qualityClass: i.cls,
       };
@@ -152,7 +152,7 @@ export default async function ActionsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">{t('nav.actions')}</h1>
         <p className="text-sm text-muted-foreground">
           {t('actions.intro')}{' '}
-          <Link href="/settings#notices" className="underline">
+          <Link href="/settings/notices" className="underline">
             {t('actions.levels')}
           </Link>
         </p>

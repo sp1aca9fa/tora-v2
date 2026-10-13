@@ -205,6 +205,7 @@
       "tcg_main_source": "識別リンクがないTCGアイテム {count}件",
       "game_main_source": "識別リンクがないゲーム・その他 {count}件",
       "second_source": "他の価格ソースの候補 {count}件",
+      "secondary_identity": "セカンダリ市場の識別リンクがないアイテム {count}件",
       "card_grade": "グレードのないカード {count}件",
       "game_condition": "状態のないゲーム {count}件",
       "import_review": "確認待ちのインポート {count}件",
@@ -273,7 +274,29 @@
     "stale": "3日以上収集されていません:",
     "never": "未実行",
     "jumps": "中央値が50%以上変動（直近7日 vs その前30日）:",
-    "recentRuns": "最近の実行"
+    "recentRuns": "最近の実行",
+    "section": {
+      "account": {
+        "title": "アカウント",
+        "info": "ログアウトとログイン中の端末。"
+      },
+      "display": {
+        "title": "表示",
+        "info": "金額の表示・非表示、サマリーのインサイトカード。"
+      },
+      "notices": {
+        "title": "通知",
+        "info": "各アクションの色と順序。"
+      },
+      "sources": {
+        "title": "市場と価格ソース",
+        "info": "プライマリ・セカンダリ市場、各ソースの役割、識別ページ。"
+      },
+      "collectors": {
+        "title": "コレクター",
+        "info": "自宅PCの毎日の収集の状況。"
+      }
+    }
   },
   "fields": {
     "type": "種類",
@@ -432,7 +455,10 @@
     "missingStable": "識別リンクがまだありません。{source}（商品を特定できる固定の商品ページ）にリンクしてください。下の候補を確定するか、リンクを貼り付けてください。",
     "pasteOne": "{source}の商品リンクを貼り付け",
     "nothingYet": "この商品の{source}のデータはまだありません。次回の収集で探します。",
-    "market": { "jp": "日本", "us": "米国" },
+    "market": {
+      "jp": "日本",
+      "us": "米国"
+    },
     "pasteUrl": "価格ソースの商品リンクを貼り付け({sources})",
     "link": "リンク",
     "last30": "直近30日",
@@ -725,14 +751,12 @@
     }
   },
   "compare": {
-    "title": "日本と米国の比較",
-    "info": "同じ状態（{bucket}）で比較しています。米国の価格は比較用で、評価額には含まれません。",
+    "title": "{primary}と{secondary}の比較",
+    "info": "同じ状態（{bucket}）で比較しています。{secondary}の価格は比較用で、評価額には含まれません。",
     "graded": "海外の価格は鑑定なしのカードのものなので、鑑定済みカードはこの状態で比較しています。",
-    "japan": "日本",
-    "us": "米国",
-    "noJapan": "日本の価格なし",
-    "spread": "日本比 {pct}%",
-    "converted": "{price}（1ドル {rate}円、{date}）",
+    "noJapan": "{primary}の価格なし",
+    "spread": "{primary}比 {pct}%",
+    "converted": "{price}（1 {currency} = {rate}円、{date}）",
     "asks": "出品{count}件の中央値",
     "middleOf": "{count}件の価格の中央値"
   },
@@ -755,6 +779,7 @@
       "tcg_main_source": "識別リンクがないTCGアイテム",
       "game_main_source": "識別リンクがないゲーム・その他",
       "second_source": "他の価格ソースの候補",
+      "secondary_identity": "セカンダリ市場の識別リンクがないアイテム",
       "card_grade": "グレードのないカード",
       "game_condition": "状態のないゲーム",
       "import_review": "確認待ちのインポート",
@@ -849,6 +874,18 @@
     },
     "suggestedRole": "提案: {role}",
     "suggestedWhy": "ソースのプラグインが提案する役割です。作者が検証した設定(日本のコレクション向けプリセット)で、測定結果ではありません。根拠は各補助ソースの下の確認結果(同じアイテムでの基準ソースとの取引価格の比較)です。",
-    "perClass": "列ごとにアイテムの種類が別です。「カード」での変更はカードのみに適用されます(未開封品やゲームはそれぞれの役割のまま)。評価額と推移は数秒で反映されます。"
+    "perClass": "列ごとにアイテムの種類が別です。「カード」での変更はカードのみに適用されます(未開封品やゲームはそれぞれの役割のまま)。評価額と推移は数秒で反映されます。",
+    "identity": "識別ページ",
+    "identityInfo": "商品を正確に特定できる商品ページ。この市場の商品ページを持つ他のソースのリンクも有効です。",
+    "identityNone": "なし"
+  },
+  "markets": {
+    "title": "市場",
+    "info": "評価額はプライマリ市場のソースのみで計算します。セカンダリ市場は比較用に商品ごとに1つの価格を表示します（基準ソース、なければ補助ソースの価格）。全アカウントに適用されます。",
+    "primary": "プライマリ市場",
+    "secondary": "セカンダリ市場",
+    "primaryInfo": "評価額の元になる市場。",
+    "secondaryInfo": "評価額の横に表示（評価額には含めません）。",
+    "none": "なし"
   }
 }

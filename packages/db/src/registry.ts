@@ -2,6 +2,7 @@
 // by the collectors, read by the app.
 import {
   ITEM_CLASSES,
+  type MarketSettings,
   type ProductClass,
   QUALITY_MAX_GAP,
   QUALITY_MIN_PAIRS,
@@ -12,11 +13,12 @@ import {
   effectiveRoles,
   median,
   productClass,
+  resolveMarkets,
   toTokyoIso,
 } from '@tora/core';
 import { and, eq, gte, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { priceObservations, products, sources } from './schema';
+import { appSettings, priceObservations, products, sources } from './schema';
 
 /** Saves the plug-ins' descriptions (collectors, at the start of a run); roles chosen stay. */
 export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void> {
@@ -50,8 +52,12 @@ const TTL_MS = 5_000;
 export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<SourceRegistry> {
   const hit = cache.get(db);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.registry;
-  const rows = await db.select().from(sources);
+  const [rows, [markets]] = await Promise.all([
+    db.select().from(sources),
+    db.select().from(appSettings).where(eq(appSettings.key, 'markets')),
+  ]);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
+  const infos = rows.map((r) => r.info);
   const quality = Object.fromEntries(
     rows.map((r) => [r.key, (r.quality ?? {}) as Partial<Record<ProductClass, SourceQuality>>]),
   );
@@ -64,7 +70,11 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     ),
     declared,
     quality,
-    changedAt: rows.reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), ''),
+    markets: resolveMarkets(infos, markets?.value as Partial<MarketSettings> | undefined),
+    changedAt: [...rows, ...(markets ? [markets] : [])].reduce(
+      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
+      '',
+    ),
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;
@@ -80,9 +90,19 @@ export async function setSourceRoles(
   cache = new WeakMap();
 }
 
+/** The admin's markets and identity sources (requirements S11); values follow. */
+export async function setMarketSettings(db: Db, value: MarketSettings): Promise<void> {
+  const at = toTokyoIso();
+  await db
+    .insert(appSettings)
+    .values({ key: 'markets', value })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: at } });
+  cache = new WeakMap();
+}
+
 /**
  * The quality gate (requirements S8): each supporting source's sales against its class's
- * reference source's, like for like (same item and condition, the last 90 days, 3+ sales each).
+ * reference source's in the same market, like for like (same item and condition, the last 90 days, 3+ sales each).
  * A median gap over 15% on 10+ items: it disagrees and is valued as comparison only until it
  * agrees again; fewer items: unverified (keeps its role). Run at the end of each collect.
  * Returns the sources and classes now valued differently (into or out of "disagrees").
@@ -124,7 +144,10 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
     const next: Partial<Record<ProductClass, SourceQuality>> = {};
     for (const cls of ITEM_CLASSES) {
       if (declared[row.key]?.[cls] !== 'supporting') continue;
-      const reference = rows.find((r) => declared[r.key]?.[cls] === 'reference')?.key ?? null;
+      const reference =
+        rows.find(
+          (r) => declared[r.key]?.[cls] === 'reference' && r.info.market === row.info.market,
+        )?.key ?? null;
       const gaps: number[] = [];
       for (const e of byKey.values()) {
         if (e.cls !== cls || !reference) continue;

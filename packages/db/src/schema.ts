@@ -579,6 +579,13 @@ export const sources = sqliteTable('sources', {
   ...timestamps,
 });
 
+/** Settings for the whole app, set by an admin (requirements S11): e.g. `markets`. */
+export const appSettings = sqliteTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
+  ...timestamps,
+});
+
 /**
  * Purchase files uploaded in the app for the import through Claude (requirements S8 step 5):
  * screenshots, PDFs, text. Read right away by the app when it has a Claude API key, else by the
