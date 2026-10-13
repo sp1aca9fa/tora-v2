@@ -9,6 +9,7 @@ import {
   identityFor,
 } from '@tora/db';
 import type { Product } from '@tora/db';
+import { productClass, roleOf, valuationOrder } from '@tora/core';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { cn, formatJpy } from '@/lib/utils';
 import { LinkUrlForm } from './link-url-form';
 import { SearchSource } from './search-source';
+import { type MarketTab, SourceTabs } from './source-tabs';
 import {
   confirmCandidateAction,
   linkUrlAction,
@@ -53,7 +55,7 @@ export async function PriceSources({
     listProductSources(db, product.id),
     listPendingCandidates(db, product.id),
     bucketStats(db, product.id, 30),
-    recentObservations(db, product.id, 10),
+    recentObservations(db, product.id, 60),
   ]);
   // Suggestions without a picture of their own (e.g. from a linked look-alike): show the stored
   // thumbnail of the product already linked to that listing.
@@ -84,9 +86,6 @@ export async function PriceSources({
       ? identity.preferred
       : null;
   const pasteUp = !!missing && !candidates.some((c) => c.source === missing);
-  const open = candidates.filter((c) => !linked.has(c.source));
-  const more = candidates.filter((c) => linked.has(c.source));
-
   const suggestions = (list: typeof candidates) =>
     list.length > 0 && (
       <div className="space-y-2">
@@ -157,23 +156,52 @@ export async function PriceSources({
     </div>
   );
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('sources.title')}</CardTitle>
-        <CardDescription>{t('sources.info')}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {searches.map((s) =>
-          s.active ? (
-            <SearchSource key={s.id} db={db} link={s} />
+  // A tab per source that applies to this kind of item or has something for it, grouped by
+  // market; the market of the class's first valued source comes first.
+  const cls = productClass(product);
+  const order = valuationOrder(registry, cls);
+  const hasAny = (key: string) =>
+    sources.some((x) => x.source === key) ||
+    candidates.some((c) => c.source === key) ||
+    stats.some((x) => x.source === key);
+  const tabSources = registry.sources
+    .filter(
+      (x) => x.market && !x.shopOnly && (roleOf(registry, x.key, cls) !== 'off' || hasAny(x.key)),
+    )
+    .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key));
+  const firstMarket = tabSources.find((x) => x.key === order[0])?.market;
+  const marketKeys = [...new Set(tabSources.map((x) => x.market!))].toSorted(
+    (a, b) => Number(b === firstMarket) - Number(a === firstMarket) || a.localeCompare(b),
+  );
+  const marketLabel = (m: string) =>
+    t.has(`sources.market.${m}`) ? t(`sources.market.${m}`) : m.toUpperCase();
+
+  const panel = (key: string) => {
+    const label = sourceLabel(key);
+    const mySearches = searches.filter((x) => x.source === key);
+    const myLinks = active.filter((x) => x.source === key);
+    const mine = candidates.filter((c) => c.source === key);
+    const myStats = stats.filter((x) => x.source === key);
+    const myRecent = recent.filter((o) => o.source === key).slice(0, 10);
+    const canPaste = !!registry.sources.find((x) => x.key === key)?.links?.length;
+    const pasteHere = canPaste && !(pasteUp && key === missing) && (
+      <div className="space-y-1">
+        <p className="text-xs text-muted-foreground">{t('sources.pasteOne', { source: label })}</p>
+        <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
+      </div>
+    );
+    return (
+      <>
+        {mySearches.map((x) =>
+          x.active ? (
+            <SearchSource key={x.id} db={db} link={x} />
           ) : (
             <div
-              key={s.id}
+              key={x.id}
               className="flex items-center justify-between gap-3 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground"
             >
-              <span>{t('sources.search.off', { source: sourceLabel(s.source) })}</span>
-              <form action={reactivateSourceAction.bind(null, s.id)}>
+              <span>{t('sources.search.off', { source: label })}</span>
+              <form action={reactivateSourceAction.bind(null, x.id)}>
                 <Button variant="ghost" size="sm">
                   {t('sources.search.turnOn')}
                 </Button>
@@ -181,16 +209,16 @@ export async function PriceSources({
             </div>
           ),
         )}
-        {active.length > 0 && (
+        {myLinks.length > 0 && (
           <ul className="divide-y text-sm">
-            {active.map((s) => (
-              <li key={s.id} className="flex items-start justify-between gap-3 py-2">
+            {myLinks.map((x) => (
+              <li key={x.id} className="flex items-start justify-between gap-3 py-2">
                 <div className="min-w-0">
                   <p className="font-medium">
-                    {sourceLabel(s.source)}{' '}
-                    {s.url && (
+                    {label}{' '}
+                    {x.url && (
                       <a
-                        href={s.url}
+                        href={x.url}
                         target="_blank"
                         rel="noreferrer"
                         className="font-normal underline"
@@ -199,17 +227,17 @@ export async function PriceSources({
                       </a>
                     )}
                   </p>
-                  {s.title && <p className="truncate text-xs text-muted-foreground">{s.title}</p>}
+                  {x.title && <p className="truncate text-xs text-muted-foreground">{x.title}</p>}
                   <p className="text-xs text-muted-foreground">
-                    {s.lastSuccessAt
+                    {x.lastSuccessAt
                       ? t('sources.collected', {
-                          count: s.observations,
-                          date: date(s.lastSuccessAt),
+                          count: x.observations,
+                          date: date(x.lastSuccessAt),
                         })
                       : t('sources.waiting')}
                   </p>
                 </div>
-                <form action={unlinkSourceAction.bind(null, s.id)}>
+                <form action={unlinkSourceAction.bind(null, x.id)}>
                   <Button variant="ghost" size="sm">
                     {t('sources.unlink')}
                   </Button>
@@ -218,8 +246,109 @@ export async function PriceSources({
             ))}
           </ul>
         )}
+        {mySearches.length === 0 && myLinks.length === 0 && mine.length === 0 && (
+          <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {t('sources.nothingYet', { source: label })}
+          </p>
+        )}
+        {myLinks.length === 0 ? (
+          <>
+            {suggestions(mine)}
+            {pasteHere}
+          </>
+        ) : (
+          (mine.length > 0 || pasteHere) && (
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground">
+                {t('sources.addAnother', { count: mine.length })}
+              </summary>
+              <div className="mt-3 space-y-4">
+                {suggestions(mine)}
+                {pasteHere}
+              </div>
+            </details>
+          )
+        )}
+        {myStats.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{t('sources.last30')}</p>
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 font-normal">{t('holding.bucket')}</th>
+                  <th className="py-1 text-right font-normal">{t('sources.median')}</th>
+                  <th className="py-1 text-right font-normal">{t('sources.trades')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myStats.map((x) => (
+                  <tr key={x.bucket ?? ''} className={cn(x.bucket === bucket && 'font-medium')}>
+                    <td className="py-1">
+                      <code className="text-xs">{x.bucket ?? t('sources.unmapped')}</code>
+                      {x.bucket === bucket && (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          ({t('sources.yours')})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      {x.medianJpy === null ? '-' : formatJpy(Math.round(x.medianJpy))}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">{x.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {myRecent.length > 0 && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground">
+              {t('sources.recentTrades')}
+            </summary>
+            <ul className="mt-2 divide-y">
+              {myRecent.map((o) => (
+                <li key={o.id} className="flex justify-between gap-3 py-1.5">
+                  <span className="text-muted-foreground">
+                    {date(o.observedAt)} · <code className="text-xs">{o.bucket ?? '-'}</code>
+                  </span>
+                  <span className="tabular-nums">{formatJpy(o.priceJpy)}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </>
+    );
+  };
 
-        {missing && active.length > 0 && (
+  const markets: MarketTab[] = marketKeys.map((m) => ({
+    key: m,
+    label: marketLabel(m),
+    sources: tabSources
+      .filter((x) => x.market === m)
+      .map((x) => ({
+        key: x.key,
+        label: sourceLabel(x.key),
+        // Suggestions for a source without a linked listing yet are what needs a look.
+        waiting: linked.has(x.key) ? 0 : candidates.filter((c) => c.source === x.key).length,
+        content: panel(x.key),
+      })),
+  }));
+  const initial =
+    missing ??
+    tabSources.find((x) => !linked.has(x.key) && candidates.some((c) => c.source === x.key))?.key ??
+    order.find((key) => tabSources.some((x) => x.key === key)) ??
+    tabSources[0]?.key;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('sources.title')}</CardTitle>
+        <CardDescription>{t('sources.info')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {missing && (
           <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2">
             <p className="text-sm">
               {t('sources.missingStable', { source: sourceLabel(missing) })}
@@ -232,84 +361,7 @@ export async function PriceSources({
             </form>
           </div>
         )}
-        {suggestions(open)}
-        {active.length === 0 && candidates.length === 0 && (
-          <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            {t('sources.noneYet')}
-          </p>
-        )}
-        {active.length === 0 ? (
-          paste
-        ) : (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground">
-              {t('sources.addAnother', { count: more.length })}
-            </summary>
-            <div className="mt-3 space-y-4">
-              {suggestions(more)}
-              {!pasteUp && paste}
-            </div>
-          </details>
-        )}
-
-        {stats.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium">{t('sources.last30')}</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="py-1 font-normal">{t('holding.bucket')}</th>
-                    <th className="py-1 text-right font-normal">{t('sources.median')}</th>
-                    <th className="py-1 text-right font-normal">{t('sources.trades')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.map((s) => (
-                    <tr
-                      key={`${s.source}-${s.bucket}`}
-                      className={cn(s.bucket === bucket && 'font-medium')}
-                    >
-                      <td className="py-1">
-                        <span className="mr-1.5 text-xs text-muted-foreground">
-                          {sourceLabel(s.source)}
-                        </span>
-                        <code className="text-xs">{s.bucket ?? t('sources.unmapped')}</code>
-                        {s.bucket === bucket && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            ({t('sources.yours')})
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1 text-right tabular-nums">
-                        {s.medianJpy === null ? '-' : formatJpy(Math.round(s.medianJpy))}
-                      </td>
-                      <td className="py-1 text-right tabular-nums">{s.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {recent.length > 0 && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground">
-              {t('sources.recentTrades')}
-            </summary>
-            <ul className="mt-2 divide-y">
-              {recent.map((o) => (
-                <li key={o.id} className="flex justify-between gap-3 py-1.5">
-                  <span className="text-muted-foreground">
-                    {date(o.observedAt)} · <code className="text-xs">{o.bucket ?? '-'}</code>
-                  </span>
-                  <span className="tabular-nums">{formatJpy(o.priceJpy)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
+        {initial && <SourceTabs markets={markets} initial={initial} />}
       </CardContent>
     </Card>
   );
