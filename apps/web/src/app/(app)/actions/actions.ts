@@ -1,8 +1,15 @@
 'use server';
 
-import { CONDITIONS, type CardGrade, type Condition, toTokyoIso } from '@tora/core';
+import {
+  CONDITIONS,
+  type CardGrade,
+  type Condition,
+  type ProductClass,
+  toTokyoIso,
+} from '@tora/core';
 import {
   changeCondition,
+  dismissSourceQuality,
   getHoldingDetail,
   setCardGrade,
   setSourceWarningDismissed,
@@ -37,5 +44,13 @@ export async function setSourceWarningAction(productId: string, dismiss: boolean
   const { db, user } = await authed();
   if (!(await userHoldsProduct(db, user.id, productId))) return;
   await setSourceWarningDismissed(db, user.id, productId, dismiss);
+  revalidatePath('/', 'layout');
+}
+
+/** Dismisses a source quality notice (admins): the source stays comparison only for the class. */
+export async function dismissSourceQualityAction(source: string, cls: ProductClass) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  await dismissSourceQuality(db, source, cls);
   revalidatePath('/', 'layout');
 }

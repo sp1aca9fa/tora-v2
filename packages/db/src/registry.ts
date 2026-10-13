@@ -135,6 +135,10 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
         checkedAt: at,
       };
       const before = (row.quality as Partial<Record<ProductClass, SourceQuality>> | null)?.[cls];
+      // A dismissed notice stays dismissed while the source keeps disagreeing.
+      if (before?.status === 'disagrees' && next[cls]!.status === 'disagrees') {
+        next[cls]!.dismissedAt = before.dismissedAt ?? null;
+      }
       // Only a change in or out of "disagrees" changes what values use.
       if ((before?.status === 'disagrees') !== (next[cls]!.status === 'disagrees')) {
         changed.push(`${row.key}:${cls}`);
@@ -144,4 +148,14 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
   }
   cache = new WeakMap();
   return changed;
+}
+
+/** An admin dismisses a source's quality notice for a class (it stays comparison only). */
+export async function dismissSourceQuality(db: Db, key: string, cls: ProductClass): Promise<void> {
+  const [row] = await db.select().from(sources).where(eq(sources.key, key));
+  const quality = (row?.quality ?? {}) as Partial<Record<ProductClass, SourceQuality>>;
+  if (!quality[cls]) return;
+  quality[cls] = { ...quality[cls]!, dismissedAt: toTokyoIso() };
+  await db.update(sources).set({ quality }).where(eq(sources.key, key));
+  cache = new WeakMap();
 }

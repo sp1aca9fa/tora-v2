@@ -258,7 +258,7 @@ export async function pendingActions(
   if (options.admin) {
     for (const [source, byClass] of Object.entries(registry.quality ?? {})) {
       for (const [cls, quality] of Object.entries(byClass)) {
-        if (quality?.status !== 'disagrees') continue;
+        if (quality?.status !== 'disagrees' || quality.dismissedAt) continue;
         items.push({
           key: `quality:${source}:${cls}`,
           type: 'source_quality',

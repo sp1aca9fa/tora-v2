@@ -62,6 +62,8 @@ export interface SourceQuality {
   /** The reference it was compared with. */
   against: string | null;
   checkedAt: string;
+  /** An admin dismissed the notice (kept while it keeps disagreeing). */
+  dismissedAt?: string | null;
 }
 
 export interface SourceRegistry {

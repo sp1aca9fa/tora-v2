@@ -221,7 +221,8 @@
     "quality": {
       "below": "Sales {pct}% below {reference} on {count} items ({cls}): used for comparison only",
       "above": "Sales {pct}% above {reference} on {count} items ({cls}): used for comparison only",
-      "explain": "Its sales stray too far from the reference source's on the same items and conditions, so values no longer use them; they stay visible as a comparison. It is checked again on each collect. An admin can change the source's role in Settings."
+      "explain": "Its sales stray too far from the reference source's on the same items and conditions, so values no longer use them; they stay visible as a comparison. It is checked again on each collect. An admin can change the source's role in Settings.",
+      "dismiss": "Keep it this way"
     },
     "openSettings": "Open price sources in Settings"
   },
@@ -818,7 +819,6 @@
     "info": "Where values come from, per kind of item: a reference source is valued first and is the source items should be linked to; supporting sources are used when the reference has too few sales; comparison sources are shown beside the value, never in it. The roles come from the sources' plug-ins (suggested) and apply to every account.",
     "adminOnly": "Only an admin can change them.",
     "source": "Source",
-    "suggested": "suggested",
     "class": {
       "card": "Cards",
       "sealed": "Sealed TCG",
@@ -840,7 +840,9 @@
       "disagrees": "{pct}% {direction} {reference} on {count} items: comparison only",
       "unverified": "Unverified: {count} items in common with {reference} (10 needed)",
       "below": "below",
-      "above": "above"
-    }
+      "above": "above",
+      "dismissed": "notice dismissed"
+    },
+    "suggestedRole": "Suggested: {role}"
   }
 }

@@ -7,6 +7,7 @@ import {
   NOTICE_LEVELS,
   type NoticeLevel,
   type NoticeType,
+  type ProductClass,
   RAW_GRADES,
 } from '@tora/core';
 import { ChevronDown, ChevronRight, ExternalLink, RotateCw } from 'lucide-react';
@@ -32,7 +33,12 @@ import {
   linkUrlAction,
   rejectCandidateAction,
 } from '../products/[id]/source-actions';
-import { setLotConditionAction, setLotGradeAction, setSourceWarningAction } from './actions';
+import {
+  dismissSourceQualityAction,
+  setLotConditionAction,
+  setLotGradeAction,
+  setSourceWarningAction,
+} from './actions';
 
 /** One action as the page shows it (built on the server from `pendingActions`). */
 export interface ActionCardView {
@@ -65,6 +71,8 @@ export interface ActionCardView {
   holdingId?: string;
   /** An imported lot waiting for review. */
   review?: ReviewItem;
+  /** The item class a source quality notice is about. */
+  qualityClass?: ProductClass;
   /** A purchase link that failed. */
   linkId?: string;
   url?: string;
@@ -281,7 +289,17 @@ function ActionCard({
       {open && (
         <div className="space-y-3 border-t px-3 py-3">
           {c.kind === 'quality' && (
-            <p className="text-sm text-muted-foreground">{t('actions.quality.explain')}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('actions.quality.explain')}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => run(() => dismissSourceQualityAction(c.source!, c.qualityClass!))}
+              >
+                {t('actions.quality.dismiss')}
+              </Button>
+            </div>
           )}
           {c.kind !== 'link' && c.kind !== 'quality' && (
             <div className="grid gap-3 sm:grid-cols-2">

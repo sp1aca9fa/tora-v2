@@ -6,7 +6,12 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
-import { checkSourceQuality, loadSourceRegistry, saveSourceInfos } from './registry';
+import {
+  checkSourceQuality,
+  dismissSourceQuality,
+  loadSourceRegistry,
+  saveSourceInfos,
+} from './registry';
 import { insertObservations } from './sources';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -88,4 +93,15 @@ it('leaves a source unverified with fewer than 10 items in common', async () => 
   const registry = await loadSourceRegistry(db);
   expect(registry.quality?.mercari?.card).toMatchObject({ status: 'unverified', pairs: 9 });
   expect(registry.roles.mercari?.card).toBe('supporting');
+});
+
+it('keeps a dismissed notice dismissed while the source keeps disagreeing', async () => {
+  await cardsSoldOnBoth(10, 0.7);
+  await checkSourceQuality(db);
+  await dismissSourceQuality(db, 'mercari', 'card');
+  await checkSourceQuality(db);
+  const registry = await loadSourceRegistry(db);
+  expect(registry.quality?.mercari?.card?.dismissedAt).toBeTruthy();
+  // Still comparison only: dismissing hides the notice, it does not change the role.
+  expect(registry.roles.mercari?.card).toBe('comparison');
 });

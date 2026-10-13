@@ -16,7 +16,7 @@ import { setSourceRoleAction } from './actions';
 
 /**
  * Each price source and its role per item class (requirements S8, sources with roles). The
- * admin can change a role; the plug-in's suggestion is marked.
+ * admin can change a role; the plug-in's suggestion shows when the role differs.
  */
 export function SourcesForm({
   sources,
@@ -81,18 +81,22 @@ export function SourcesForm({
                           )
                         }
                         aria-label={`${s.label} · ${t(`class.${cls}`)}`}
-                        className="h-8 w-32 text-xs"
+                        className="h-9 w-36"
                       >
                         {SOURCE_ROLES.map((r) => (
                           <option key={r} value={r}>
                             {t(`role.${r}`)}
-                            {r === suggested ? ` (${t('suggested')})` : ''}
                           </option>
                         ))}
                       </NativeSelect>
                     ) : (
                       <span className={role === 'off' ? 'text-muted-foreground' : undefined}>
                         {t(`role.${role}`)}
+                      </span>
+                    )}
+                    {role !== suggested && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {t('suggestedRole', { role: t(`role.${suggested}`) })}
                       </span>
                     )}
                     {q && (
@@ -110,6 +114,7 @@ export function SourcesForm({
                           reference: labels[q.against ?? ''] ?? q.against ?? '',
                           count: q.pairs,
                         })}
+                        {q.dismissedAt && ` · ${t('quality.dismissed')}`}
                       </span>
                     )}
                   </td>

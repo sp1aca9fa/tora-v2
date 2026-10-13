@@ -55,6 +55,8 @@ export default async function ActionsPage() {
         }),
         image: null,
         href: '/settings#sources',
+        source: i.source,
+        qualityClass: i.cls,
       };
     }
     if (i.kind === 'link') {
