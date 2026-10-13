@@ -47,6 +47,11 @@ export interface SourceInfo {
   /** A shop purchases come from, not a price source. */
   shopOnly?: boolean;
   /**
+   * Item classes it has one stable page per item for: such a page can be an item's identity link
+   * (what the item exactly is, to search for it everywhere), whatever its price role.
+   */
+  identity?: ProductClass[];
+  /**
    * Its terms forbid giving its data to AI models: left out of the data review, the MCP tools
    * (Claude) and anything else that would feed it to a model.
    */
@@ -143,6 +148,17 @@ export function valuationOrder(registry: SourceRegistry, cls: ProductClass): str
 export function referenceSource(registry: SourceRegistry, cls: ProductClass): string | null {
   const first = valuationOrder(registry, cls)[0];
   return first && roleOf(registry, first, cls) === 'reference' ? first : null;
+}
+
+/**
+ * Sources whose product pages can be an item's identity link, best first (by priority): a link
+ * from any of them identifies the item.
+ */
+export function identitySources(registry: SourceRegistry, cls: ProductClass): string[] {
+  return registry.sources
+    .filter((s) => s.identity?.includes(cls))
+    .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key))
+    .map((s) => s.key);
 }
 
 export function sourceInfo(registry: SourceRegistry, key: string): SourceInfo | undefined {

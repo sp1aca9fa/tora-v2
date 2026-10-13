@@ -11,6 +11,7 @@ export const TEST_SOURCES: SourceInfo[] = [
     label: 'SNKRDUNK',
     priority: 10,
     roles: { card: 'reference', sealed: 'reference' },
+    identity: ['card', 'sealed'],
     links: [
       {
         pattern: 'snkrdunk\\.com/(?:en/)?apparels/(\\d+)',
@@ -33,6 +34,7 @@ export const TEST_SOURCES: SourceInfo[] = [
     label: '駿河屋',
     priority: 30,
     roles: { sealed: 'supporting', item: 'reference' },
+    identity: ['sealed', 'item'],
     aliases: ['surugaya', '駿河屋'],
   },
   {

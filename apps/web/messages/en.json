@@ -202,8 +202,8 @@
     "openLot": "Open lot",
     "levels": "Change levels",
     "section": {
-      "tcg_main_source": "{count, plural, one {# TCG item} other {# TCG items}} without their main price source",
-      "game_main_source": "{count, plural, one {# game or item} other {# games and items}} without their main price source",
+      "tcg_main_source": "{count, plural, one {# TCG item} other {# TCG items}} without an identity link",
+      "game_main_source": "{count, plural, one {# game or item} other {# games and items}} without an identity link",
       "second_source": "{count, plural, one {# suggestion} other {# suggestions}} from another price source",
       "card_grade": "{count, plural, one {# card} other {# cards}} without a grade",
       "game_condition": "{count, plural, one {# game} other {# games}} without a condition",
@@ -429,7 +429,7 @@
     "reject": "No",
     "score": "{score}% match",
     "noneYet": "Not linked yet. The next collector run looks for this item on its price sources, or paste its link below.",
-    "missingStable": "Not linked to {source} yet: it is this item's main price source. Confirm a suggestion below or paste its link.",
+    "missingStable": "No identity link yet: link this item to {source} (a stable product page that identifies it). Confirm a suggestion below or paste its link.",
     "pasteUrl": "Paste a product link from a price source ({sources})",
     "link": "Link",
     "last30": "Last 30 days",
@@ -748,8 +748,8 @@
       "grey": "Quiet (grey)"
     },
     "type": {
-      "tcg_main_source": "TCG item without its main price source",
-      "game_main_source": "Game or other item without its main price source",
+      "tcg_main_source": "TCG item without an identity link",
+      "game_main_source": "Game or other item without an identity link",
       "second_source": "Suggestions from another price source",
       "card_grade": "Card without a grade",
       "game_condition": "Game without a condition",

@@ -6,7 +6,7 @@ import {
   listProductSources,
   QUERY_SOURCE_ID,
   recentObservations,
-  stableSourceFor,
+  identityFor,
 } from '@tora/db';
 import type { Product } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
@@ -70,16 +70,19 @@ export async function PriceSources({
   // Suggestions from a source this product has no listing of yet are shown open; the rest
   // (e.g. a no-shrink variant of a linked SNKRDUNK listing) wait under "Add another listing".
   const linked = new Set(active.map((s) => s.source));
-  // The item's main source (SNKRDUNK for cards, 駿河屋 for other items over ¥3,000) is still
-  // missing: say so and keep the paste box open, whatever else is linked.
+  // No identity link yet (a stable product page: SNKRDUNK for cards, 駿河屋 for other items over
+  // ¥3,000): say so and keep the paste box open, whatever else is linked.
   const registry = await getRegistry();
-  const stable = stableSourceFor(product, ownedCostJpy, registry);
+  const identity = identityFor(product, ownedCostJpy, registry);
   // Sources whose product links can be pasted here.
   const linkable = registry.sources
     .filter((s) => s.links?.length)
     .map((s) => s.label)
     .join(', ');
-  const missing = stable && !linked.has(stable) && !warningDismissed ? stable : null;
+  const missing =
+    identity && !identity.accepted.some((s) => linked.has(s)) && !warningDismissed
+      ? identity.preferred
+      : null;
   const pasteUp = !!missing && !candidates.some((c) => c.source === missing);
   const open = candidates.filter((c) => !linked.has(c.source));
   const more = candidates.filter((c) => linked.has(c.source));

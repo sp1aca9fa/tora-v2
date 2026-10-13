@@ -5,7 +5,7 @@ import {
   type SourceRegistry,
   median,
   productClass,
-  referenceSource,
+  identitySources,
   toTokyoIso,
 } from '@tora/core';
 import {
@@ -877,18 +877,29 @@ export async function addSourceReference(
 export const STORE_LINK_MIN_COST = 3000;
 
 /**
- * The main source an item should be linked to: its class's reference source in the registry
- * (e.g. the trusted card market for cards and sealed product); for other items only when they
- * cost more than ¥3,000 (what the user paid for the lots they own). Null when none.
+ * The identity link an item is expected to have (requirements S8): a product page of one of its
+ * class's identity sources (see `identitySources`), whatever the price roles; for other items
+ * only when they cost more than ¥3,000 (what the user paid for the lots they own). The preferred
+ * source (to look for and suggest) and every source whose page counts. Null when none applies.
  */
+export function identityFor(
+  product: Pick<Product, 'category' | 'kind'>,
+  costJpy: number,
+  registry: SourceRegistry,
+): { preferred: string; accepted: string[] } | null {
+  const cls = productClass(product);
+  if (cls === 'item' && costJpy <= STORE_LINK_MIN_COST) return null;
+  const accepted = identitySources(registry, cls);
+  return accepted.length ? { preferred: accepted[0]!, accepted } : null;
+}
+
+/** The source an item's identity link is looked for on (see `identityFor`). */
 export function stableSourceFor(
   product: Pick<Product, 'category' | 'kind'>,
   costJpy: number,
   registry: SourceRegistry,
 ): string | null {
-  const cls = productClass(product);
-  if (cls === 'item' && costJpy <= STORE_LINK_MIN_COST) return null;
-  return referenceSource(registry, cls);
+  return identityFor(product, costJpy, registry)?.preferred ?? null;
 }
 
 export interface MissingSource {
@@ -920,8 +931,10 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
     .groupBy(products.id);
   const registry = await loadSourceRegistry(db);
   const wanted = owned.flatMap(({ product, cost }) => {
-    const source = stableSourceFor(product, Number(cost), registry);
-    return source ? [{ product, costJpy: Number(cost), source }] : [];
+    const identity = identityFor(product, Number(cost), registry);
+    return identity
+      ? [{ product, costJpy: Number(cost), source: identity.preferred, accepted: identity.accepted }]
+      : [];
   });
   if (wanted.length === 0) return [];
   const ids = wanted.map((w) => w.product.id);
@@ -943,8 +956,12 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
   const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
   const dismissed = await dismissedSourceWarnings(db, userId);
   return wanted
-    .filter((w) => !has.has(`${w.product.id}|${w.source}`) && !dismissed.has(w.product.id))
-    .map((w) => ({
+    .filter(
+      (w) =>
+        !w.accepted.some((source) => has.has(`${w.product.id}|${source}`)) &&
+        !dismissed.has(w.product.id),
+    )
+    .map(({ accepted: _accepted, ...w }) => ({
       ...w,
       suggestions:
         pending.find((p) => p.productId === w.product.id && p.source === w.source)?.n ?? 0,

@@ -13,7 +13,7 @@ import {
   pruneSourceDetails,
   saveSourceInfos,
 } from './registry';
-import { insertObservations } from './sources';
+import { identityFor, insertObservations } from './sources';
 import * as schema from './schema';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -139,4 +139,17 @@ it('drops listing details of sources that keep them only for a while', async () 
   const raw = (ref: string) => rows.find((r) => r.externalRef === ref)!.raw;
   expect(raw('a20')).toEqual({ count: 3 });
   expect(raw('a2')).toEqual({ count: 3, ids: ['1', '2', '3'] });
+});
+
+it('accepts a link from any identity source, best first', async () => {
+  const registry = await loadSourceRegistry(db);
+  const box = { category: 'tcg', kind: 'booster_box' } as const;
+  expect(identityFor(box, 10000, registry)).toEqual({
+    preferred: 'snkrdunk',
+    accepted: ['snkrdunk', 'surugaya'],
+  });
+  const game = { category: 'game', kind: 'game' } as never;
+  expect(identityFor(game, 10000, registry)?.accepted).toEqual(['surugaya']);
+  // Cheap items are not asked for one.
+  expect(identityFor(game, 2000, registry)).toBeNull();
 });

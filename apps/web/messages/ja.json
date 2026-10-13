@@ -202,8 +202,8 @@
     "openLot": "ロットを開く",
     "levels": "レベルを変更",
     "section": {
-      "tcg_main_source": "メイン価格ソースがないTCGアイテム {count}件",
-      "game_main_source": "メイン価格ソースがないゲーム・その他 {count}件",
+      "tcg_main_source": "識別リンクがないTCGアイテム {count}件",
+      "game_main_source": "識別リンクがないゲーム・その他 {count}件",
       "second_source": "他の価格ソースの候補 {count}件",
       "card_grade": "グレードのないカード {count}件",
       "game_condition": "状態のないゲーム {count}件",
@@ -429,7 +429,7 @@
     "reject": "いいえ",
     "score": "一致度 {score}%",
     "noneYet": "まだリンクされていません。次回の収集で価格ソースから探します。または下にリンクを貼り付けてください。",
-    "missingStable": "{source}に未リンクです（この商品の主な価格ソース）。下の候補を確定するか、リンクを貼り付けてください。",
+    "missingStable": "識別リンクがまだありません。{source}（商品を特定できる固定の商品ページ）にリンクしてください。下の候補を確定するか、リンクを貼り付けてください。",
     "pasteUrl": "価格ソースの商品リンクを貼り付け({sources})",
     "link": "リンク",
     "last30": "直近30日",
@@ -748,8 +748,8 @@
       "grey": "静か(グレー)"
     },
     "type": {
-      "tcg_main_source": "メイン価格ソースがないTCGアイテム",
-      "game_main_source": "メイン価格ソースがないゲーム・その他",
+      "tcg_main_source": "識別リンクがないTCGアイテム",
+      "game_main_source": "識別リンクがないゲーム・その他",
       "second_source": "他の価格ソースの候補",
       "card_grade": "グレードのないカード",
       "game_condition": "状態のないゲーム",

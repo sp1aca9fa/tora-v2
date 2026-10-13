@@ -28,7 +28,7 @@ import {
   sourceCandidates,
 } from './schema';
 import { loadSourceRegistry } from './registry';
-import { dismissedSourceWarnings, stableSourceFor } from './sources';
+import { dismissedSourceWarnings, identityFor } from './sources';
 import { openSuggestions } from './suggestions';
 
 export interface ListingSuggestion {
@@ -56,7 +56,7 @@ export type ActionItem = ActionBase &
         product: Product;
         imageVersion: string | null;
         source: string;
-        /** The item's main source (its class's reference source; see `stableSourceFor`). */
+        /** The source the item's identity link is looked for on (see `identityFor`). */
         main: boolean;
         /** What the user paid for the lots they own, and how many units. */
         costJpy: number;
@@ -165,7 +165,12 @@ export async function pendingActions(
   const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
   for (const { product, cost, units } of owned) {
     const costJpy = Number(cost);
-    const main = stableSourceFor(product, costJpy, registry);
+    const identity = identityFor(product, costJpy, registry);
+    // No identity link yet: the preferred identity source is the one asked for.
+    const main =
+      identity && !identity.accepted.some((source) => has.has(`${product.id}|${source}`))
+        ? identity.preferred
+        : null;
     // Suggestions of sources the item has no listing of yet (variants of a linked listing wait
     // on the item page).
     const bySource = new Map<string, typeof pending>();
@@ -173,9 +178,9 @@ export async function pendingActions(
       if (c.productId !== product.id || has.has(`${product.id}|${c.source}`)) continue;
       bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);
     }
-    // The main source is missing: a card even without suggestions, unless the user said not to
-    // warn about it.
-    if (main && !has.has(`${product.id}|${main}`) && !dismissed.has(product.id)) {
+    // No identity link: a card even without suggestions, unless the user said not to warn
+    // about it.
+    if (main && !dismissed.has(product.id)) {
       bySource.set(main, bySource.get(main) ?? []);
     }
     for (const [source, candidates] of bySource) {
