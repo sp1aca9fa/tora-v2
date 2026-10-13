@@ -20,7 +20,7 @@ import {
   estimatedPullCosts,
   clearManualPrice,
   loadMarketData,
-  mostTraded,
+  tradeCounts,
   portfolioSeries,
   portfolioValuation,
   priceHistory,
@@ -281,15 +281,22 @@ describe('saved bucket values (S8 speed)', () => {
   });
 });
 
-describe('most traded (Summary insights)', () => {
-  it('counts the last 30 days of sales of owned items, most first', async () => {
+describe('trade counts (Summary insights)', () => {
+  it("counts sales per period for items anyone holds, marking the user's own", async () => {
     const { pika, mew } = await scenario();
-    // The opened box is not owned any more; ピカチュウ's sale 40 days before is too old.
-    const traded = await mostTraded(db, uid, 30, 5);
-    expect(traded.map((r) => [r.product.id, r.sales])).toEqual([
-      [mew.product.id, 5],
-      [pika.product.id, 3],
+    // The opened box is held by nobody any more; ピカチュウ also sold 40 days before.
+    const counts = await tradeCounts(db, uid, [30, 90]);
+    const of = (id: string) => counts.find((c) => c.product.id === id)!;
+    expect(counts).toHaveLength(2);
+    expect([...of(mew.product.id).sales]).toEqual([
+      [30, 5],
+      [90, 5],
     ]);
+    expect([...of(pika.product.id).sales]).toEqual([
+      [30, 3],
+      [90, 4],
+    ]);
+    expect(of(pika.product.id).mine).toBe(true);
   });
 });
 

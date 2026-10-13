@@ -79,15 +79,25 @@
       "gainsUp": "Gains",
       "gainsDown": "Losses",
       "title": {
-        "movers_pct": "Top movers (%), last 30 days",
-        "movers_jpy": "Top movers (¥), last 30 days",
-        "movers_sealed": "Sealed product movers (%), last 30 days",
-        "most_traded": "Most traded, last 30 days",
+        "movers_pct": "Top movers (%)",
+        "movers_jpy": "Top movers (¥)",
+        "movers_sealed": "Sealed product movers (%)",
+        "most_traded": "Most traded",
         "gains": "Biggest gains and losses since purchase",
-        "most_valuable": "Most valuable items"
+        "most_valuable": "Most valuable items",
+        "market_movers": "Market movers (%)",
+        "market_traded": "Most traded in the market"
       },
       "up": "Rising",
-      "down": "Falling"
+      "down": "Falling",
+      "period": {
+        "7": "7d",
+        "30": "30d",
+        "90": "90d",
+        "365": "1y"
+      },
+      "market": "All tracked items",
+      "noData": "No data for this period yet."
     }
   },
   "inventory": {

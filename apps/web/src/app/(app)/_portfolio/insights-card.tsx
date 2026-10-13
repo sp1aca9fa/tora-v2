@@ -8,6 +8,10 @@ import { cn } from '@/lib/utils';
 export interface InsightPanel {
   id: string;
   title: string;
+  /** Across every item any user holds (not only the user's). */
+  market?: boolean;
+  /** The panel per period (movers, trades); else `body`. */
+  bodies?: { days: number; body: ReactNode }[];
   body: ReactNode;
 }
 
@@ -21,15 +25,50 @@ export function InsightsCard({
   panels,
   rotate,
   seconds,
+  periods,
 }: {
   panels: InsightPanel[];
   rotate: boolean;
   seconds: number;
+  periods: number[];
 }) {
   const t = useTranslations('portfolio.insights');
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
+  // One period for every panel that has periods (30 days first).
+  const [days, setDays] = useState(30);
   const n = panels.length;
+  const bodyOf = (p: InsightPanel) => p.bodies?.find((b) => b.days === days)?.body ?? p.body;
+  const periodChips = (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-full border p-0.5 text-xs">
+      {periods.map((d) => (
+        <button
+          key={d}
+          type="button"
+          onClick={() => setDays(d)}
+          aria-pressed={d === days}
+          className={cn(
+            'rounded-full px-2 py-0.5 transition-colors',
+            d === days
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {t(`period.${d}`)}
+        </button>
+      ))}
+    </div>
+  );
+  const title = (p: InsightPanel) => (
+    <>
+      {p.title}
+      {p.market && (
+        <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
+          {t('market')}
+        </span>
+      )}
+    </>
+  );
   // A new timer per panel: moving by hand gives the next panel its full time.
   useEffect(() => {
     if (!rotate || !playing || n < 2) return;
@@ -40,13 +79,16 @@ export function InsightsCard({
   if (n === 0) return null;
   if (!rotate) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
-        {panels.map((p) => (
-          <section key={p.id} className={cn(card, 'space-y-3')}>
-            <h2 className="text-sm font-medium">{p.title}</h2>
-            {p.body}
-          </section>
-        ))}
+      <div className="space-y-3">
+        {panels.some((p) => p.bodies) && <div className="flex justify-end">{periodChips}</div>}
+        <div className="grid gap-4 md:grid-cols-2">
+          {panels.map((p) => (
+            <section key={p.id} className={cn(card, 'space-y-3')}>
+              <h2 className="text-sm font-medium">{title(p)}</h2>
+              {bodyOf(p)}
+            </section>
+          ))}
+        </div>
       </div>
     );
   }
@@ -57,8 +99,9 @@ export function InsightsCard({
     <section className={cn(card, 'space-y-3')} aria-roledescription="carousel">
       <div className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 truncate text-sm font-medium" aria-live="polite">
-          {panels[current]!.title}
+          {title(panels[current]!)}
         </h2>
+        {panels[current]!.bodies && periodChips}
         {n > 1 && (
           <div className="flex shrink-0 items-center">
             <button
@@ -97,7 +140,7 @@ export function InsightsCard({
             className={cn('[grid-area:1/1]', i !== current && 'invisible')}
             aria-hidden={i !== current}
           >
-            {p.body}
+            {bodyOf(p)}
           </div>
         ))}
       </div>

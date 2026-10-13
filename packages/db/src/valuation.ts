@@ -1232,22 +1232,32 @@ export interface Mover {
 }
 
 /**
- * How each item's market value moved over the last `days` (requirements S8, Summary): the lots
- * still owned, valued on the latest snapshot day and on the day `days` before; items worth under
- * ¥1,000 then are left out (noise), and so are items that did not move.
+ * How items' market values moved over each period (requirements S8, Summary insights), from the
+ * daily snapshots: the latest snapshot day against the day `days` before.
+ * - mine: the user's lots still owned and counted in value, summed per item (same lots both days);
+ * - market: every item anyone holds, by its unit value (the median over the lots holding it).
+ * Items worth under ¥1,000 then, and items that did not move, are left out (noise).
  */
-export async function valueMovers(db: Db, userId: string, days = 30): Promise<Mover[]> {
+export async function moversByPeriod(
+  db: Db,
+  userId: string,
+  periods: readonly number[],
+): Promise<{ mine: Map<number, Mover[]>; market: Map<number, Mover[]> }> {
+  const mine = new Map<number, Mover[]>();
+  const market = new Map<number, Mover[]>();
   const [latest] = await db
     .select({ date: sql<string | null>`max(${valuationSnapshots.date})` })
-    .from(valuationSnapshots)
-    .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
-    .where(eq(holdings.userId, userId));
-  if (!latest?.date) return [];
-  const then = tokyoDate(new Date(Date.parse(`${latest.date}T12:00:00+09:00`) - days * DAY));
+    .from(valuationSnapshots);
+  if (!latest?.date) return { mine, market };
+  const thenOf = (days: number) =>
+    tokyoDate(new Date(Date.parse(`${latest.date}T12:00:00+09:00`) - days * DAY));
   const rows = await db
     .select({
       product: products,
       holdingId: holdings.id,
+      userId: holdings.userId,
+      countInValue: holdings.countInValue,
+      quantity: holdings.quantity,
       date: valuationSnapshots.date,
       valueJpy: valuationSnapshots.valueJpy,
     })
@@ -1256,61 +1266,103 @@ export async function valueMovers(db: Db, userId: string, days = 30): Promise<Mo
     .innerJoin(products, eq(products.id, holdings.productId))
     .where(
       and(
-        eq(holdings.userId, userId),
         eq(holdings.status, 'owned'),
-        eq(holdings.countInValue, true),
-        inArray(valuationSnapshots.date, [latest.date, then]),
+        inArray(valuationSnapshots.date, [latest.date, ...periods.map(thenOf)]),
       ),
     );
-  // Per lot both days must have a value, so a lot bought since (or valued since) does not count.
-  const byLot = new Map<string, { product: Product; now?: number; then?: number }>();
+  const valueOn = new Map<string, number>(); // holdingId|date -> value
+  const lots = new Map<string, (typeof rows)[number]>();
   for (const r of rows) {
     if (r.valueJpy === null) continue;
-    const lot = byLot.get(r.holdingId) ?? { product: r.product };
-    if (r.date === latest.date) lot.now = r.valueJpy;
-    else lot.then = r.valueJpy;
-    byLot.set(r.holdingId, lot);
+    valueOn.set(`${r.holdingId}|${r.date}`, r.valueJpy);
+    lots.set(r.holdingId, r);
   }
-  const byProduct = new Map<string, Mover>();
-  for (const lot of byLot.values()) {
-    if (lot.now === undefined || lot.then === undefined) continue;
-    const m = byProduct.get(lot.product.id) ?? {
-      product: lot.product,
-      nowJpy: 0,
-      thenJpy: 0,
-      changeJpy: 0,
-      pct: 0,
-    };
-    m.nowJpy += lot.now;
-    m.thenJpy += lot.then;
-    byProduct.set(lot.product.id, m);
+  const finish = (list: Mover[]) =>
+    list
+      .filter((m) => m.thenJpy >= 1_000 && m.nowJpy !== m.thenJpy)
+      .map((m) => ({
+        ...m,
+        changeJpy: m.nowJpy - m.thenJpy,
+        pct: Math.round(((m.nowJpy - m.thenJpy) / m.thenJpy) * 1000) / 10,
+      }));
+  for (const days of periods) {
+    const then = thenOf(days);
+    const own = new Map<string, Mover>();
+    const units = new Map<string, { product: Product; now: number[]; then: number[] }>();
+    for (const lot of lots.values()) {
+      const now = valueOn.get(`${lot.holdingId}|${latest.date}`);
+      const before = valueOn.get(`${lot.holdingId}|${then}`);
+      if (now === undefined || before === undefined) continue;
+      if (lot.userId === userId && lot.countInValue) {
+        const m = own.get(lot.product.id) ?? {
+          product: lot.product,
+          nowJpy: 0,
+          thenJpy: 0,
+          changeJpy: 0,
+          pct: 0,
+        };
+        m.nowJpy += now;
+        m.thenJpy += before;
+        own.set(lot.product.id, m);
+      }
+      const u = units.get(lot.product.id) ?? { product: lot.product, now: [], then: [] };
+      u.now.push(now / lot.quantity);
+      u.then.push(before / lot.quantity);
+      units.set(lot.product.id, u);
+    }
+    mine.set(days, finish([...own.values()]));
+    market.set(
+      days,
+      finish(
+        [...units.values()].map((u) => ({
+          product: u.product,
+          nowJpy: Math.round(median(u.now)!),
+          thenJpy: Math.round(median(u.then)!),
+          changeJpy: 0,
+          pct: 0,
+        })),
+      ),
+    );
   }
-  return [...byProduct.values()]
-    .filter((m) => m.thenJpy >= 1_000 && m.nowJpy !== m.thenJpy)
-    .map((m) => ({
-      ...m,
-      changeJpy: m.nowJpy - m.thenJpy,
-      pct: Math.round(((m.nowJpy - m.thenJpy) / m.thenJpy) * 1000) / 10,
-    }));
+  return { mine, market };
 }
 
-/** The user's owned items with the most sales on the sources over the last `days`. */
-export async function mostTraded(db: Db, userId: string, days = 30, limit = 5) {
-  const since = toTokyoIso(new Date(Date.now() - days * DAY));
+/**
+ * Sales counted per period for every item anyone holds (one pass): `mine` marks the user's own
+ * items. Sorted by the caller per period.
+ */
+export async function tradeCounts(db: Db, userId: string, periods: readonly number[]) {
+  const longest = Math.max(...periods);
+  const since = (days: number) => toTokyoIso(new Date(Date.now() - days * DAY));
+  const counts = Object.fromEntries(
+    periods.map((days) => [
+      `d${days}`,
+      sql<number>`sum(case when ${priceObservations.observedAt} >= ${since(days)} then 1 else 0 end)`,
+    ]),
+  );
   const rows = await db
-    .select({ product: products, sales: sql<number>`count(*)` })
+    .select({
+      product: products,
+      mine: sql<number>`max(case when ${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.userId} = ${userId} and ${holdings.status} = 'owned') then 1 else 0 end)`,
+      ...counts,
+    })
     .from(priceObservations)
     .innerJoin(products, eq(products.id, priceObservations.productId))
     .where(
       and(
-        sql`${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.userId} = ${userId} and ${holdings.status} = 'owned')`,
+        sql`${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.status} = 'owned')`,
         eq(priceObservations.observationType, 'sold'),
         eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, since),
+        gte(priceObservations.observedAt, since(longest)),
       ),
     )
-    .groupBy(priceObservations.productId)
-    .orderBy(sql`count(*) desc`)
-    .limit(limit);
-  return rows.map((r) => ({ product: r.product, sales: Number(r.sales) }));
+    .groupBy(priceObservations.productId);
+  return rows.map((r) => {
+    const row = r as unknown as Record<string, unknown>;
+    return {
+      product: r.product,
+      mine: Number(r.mine) === 1,
+      sales: new Map(periods.map((days) => [days, Number(row[`d${days}`] ?? 0)])),
+    };
+  });
 }

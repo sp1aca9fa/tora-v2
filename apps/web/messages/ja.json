@@ -79,15 +79,25 @@
       "gainsUp": "含み益",
       "gainsDown": "含み損",
       "title": {
-        "movers_pct": "値動き(%)、直近30日",
-        "movers_jpy": "値動き(円)、直近30日",
-        "movers_sealed": "未開封品の値動き(%)、直近30日",
-        "most_traded": "取引の多いアイテム、直近30日",
+        "movers_pct": "値動き(%)",
+        "movers_jpy": "値動き(円)",
+        "movers_sealed": "未開封品の値動き(%)",
+        "most_traded": "取引の多いアイテム",
         "gains": "購入時からの含み益・含み損",
-        "most_valuable": "評価額の高いアイテム"
+        "most_valuable": "評価額の高いアイテム",
+        "market_movers": "市場の値動き(%)",
+        "market_traded": "市場で取引の多いアイテム"
       },
       "up": "上昇",
-      "down": "下落"
+      "down": "下落",
+      "period": {
+        "7": "7日",
+        "30": "30日",
+        "90": "90日",
+        "365": "1年"
+      },
+      "market": "全ユーザーのアイテム",
+      "noData": "この期間のデータはまだありません。"
     }
   },
   "inventory": {

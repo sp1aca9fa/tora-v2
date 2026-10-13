@@ -8,8 +8,13 @@ export const SUMMARY_PANELS = [
   'most_traded',
   'gains',
   'most_valuable',
+  'market_movers',
+  'market_traded',
 ] as const;
 export type SummaryPanel = (typeof SUMMARY_PANELS)[number];
+
+/** Periods (days) the movers and trade panels switch between. */
+export const INSIGHT_PERIODS = [7, 30, 90, 365] as const;
 
 /** Seconds per panel the user can pick. */
 export const ROTATE_SECONDS = [5, 8, 15, 30] as const;
