@@ -29,7 +29,7 @@ packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
 packages/collector-sdk   Collector interface, registry, `pnpm collect`
-collectors-public/       Publishable plug-ins (public APIs: TCGCSV prices, USD/JPY rates)
+collectors-public/       Publishable plug-ins (public APIs: TCGCSV and eBay prices, USD/JPY rates; shops)
 collectors/              Optional private plug-ins (git submodule; not in this repo)
 ```
 
@@ -165,7 +165,7 @@ pnpm valuate                         # only refresh valuation snapshots (collect
 1. Register an item in the app as usual.
 2. On the next run, each collector searches its site for owned (or opened) items without a
    listing and stores the best candidates.
-3. In the app, the item page shows them under **Price sources** (and Portfolio shows a banner):
+3. In the app, **Actions** and the item page's **Price sources** show them:
    confirm the right one, or paste the listing's link instead. A product can have several listings
    (e.g. a box with and without shrink wrap); each feeds its own price bucket.
 4. The next runs backfill the listing's sales history (a page budget per run, resuming where they
@@ -174,26 +174,78 @@ pnpm valuate                         # only refresh valuation snapshots (collect
 Settings shows each source's last run, items waiting for confirmation, listings not collected for
 3+ days and big median moves.
 
-### Sources and what they are used for
+### Sources and roles
 
-- **Value (Japan)**: sales on SNKRDUNK and Mercari. When an item has no sale at all, a 駿河屋 store
-  price in the same condition (at most 30 days old) is used, then the retail price. Only yen
-  prices count.
+Every price source a plug-in brings has a **role** per kind of item (cards, sealed TCG, games and
+other items):
+
+- **Reference**: the trusted market for that kind of item. Valued first, and the source each item
+  should be linked to (items without it show under **Actions**; other items only when they cost
+  more than ¥3,000).
+- **Supporting**: used when the reference has too few sales (fewer than 3 in the windows the
+  valuation tries).
+- **Comparison**: shown next to the value (e.g. a foreign market), never counted in it.
+- **Off**: not used for that kind of item.
+
+A value is the median of the reference's sales (30 days, widened to 90 / 180 / 365 when there are
+fewer than 3), else a supporting source's, else a shop's asking price in the same condition (at
+most 30 days old), else the retail price. Only prices in yen count.
+
+Each plug-in suggests its sources' roles; an admin can change them in **Settings > Price
+sources** (they apply to every account). The suggestions of the author's plug-ins make the
+**Japan collectibles** setup this app is built and tested with:
+
+| Source             | Cards      | Sealed TCG | Games & other | What it gives                                               |
+| ------------------ | ---------- | ---------- | ------------- | ----------------------------------------------------------- |
+| SNKRDUNK           | reference  | reference  | -             | verified trades, raw grades and slabs apart                 |
+| Mercari            | supporting | supporting | supporting    | sold listings (searched; bundles, parts and fakes filtered) |
+| 駿河屋             | -          | supporting | reference     | store and buy-back prices (no sales)                        |
+| TCGplayer (TCGCSV) | comparison | comparison | -             | US market prices, converted to yen                          |
+| eBay               | comparison | comparison | -             | US asking prices (official API)                             |
+
+**Trust is earned, not declared.** After each collect, each supporting source's sales are compared
+with the reference's on the same items and conditions (the last 90 days, 3+ sales on each side). On
+10+ items, a median gap over 15% means it disagrees: it is valued as comparison only until it agrees
+again, admins get a notice, and Settings shows the gap. With fewer items in common it is
+"unverified" and keeps its role. (For example, Mercari card sales run about 15% below SNKRDUNK's,
+so Mercari is comparison only for cards; for sealed product it agrees.)
+
+Notes on the author's sources:
+
 - **US prices**: TCGplayer market prices through TCGCSV (public files, updated daily), for
-  Japanese and English Pokemon cards and sealed product. Converted with that day's USD/JPY rate
+  Japanese and English Pokemon cards and sealed product, converted with that day's USD/JPY rate
   (Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
-  US**, never counted in the value. TCGplayer only prices ungraded cards.
+  US**. TCGplayer only prices ungraded cards.
 - **eBay asks**: eBay's official Browse API (active listings only; eBay closed its sold data to new
   developers and blocks scraping). Each collect stores, per condition (ungraded, PSA 10, ...), the
-  median asking price, the lowest and how many are listed, and the listing IDs seen, so prices can
-  be followed over time and listings that vanish early read as probable sales. Shown in Japan vs
-  US next to the same grade in Japan. Needs a production keyset from developer.ebay.com in the
-  root `.env` (`EBAY_CLIENT_ID` = App ID, `EBAY_CLIENT_SECRET` = Cert ID); without it the
-  collector is skipped. The search starts from the item's TCGplayer title (English) and can be
-  edited on the item page.
-- **Stable sources**: every card and sealed TCG product (box, pack, deck, special set) should be
-  linked to SNKRDUNK, and every other item costing more than ¥3,000 to a 駿河屋 page (store and 買取 prices). Missing ones show under Imports > Needs you
-  and on the portfolio; the list links to each item's price sources.
+  median asking price, the lowest and how many are listed, and the listing IDs seen. Needs a
+  production keyset from developer.ebay.com in the root `.env` (`EBAY_CLIENT_ID` = App ID,
+  `EBAY_CLIENT_SECRET` = Cert ID); without it the collector is skipped.
+
+### Writing a source plug-in
+
+A plug-in package exports `collectors` (find listings for a product, collect their prices),
+optionally `importers` (read order emails or pasted links into purchases) and `sources`: one
+description per price source or shop (`SourceInfo` in `packages/core/src/sources.ts`):
+
+- `key`, `label`, `badge`: how it is stored and shown;
+- `market`, `currency`, `priceKinds`: where its prices are from and what they are (sales, asking
+  prices, buy-back prices);
+- `roles` (per item class) and `priority`: its suggested role, and its order among sources of the
+  same role;
+- `links`: the shape of its product links (pasting one on an item links that listing);
+- `aliases`, `singleItemOrders`, `orderIds`: how purchases from it are recognised in imports (its
+  names, whether an order ID is one item, the shape of its IDs);
+- `shopOnly`: a shop purchases come from that is not a price source.
+
+The collectors save these descriptions to the database on each run; the app reads them there (it
+cannot load private plug-ins). Nothing in the app names a store.
+
+**Your sources, your responsibility.** The app checks what it can (sales against the reference,
+outliers, the data review, the import review), but which sites you collect from, whether their
+terms allow it, and how good their data is are up to you. The author takes no responsibility for
+other setups, sources or imports. A new source is best started as **comparison** and given a
+role once its numbers look right.
 
 ### Purchase import
 
@@ -248,7 +300,8 @@ verdicts without filing anything. A run with ~20 cases costs a few cents.
 ### Private plug-ins (submodule)
 
 The author's own plug-ins live in a private repo mounted at `collectors/` (git submodule). Use the
-same layout for yours: `collectors/src/index.ts` exporting `collectors` and `importers`.
+same layout for yours: `collectors/src/index.ts` exporting `collectors`, `importers` and `sources`
+(see "Writing a source plug-in").
 
 ```bash
 git clone --recurse-submodules git@github.com:sp1aca9fa/tora-v2.git
