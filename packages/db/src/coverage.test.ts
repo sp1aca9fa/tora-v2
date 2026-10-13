@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
 import { actionTotal, pendingActions } from './actions';
 import { type Db, createDb } from './client';
-import { foreignPrices } from './fx';
+import { type ForeignPrice, foreignEstimates, foreignPrices } from './fx';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
 import {
@@ -200,4 +200,32 @@ it("follows the user's notice levels; quiet ones are listed but not counted", as
   expect(actionTotal(items)).toBe(1);
   await setNoticeLevels(db, userId, null);
   expect((await getUserById(db, userId))?.noticeLevels).toBeNull();
+});
+
+it('keeps one ungraded foreign price per source, the middle one', () => {
+  const row = (source: string, priceJpy: number, bucket: string | null = null): ForeignPrice => ({
+    source,
+    title: null,
+    url: null,
+    price: priceJpy / 150,
+    currency: 'USD',
+    priceJpy,
+    fxRate: 150,
+    fxDate: null,
+    observedAt: '2026-10-01',
+    variant: null,
+    bucket,
+    count: null,
+  });
+  const out = foreignEstimates([
+    row('tcgcsv', 3000),
+    row('tcgcsv', 1000),
+    row('tcgcsv', 2000),
+    row('ebay', 9000, 'graded:PSA:10'),
+    row('ebay', 1500),
+  ]);
+  expect(out.map((f) => [f.source, f.priceJpy, f.of])).toEqual([
+    ['tcgcsv', 2000, 3],
+    ['ebay', 1500, 1],
+  ]);
 });

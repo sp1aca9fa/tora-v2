@@ -129,3 +129,20 @@ export async function foreignPrices(
   }
   return out;
 }
+
+/**
+ * One estimated price per foreign source, for comparing with Japan in the same condition:
+ * its ungraded (or sealed as sold new) prices only, and when there are several (TCGplayer
+ * printings, several linked listings) the middle one. `of`: how many prices it was chosen from.
+ */
+export function foreignEstimates(prices: ForeignPrice[]): (ForeignPrice & { of: number })[] {
+  const bySource = new Map<string, ForeignPrice[]>();
+  for (const p of prices) {
+    if (p.bucket !== null) continue;
+    bySource.set(p.source, [...(bySource.get(p.source) ?? []), p]);
+  }
+  return [...bySource.values()].map((list) => {
+    const sorted = list.toSorted((a, b) => a.priceJpy - b.priceJpy);
+    return { ...sorted[Math.floor((sorted.length - 1) / 2)]!, of: sorted.length };
+  });
+}

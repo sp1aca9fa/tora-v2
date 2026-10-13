@@ -1,5 +1,5 @@
 import type { Valuation } from '@tora/core';
-import type { ForeignPrice, Product } from '@tora/db';
+import { type ForeignPrice, type Product, foreignEstimates } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatJpy } from '@/lib/utils';
@@ -15,7 +15,10 @@ export function compareBucket(product: Product, mainBucket: string | null): stri
   return mainBucket === 'sealed:no_shrink' ? mainBucket : 'sealed:shrink';
 }
 
-/** Japan vs US: the Japanese market value next to foreign prices converted to yen (S7). */
+/**
+ * Japan vs US: the Japanese market value next to one estimated price per foreign source,
+ * converted to yen (S7).
+ */
 export async function MarketCompare({
   bucket,
   japan,
@@ -30,13 +33,14 @@ export async function MarketCompare({
   foreign: ForeignPrice[];
 }) {
   const sourceLabel = await sourceLabels();
-  if (foreign.length === 0) return null;
+  const estimates = foreignEstimates(foreign);
+  if (estimates.length === 0) return null;
   const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
   // A market comparison: a retail price is no market value.
   const jp =
     japan && japan.method !== 'retail' ? japan : { unitJpy: null, source: null, method: 'none' };
-  // A graded foreign price (eBay "PSA 10") is compared with the same grade in Japan.
-  const graded = mainBucket?.startsWith('graded:') && !foreign.some((f) => f.bucket === mainBucket);
+  // Graded lots are compared at the ungraded condition on both sides.
+  const graded = mainBucket?.startsWith('graded:');
   const money = (n: number, currency: string) =>
     format.number(n, { style: 'currency', currency, maximumFractionDigits: 2 });
   return (
@@ -65,12 +69,12 @@ export async function MarketCompare({
               {jp.unitJpy === null ? t('compare.noJapan') : formatJpy(jp.unitJpy)}
             </span>
           </li>
-          {foreign.map((f) => {
+          {estimates.map((f) => {
             const spread = jp.unitJpy
               ? Math.round(((f.priceJpy - jp.unitJpy) / jp.unitJpy) * 100)
               : null;
             return (
-              <li key={`${f.source}|${f.url}|${f.variant}`} className="space-y-0.5 py-2">
+              <li key={f.source} className="space-y-0.5 py-2">
                 <div className="flex items-baseline justify-between gap-3">
                   <span>
                     {t('compare.us')}
@@ -82,8 +86,11 @@ export async function MarketCompare({
                       ) : (
                         sourceLabel(f.source)
                       )}
-                      {f.variant && ` · ${f.variant}`}
-                      {f.count !== null && ` · ${t('compare.asks', { count: f.count })}`}
+                      {f.count !== null
+                        ? ` · ${t('compare.asks', { count: f.count })}`
+                        : f.of > 1
+                          ? ` · ${t('compare.middleOf', { count: f.of })}`
+                          : f.variant && ` · ${f.variant}`}
                     </span>
                   </span>
                   <span className="text-right tabular-nums">
