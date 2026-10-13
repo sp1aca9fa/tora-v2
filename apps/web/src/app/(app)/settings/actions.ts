@@ -14,12 +14,15 @@ import {
 } from '@tora/core';
 import {
   clearAllBucketValues,
+  refreshBucketValues,
+  runSnapshots,
   loadSourceRegistry,
   setNoticeLevels,
   setPreferences,
   setSourceRoles,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { cookies } from 'next/headers';
 import { AMOUNTS_COOKIE } from '@/lib/amounts';
 import { authed } from '@/lib/auth/guard';
@@ -82,8 +85,8 @@ export async function setAmountsVisibleAction(visible: boolean) {
 }
 
 /**
- * A source's role for one item class (admins; the whole deployment): values and the main-source
- * notices follow it. Saved values are valued again on the next page view or collect.
+ * A source's role for one item class (admins; the whole deployment): values, the value-over-time
+ * history and the main-source notices follow it.
  */
 export async function setSourceRoleAction(key: string, cls: ProductClass, role: SourceRole) {
   const { db, user } = await authed();
@@ -92,5 +95,11 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   if (!registry.sources.some((s) => s.key === key)) return;
   await setSourceRoles(db, key, { ...(registry.declared ?? registry.roles)[key], [cls]: role });
   await clearAllBucketValues(db);
+  // The value-over-time history follows too (about 10 s), right after answering.
+  after(async () => {
+    await runSnapshots(db);
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
   revalidatePath('/', 'layout');
 }

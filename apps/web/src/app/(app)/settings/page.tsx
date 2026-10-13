@@ -22,6 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('title') };
 }
 
+/** A role change rebuilds the value history after answering, within this time. */
+export const maxDuration = 120;
+
 export default async function SettingsPage() {
   const sourceLabel = await sourceLabels();
   const registry = await getRegistry();
