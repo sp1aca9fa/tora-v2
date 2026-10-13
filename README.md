@@ -218,7 +218,9 @@ Notes on the author's sources:
   US**. TCGplayer only prices ungraded cards.
 - **eBay asks**: eBay's official Browse API (active listings only; eBay closed its sold data to new
   developers and blocks scraping). Each collect stores, per condition (ungraded, PSA 10, ...), the
-  median asking price, the lowest and how many are listed, and the listing IDs seen. Needs a
+  median asking price, the lowest and how many are listed, and the listing IDs seen (kept 14
+  days; no titles or links). eBay's terms forbid giving its data to AI models, so the source is
+  marked `noAi`: the data review, the MCP tools and Claude never see it. Needs a
   production keyset from developer.ebay.com in the root `.env` (`EBAY_CLIENT_ID` = App ID,
   `EBAY_CLIENT_SECRET` = Cert ID); without it the collector is skipped.
 
@@ -236,7 +238,9 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 - `links`: the shape of its product links (pasting one on an item links that listing);
 - `aliases`, `singleItemOrders`, `orderIds`: how purchases from it are recognised in imports (its
   names, whether an order ID is one item, the shape of its IDs);
-- `shopOnly`: a shop purchases come from that is not a price source.
+- `shopOnly`: a shop purchases come from that is not a price source;
+- `noAi`, `detailsDays`: when its terms forbid giving its data to AI models (left out of the data
+  review and the MCP tools), or allow keeping listing details only for some days.
 
 The collectors save these descriptions to the database on each run; the app reads them there (it
 cannot load private plug-ins). Nothing in the app names a store.
