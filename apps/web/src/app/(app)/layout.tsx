@@ -7,7 +7,7 @@ import { getRegistry } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await authed();
+  await authed();
   // Not awaited: the badges fill in when counted. Imports counts only its own things.
   const badges = userActions().then((items) => ({
     actions: actionTotal(items),
@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   return (
     <SourcesProvider value={sources}>
-      <Nav badges={badges} admin={user.role === 'admin'} />
+      <Nav badges={badges} />
       <div className="md:pl-16 xl:pl-56">
         <PageWidth>{children}</PageWidth>
       </div>

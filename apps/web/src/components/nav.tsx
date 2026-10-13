@@ -2,13 +2,12 @@
 
 import { Inbox, LayoutGrid, ListChecks, LogOut, PlusCircle, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { Fragment, Suspense, use } from 'react';
+import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { logout } from '@/app/actions';
 import { AmountsToggle } from '@/components/amounts-toggle';
 import { LocaleToggle } from '@/components/locale-toggle';
-import { sectionsFor } from '@/app/(app)/settings/sections';
 import { cn } from '@/lib/utils';
 
 const ITEMS = [
@@ -45,7 +44,7 @@ function Count({ counts, item }: { counts: Promise<Counts>; item: keyof Counts }
 }
 
 /** Bottom tab bar on mobile, side nav on desktop. `badges`: counts per item key. */
-export function Nav({ badges, admin }: { badges: Promise<Counts>; admin: boolean }) {
+export function Nav({ badges }: { badges: Promise<Counts> }) {
   const t = useTranslations();
   const pathname = usePathname();
 
@@ -62,28 +61,22 @@ export function Nav({ badges, admin }: { badges: Promise<Counts>; admin: boolean
         </div>
         <nav className="flex flex-col gap-1">
           {ITEMS.map(({ href, key, icon: Icon }) => (
-            <Fragment key={href}>
-              <Link
-                key={href}
-                href={href}
-                title={t(`nav.${key}`)}
-                aria-current={isActive(pathname, href) ? 'page' : undefined}
-                className={cn(
-                  'relative flex items-center justify-center gap-3 rounded-md py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground xl:justify-start xl:px-3 xl:py-2',
-                  isActive(pathname, href) && 'bg-accent font-medium text-accent-foreground',
-                )}
-              >
-                <Icon className="size-5 xl:size-4" />
-                <span className="sr-only flex-1 xl:not-sr-only">{t(`nav.${key}`)}</span>
-                <span className="absolute top-0.5 right-0.5 xl:static">
-                  <Badge counts={badges} item={key} />
-                </span>
-              </Link>
-              {/* Settings opens into its sections (full screens; the rail has no room). */}
-              {key === 'settings' && pathname.startsWith('/settings') && (
-                <SettingsLinks pathname={pathname} admin={admin} />
+            <Link
+              key={href}
+              href={href}
+              title={t(`nav.${key}`)}
+              aria-current={isActive(pathname, href) ? 'page' : undefined}
+              className={cn(
+                'relative flex items-center justify-center gap-3 rounded-md py-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground xl:justify-start xl:px-3 xl:py-2',
+                isActive(pathname, href) && 'bg-accent font-medium text-accent-foreground',
               )}
-            </Fragment>
+            >
+              <Icon className="size-5 xl:size-4" />
+              <span className="sr-only flex-1 xl:not-sr-only">{t(`nav.${key}`)}</span>
+              <span className="absolute top-0.5 right-0.5 xl:static">
+                <Badge counts={badges} item={key} />
+              </span>
+            </Link>
           ))}
         </nav>
         <div className="mt-auto flex flex-col items-center gap-2 xl:items-stretch">
@@ -145,37 +138,5 @@ export function Nav({ badges, admin }: { badges: Promise<Counts>; admin: boolean
         </div>
       </nav>
     </>
-  );
-}
-
-function SettingsLinks({ pathname, admin }: { pathname: string; admin: boolean }) {
-  const t = useTranslations('settings.section');
-  const link = (key: string, href: string, Icon: typeof Settings, depth: number) => (
-    <Link
-      key={key}
-      href={href}
-      aria-current={pathname === href ? 'page' : undefined}
-      className={cn(
-        'flex items-center gap-2.5 rounded-md py-1.5 pr-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
-        depth === 1 ? 'pl-7' : 'pl-11',
-        pathname.startsWith(href) && 'font-medium text-foreground',
-        pathname === href && 'bg-accent text-accent-foreground',
-      )}
-    >
-      <Icon className="size-3.5" />
-      {t(`${key}.title`)}
-    </Link>
-  );
-  return (
-    <div className="hidden flex-col gap-0.5 xl:flex">
-      {sectionsFor(admin).map((s) => (
-        <Fragment key={s.key}>
-          {link(s.key, s.href, s.icon, 1)}
-          {s.children &&
-            pathname.startsWith(s.href) &&
-            s.children.map((c) => link(c.key, c.href, c.icon, 2))}
-        </Fragment>
-      ))}
-    </div>
   );
 }
