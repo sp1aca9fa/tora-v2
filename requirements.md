@@ -27,7 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
-| S16 | Admin-defined product categories (from scratch: kinds, fields, price condition) and markets; ground rules for running many collectors | todo (before S12; user, 2026-10-14) |
+| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | todo (before S12; user, 2026-10-14) |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
@@ -627,9 +627,9 @@ Built (2026-10-14): `app_settings` table (migration 0022, key `markets`: primary
 
 Acceptance: switch a US source between reference and comparison in Settings and see the item page's secondary price follow; set an identity source per market and see the notices follow; the portfolio value unchanged by any secondary-market setting.
 
-## S16: Admin-defined product categories and markets
+## S16: Make Tora work anywhere: categories, markets, languages, currency
 
-Added at the user's request (2026-10-14). The admin creates product categories from scratch in Settings, and adds markets; whoever adds a complex category builds collectors to match (S12 explains how). Planned for up to 10 categories across 5 markets. Before S12, so the documentation covers it.
+Added at the user's request (2026-10-14): anyone should be able to run Tora in any setup. The admin creates product categories from scratch in Settings, adds markets, and chooses the languages and the currency; whoever adds a complex category builds collectors to match (S12 explains how). Planned for up to 10 categories across 5 markets. These are choices made at setup, not switches to flip at any time. Before S12, so the documentation covers it; done together because they touch the same files.
 
 Today, categories are code: 2 categories (TCG, games and other), 13 kinds, and 3 behaviours (cards, sealed TCG, games and other). A behaviour decides the condition fields, grades or shrink, the price buckets, which conditions may be pooled for rare items, and the source roles. About 38 files depend on it. Markets come from plug-ins: a market exists when a collector for it is installed.
 
@@ -645,6 +645,20 @@ Markets:
 - A market appears when a collector for it is installed and describes itself (S11). The admin gives it a display name, checks its currency has exchange rates, and picks primary and secondary.
 - To decide in the design session: whether the item page compares all the markets, or keeps primary against secondary.
 
+Languages:
+- A language is a translation file (about 950 texts today, English and Japanese). Adding one means translating that file (Claude can draft it); S12 explains how and how to check it (the message scan finds missing texts).
+- Settings > Admin preferences: the primary and secondary language, picked from the installed ones; each user picks theirs (today: English or Japanese).
+- Item names: the two name fields follow the primary and secondary language instead of Japanese and English; collectors and search use both, as today.
+- Dates and numbers follow each language's formats.
+- Speed: each page loads one language (lighter still once S14 sends a page only its own texts).
+
+Currency:
+- Today every amount is stored in yen (costs, sales, saved values, value history): about 1,050 references in 83 files, and columns named `_jpy`.
+- A base currency chosen once at setup; every amount is stored in it (columns renamed to a neutral name; existing data is yen and stays as is). Changing it later is a terminal command that converts every stored amount, not a settings switch.
+- Each market's currency is converted to the base with daily exchange rates. Today only USD to JPY is collected; a free source covering every pair (e.g. the European Central Bank's daily rates) replaces it.
+- Optional display currency per user: amounts are converted when shown, labelled as converted.
+- Speed: a multiplication per amount; saved values stay in the base currency.
+
 Ground rules for heavy users (collectors on the home PC):
 - Measure first: Settings > Collectors shows each collector's run time and the night's total; a run longer than its window gets a warning.
 - Up to about 3 markets and 10 collectors: one nightly `pnpm collect`, as today.
@@ -657,6 +671,7 @@ Acceptance:
 - An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.
 - A third market added by a test plug-in shows in Markets, Price sources and Identity pages.
 - The ground rules are measured on S14's large data and written down.
+- A test setup with another base currency and language (e.g. EUR, French) works end to end: registering, collecting with a test plug-in, values, charts; this setup is S10's France + China check.
 
 ## S12: Documentation for others
 
