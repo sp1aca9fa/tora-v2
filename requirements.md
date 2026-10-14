@@ -30,9 +30,9 @@
 | S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | todo (before S12; user, 2026-10-14) |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
-| S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
+| S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check | todo (user, 2026-10-14) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 
