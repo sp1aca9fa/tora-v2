@@ -1,15 +1,15 @@
 'use server';
 
 import {
-  CATEGORIES,
   type Category,
-  PRODUCT_KINDS,
   type ProductClass,
+  SEALED_KINDS,
   type ProductKind,
   REGIONS,
   type Region,
   type SetType,
   TCG_FRANCHISES,
+  itemTypeOf,
   kindsForSetType,
   productClass,
   tokyoDateToIso,
@@ -40,6 +40,7 @@ import {
   reqEnum,
   runDomain,
 } from '@/lib/form';
+import { getTaxonomy } from '@/lib/taxonomy';
 import {
   conditionInputFrom,
   conditionSchema,
@@ -79,8 +80,9 @@ export async function searchProductsAction(
 ): Promise<ProductSummary[]> {
   const { db } = await authed();
   const rows = await searchProducts(db, q.slice(0, 100), {
-    category: CATEGORIES.includes(filter.category as Category) ? filter.category : undefined,
-    kinds: filter.kinds?.filter((k) => PRODUCT_KINDS.includes(k)),
+    // Plain text matches only: unknown keys find nothing.
+    category: filter.category?.slice(0, 40) || undefined,
+    kinds: filter.kinds?.map((k) => k.slice(0, 40)),
     limit: 15,
   });
   const linked = await linkedProductIds(
@@ -136,7 +138,7 @@ const holdingSchema = z.object({
   mode: reqEnum(['existing', 'new', 'catalog'] as const),
   productId: optText,
   catalogSetId: optText,
-  catalogKind: optEnum(PRODUCT_KINDS),
+  catalogKind: optEnum(SEALED_KINDS),
   catalogVariant: optText,
   region: optEnum(REGIONS),
   acquiredAt: dateText,
@@ -182,10 +184,11 @@ export async function createHoldingAction(
   } else {
     const parsed = await parseForm(productSchema, formData);
     if ('state' in parsed) return parsed.state;
-    const product = productInputFrom(parsed.data);
+    const taxonomy = await getTaxonomy();
+    const product = productInputFrom(parsed.data, taxonomy, formData);
     if (!product) return { error: 'check', fields: ['name'] };
     ref = { product };
-    cls = productClass(product);
+    cls = itemTypeOf(taxonomy, product.category, product.kind) ?? productClass(product);
     retailPriceBase = product.retailPriceBase ?? null;
   }
   const costTotalBase =

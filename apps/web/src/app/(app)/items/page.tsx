@@ -1,11 +1,11 @@
 import {
-  CATEGORIES,
   type Category,
   HOLDING_STATUSES,
   type HoldingStatus,
   type ProductKind,
   TRACKING_MODES,
-  kindsFor,
+  type Taxonomy,
+  categoryDef,
   trackingMode,
 } from '@tora/core';
 import {
@@ -27,6 +27,7 @@ import { PortfolioHeader } from '../_portfolio/header';
 import { ItemCard } from './item-card';
 import { ItemFilters } from './item-filters';
 import { getMoney } from '@/lib/money-server';
+import { getTaxonomy } from '@/lib/taxonomy';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
@@ -35,14 +36,21 @@ export async function generateMetadata(): Promise<Metadata> {
 type SearchParams = Promise<{ q?: string; type?: string; status?: string }>;
 
 /** `type` is a category (`tcg`) or category:kind (`tcg:booster_box`). */
-function parseType(type: string | undefined): { category?: Category; kind?: ProductKind } {
+function parseType(
+  taxonomy: Taxonomy,
+  type: string | undefined,
+): { category?: Category; kind?: ProductKind } {
   const [c, k] = (type ?? '').split(':');
-  if (!CATEGORIES.includes(c as Category)) return {};
-  const category = c as Category;
-  return kindsFor(category).includes(k as ProductKind)
-    ? { category, kind: k as ProductKind }
-    : { category };
+  const def = categoryDef(taxonomy, c ?? '');
+  if (!def) return {};
+  return def.kinds.some((d) => d.key === k)
+    ? { category: def.key, kind: k }
+    : { category: def.key };
 }
+
+/** Kinds of a category, in the admin's order. */
+const kindsOf = (taxonomy: Taxonomy, category: string) =>
+  categoryDef(taxonomy, category)?.kinds.map((k) => k.key) ?? [];
 
 /**
  * Portfolio, Items tab (requirements S8): category and kind chips filter in one tap; the items
@@ -51,8 +59,9 @@ function parseType(type: string | undefined): { category?: Category; kind?: Prod
 export default async function ItemsPage({ searchParams }: { searchParams: SearchParams }) {
   const money = await getMoney();
   const { db, user } = await authed();
-  const sp = await searchParams;
-  const { category, kind } = parseType(sp.type);
+  const [sp, taxonomy] = await Promise.all([searchParams, getTaxonomy()]);
+  const categories = taxonomy.categories.map((c) => c.key);
+  const { category, kind } = parseType(taxonomy, sp.type);
   const status =
     sp.status === 'all' || HOLDING_STATUSES.includes(sp.status as HoldingStatus)
       ? (sp.status as HoldingStatus | 'all')
@@ -107,8 +116,8 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
   // Tracking groups (investments first), then kinds in the catalog's order (category, kind).
   const modes = TRACKING_MODES.filter((m) => shown.some((s) => s.mode === m)).map((mode) => {
     const groups: { key: string; label: string; list: typeof shown }[] = [];
-    for (const c of CATEGORIES) {
-      for (const k of kindsFor(c)) {
+    for (const c of categories) {
+      for (const k of kindsOf(taxonomy, c)) {
         const list = shown.filter(
           (s) => s.mode === mode && s.product.category === c && s.product.kind === k,
         );
@@ -135,7 +144,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
           <Link href={href(null)} className={chip(!category)}>
             {t('actions.all')} {stats(all).count} {total(stats(all).valueBase)}
           </Link>
-          {CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const list = all.filter((s) => s.product.category === c);
             if (list.length === 0) return null;
             const st = stats(list);
@@ -148,7 +157,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
         </div>
         {category && (
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
-            {kindsFor(category).map((k) => {
+            {kindsOf(taxonomy, category).map((k) => {
               const n = all.filter(
                 (s) => s.product.category === category && s.product.kind === k,
               ).length;

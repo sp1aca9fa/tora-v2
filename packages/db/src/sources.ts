@@ -7,6 +7,7 @@ import {
   productClass,
   identitySources,
   toTokyoIso,
+  conditionListOf,
 } from '@tora/core';
 import {
   and,
@@ -884,20 +885,22 @@ export const STORE_LINK_MIN_COST = 3000;
  * the primary one, S11). Null when none applies.
  */
 export function identityFor(
-  product: Pick<Product, 'category' | 'kind'>,
+  product: Pick<Product, 'category' | 'kind'> & { itemType?: string | null },
   costBase: number,
   registry: SourceRegistry,
   market: string | null | undefined = registry.markets?.primary,
 ): { preferred: string; accepted: string[] } | null {
   const cls = productClass(product);
-  if (cls === 'item' && costBase <= STORE_LINK_MIN_COST) return null;
+  // Cards and sealed TCG always; other items (the item-condition list, the admin's lists) when not cheap.
+  const always = ['card_grades', 'sealed'].includes(conditionListOf(cls));
+  if (!always && costBase <= STORE_LINK_MIN_COST) return null;
   const accepted = identitySources(registry, cls, market);
   return accepted.length ? { preferred: accepted[0]!, accepted } : null;
 }
 
 /** The source an item's identity link is looked for on (see `identityFor`). */
 export function stableSourceFor(
-  product: Pick<Product, 'category' | 'kind'>,
+  product: Pick<Product, 'category' | 'kind'> & { itemType?: string | null },
   costBase: number,
   registry: SourceRegistry,
 ): string | null {

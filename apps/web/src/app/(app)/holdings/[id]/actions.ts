@@ -42,6 +42,7 @@ import {
   runDomain,
   amount,
 } from '@/lib/form';
+import { getTaxonomy } from '@/lib/taxonomy';
 import { productInputFrom, productSchema } from '@/lib/schemas';
 
 const holdingPath = (id: string) => `/holdings/${id}`;
@@ -189,6 +190,7 @@ export async function conditionAction(id: string, _prev: FormState, formData: Fo
       condition: optEnum(CONDITIONS),
       rawGrade: optEnum(RAW_GRADES),
       packagingState: optEnum(PACKAGING_STATES),
+      conditionValue: optText,
       date: dateText,
     }),
     (d, { db, userId }) => changeCondition(db, userId, id, { ...d, occurredAt: at(d.date) }),
@@ -235,7 +237,7 @@ export async function editProductAction(
 ) {
   const parsed = await parseForm(productSchema, formData);
   if ('state' in parsed) return parsed.state;
-  const input = productInputFrom(parsed.data);
+  const input = productInputFrom(parsed.data, await getTaxonomy(), formData);
   if (!input) return { error: 'check', fields: ['name'] };
   return handle(
     formData,

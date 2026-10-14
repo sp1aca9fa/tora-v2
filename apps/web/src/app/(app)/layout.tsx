@@ -3,9 +3,11 @@ import { MoneyProvider } from '@/components/money-context';
 import { Nav } from '@/components/nav';
 import { PageWidth } from '@/components/page-width';
 import { SourcesProvider } from '@/components/sources-context';
+import { TaxonomyProvider } from '@/components/taxonomy-context';
 import { userActions } from '@/lib/actions';
 import { getMoneySettings } from '@/lib/money-server';
 import { getRegistry } from '@/lib/sources';
+import { getTaxonomy } from '@/lib/taxonomy';
 import { authed } from '@/lib/auth/guard';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,10 +33,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SourcesProvider value={sources}>
       <MoneyProvider value={await getMoneySettings()}>
-        <Nav badges={badges} />
-        <div className="md:pl-16 xl:pl-56">
-          <PageWidth>{children}</PageWidth>
-        </div>
+        <TaxonomyProvider value={await getTaxonomy()}>
+          <Nav badges={badges} />
+          <div className="md:pl-16 xl:pl-56">
+            <PageWidth>{children}</PageWidth>
+          </div>
+        </TaxonomyProvider>
       </MoneyProvider>
     </SourcesProvider>
   );

@@ -7,9 +7,13 @@ import {
   PACKAGING_STATES,
   type ProductClass,
   RAW_GRADES,
+  conditionList,
+  conditionListOf,
   holdingFieldsFor,
+  pickName,
 } from '@tora/core';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useTaxonomy } from '@/components/taxonomy-context';
 import { useState } from 'react';
 import { Field } from '@/components/field';
 import { Input } from '@/components/ui/input';
@@ -24,6 +28,7 @@ export interface ConditionDefaults {
   grader?: string | null;
   grade?: string | null;
   certNumber?: string | null;
+  conditionValue?: string | null;
 }
 
 /** Condition / packaging / grading inputs relevant to the product class. */
@@ -35,11 +40,31 @@ export function ConditionFields({
   defaults?: ConditionDefaults;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
+  const taxonomy = useTaxonomy();
   const show = holdingFieldsFor(cls);
+  const sealed = conditionListOf(cls) === 'sealed';
+  const own = show.value ? conditionList(taxonomy, show.value) : undefined;
   const [grading, setGrading] = useState<Grading>(defaults.grading === 'graded' ? 'graded' : 'raw');
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {own && (
+        <Field label={pickName(own.names, locale, t('fields.condition'))} htmlFor="c-value">
+          <NativeSelect
+            id="c-value"
+            name="conditionValue"
+            required
+            defaultValue={defaults.conditionValue ?? own.values[0]?.key}
+          >
+            {own.values.map((v) => (
+              <option key={v.key} value={v.key}>
+                {pickName(v.names, locale, v.key)}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )}
       {show.condition && (
         <Field label={t('fields.condition')} htmlFor="c-condition">
           <NativeSelect
@@ -62,12 +87,12 @@ export function ConditionFields({
           <NativeSelect
             id="c-packaging"
             name="packagingState"
-            required={cls === 'sealed'}
-            defaultValue={defaults.packagingState ?? (cls === 'sealed' ? 'sealed_shrink' : '')}
+            required={sealed}
+            defaultValue={defaults.packagingState ?? (sealed ? 'sealed_shrink' : '')}
           >
-            {cls !== 'sealed' && <option value="">{t('common.notSet')}</option>}
+            {!sealed && <option value="">{t('common.notSet')}</option>}
             {PACKAGING_STATES.filter(
-              (p) => p !== 'n/a' && (cls === 'sealed' || p !== 'box_opened_contents_sealed'),
+              (p) => p !== 'n/a' && (sealed || p !== 'box_opened_contents_sealed'),
             ).map((p) => (
               <option key={p} value={p}>
                 {t(`packaging.${p}`)}

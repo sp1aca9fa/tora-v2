@@ -6,9 +6,13 @@ import {
   type PackagingState,
   type RawGrade,
 } from './domain';
+import { conditionListOf } from './categories';
 import type { ProductClass } from './taxonomy';
 
-/** Valuation bucket (requirements section 6), e.g. `raw:A`, `graded:PSA:10`, `sealed:shrink`, `cond:new`. */
+/**
+ * Valuation bucket (requirements section 6), e.g. `raw:A`, `graded:PSA:10`, `sealed:shrink`,
+ * `cond:new`; an admin's condition list: `{list}:{value}` (S16).
+ */
 export type Bucket = string;
 
 export interface BucketInput {
@@ -19,6 +23,8 @@ export interface BucketInput {
   rawGrade?: RawGrade | null;
   grader?: Grader | null;
   grade?: string | null;
+  /** The value of an admin's condition list (S16). */
+  conditionValue?: string | null;
 }
 
 const SEALED_BUCKETS: Record<PackagingState, Bucket | null> = {
@@ -50,8 +56,8 @@ export function gradedBucket(grader: Grader, grade: string): Bucket {
  * needed to decide (e.g. a raw card without a raw grade).
  */
 export function deriveBucket(input: BucketInput): Bucket | null {
-  switch (input.productClass) {
-    case 'card': {
+  switch (conditionListOf(input.productClass)) {
+    case 'card_grades': {
       if (input.grading === 'graded') {
         if (!input.grader || !input.grade?.trim()) return null;
         return gradedBucket(input.grader, input.grade);
@@ -60,8 +66,12 @@ export function deriveBucket(input: BucketInput): Bucket | null {
     }
     case 'sealed':
       return input.packagingState ? SEALED_BUCKETS[input.packagingState] : null;
-    default:
+    case 'item_condition':
       return input.condition ? CONDITION_BUCKETS[input.condition] : null;
+    default: {
+      const list = conditionListOf(input.productClass);
+      return input.conditionValue ? `${list}:${input.conditionValue}` : null;
+    }
   }
 }
 

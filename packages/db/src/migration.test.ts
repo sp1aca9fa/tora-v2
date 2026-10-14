@@ -133,3 +133,56 @@ it('renames yen amounts to base ones, in columns and inside saved JSON (0023)', 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+it('gives items their type and games their own roles, keeping every row (0024)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tora-mig-'));
+  try {
+    const before = join(dir, 'v23');
+    await cp(MIGRATIONS_FOLDER, before, { recursive: true });
+    const journalPath = join(before, 'meta', '_journal.json');
+    const journal = JSON.parse(await readFile(journalPath, 'utf8'));
+    journal.entries = journal.entries.filter((e: { idx: number }) => e.idx <= 23);
+    await writeFile(journalPath, JSON.stringify(journal));
+    const client = createClient({ url: `file:${join(dir, 'db.sqlite')}` });
+    const db = drizzle(client);
+    await migrate(db, { migrationsFolder: before });
+    const ts = '2026-10-01T00:00:00.000+09:00';
+    const product = (id: string, category: string, kind: string) =>
+      `INSERT INTO products (id, category, kind, name, created_at, updated_at) VALUES ('${id}', '${category}', '${kind}', 'x', '${ts}', '${ts}')`;
+    await client.batch([
+      product('P1', 'tcg', 'single'),
+      product('P2', 'tcg', 'booster_box'),
+      product('P3', 'tcg', 'supply'),
+      product('P4', 'game', 'software'),
+      `INSERT INTO price_observations (id, product_id, source, observation_type, price_base, observed_at, fetched_at, external_ref, created_at, updated_at)
+       VALUES ('O1', 'P4', 'shop', 'sold', 5400, '${ts}', '${ts}', 'r', '${ts}', '${ts}')`,
+      `INSERT INTO sources (key, info, roles, created_at, updated_at) VALUES ('shop', '{"key":"shop","label":"Shop","roles":{"item":"reference"},"identity":["item"]}', '{"item":"supporting"}', '${ts}', '${ts}')`,
+      `INSERT INTO app_settings (key, value, created_at, updated_at) VALUES ('sourceOrder', '{"item":["shop"]}', '${ts}', '${ts}')`,
+      `INSERT INTO app_settings (key, value, created_at, updated_at) VALUES ('markets', '{"primary":"jp","identity":{"jp":{"item":"shop","card":null}}}', '${ts}', '${ts}')`,
+    ]);
+    await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    const all = async (q: string) => (await client.execute(q)).rows;
+    expect(
+      (await all('SELECT id, item_type FROM products ORDER BY id')).map((r) => r.item_type),
+    ).toEqual(['card', 'sealed', 'item', 'game']);
+    expect(await all('SELECT product_id FROM price_observations')).toHaveLength(1);
+    const [source] = await all('SELECT info, roles FROM sources');
+    expect(JSON.parse(String(source!.roles))).toEqual({ item: 'supporting', game: 'supporting' });
+    expect(JSON.parse(String(source!.info))).toMatchObject({
+      roles: { item: 'reference', game: 'reference' },
+      identity: ['item', 'game'],
+    });
+    const settings = Object.fromEntries(
+      (await all('SELECT key, value FROM app_settings')).map((r) => [
+        r.key,
+        JSON.parse(String(r.value)),
+      ]),
+    );
+    expect(settings.sourceOrder).toEqual({ item: ['shop'], game: ['shop'] });
+    expect(settings.markets.identity.jp).toEqual({ item: 'shop', card: null, game: 'shop' });
+    // Category and kind are no longer limited to the built-in ones.
+    await client.execute(product('P5', 'watch', 'wrist'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

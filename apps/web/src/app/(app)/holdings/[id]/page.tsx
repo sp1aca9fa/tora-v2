@@ -4,16 +4,17 @@ import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getFormatter, getTranslations } from 'next-intl/server';
+import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
-import { productMeta } from '@/lib/product-display';
+import { customFieldLines, productMeta } from '@/lib/product-display';
 import { BoxCard } from './box-card';
 import { EventList } from './event-list';
 import { TrackingForm } from './tracking-form';
 import { ValuationCard } from './valuation-card';
 import { getMoney } from '@/lib/money-server';
+import { getTaxonomy } from '@/lib/taxonomy';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -100,6 +101,14 @@ export default async function HoldingPage({ params }: Params) {
       : []),
     [t('fields.acquisitionType'), t(`acquisitionType.${holding.acquisitionType}`)],
   ];
+  // The admin's own condition list (S16): its name and the value's (see taxonomy-messages).
+  if (fields.value && holding.conditionValue)
+    facts.push([
+      t.has(`conditionLists.${fields.value}`)
+        ? t(`conditionLists.${fields.value}`)
+        : t('fields.condition'),
+      t(`conditionValue.${fields.value}.${holding.conditionValue}`),
+    ]);
   if (fields.condition && holding.condition)
     facts.push([t('fields.condition'), t(`condition.${holding.condition}`)]);
   if (fields.packaging && holding.packagingState)
@@ -141,6 +150,9 @@ export default async function HoldingPage({ params }: Params) {
           )}
           <p className="text-sm text-muted-foreground">
             {productMeta(product, t)}
+            {customFieldLines(product, await getTaxonomy(), await getLocale(), t)
+              .map((l) => ` · ${l.label}: ${l.value}`)
+              .join('')}
             {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
             {canEditProduct(user, product) && (
               <>

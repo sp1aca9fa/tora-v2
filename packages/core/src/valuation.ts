@@ -1,4 +1,5 @@
 // Valuation rules (requirements section 6). Pure: callers pass the observations and prices.
+import type { Pools } from './categories';
 import { median } from './market';
 
 export interface ValuationObservation {
@@ -53,13 +54,15 @@ export const LONG_WINDOW = 365;
 /**
  * Conditions close enough to pool when one has too few sales: an item's conditions ("cond:*"), a
  * card's raw grades ("raw:*"), an intact box with or without shrink. Graded slabs never (a PSA 10
- * and a PSA 9 are priced far apart), nor opened boxes.
+ * and a PSA 9 are priced far apart), nor opened boxes. An admin's condition lists pool the values
+ * they group (`pools`, see `conditionPools`).
  */
-export function bucketFamily(bucket: string): string | null {
+export function bucketFamily(bucket: string, pools?: Pools): string | null {
+  if (pools?.[bucket]) return pools[bucket];
   // Only intact boxes pool (with or without shrink); an opened box is another thing.
   if (bucket.startsWith('sealed:')) return /^sealed:(no_)?shrink$/.test(bucket) ? 'sealed' : null;
   const prefix = bucket.split(':')[0]!;
-  return prefix === 'graded' ? null : prefix;
+  return prefix === 'raw' || prefix === 'cond' ? prefix : null;
 }
 
 /** Parsed `observedAt` per observation object (snapshot rebuilds value thousands of days). */
@@ -119,6 +122,8 @@ export function valueUnit(input: {
   now?: Date;
   /** Sources valued from, best first (the registry's order for the item's class). */
   sources?: readonly string[];
+  /** Pool groups of the admin's condition lists (see `bucketFamily`). */
+  pools?: Pools;
 }): Valuation {
   const now = input.now ?? new Date();
   const none: Valuation = {
@@ -149,13 +154,14 @@ export function valueUnit(input: {
   }
 
   if (input.bucket) {
-    const family = bucketFamily(input.bucket);
+    const family = bucketFamily(input.bucket, input.pools);
     const sold = input.observations.filter(
       (o) =>
         o.observationType === 'sold' &&
         !o.excluded &&
         !!o.bucket &&
-        (o.bucket === input.bucket || (family !== null && bucketFamily(o.bucket) === family)) &&
+        (o.bucket === input.bucket ||
+          (family !== null && bucketFamily(o.bucket, input.pools) === family)) &&
         timeOf(o) <= now.getTime(),
     );
     // Steps, best first: the holding's own condition over 30 / 90 / 180 days, then a year; then
@@ -339,6 +345,7 @@ export function sourceSummaries(
   now: Date = new Date(),
   /** The valuation order (see `valueUnit`). */
   order?: readonly string[],
+  pools?: Pools,
 ): SourceSummary[] {
   if (!bucket) return [];
   const sources = new Set([
@@ -352,6 +359,7 @@ export function sourceSummaries(
       bucket,
       observations: observations.filter((o) => o.source === source),
       now,
+      pools,
     });
     const last = lastSale(observations, recent, bucket, source, now);
     return {

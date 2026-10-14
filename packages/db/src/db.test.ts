@@ -106,10 +106,6 @@ describe('constraints', () => {
     await expect(
       db.insert(products).values({ category: 'game', kind: 'amiibo', name: ' ' }),
     ).rejects.toThrow();
-    await expect(
-      // @ts-expect-error invalid enum on purpose
-      db.insert(products).values({ category: 'cards', kind: 'amiibo', name: 'x' }),
-    ).rejects.toThrow();
   });
 
   it('dedupes observations by source + external_ref', async () => {

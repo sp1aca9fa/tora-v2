@@ -21,6 +21,10 @@ import {
   valuationOrder,
   marketCurrency,
   valueUnit,
+  type Pools,
+  conditionPools,
+  itemTypes,
+  resolveTaxonomy,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -87,19 +91,24 @@ export interface MarketData {
    * source is described yet (then every source counts).
    */
   order: Partial<Record<ProductClass, string[]>>;
+  /** Pool groups of the admin's condition lists (S16). */
+  pools?: Pools;
 }
 
 /** The currency of the prices a valuation uses (the primary market's). */
 const valuedCurrency = async (db: Db) => marketCurrency(await loadSourceRegistry(db));
 
-/** The registry's valuation order per item class. */
-async function orderByClass(db: Db): Promise<Partial<Record<ProductClass, string[]>>> {
+/** The registry's valuation order per item type, and the condition lists' pool groups. */
+async function valuationSettings(
+  db: Db,
+): Promise<{ order: Partial<Record<ProductClass, string[]>>; pools: Pools }> {
   const registry = await loadSourceRegistry(db);
-  if (registry.sources.length === 0) return {};
+  const pools = conditionPools(registry.taxonomy?.lists ?? []);
+  if (registry.sources.length === 0) return { order: {}, pools };
+  const types = itemTypes(registry.taxonomy ?? resolveTaxonomy(null)).map((t) => t.key);
   return {
-    card: valuationOrder(registry, 'card'),
-    sealed: valuationOrder(registry, 'sealed'),
-    item: valuationOrder(registry, 'item'),
+    order: Object.fromEntries(types.map((cls) => [cls, valuationOrder(registry, cls)])),
+    pools,
   };
 }
 
@@ -116,7 +125,7 @@ export async function loadMarketData(
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   if (productIds.length === 0)
-    return { observations, recent, manual, order: await orderByClass(db) };
+    return { observations, recent, manual, ...(await valuationSettings(db)) };
   const currency = await valuedCurrency(db);
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
@@ -167,7 +176,7 @@ export async function loadMarketData(
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }
-  return { observations, recent, manual, order: await orderByClass(db) };
+  return { observations, recent, manual, ...(await valuationSettings(db)) };
 }
 
 /** Sales a valuation may use (the filters of `loadMarketData`). */
@@ -197,8 +206,9 @@ export async function loadHoldingsMarketData(
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
-  if (productIds.length === 0)
-    return { observations, recent, manual, order: await orderByClass(db) };
+  const settings = await valuationSettings(db);
+  const { pools } = settings;
+  if (productIds.length === 0) return { observations, recent, manual, ...settings };
   const currency = await valuedCurrency(db);
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
   // window are never used, so extra is safe).
@@ -283,7 +293,7 @@ export async function loadHoldingsMarketData(
   };
   for (const { productId, bucket } of wanted) {
     if (!bucket) continue;
-    const family = bucketFamily(bucket);
+    const family = bucketFamily(bucket, pools);
     const ofProduct = counts.filter((c) => c.productId === productId && c.bucket !== null);
     for (const source of new Set(ofProduct.map((c) => c.source))) {
       const own = ofProduct.find((c) => c.source === source && c.bucket === bucket);
@@ -297,7 +307,7 @@ export async function loadHoldingsMarketData(
       // No own window holds 3 sales: similar conditions are pooled.
       if (at === since && family !== null) {
         for (const c of ofProduct) {
-          if (c.source === source && bucketFamily(c.bucket!) === family) {
+          if (c.source === source && bucketFamily(c.bucket!, pools) === family) {
             need(productId, source, c.bucket!, since);
           }
         }
@@ -349,7 +359,7 @@ export async function loadHoldingsMarketData(
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }
-  return { observations, recent, manual, order: await orderByClass(db) };
+  return { observations, recent, manual, ...(await valuationSettings(db)) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -381,6 +391,7 @@ function bucketValueOf(
       retailPriceBase: product.retailPriceBase,
       now,
       sources: market.order[productClass(product)],
+      pools: market.pools,
     }),
     last: lastSale(observations, recent, bucket, undefined, now),
     buylist: buylistFloor(observations, bucket, now),
@@ -390,6 +401,7 @@ function bucketValueOf(
       bucket,
       now,
       market.order[productClass(product)],
+      market.pools,
     ),
   };
 }
@@ -623,6 +635,7 @@ export function valueHolding(
     retailPriceBase: product.retailPriceBase,
     now,
     sources: market.order[productClass(product)],
+    pools: market.pools,
   });
   const recent = market.recent.get(product.id) ?? [];
   const last = lastSale(observations, recent, bucket, undefined, now);
@@ -639,6 +652,7 @@ export function valueHolding(
       bucket,
       now,
       market.order[productClass(product)],
+      market.pools,
     ),
   };
 }
@@ -955,6 +969,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
     const key = `${userId}|${productId}|${bucket}`;
     let s = series.get(key);
     if (!s) {
+      const { pools } = markets.get(userId)!;
       const observations = (markets.get(userId)!.observations.get(productId) ?? [])
         // Similar conditions too: a rare item's value may pool them (see valueUnit).
         .filter(
@@ -962,8 +977,8 @@ export async function runSnapshots(db: Db, now = new Date()) {
             o.bucket === bucket ||
             (bucket !== null &&
               o.bucket !== null &&
-              bucketFamily(bucket) !== null &&
-              bucketFamily(o.bucket) === bucketFamily(bucket)),
+              bucketFamily(bucket, pools) !== null &&
+              bucketFamily(o.bucket, pools) === bucketFamily(bucket, pools)),
         )
         .toSorted((a, b) => a.observedAt.localeCompare(b.observedAt));
       s = { at: observations.map((o) => Date.parse(o.observedAt)), observations };
@@ -997,6 +1012,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
         retailPriceBase: product.retailPriceBase,
         now: at,
         sources: markets.get(userId)!.order[productClass(product)],
+        pools: markets.get(userId)!.pools,
       });
       unitCache.set(key, v);
     }

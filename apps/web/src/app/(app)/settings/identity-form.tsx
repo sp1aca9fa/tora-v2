@@ -1,9 +1,10 @@
 'use client';
 
-import { ITEM_CLASSES, type ProductClass } from '@tora/core';
+import { type ProductClass, itemTypes } from '@tora/core';
 import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { NativeSelect } from '@/components/ui/native-select';
+import { useTaxonomy } from '@/components/taxonomy-context';
 import { cn } from '@/lib/utils';
 import { setIdentitySourceAction } from './actions';
 
@@ -24,9 +25,10 @@ export function IdentityForm({
 }) {
   const t = useTranslations('sourceRoles');
   const [pending, startTransition] = useTransition();
+  const types = itemTypes(useTaxonomy());
   return (
-    <dl className={cn('grid grid-cols-1 gap-4 sm:grid-cols-3', pending && 'opacity-60')}>
-      {ITEM_CLASSES.map((cls) => {
+    <dl className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2', pending && 'opacity-60')}>
+      {types.map(({ key: cls }) => {
         const key = chosen[cls] ?? null;
         return (
           <div key={cls} className="space-y-1.5 text-sm">

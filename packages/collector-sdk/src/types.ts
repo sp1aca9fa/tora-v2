@@ -184,7 +184,7 @@ export interface PurchaseImporter {
   /** Holding fields read from the receipt for that product (condition, grading, packaging). */
   holdingFor?(
     receipt: PurchaseReceipt,
-    product: Pick<Product, 'category' | 'kind'>,
+    product: Pick<Product, 'category' | 'kind'> & { itemType?: string | null },
   ): Partial<HoldingInput>;
 }
 

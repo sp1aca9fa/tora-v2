@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  CATEGORIES,
   type Category,
   type ProductKind,
   type Region,
@@ -9,9 +8,9 @@ import {
   TCG_FRANCHISES,
   type TcgFranchise,
   catalogProductName,
-  kindsFor,
+  categoryDef,
+  itemTypeOf,
   productClass,
-  regionsFor,
   unitCost,
 } from '@tora/core';
 import { Check } from 'lucide-react';
@@ -23,6 +22,7 @@ import { FormError } from '@/components/form-error';
 import { ProductFields } from '@/components/product-fields';
 import { ExistingSuggestions } from '@/components/existing-suggestions';
 import { ProductPicker } from '@/components/product-picker';
+import { useTaxonomy } from '@/components/taxonomy-context';
 import { SetPicker } from '@/components/set-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -127,14 +127,20 @@ export function AddFlow({
   const [onRelease, setOnRelease] = useState(false);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
 
-  const isSealed = kind !== null && SEALED_KINDS.includes(kind);
-  const hasCatalog = category === 'tcg' && franchise !== null && franchise !== 'other';
+  const taxonomy = useTaxonomy();
+  const def = category ? categoryDef(taxonomy, category) : undefined;
+  // TCG (S16: a category with the set catalog) picks its franchise and region first.
+  const catalog = !!def?.setCatalog;
+  const isSealed = kind !== null && (SEALED_KINDS as readonly string[]).includes(kind);
+  const hasCatalog = catalog && franchise !== null && franchise !== 'other';
   const catalogMode = mode === 'new' && isSealed && hasCatalog && !manual;
   const submitMode = mode === 'existing' ? 'existing' : catalogMode ? 'catalog' : 'new';
   const cls =
     mode === 'existing'
       ? selected && productClass(selected)
-      : category && kind && productClass({ category, kind });
+      : category &&
+        kind &&
+        (itemTypeOf(taxonomy, category, kind) ?? productClass({ category, kind }));
 
   function reset(level: 'category' | 'franchise' | 'kind') {
     if (level === 'category') {
@@ -164,7 +170,7 @@ export function AddFlow({
     if (step === 0) {
       if (mode === 'existing') return selected ? true : fail('pickProduct');
       if (!category) return fail('pickCategory');
-      if (category === 'tcg' && !franchise) return fail('pickFranchise');
+      if (catalog && !franchise) return fail('pickFranchise');
       if (!kind) return fail('pickKind');
       if (catalogMode && !set) return fail('pickSet');
     }
@@ -307,7 +313,7 @@ export function AddFlow({
           <>
             <Field label={t('add.category')}>
               <Chips
-                options={CATEGORIES}
+                options={taxonomy.categories.filter((c) => !c.hidden).map((c) => c.key)}
                 value={category}
                 onChange={(c) => {
                   setCategory(c);
@@ -319,7 +325,7 @@ export function AddFlow({
               <input type="hidden" name="category" value={category ?? ''} />
             </Field>
 
-            {category === 'tcg' && (
+            {catalog && (
               <>
                 <Field label={t('fields.franchise')}>
                   <Chips
@@ -357,7 +363,7 @@ export function AddFlow({
                         setSet(null);
                       }}
                     >
-                      {regionsFor('tcg').map((r) => (
+                      {(def?.regions ?? []).map((r) => (
                         <option key={r} value={r}>
                           {t(`region.${r}`)}
                         </option>
@@ -368,10 +374,10 @@ export function AddFlow({
               </>
             )}
 
-            {category && (category === 'game' || franchise) && (
+            {category && (!catalog || franchise) && (
               <Field label={t('fields.kind')}>
                 <Chips
-                  options={kindsFor(category)}
+                  options={(def?.kinds ?? []).filter((k) => !k.hidden).map((k) => k.key)}
                   value={kind}
                   onChange={(k) => {
                     setKind(k);
@@ -443,8 +449,8 @@ export function AddFlow({
                 category={category}
                 kind={kind}
                 // For TCG, franchise and region are chosen above.
-                franchiseInput={category === 'game'}
-                showRegion={category === 'game'}
+                franchiseInput={!catalog}
+                showRegion={!catalog}
                 franchiseSuggestions={franchiseSuggestions}
                 defaults={draft}
               />

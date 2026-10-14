@@ -18,3 +18,4 @@ export * from './actions';
 export * from './registry';
 export * from './uploads';
 export * from './base-currency';
+export * from './categories';

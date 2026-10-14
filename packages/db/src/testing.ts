@@ -27,7 +27,7 @@ export const TEST_SOURCES: SourceInfo[] = [
     market: 'jp',
     label: 'Mercari',
     priority: 20,
-    roles: { card: 'supporting', sealed: 'supporting', item: 'supporting' },
+    roles: { card: 'supporting', sealed: 'supporting', item: 'supporting', game: 'supporting' },
     aliases: ['mercari', 'メルカリ'],
     singleItemOrders: true,
   },
@@ -36,8 +36,8 @@ export const TEST_SOURCES: SourceInfo[] = [
     market: 'jp',
     label: '駿河屋',
     priority: 30,
-    roles: { sealed: 'supporting', item: 'reference' },
-    identity: ['sealed', 'item'],
+    roles: { sealed: 'supporting', item: 'reference', game: 'reference' },
+    identity: ['sealed', 'item', 'game'],
     links: [
       {
         pattern: 'suruga-ya\\.jp/product/(?:detail|other)/([A-Za-z0-9]+)',

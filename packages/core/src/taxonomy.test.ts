@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  catalogProductName,
+  BUILT_IN_CATEGORIES,
+  checkTaxonomy,
+  fieldsFor,
   holdingFieldsFor,
-  kindsForSetType,
-  productClass,
-  productFieldsFor,
-} from './taxonomy';
+  itemTypeOf,
+  itemTypes,
+  resolveTaxonomy,
+} from './categories';
+import { catalogProductName, kindsForSetType, productClass } from './taxonomy';
+
+const builtIn = resolveTaxonomy(null);
+const keys = (fields: { key: string }[]) => fields.map((f) => f.key);
 
 describe('productClass', () => {
   it('classifies by category and kind', () => {
@@ -13,23 +19,73 @@ describe('productClass', () => {
     expect(productClass({ category: 'tcg', kind: 'booster_box' })).toBe('sealed');
     expect(productClass({ category: 'tcg', kind: 'deck' })).toBe('sealed');
     expect(productClass({ category: 'tcg', kind: 'supply' })).toBe('item');
-    expect(productClass({ category: 'game', kind: 'amiibo' })).toBe('item');
+    expect(productClass({ category: 'game', kind: 'amiibo' })).toBe('game');
+    expect(productClass({ category: 'watch', kind: 'wrist', itemType: 'watch/dial' })).toBe(
+      'watch/dial',
+    );
+  });
+
+  it('gives the built-in templates the same item types', () => {
+    for (const c of BUILT_IN_CATEGORIES) {
+      for (const k of c.kinds) {
+        expect(itemTypeOf(builtIn, c.key, k.key)).toBe(
+          productClass({ category: c.key, kind: k.key }),
+        );
+      }
+    }
+    expect(itemTypes(builtIn).map((t) => t.key)).toEqual(['card', 'sealed', 'item', 'game']);
+    expect(checkTaxonomy(builtIn)).toEqual([]);
   });
 
   it('maps classes to condition dimensions', () => {
-    expect(holdingFieldsFor('card')).toEqual({ condition: false, packaging: false, grading: true });
-    expect(holdingFieldsFor('sealed')).toEqual({
+    expect(holdingFieldsFor('card')).toMatchObject({ grading: true, packaging: false });
+    expect(holdingFieldsFor('sealed')).toMatchObject({ packaging: true, condition: false });
+    expect(holdingFieldsFor('item')).toMatchObject({ condition: true, packaging: true });
+    expect(holdingFieldsFor('game')).toMatchObject({ condition: true, value: null });
+    expect(holdingFieldsFor('watch/dial')).toEqual({
       condition: false,
-      packaging: true,
+      packaging: false,
       grading: false,
+      value: 'dial',
     });
-    expect(holdingFieldsFor('item')).toEqual({ condition: true, packaging: true, grading: false });
   });
 
-  it('shows platform only for games and card fields only for singles', () => {
-    expect(productFieldsFor('game', 'software')).toContain('platform');
-    expect(productFieldsFor('tcg', 'single')).toContain('cardNumber');
-    expect(productFieldsFor('tcg', 'booster_box')).not.toContain('cardNumber');
+  it('shows the same fields as before for the built-in kinds', () => {
+    expect(keys(fieldsFor(builtIn, 'game', 'software'))).toEqual([
+      'franchise',
+      'platform',
+      'releaseDate',
+      'retailPriceBase',
+    ]);
+    expect(keys(fieldsFor(builtIn, 'tcg', 'single'))).toEqual([
+      'franchise',
+      'setName',
+      'setCode',
+      'cardNumber',
+      'rarity',
+    ]);
+    expect(keys(fieldsFor(builtIn, 'tcg', 'booster_box'))).toEqual([
+      'franchise',
+      'setName',
+      'setCode',
+      'variant',
+      'releaseDate',
+      'retailPriceBase',
+    ]);
+    expect(keys(fieldsFor(builtIn, 'tcg', 'supply'))).toEqual([
+      'franchise',
+      'releaseDate',
+      'retailPriceBase',
+    ]);
+  });
+
+  it('flags broken categories', () => {
+    expect(
+      checkTaxonomy({
+        categories: [{ key: 'watch', kinds: [{ key: 'wrist', conditions: 'dial' }], fields: [] }],
+        lists: [{ key: 'raw', values: [] }],
+      }),
+    ).toEqual(expect.arrayContaining(['list_key', 'list_empty', 'kind_list']));
   });
 });
 

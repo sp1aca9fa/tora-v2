@@ -1,4 +1,4 @@
-import { ITEM_CLASSES, identityChoices, identitySources } from '@tora/core';
+import { identityChoices, identitySources, typesOf } from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,7 +50,10 @@ export default async function IdentitySettingsPage() {
             <IdentityForm
               market={market}
               chosen={Object.fromEntries(
-                ITEM_CLASSES.map((cls) => [cls, identitySources(registry, cls, market)[0] ?? null]),
+                typesOf(registry).map((cls) => [
+                  cls,
+                  identitySources(registry, cls, market)[0] ?? null,
+                ]),
               )}
               choices={identityChoices(registry, market)}
               labels={labels}

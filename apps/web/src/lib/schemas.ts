@@ -1,23 +1,25 @@
 import {
-  CATEGORIES,
   CONDITIONS,
   GRADERS,
   GRADINGS,
   PACKAGING_STATES,
-  PRODUCT_KINDS,
   type ProductClass,
   RAW_GRADES,
   REGIONS,
+  type Taxonomy,
+  conditionListOf,
+  fieldType,
+  fieldsFor,
   holdingFieldsFor,
-  productFieldsFor,
 } from '@tora/core';
 import type { HoldingInput, ProductInput } from '@tora/db';
 import { z } from 'zod';
-import { optDateText, optEnum, optText, optAmount, reqEnum } from './form';
+import { optDateText, optEnum, optText, optAmount } from './form';
 
 export const productSchema = z.object({
-  category: reqEnum(CATEGORIES),
-  kind: reqEnum(PRODUCT_KINDS),
+  // Checked against the admin's categories when saved (S16).
+  category: z.string().trim().min(1).max(40),
+  kind: z.string().trim().min(1).max(40),
   name: optText,
   nameAlias: optText,
   franchise: optText,
@@ -33,13 +35,46 @@ export const productSchema = z.object({
   retailPriceBase: optAmount,
 });
 
+/** The category's custom fields typed in a form (`f_{key}`), as numbers, yes / no or text (S16). */
+function customFieldsFrom(
+  taxonomy: Taxonomy,
+  category: string,
+  kind: string,
+  form: FormData | undefined,
+): Record<string, string | number | boolean> | null {
+  if (!form) return null;
+  const out: Record<string, string | number | boolean> = {};
+  for (const f of fieldsFor(taxonomy, category, kind)) {
+    if (f.standard) continue;
+    const raw = String(form.get(`f_${f.key}`) ?? '').trim();
+    if (!raw) continue;
+    const type = fieldType(f);
+    if (type === 'number') {
+      const n = Number(raw.replace(',', '.'));
+      if (Number.isFinite(n)) out[f.key] = n;
+    } else if (type === 'yesno') out[f.key] = raw === 'true';
+    else if (type === 'choice') {
+      if (f.choices?.some((c) => c.key === raw)) out[f.key] = raw;
+    } else out[f.key] = raw.slice(0, 500);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /**
- * Keeps the fields that apply to the category + kind (the rest are stored as null). Returns null
- * when the name is missing.
+ * Keeps the fields that apply to the category + kind (the rest are stored as null), and its
+ * custom fields from the form. Returns null when the name is missing.
  */
-export function productInputFrom(data: z.infer<typeof productSchema>): ProductInput | null {
+export function productInputFrom(
+  data: z.infer<typeof productSchema>,
+  taxonomy: Taxonomy,
+  form?: FormData,
+): ProductInput | null {
   if (!data.name) return null;
-  const allowed = new Set<string>(productFieldsFor(data.category, data.kind));
+  const allowed = new Set<string>(
+    fieldsFor(taxonomy, data.category, data.kind)
+      .filter((f) => f.standard)
+      .map((f) => f.key),
+  );
   const pick = <K extends keyof typeof data>(key: K) =>
     allowed.has(key as string) ? (data[key] ?? null) : null;
   return {
@@ -60,6 +95,7 @@ export function productInputFrom(data: z.infer<typeof productSchema>): ProductIn
     rarity: pick('rarity'),
     releaseDate: pick('releaseDate'),
     retailPriceBase: pick('retailPriceBase'),
+    fields: customFieldsFrom(taxonomy, data.category, data.kind, form),
   };
 }
 
@@ -71,11 +107,19 @@ export const conditionSchema = z.object({
   grader: optEnum(GRADERS),
   grade: optText,
   certNumber: optText,
+  conditionValue: optText,
 });
 
 type ConditionInput = Pick<
   HoldingInput,
-  'condition' | 'packagingState' | 'grading' | 'rawGrade' | 'grader' | 'grade' | 'certNumber'
+  | 'condition'
+  | 'packagingState'
+  | 'grading'
+  | 'rawGrade'
+  | 'grader'
+  | 'grade'
+  | 'certNumber'
+  | 'conditionValue'
 >;
 
 /** Condition fields for the product class, plus the names of required fields that are missing. */
@@ -93,14 +137,19 @@ export function conditionInputFrom(
     grader: null,
     grade: null,
     certNumber: null,
+    conditionValue: null,
   };
+  if (show.value) {
+    input.conditionValue = data.conditionValue?.slice(0, 40) ?? null;
+    if (!input.conditionValue) missing.push('conditionValue');
+  }
   if (show.condition) {
     input.condition = data.condition ?? null;
     if (!input.condition) missing.push('condition');
   }
   if (show.packaging) {
     input.packagingState = data.packagingState ?? null;
-    if (cls === 'sealed' && !input.packagingState) missing.push('packagingState');
+    if (conditionListOf(cls) === 'sealed' && !input.packagingState) missing.push('packagingState');
   }
   if (show.grading) {
     input.grading = data.grading ?? 'raw';

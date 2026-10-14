@@ -5,6 +5,7 @@ export * from './bucket';
 export * from './names';
 export * from './holding-state';
 export * from './taxonomy';
+export * from './categories';
 export * from './text';
 export * from './market';
 export * from './valuation';

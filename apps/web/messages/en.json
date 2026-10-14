@@ -17,7 +17,9 @@
     "back": "Back",
     "other": "Other",
     "notSet": "Not set",
-    "perUnit": "{amount} per unit"
+    "perUnit": "{amount} per unit",
+    "yes": "Yes",
+    "no": "No"
   },
   "login": {
     "title": "Sign in",
@@ -320,7 +322,7 @@
       },
       "admin": {
         "title": "Admin preferences",
-        "info": "Markets, price sources, identity pages and languages, for every account."
+        "info": "Markets, price sources, identity pages, categories and languages, for every account."
       },
       "markets": {
         "title": "Markets",
@@ -333,6 +335,10 @@
       "languages": {
         "title": "Languages",
         "info": "The app's two languages, which people switch between."
+      },
+      "categories": {
+        "title": "Categories",
+        "info": "Kinds of items, their fields and condition lists."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app."
@@ -899,7 +905,8 @@
     "class": {
       "card": "Cards",
       "sealed": "Sealed TCG",
-      "item": "Games & other"
+      "item": "Other TCG items",
+      "game": "Games & merch"
     },
     "role": {
       "reference": "Reference",
@@ -978,5 +985,83 @@
     "none": "None (no toggle)",
     "primaryInfo": "Shown first, and to people signing in.",
     "secondaryInfo": "The other side of the toggle."
+  },
+  "conditionLists": {
+    "card_grades": "Card grades (raw S-D, slabs)",
+    "sealed": "Sealed packaging",
+    "item_condition": "Item condition"
+  },
+  "categories": {
+    "title": "Categories",
+    "info": "What kinds of items the app holds. Each category has kinds (e.g. booster box, single) and fields; each kind has a condition list, which decides how lots are described and which prices value them. Names are typed in the app's languages.",
+    "plugins": "Collectors say which categories they collect; a new category needs a collector that prices it (the setup guide explains how). Price sources and identity pages are set per category and condition list.",
+    "items": "{count, plural, =0 {no items} one {# item} other {# items}}",
+    "lots": "{count, plural, =0 {no lots} one {# lot} other {# lots}}",
+    "key": "Key: {key}",
+    "newKey": "Key: made from the name on save",
+    "name": "Name",
+    "hidden": "Hidden: not offered for new items",
+    "hiddenBadge": "hidden",
+    "kinds": "Kinds",
+    "kindName": "Kind name",
+    "conditionList": "Condition list",
+    "addKind": "Add kind",
+    "up": "Move up",
+    "down": "Move down",
+    "remove": "Remove",
+    "inUse": "Used by items: hide it instead",
+    "removeCategory": "Remove category",
+    "cannotRemove": "Has items: it can be hidden, not removed.",
+    "addCategory": "Add category",
+    "fields": "Fields",
+    "standard": "standard",
+    "fieldName": "Field name",
+    "fieldType": "Type",
+    "required": "Required",
+    "shown": "Shown on the item page",
+    "forKinds": "For:",
+    "choiceName": "Choice",
+    "addChoice": "Add choice",
+    "addField": "Add custom field",
+    "addStandard": "Add a standard field",
+    "type": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "choice": "Choice list",
+      "yesno": "Yes / no"
+    },
+    "lists": "Condition lists",
+    "listsInfo": "Ready-made lists (their prices come from the collectors as they are):",
+    "listName": "List name",
+    "valuesInfo": "Values, best first. Values with the same pool group are valued together when one has too few sales.",
+    "valueName": "Value",
+    "pool": "Pool group (optional)",
+    "addValue": "Add value",
+    "removeList": "Remove list",
+    "addList": "Add condition list",
+    "save": "Save categories",
+    "undo": "Undo changes",
+    "saved": "Saved. Values are being rebuilt.",
+    "confirm": "This change touches registered items:",
+    "touched": {
+      "kind_list": "{name}: {count, plural, one {# item moves} other {# items move}} to another condition list (their lots need the new condition)",
+      "field_removed": "Field {name}: removed from {count, plural, one {# item} other {# items}}",
+      "choice_removed": "{name}: cleared on {count, plural, one {# item} other {# items}}",
+      "value_removed": "{name}: cleared on {count, plural, one {# lot} other {# lots}}"
+    },
+    "blocked": {
+      "category_in_use": "A category with items cannot be removed; hide it.",
+      "kind_in_use": "A kind with items cannot be removed; hide it.",
+      "list_key": "A condition list needs a name.",
+      "list_empty": "A condition list needs at least one value.",
+      "value_key": "Two values have the same name.",
+      "category_key": "A category needs a name.",
+      "no_kinds": "Each category needs at least one kind.",
+      "kind_key": "Two kinds have the same name.",
+      "kind_list": "A kind uses a removed condition list.",
+      "field_key": "Two fields have the same name.",
+      "choice_empty": "A choice field needs at least one choice."
+    }
   }
 }

@@ -12,9 +12,11 @@ import {
   listProductSources,
   pendingMatchesForUser,
   rejectCandidate,
+  saveTaxonomy,
   schema,
   unlinkSource,
 } from '@tora/db';
+import { resolveTaxonomy } from '@tora/core';
 import { migrateDb } from '@tora/db/migrate';
 import { eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -279,4 +281,74 @@ it('searches newer items too when older ones are of a kind the source does not h
   const run = await runCollector(db, fakeCollector(), { ...quiet, matchOnly: true });
   expect(run.candidates).toBe(2);
   expect((await listPendingCandidates(db, product.id)).length).toBe(2);
+});
+
+it('collects for a category the admin made, in its own condition values (S16)', async () => {
+  const taxonomy = resolveTaxonomy(null);
+  await saveTaxonomy(
+    db,
+    {
+      categories: [
+        ...taxonomy.categories,
+        {
+          key: 'watch',
+          kinds: [{ key: 'wrist', conditions: 'watch_condition' }],
+          fields: [{ key: 'brand', type: 'text' }],
+        },
+      ],
+      lists: [
+        ...taxonomy.lists,
+        {
+          key: 'watch_condition',
+          values: [
+            { key: 'unworn', names: { en: 'Unworn' } },
+            { key: 'worn', names: { en: 'Worn' } },
+          ],
+        },
+      ],
+    },
+    false,
+  );
+  const { product } = await createHolding(
+    db,
+    userId,
+    { product: { category: 'watch', kind: 'wrist', name: 'Seiko', fields: { brand: 'Seiko' } } },
+    {
+      quantity: 1,
+      costTotalBase: 90_000,
+      acquiredAt: '2026-09-01T00:00:00.000+09:00',
+      conditionValue: 'unworn',
+    },
+  );
+  await linkSource(db, product.id, { source: 'watches', externalId: 'W1' });
+  const seen: string[] = [];
+  const collector = fakeCollector({
+    source: 'watches',
+    supports: (p) => p.category === 'watch',
+    findCandidates: async () => [],
+    collect: async (link, p, ctx) => {
+      seen.push(`${p.category}/${p.kind}/${p.itemType}/${p.fields?.brand}`);
+      await ctx.save([
+        {
+          productId: p.id,
+          source: 'watches',
+          observationType: 'sold' as const,
+          bucket: 'watch_condition:unworn',
+          price: 100_000,
+          currency: 'JPY',
+          observedAt: '2026-10-01T12:00:00.000+09:00',
+          fetchedAt: ctx.now.toISOString(),
+          externalRef: 'w1',
+        },
+      ]);
+      return { state: {}, complete: true };
+    },
+  });
+  expect(await runCollector(db, collector, quiet)).toMatchObject({
+    status: 'ok',
+    observationsAdded: 1,
+  });
+  expect(seen).toEqual(['watch/wrist/watch/watch_condition/Seiko']);
+  const stats = await bucketStats(db, product.id, 30, new Date('2026-10-09T00:00:00Z'));
+  expect(stats).toEqual([expect.objectContaining({ bucket: 'watch_condition:unworn', count: 1 })]);
 });

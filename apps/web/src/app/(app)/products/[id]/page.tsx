@@ -16,18 +16,19 @@ import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getFormatter, getTranslations } from 'next-intl/server';
+import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
 import { PriceChart } from '@/components/charts/price-chart';
 import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { lotConditionLabel, productMeta } from '@/lib/product-display';
+import { lotConditionLabel, productMeta, customFieldLines } from '@/lib/product-display';
 import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
 import { getMoney } from '@/lib/money-server';
+import { getTaxonomy } from '@/lib/taxonomy';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -109,6 +110,9 @@ export default async function ProductPage({ params }: Params) {
             )}
             <p className="text-sm text-muted-foreground">
               {productMeta(product, t)}
+              {customFieldLines(product, await getTaxonomy(), await getLocale(), t)
+                .map((l) => ` · ${l.label}: ${l.value}`)
+                .join('')}
               {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
               {canEditProduct(user, product) && (
                 <>

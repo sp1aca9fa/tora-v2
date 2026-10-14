@@ -1,8 +1,9 @@
 'use client';
 
 import {
-  ITEM_CLASSES,
   type ProductClass,
+  collects,
+  itemTypes,
   SOURCE_ROLES,
   type SourceInfo,
   type SourceQuality,
@@ -12,6 +13,7 @@ import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { NativeSelect } from '@/components/ui/native-select';
+import { useTaxonomy } from '@/components/taxonomy-context';
 import { cn } from '@/lib/utils';
 import { moveSourceAction, setSourceRoleAction } from './actions';
 
@@ -30,7 +32,7 @@ export function SourcesForm({
 }: {
   sources: SourceInfo[];
   /** Each kind of item's order of the sources (keys). */
-  order: Record<ProductClass, string[]>;
+  order: Partial<Record<ProductClass, string[]>>;
   /** The declared roles (what the admin set or the plug-in suggested). */
   roles: Record<string, Partial<Record<ProductClass, SourceRole>>>;
   /** The quality gate's last check per source and class. */
@@ -40,10 +42,14 @@ export function SourcesForm({
 }) {
   const t = useTranslations('sourceRoles');
   const [pending, startTransition] = useTransition();
-  const [cls, setCls] = useState<ProductClass>(ITEM_CLASSES[0]!);
+  // Item types of the admin's categories (S16), each listing the sources that collect it.
+  const types = itemTypes(useTaxonomy());
+  const [cls, setCls] = useState<ProductClass>(types[0]?.key ?? 'card');
+  const category = types.find((x) => x.key === cls)?.category ?? '';
+  const ordered = order[cls] ?? [];
   const priced = sources
-    .filter((s) => !s.shopOnly)
-    .toSorted((a, b) => order[cls].indexOf(a.key) - order[cls].indexOf(b.key));
+    .filter((s) => !s.shopOnly && collects(s, category))
+    .toSorted((a, b) => ordered.indexOf(a.key) - ordered.indexOf(b.key));
   const roleOf = (key: string): SourceRole => roles[key]?.[cls] ?? 'off';
   const groups = SOURCE_ROLES.map((r) => ({
     role: r,
@@ -55,7 +61,7 @@ export function SourcesForm({
   return (
     <div className={cn('space-y-3 text-sm', pending && 'opacity-60')}>
       <div role="tablist" className="flex flex-wrap gap-1.5">
-        {ITEM_CLASSES.map((c) => (
+        {types.map(({ key: c }) => (
           <button
             key={c}
             type="button"

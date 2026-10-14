@@ -17,7 +17,9 @@
     "back": "戻る",
     "other": "その他",
     "notSet": "未設定",
-    "perUnit": "1点あたり {amount}"
+    "perUnit": "1点あたり {amount}",
+    "yes": "はい",
+    "no": "いいえ"
   },
   "login": {
     "title": "ログイン",
@@ -320,7 +322,7 @@
       },
       "admin": {
         "title": "管理者設定",
-        "info": "市場、価格ソース、識別ページ、言語（全アカウント共通）。"
+        "info": "市場、価格ソース、識別ページ、カテゴリー、言語（全アカウント共通）。"
       },
       "markets": {
         "title": "市場",
@@ -333,6 +335,10 @@
       "languages": {
         "title": "言語",
         "info": "アプリの2つの言語（切り替えて使用）。"
+      },
+      "categories": {
+        "title": "カテゴリー",
+        "info": "商品の種類、項目、状態リスト。"
       }
     },
     "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。"
@@ -899,7 +905,8 @@
     "class": {
       "card": "カード",
       "sealed": "未開封TCG",
-      "item": "ゲーム・その他"
+      "item": "その他のトレカ用品",
+      "game": "ゲーム・グッズ"
     },
     "role": {
       "reference": "基準",
@@ -978,5 +985,83 @@
     "none": "なし（切替なし）",
     "primaryInfo": "最初に表示され、ログイン画面にも使われます。",
     "secondaryInfo": "切替のもう一方の言語。"
+  },
+  "conditionLists": {
+    "card_grades": "カードの状態（素体 S-D、鑑定品）",
+    "sealed": "未開封の梱包状態",
+    "item_condition": "商品の状態"
+  },
+  "categories": {
+    "title": "カテゴリー",
+    "info": "アプリで扱う商品の種類。各カテゴリーには種類（例: BOX、シングル）と項目があり、種類ごとに状態リストを選びます。状態リストはロットの状態の記録方法と、評価に使う価格を決めます。名前はアプリの各言語で入力します。",
+    "plugins": "コレクターは収集するカテゴリーを宣言します。新しいカテゴリーには価格を集めるコレクターが必要です（手順はセットアップガイドに記載）。価格ソースと識別ページはカテゴリーと状態リストごとに設定します。",
+    "items": "{count, plural, =0 {アイテムなし} other {#件}}",
+    "lots": "{count, plural, =0 {ロットなし} other {#ロット}}",
+    "key": "キー: {key}",
+    "newKey": "キー: 保存時に名前から作成",
+    "name": "名前",
+    "hidden": "非表示: 新規登録に表示しない",
+    "hiddenBadge": "非表示",
+    "kinds": "種類",
+    "kindName": "種類の名前",
+    "conditionList": "状態リスト",
+    "addKind": "種類を追加",
+    "up": "上へ",
+    "down": "下へ",
+    "remove": "削除",
+    "inUse": "アイテムで使用中: 非表示にしてください",
+    "removeCategory": "カテゴリーを削除",
+    "cannotRemove": "アイテムがあるため削除できません（非表示にできます）。",
+    "addCategory": "カテゴリーを追加",
+    "fields": "項目",
+    "standard": "標準",
+    "fieldName": "項目名",
+    "fieldType": "種類",
+    "required": "必須",
+    "shown": "アイテムページに表示",
+    "forKinds": "対象:",
+    "choiceName": "選択肢",
+    "addChoice": "選択肢を追加",
+    "addField": "独自項目を追加",
+    "addStandard": "標準項目を追加",
+    "type": {
+      "text": "テキスト",
+      "number": "数値",
+      "date": "日付",
+      "choice": "選択リスト",
+      "yesno": "はい / いいえ"
+    },
+    "lists": "状態リスト",
+    "listsInfo": "既製のリスト（価格はコレクターがそのまま提供）:",
+    "listName": "リスト名",
+    "valuesInfo": "値（良い順）。同じプールグループの値は、売買が少ないときにまとめて評価されます。",
+    "valueName": "値",
+    "pool": "プールグループ（任意）",
+    "addValue": "値を追加",
+    "removeList": "リストを削除",
+    "addList": "状態リストを追加",
+    "save": "カテゴリーを保存",
+    "undo": "変更を元に戻す",
+    "saved": "保存しました。評価を再計算しています。",
+    "confirm": "この変更は登録済みのアイテムに影響します:",
+    "touched": {
+      "kind_list": "{name}: {count}件が別の状態リストに移ります（ロットの状態の再入力が必要）",
+      "field_removed": "項目 {name}: {count}件から削除",
+      "choice_removed": "{name}: {count}件で解除",
+      "value_removed": "{name}: {count}ロットで解除"
+    },
+    "blocked": {
+      "category_in_use": "アイテムのあるカテゴリーは削除できません。非表示にしてください。",
+      "kind_in_use": "アイテムのある種類は削除できません。非表示にしてください。",
+      "list_key": "状態リストに名前が必要です。",
+      "list_empty": "状態リストには値が1つ以上必要です。",
+      "value_key": "同じ名前の値が2つあります。",
+      "category_key": "カテゴリーに名前が必要です。",
+      "no_kinds": "各カテゴリーに種類が1つ以上必要です。",
+      "kind_key": "同じ名前の種類が2つあります。",
+      "kind_list": "削除した状態リストを使っている種類があります。",
+      "field_key": "同じ名前の項目が2つあります。",
+      "choice_empty": "選択リスト項目には選択肢が1つ以上必要です。"
+    }
   }
 }

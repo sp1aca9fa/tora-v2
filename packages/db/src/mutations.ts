@@ -14,7 +14,9 @@ import {
   type Region,
   catalogProductName,
   isConsumedAfterOpening,
-  kindsFor,
+  fieldsFor,
+  itemTypeOf,
+  resolveTaxonomy,
   kindsForSetType,
   orderSourceOf,
   singleItemOrders,
@@ -94,6 +96,8 @@ export interface HoldingInput {
   grader?: Grader | null;
   grade?: string | null;
   certNumber?: string | null;
+  /** A value of the admin's condition list (S16). */
+  conditionValue?: string | null;
   notes?: string | null;
   /** Transaction / order ID at the place of purchase (e.g. a SNKRDUNK 取引ID). */
   orderId?: string | null;
@@ -134,9 +138,27 @@ function assertYen(amount: number): void {
   if (!Number.isSafeInteger(amount) || amount < 0) throw new DomainError('invalid_input');
 }
 
-function assertProductInput(input: ProductInput): void {
+/**
+ * A product as saved: its category and kind must be the admin's (S16), its item type follows
+ * them, and only its category's custom fields are kept.
+ */
+async function checkedProduct(
+  tx: Pick<Db, 'select'>,
+  input: ProductInput,
+): Promise<ProductInput & { itemType: string }> {
   if (!input.name?.trim()) throw new DomainError('invalid_input');
-  if (!kindsFor(input.category).includes(input.kind)) throw new DomainError('invalid_input');
+  const taxonomy = (await loadSourceRegistry(tx)).taxonomy ?? resolveTaxonomy(null);
+  const itemType = itemTypeOf(taxonomy, input.category, input.kind);
+  if (!itemType) throw new DomainError('invalid_input');
+  const custom = new Set(
+    fieldsFor(taxonomy, input.category, input.kind)
+      .filter((f) => !f.standard)
+      .map((f) => f.key),
+  );
+  const fields = Object.fromEntries(
+    Object.entries(input.fields ?? {}).filter(([k, v]) => custom.has(k) && v !== '' && v !== null),
+  );
+  return { ...input, itemType, fields: Object.keys(fields).length ? fields : null };
 }
 
 async function loadHolding(
@@ -209,11 +231,14 @@ async function resolveCatalogProduct(tx: Tx, ref: CatalogRef): Promise<Product> 
     );
   if (existing) return existing;
 
+  const taxonomy = (await loadSourceRegistry(tx)).taxonomy ?? resolveTaxonomy(null);
   const [product] = await tx
     .insert(products)
     .values({
       category: 'tcg',
       kind: ref.kind,
+      itemType:
+        itemTypeOf(taxonomy, 'tcg', ref.kind) ?? productClass({ category: 'tcg', kind: ref.kind }),
       name: catalogProductName(set.name, ref.kind, variant),
       nameAlias: set.nameAlias ? catalogProductName(set.nameAlias, ref.kind, variant) : null,
       franchise: set.franchise,
@@ -236,10 +261,10 @@ async function resolveProduct(tx: Tx, userId: string, ref: ProductRef): Promise<
     if (!product) throw new DomainError('not_found');
     return product;
   }
-  assertProductInput(ref.product);
+  const input = await checkedProduct(tx, ref.product);
   const [product] = await tx
     .insert(products)
-    .values({ ...ref.product, createdBy: userId })
+    .values({ ...input, createdBy: userId })
     .returning();
   return product!;
 }
@@ -320,6 +345,7 @@ async function insertHolding(
       rawGrade: holding!.rawGrade,
       grader: holding!.grader,
       grade: holding!.grade,
+      conditionValue: holding!.conditionValue,
     },
   });
   return holding!;
@@ -329,10 +355,10 @@ async function insertHolding(
 // products
 
 export async function createProduct(db: Db, userId: string, input: ProductInput): Promise<Product> {
-  assertProductInput(input);
+  const checked = await checkedProduct(db, input);
   const [product] = await db
     .insert(products)
-    .values({ ...input, createdBy: userId })
+    .values({ ...checked, createdBy: userId })
     .returning();
   return product!;
 }
@@ -344,14 +370,14 @@ export async function updateProduct(
   id: string,
   input: ProductInput,
 ): Promise<Product> {
-  assertProductInput(input);
+  const checked = await checkedProduct(db, input);
   return db.transaction(async (tx) => {
     const [current] = await tx.select().from(products).where(eq(products.id, id));
     if (!current) throw new DomainError('not_found');
     if (actor.role !== 'admin' && current.createdBy !== actor.id) {
       throw new DomainError('forbidden');
     }
-    const [product] = await tx.update(products).set(input).where(eq(products.id, id)).returning();
+    const [product] = await tx.update(products).set(checked).where(eq(products.id, id)).returning();
     // Kind, retail price and the like change what the item is worth.
     await clearBucketValues(tx, [id]);
     return product!;
@@ -826,16 +852,18 @@ export async function changeCondition(
     condition?: Condition | null;
     rawGrade?: RawGrade | null;
     packagingState?: PackagingState | null;
+    conditionValue?: string | null;
     occurredAt: string;
   },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    const patch: Partial<Pick<Holding, 'condition' | 'rawGrade' | 'packagingState' | 'grading'>> =
-      {};
+    const patch: Partial<
+      Pick<Holding, 'condition' | 'rawGrade' | 'packagingState' | 'grading' | 'conditionValue'>
+    > = {};
     const before: Record<string, unknown> = {};
-    for (const key of ['condition', 'rawGrade', 'packagingState'] as const) {
+    for (const key of ['condition', 'rawGrade', 'packagingState', 'conditionValue'] as const) {
       const value = input[key];
       if (value === undefined || value === holding[key]) continue;
       Object.assign(patch, { [key]: value });

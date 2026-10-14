@@ -5,7 +5,11 @@ import {
   NOTICE_TYPES,
   type NoticeLevel,
   type NoticeLevels,
-  ITEM_CLASSES,
+  typesOf,
+  type Taxonomy,
+  resolveTaxonomy,
+  categoryOfType,
+  collects,
   type ProductClass,
   type RateSetting,
   ROTATE_SECONDS,
@@ -28,6 +32,9 @@ import {
   changeBaseCurrency,
   setMarketSettings,
   setLanguageSettings,
+  categoryUsage,
+  saveTaxonomy,
+  taxonomyChange,
   setSourceOrder,
   setSourceRoles,
 } from '@tora/db';
@@ -104,7 +111,7 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   const { db, user } = await authed();
   if (user.role !== 'admin' || !(SOURCE_ROLES as readonly string[]).includes(role)) return;
   const registry = await loadSourceRegistry(db);
-  if (!registry.sources.some((s) => s.key === key)) return;
+  if (!registry.sources.some((s) => s.key === key) || !typesOf(registry).includes(cls)) return;
   await setSourceRoles(db, key, { ...(registry.declared ?? registry.roles)[key], [cls]: role });
   await clearAllBucketValues(db);
   // The value-over-time history follows too (about 10 s), right after answering.
@@ -124,16 +131,18 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
 export async function moveSourceAction(key: string, cls: ProductClass, step: -1 | 1) {
   const { db, user } = await authed();
   if (user.role !== 'admin' || (step !== -1 && step !== 1)) return;
-  if (!(ITEM_CLASSES as readonly string[]).includes(cls)) return;
   const registry = await loadSourceRegistry(db);
+  if (!typesOf(registry).includes(cls)) return;
   const roles = registry.declared ?? registry.roles;
   const me = registry.sources.find((s) => s.key === key);
   if (!me) return;
   const all = inClassOrder(registry, cls, registry.sources);
   // The same list Settings shows: this market's priced sources with the same role.
   const role = (k: string) => roles[k]?.[cls] ?? 'off';
+  const category = categoryOfType(cls);
   const group = all.filter(
-    (s) => s.market === me.market && !s.shopOnly && role(s.key) === role(key),
+    (s) =>
+      s.market === me.market && !s.shopOnly && collects(s, category) && role(s.key) === role(key),
   );
   const other = group[group.findIndex((s) => s.key === key) + step];
   if (!other) return;
@@ -174,6 +183,45 @@ export async function setMarketsAction(primary: string, secondary: string | null
   revalidatePath('/', 'layout');
 }
 
+export interface CategoriesState {
+  /** Problems that stop the save (codes). */
+  blocked?: string[];
+  /** Registered items the change touches, asked about before saving. */
+  touched?: { code: string; name: string; count: number }[];
+  /** What was saved (new entries got keys from their names). */
+  saved?: Taxonomy;
+}
+
+/**
+ * The admin's categories and condition lists (S16). A change that touches registered items
+ * returns them first; saved with `confirmed`, the values are rebuilt after answering.
+ */
+export async function saveCategoriesAction(
+  next: Taxonomy,
+  confirmed: boolean,
+): Promise<CategoriesState> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return {};
+  const taxonomy: Taxonomy = {
+    categories: Array.isArray(next?.categories) ? next.categories : [],
+    lists: Array.isArray(next?.lists) ? next.lists.filter((l) => !l.builtIn) : [],
+  };
+  const full = resolveTaxonomy(taxonomy);
+  const prev = (await loadSourceRegistry(db)).taxonomy!;
+  const check = taxonomyChange(prev, full, await categoryUsage(db));
+  if (check.blocked.length) return { blocked: check.blocked };
+  const change = await saveTaxonomy(db, full, confirmed);
+  if (change.touched.length && !confirmed) return { touched: change.touched };
+  await clearAllBucketValues(db);
+  after(async () => {
+    await runSnapshots(db);
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+  return { saved: full };
+}
+
 /** The app's primary and secondary language (admins, S16), from the installed ones. */
 export async function setLanguagesAction(primary: string, secondary: string | null) {
   const { db, user } = await authed();
@@ -190,7 +238,7 @@ export async function setIdentitySourceAction(
   key: string | null,
 ) {
   const { db, user } = await authed();
-  if (user.role !== 'admin' || !(ITEM_CLASSES as readonly string[]).includes(cls)) return;
+  if (user.role !== 'admin' || !typesOf(await loadSourceRegistry(db)).includes(cls)) return;
   const registry = await loadSourceRegistry(db);
   const markets = registry.markets;
   if (!markets || (key !== null && !identityChoices(registry, market).includes(key))) return;

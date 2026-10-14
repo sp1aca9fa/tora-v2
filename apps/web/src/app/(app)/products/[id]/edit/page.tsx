@@ -1,3 +1,4 @@
+import { categoryDef } from '@tora/core';
 import { canEditProduct, getProduct } from '@tora/db';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -5,6 +6,7 @@ import { editProductAction } from '@/app/(app)/holdings/[id]/actions';
 import { ActionForm } from '@/components/action-form';
 import { authed } from '@/lib/auth/guard';
 import { franchiseLabel } from '@/lib/product-display';
+import { getTaxonomy } from '@/lib/taxonomy';
 import { EditProductFields } from './edit-fields';
 
 export default async function EditProductPage({
@@ -20,9 +22,10 @@ export default async function EditProductPage({
   const product = await getProduct(db, id);
   // Products are shared: only the creator (or an admin) may edit one.
   if (!product || !canEditProduct(user, product)) notFound();
-  const t = await getTranslations();
+  const [t, taxonomy] = await Promise.all([getTranslations(), getTaxonomy()]);
   const back = from?.startsWith('/holdings/') || from?.startsWith('/products/') ? from : '/';
-  const isTcg = product.category === 'tcg';
+  // TCG keeps the franchise picked with chips (the set catalog); others type it.
+  const isTcg = !!categoryDef(taxonomy, product.category)?.setCatalog;
 
   return (
     <div className="space-y-5">

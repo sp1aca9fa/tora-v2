@@ -1,8 +1,11 @@
 // Product taxonomy: category -> kind, franchise, region (requirements section 5, products).
+// Categories are the admin's (S16, see categories.ts); these are the built-in templates' keys.
 import { hasJapanese } from './text';
 
+/** The built-in categories (others are the admin's, see categories.ts). */
 export const CATEGORIES = ['tcg', 'game'] as const;
-export type Category = (typeof CATEGORIES)[number];
+/** A category's key (built-in or the admin's). */
+export type Category = string;
 
 export const TCG_KINDS = [
   'single',
@@ -37,11 +40,8 @@ export const PRODUCT_KINDS = [
   'console',
   'other',
 ] as const;
-export type ProductKind = (typeof PRODUCT_KINDS)[number];
-
-export function kindsFor(category: Category): readonly ProductKind[] {
-  return category === 'tcg' ? TCG_KINDS : GAME_KINDS;
-}
+/** A kind's key (built-in or the admin's). */
+export type ProductKind = string;
 
 /** TCG franchises with a pre-registered set catalog. Others are free text. */
 export const TCG_FRANCHISES = ['pokemon', 'one_piece', 'yugioh', 'mtg'] as const;
@@ -64,27 +64,27 @@ export const REGIONS = [
 ] as const;
 export type Region = (typeof REGIONS)[number];
 
-export function regionsFor(category: Category): readonly Region[] {
-  return category === 'tcg' ? TCG_REGIONS : GAME_REGIONS;
-}
-
 export const SET_TYPES = ['expansion', 'deck', 'special'] as const;
 export type SetType = (typeof SET_TYPES)[number];
 
-/** How a product is valued and what condition fields it has. */
-export type ProductClass = 'card' | 'sealed' | 'item';
+/**
+ * An item type (S16): a category's kinds sharing a condition list, with their own roles, source
+ * order and identity pages. Built-in: `card` (TCG singles), `sealed`, `item` (TCG other), `game`.
+ */
+export type ProductClass = string;
 
-export const SEALED_KINDS: readonly ProductKind[] = [
-  'booster_box',
-  'booster_pack',
-  'deck',
-  'special_set',
-];
+export const SEALED_KINDS = ['booster_box', 'booster_pack', 'deck', 'special_set'] as const;
 
-export function productClass(product: { category: Category; kind: ProductKind }): ProductClass {
-  if (product.category !== 'tcg') return 'item';
+/** An item's type: saved on the item (S16), else worked out from the built-in templates. */
+export function productClass(product: {
+  category: Category;
+  kind: ProductKind;
+  itemType?: string | null;
+}): ProductClass {
+  if (product.itemType) return product.itemType;
+  if (product.category === 'game') return 'game';
   if (product.kind === 'single') return 'card';
-  return SEALED_KINDS.includes(product.kind) ? 'sealed' : 'item';
+  return (SEALED_KINDS as readonly string[]).includes(product.kind) ? 'sealed' : 'item';
 }
 
 /** Sealed kinds that make sense for a catalog set of this type. */
@@ -127,30 +127,6 @@ export type ProductField =
   | 'rarity'
   | 'releaseDate'
   | 'retailPriceBase';
-
-/** Optional product fields shown for a category + kind (name and region are always shown). */
-export function productFieldsFor(category: Category, kind: ProductKind): readonly ProductField[] {
-  if (category === 'game') return ['franchise', 'platform', 'releaseDate', 'retailPriceBase'];
-  switch (productClass({ category, kind })) {
-    case 'card':
-      return ['setName', 'setCode', 'cardNumber', 'rarity'];
-    case 'sealed':
-      return ['setName', 'setCode', 'variant', 'releaseDate', 'retailPriceBase'];
-    default:
-      return ['releaseDate', 'retailPriceBase'];
-  }
-}
-
-/** Which condition dimensions a holding of this product records. */
-export function holdingFieldsFor(cls: ProductClass): {
-  condition: boolean;
-  packaging: boolean;
-  grading: boolean;
-} {
-  if (cls === 'card') return { condition: false, packaging: false, grading: true };
-  if (cls === 'sealed') return { condition: false, packaging: true, grading: false };
-  return { condition: true, packaging: true, grading: false };
-}
 
 export const PLATFORM_SUGGESTIONS = [
   'Nintendo Switch 2',

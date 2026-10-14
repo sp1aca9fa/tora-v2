@@ -1,4 +1,4 @@
-import { ITEM_CLASSES, type ProductClass, inClassOrder } from '@tora/core';
+import { inClassOrder, typesOf } from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +24,11 @@ export default async function SourceSettingsPage() {
   ]);
   const labels = Object.fromEntries(registry.sources.map((s) => [s.key, s.label]));
   const order = Object.fromEntries(
-    ITEM_CLASSES.map((c) => [c, inClassOrder(registry, c, registry.sources).map((s) => s.key)]),
-  ) as Record<ProductClass, string[]>;
+    typesOf(registry).map((c) => [
+      c,
+      inClassOrder(registry, c, registry.sources).map((s) => s.key),
+    ]),
+  );
   const { primary = null, secondary = null } = registry.markets ?? {};
   const tabs = [
     ...(primary ? [{ key: 'primary', market: primary }] : []),

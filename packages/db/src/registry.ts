@@ -2,8 +2,11 @@
 // by the collectors, read by the app.
 import {
   type LanguageSettings,
+  type Taxonomy,
+  resolveTaxonomy,
   type CurrencySettings,
   ITEM_CLASSES,
+  typesOf,
   type RateSourceInfo,
   type MarketSettings,
   type ProductClass,
@@ -64,7 +67,16 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     db
       .select()
       .from(appSettings)
-      .where(inArray(appSettings.key, ['markets', 'sourceOrder', 'currency', 'rateSources', 'languages'])),
+      .where(
+        inArray(appSettings.key, [
+          'markets',
+          'sourceOrder',
+          'currency',
+          'rateSources',
+          'languages',
+          'categories',
+        ]),
+      ),
   ]);
   const markets = settings.find((r) => r.key === 'markets');
   const order = settings.find((r) => r.key === 'sourceOrder');
@@ -89,11 +101,13 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     // Rates only change how prices collected next are converted: saved values stay valid.
     changedAt: [
       ...rows,
-      ...settings.filter((r) => r.key === 'markets' || r.key === 'sourceOrder'),
+      // A kind moved to another condition list changes how its items are valued.
+      ...settings.filter((r) => ['markets', 'sourceOrder', 'categories'].includes(r.key)),
     ].reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), ''),
     currency: resolveCurrency(setting('currency') as Partial<CurrencySettings> | undefined),
     rateSources: (setting('rateSources') as RateSourceInfo[] | undefined) ?? [],
     languages: (setting('languages') as Partial<LanguageSettings> | undefined) ?? null,
+    taxonomy: resolveTaxonomy(setting('categories') as Partial<Taxonomy> | undefined),
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;
@@ -132,6 +146,14 @@ async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
 /** The base currency and where each currency's rate comes from (S16). */
 export async function setCurrencySettings(db: Db, value: CurrencySettings): Promise<void> {
   await saveSetting(db, 'currency', value);
+}
+
+/** The admin's categories and condition lists (S16). */
+export async function setTaxonomy(db: Db, value: Taxonomy): Promise<void> {
+  await saveSetting(db, 'categories', {
+    categories: value.categories,
+    lists: value.lists.filter((l) => !l.builtIn),
+  });
 }
 
 /** The app's primary and secondary language (S16, admins). */
@@ -173,6 +195,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
     .select({
       productId: priceObservations.productId,
       category: products.category,
+      itemType: products.itemType,
       kind: products.kind,
       source: priceObservations.source,
       bucket: priceObservations.bucket,
@@ -200,7 +223,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
   const changed: string[] = [];
   for (const row of rows) {
     const next: Partial<Record<ProductClass, SourceQuality>> = {};
-    for (const cls of ITEM_CLASSES) {
+    for (const cls of typesOf(registry)) {
       if (declared[row.key]?.[cls] !== 'supporting') continue;
       // In the class's order: with two references, the first one is compared against.
       const reference =

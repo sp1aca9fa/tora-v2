@@ -243,10 +243,11 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 - `key`, `label`, `badge`: how it is stored and shown;
 - `market`, `currency`, `priceKinds`: where its prices are from and what they are (sales, asking
   prices, buy-back prices);
-- `roles` (per item class) and `priority`: its suggested role in its market, and its default order
-  among sources of the same role (an admin can reorder them per kind of item in Settings > Admin
+- `categories`: the categories it collects, by key (none: the built-in `tcg` and `game`);
+- `roles` (per item type) and `priority`: its suggested role in its market, and its default order
+  among sources of the same role (an admin can reorder them per item type in Settings > Admin
   preferences > Price sources);
-- `identity`: the item classes it has one stable product page per item for (it can be an item's
+- `identity`: the item types it has one stable product page per item for (it can be an item's
   identity page);
 - `links`: the shape of its product links (pasting one on an item links that listing);
 - `aliases`, `singleItemOrders`, `orderIds`: how purchases from it are recognised in imports (its
@@ -258,14 +259,24 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 The collectors save these descriptions to the database on each run; the app reads them there (it
 cannot load private plug-ins). Nothing in the app names a store.
 
+**Categories.** The admin defines the categories in Settings > Admin preferences > Categories:
+kinds, fields and a condition list per kind; TCG and games are built-in templates. An item type is
+a category's kinds sharing a condition list: `card` (TCG singles), `sealed`, `item` (other TCG
+items) and `game` for the templates, `{category}/{list}` for the admin's (e.g. `watch/watch_condition`).
+Roles and identity pages are declared per item type. A collector's `supports(product)` picks the
+items it handles (`product.category`, `product.kind`, `product.itemType`, and custom fields in
+`product.fields`). Prices go in buckets: the ready-made lists' (`raw:A`, `graded:PSA:10`,
+`sealed:shrink`, `cond:new`) or `{list}:{value}` for the admin's lists (e.g.
+`watch_condition:unworn`); the keys show in the Categories settings.
+
 **Currencies.** A plug-in reports every amount in its own currency, in the currency's smallest unit
 (yen, cents): prices as `price` with `currency`, candidates' and recent sales' `price`, receipts'
 `total`. It never converts. The collect converts each amount to the base currency with the
 exchange rate of its day and keeps the rate used. A package may also export `rates`: exchange-rate
 plug-ins (`key`, `label`, the `currencies` they cover, a `rates` function for a pair and a date
 range); `collectors-public` has one for the European Central Bank's rates. The admin sets the base
-currency, where each currency's rate comes from (a rate plug-in or a typed rate) and adds
-currencies in Settings > Admin preferences > Markets > Currencies. Prices in a currency without a
+currency and where each other currency's rate comes from (a rate plug-in or a typed rate) in
+Settings > Admin preferences > Markets > Currencies. Prices in a currency without a
 rate are not saved until it has one.
 
 **Your sources, your responsibility.** The app checks what it can (sales against the reference,

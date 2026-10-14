@@ -3,6 +3,9 @@ import {
   GRADERS,
   PACKAGING_STATES,
   RAW_GRADES,
+  conditionList,
+  conditionListOf,
+  pickName,
   productClass,
   holdingFieldsFor,
   openedStatesFor,
@@ -11,7 +14,7 @@ import {
 } from '@tora/core';
 import { getHoldingDetail } from '@tora/db';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { ActionForm } from '@/components/action-form';
 import { Field } from '@/components/field';
 import { Input } from '@/components/ui/input';
@@ -32,6 +35,7 @@ import {
   splitAction,
 } from '../actions';
 import { getMoney } from '@/lib/money-server';
+import { getTaxonomy } from '@/lib/taxonomy';
 
 const ACTIONS = {
   edit: editAction,
@@ -59,7 +63,12 @@ export default async function HoldingActionPage({
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events } = detail;
-  const [t, money] = await Promise.all([getTranslations(), getMoney()]);
+  const [t, money, taxonomy, locale] = await Promise.all([
+    getTranslations(),
+    getMoney(),
+    getTaxonomy(),
+    getLocale(),
+  ]);
   // Where it may be sold: the shops and sources the plug-ins describe, and a card shop.
   const PLATFORMS = [
     t('holding.cardShop'),
@@ -68,6 +77,8 @@ export default async function HoldingActionPage({
   const today = tokyoDate();
   const cls = productClass(product);
   const fields = holdingFieldsFor(cls);
+  // The admin's own condition list for this kind (S16), if it has one.
+  const own = fields.value ? conditionList(taxonomy, fields.value) : undefined;
   const back = `/holdings/${id}`;
 
   const dateField = (
@@ -325,6 +336,24 @@ export default async function HoldingActionPage({
         <>
           {quantityField()}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {own && (
+              <Field
+                label={pickName(own.names, locale, t('fields.condition'))}
+                htmlFor="conditionValue"
+              >
+                <NativeSelect
+                  id="conditionValue"
+                  name="conditionValue"
+                  defaultValue={holding.conditionValue ?? own.values[0]?.key}
+                >
+                  {own.values.map((v) => (
+                    <option key={v.key} value={v.key}>
+                      {pickName(v.names, locale, v.key)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
             {fields.grading && holding.grading !== 'graded' && (
               <Field label={t('fields.rawGrade')} htmlFor="rawGrade">
                 <NativeSelect id="rawGrade" name="rawGrade" defaultValue={holding.rawGrade ?? 'A'}>
@@ -360,7 +389,9 @@ export default async function HoldingActionPage({
                 >
                   <option value="">{t('common.notSet')}</option>
                   {PACKAGING_STATES.filter(
-                    (p) => p !== 'n/a' && (cls === 'sealed' || p !== 'box_opened_contents_sealed'),
+                    (p) =>
+                      p !== 'n/a' &&
+                      (conditionListOf(cls) === 'sealed' || p !== 'box_opened_contents_sealed'),
                   ).map((p) => (
                     <option key={p} value={p}>
                       {t(`packaging.${p}`)}

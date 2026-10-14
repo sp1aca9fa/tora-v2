@@ -9,10 +9,8 @@ import {
   GRADINGS,
   HOLDING_EVENT_TYPES,
   HOLDING_STATUSES,
-  CATEGORIES,
   OBSERVATION_TYPES,
   PACKAGING_STATES,
-  PRODUCT_KINDS,
   RAW_GRADES,
   REGIONS,
   SET_TYPES,
@@ -148,8 +146,11 @@ export const products = sqliteTable(
   'products',
   {
     id: id(),
-    category: text('category', { enum: CATEGORIES }).notNull(),
-    kind: text('kind', { enum: PRODUCT_KINDS }).notNull(),
+    /** The admin's categories and kinds (S16; built-in: `tcg`, `game` and their kinds). */
+    category: text('category').notNull(),
+    kind: text('kind').notNull(),
+    /** Its item type (S16, see `itemTypeOf`): roles, source order and condition fields. */
+    itemType: text('item_type'),
     name: text('name').notNull(),
     nameAlias: text('name_alias'),
     franchise: text('franchise'),
@@ -165,13 +166,13 @@ export const products = sqliteTable(
     retailPriceBase: integer('retail_price_base'),
     imageUrl: text('image_url'),
     notes: text('notes'),
+    /** Values of the category's custom fields (S16), by field key. */
+    fields: text('fields', { mode: 'json' }).$type<Record<string, string | number | boolean>>(),
     /** Null for products generated from the catalog. */
     createdBy: text('created_by').references(() => users.id),
     ...timestamps,
   },
   (t) => [
-    check('products_category_check', oneOf(t.category, CATEGORIES)),
-    check('products_kind_check', oneOf(t.kind, PRODUCT_KINDS)),
     check('products_region_check', oneOf(t.region, REGIONS)),
     check('products_name_check', sql`length(trim(${t.name})) > 0`),
     index('products_kind_idx').on(t.category, t.kind),
@@ -281,6 +282,8 @@ export const holdings = sqliteTable(
     rawGrade: text('raw_grade', { enum: RAW_GRADES }),
     grader: text('grader', { enum: GRADERS }),
     grade: text('grade'),
+    /** A value of the admin's condition list for the item's kind (S16). */
+    conditionValue: text('condition_value'),
     certNumber: text('cert_number'),
     status: text('status', { enum: HOLDING_STATUSES }).notNull().default('owned'),
     notes: text('notes'),

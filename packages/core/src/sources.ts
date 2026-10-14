@@ -2,6 +2,7 @@
 // price sources and the shops purchases come from; collectors save these descriptions to the
 // database and the app reads them there. Nothing here names a store: the descriptions do.
 import type { CurrencySettings, RateSourceInfo } from './money';
+import { type Taxonomy, itemTypes, resolveTaxonomy } from './categories';
 import type { LanguageSettings } from './names';
 import type { ProductClass } from './taxonomy';
 
@@ -12,7 +13,16 @@ import type { ProductClass } from './taxonomy';
  */
 export const SOURCE_ROLES = ['reference', 'supporting', 'comparison', 'off'] as const;
 export type SourceRole = (typeof SOURCE_ROLES)[number];
-export const ITEM_CLASSES: readonly ProductClass[] = ['card', 'sealed', 'item'];
+/** Every item type of the admin's categories (S16), in their order. */
+export const typesOf = (registry: Pick<SourceRegistry, 'taxonomy'>) =>
+  itemTypes(registry.taxonomy ?? resolveTaxonomy(null)).map((t) => t.key);
+
+/** Whether a source collects a category (none declared: the built-in TCG and games). */
+export const collects = (source: Pick<SourceInfo, 'categories'>, category: string) =>
+  (source.categories ?? ['tcg', 'game']).includes(category);
+
+/** The built-in templates' item types (the registry's taxonomy lists every one, see `itemTypes`). */
+export const ITEM_CLASSES: readonly ProductClass[] = ['card', 'sealed', 'item', 'game'];
 
 export interface SourceInfo {
   /** Stored with its data (e.g. on every sale); never changes. */
@@ -27,8 +37,13 @@ export interface SourceInfo {
   currency?: string;
   /** What its prices are: sales, asking prices, buy prices. */
   priceKinds?: ('sold' | 'listing' | 'buylist')[];
-  /** Suggested role per item class; classes not listed are off. */
+  /** Suggested role per item type (`card`, `game`, `watch/dial`...); types not listed are off. */
   roles?: Partial<Record<ProductClass, SourceRole>>;
+  /**
+   * Categories it collects (S16, by key); none: the built-in TCG and games. Price sources lists it
+   * under those categories' item types only.
+   */
+  categories?: string[];
   /** Order among sources of the same role (lower first). */
   priority?: number;
   /**
@@ -155,6 +170,8 @@ export interface SourceRegistry {
   rateSources?: RateSourceInfo[];
   /** The admin's languages as saved (app_settings `languages`; checked against the installed ones by the app). */
   languages?: Partial<LanguageSettings> | null;
+  /** The admin's categories and condition lists (S16; default: the built-in TCG and games). */
+  taxonomy?: Taxonomy;
 }
 
 /**

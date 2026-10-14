@@ -1,4 +1,11 @@
-import { TCG_FRANCHISES, productClass } from '@tora/core';
+import {
+  TCG_FRANCHISES,
+  type Taxonomy,
+  conditionListOf,
+  fieldsFor,
+  pickName,
+  productClass,
+} from '@tora/core';
 import type { Holding, Product } from '@tora/db';
 
 type T = (key: string) => string;
@@ -38,8 +45,8 @@ export function lotConditionLabel(
   holding: Pick<
     Holding,
     'grading' | 'grader' | 'grade' | 'rawGrade' | 'packagingState' | 'condition'
-  >,
-  product: Pick<Product, 'category' | 'kind'>,
+  > & { conditionValue?: string | null },
+  product: Pick<Product, 'category' | 'kind'> & { itemType?: string | null },
   t: T,
 ): string | null {
   const cls = productClass(product);
@@ -51,5 +58,31 @@ export function lotConditionLabel(
   }
   if (cls === 'sealed')
     return holding.packagingState ? t(`packaging.${holding.packagingState}`) : null;
+  // The admin's own condition list (S16): its value's name (see taxonomy-messages).
+  const list = conditionListOf(cls);
+  if (!['card_grades', 'sealed', 'item_condition'].includes(list)) {
+    return holding.conditionValue ? t(`conditionValue.${list}.${holding.conditionValue}`) : null;
+  }
   return holding.condition ? t(`condition.${holding.condition}`) : null;
+}
+
+/** The item's custom fields with a value, shown on its page (S16; not those the admin hides). */
+export function customFieldLines(
+  product: Pick<Product, 'category' | 'kind' | 'fields'>,
+  taxonomy: Taxonomy,
+  locale: string,
+  t: T,
+): { key: string; label: string; value: string }[] {
+  return fieldsFor(taxonomy, product.category, product.kind)
+    .filter((f) => !f.standard && !f.hidden && product.fields?.[f.key] !== undefined)
+    .map((f) => {
+      const v = product.fields![f.key]!;
+      const value =
+        typeof v === 'boolean'
+          ? t(v ? 'common.yes' : 'common.no')
+          : f.type === 'choice'
+            ? pickName(f.choices?.find((c) => c.key === v)?.names, locale, String(v))
+            : String(v);
+      return { key: f.key, label: pickName(f.names, locale, f.key), value };
+    });
 }

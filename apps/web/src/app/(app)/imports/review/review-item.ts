@@ -1,10 +1,11 @@
-import { productClass } from '@tora/core';
+import { conditionListOf, productClass } from '@tora/core';
 import type { Holding, Product } from '@tora/db';
 
 export interface ReviewItem {
   id: string;
   productId: string;
   importRunId: string | null;
+  /** Which review controls it gets: by its condition list (card grades, sealed, the rest). */
   cls: 'card' | 'sealed' | 'item';
   name: string;
   details: string;
@@ -29,7 +30,10 @@ export function reviewItemOf(holding: Holding, product: Product): ReviewItem {
     id: holding.id,
     productId: product.id,
     importRunId: holding.importRunId,
-    cls: productClass(product),
+    cls:
+      ({ card_grades: 'card', sealed: 'sealed' } as Record<string, ReviewItem['cls']>)[
+        conditionListOf(productClass(product))
+      ] ?? 'item',
     name: product.name,
     details: [product.rarity, product.setCode, product.cardNumber].filter(Boolean).join(' '),
     acquiredAt: holding.acquiredAt.slice(0, 10),
