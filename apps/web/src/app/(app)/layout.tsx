@@ -1,8 +1,10 @@
 import { actionTotal } from '@tora/db';
+import { MoneyProvider } from '@/components/money-context';
 import { Nav } from '@/components/nav';
 import { PageWidth } from '@/components/page-width';
 import { SourcesProvider } from '@/components/sources-context';
 import { userActions } from '@/lib/actions';
+import { getMoneySettings } from '@/lib/money-server';
 import { getRegistry } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 
@@ -28,10 +30,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   return (
     <SourcesProvider value={sources}>
-      <Nav badges={badges} />
-      <div className="md:pl-16 xl:pl-56">
-        <PageWidth>{children}</PageWidth>
-      </div>
+      <MoneyProvider value={await getMoneySettings()}>
+        <Nav badges={badges} />
+        <div className="md:pl-16 xl:pl-56">
+          <PageWidth>{children}</PageWidth>
+        </div>
+      </MoneyProvider>
     </SourcesProvider>
   );
 }

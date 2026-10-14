@@ -2,8 +2,8 @@ import { type Valuation, productClass, valuationOrder } from '@tora/core';
 import { type ForeignPrice, type Product, foreignEstimates } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatJpy } from '@/lib/utils';
 import { getRegistry, marketLabels, sourceLabels } from '@/lib/sources';
+import { getMoney } from '@/lib/money-server';
 
 /**
  * The condition US prices are quoted in: TCGplayer prices ungraded near-mint cards and sealed
@@ -17,7 +17,7 @@ export function compareBucket(product: Product, mainBucket: string | null): stri
 
 /**
  * Primary vs secondary market (S7, S11; e.g. Japan vs US): the value next to one secondary
- * price converted to yen, the secondary market's reference source's, else a supporting one's.
+ * price converted to the base currency, the secondary market's reference source's, else a supporting one's.
  */
 export async function MarketCompare({
   bucket,
@@ -46,13 +46,13 @@ export async function MarketCompare({
     .map((key) => estimates.find((e) => e.source === key))
     .find((e) => e !== undefined);
   if (!f) return null;
-  const [t, format] = await Promise.all([getTranslations(), getFormatter()]);
+  const [t, format, money] = await Promise.all([getTranslations(), getFormatter(), getMoney()]);
   const markets = { primary: marketLabel(primary), secondary: marketLabel(secondary) };
   // A market comparison: a retail price is no market value.
   const jp =
     japan && japan.method !== 'retail' ? japan : { unitBase: null, source: null, method: 'none' };
   const spread = jp.unitBase ? Math.round(((f.priceBase - jp.unitBase) / jp.unitBase) * 100) : null;
-  const money = (n: number, currency: string) =>
+  const inCurrency = (n: number, currency: string) =>
     format.number(n, { style: 'currency', currency, maximumFractionDigits: 2 });
   return (
     <Card>
@@ -78,7 +78,7 @@ export async function MarketCompare({
               )}
             </span>
             <span className="font-medium tabular-nums">
-              {jp.unitBase === null ? t('compare.noJapan', markets) : formatJpy(jp.unitBase)}
+              {jp.unitBase === null ? t('compare.noJapan', markets) : money(jp.unitBase)}
             </span>
           </li>
           <li className="space-y-0.5 py-2">
@@ -101,7 +101,7 @@ export async function MarketCompare({
                 </span>
               </span>
               <span className="text-right tabular-nums">
-                <span className="font-medium">{formatJpy(f.priceBase)}</span>
+                <span className="font-medium">{money(f.priceBase)}</span>
                 {spread !== null && (
                   <span className="ml-2 text-xs text-muted-foreground">
                     {t('compare.spread', {
@@ -114,8 +114,8 @@ export async function MarketCompare({
             </div>
             <p className="amount text-xs text-muted-foreground">
               {t('compare.converted', {
-                price: money(f.price, f.currency),
-                rate: f.fxRate ? format.number(f.fxRate, { maximumFractionDigits: 2 }) : '-',
+                price: inCurrency(f.price, f.currency),
+                rate: f.fxRate ? inCurrency(f.fxRate, money.base) : '-',
                 currency: f.currency,
                 date: f.fxDate ?? '-',
               })}

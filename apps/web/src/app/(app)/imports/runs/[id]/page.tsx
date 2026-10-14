@@ -7,7 +7,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
+import { getMoney } from '@/lib/money-server';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('imports.hub'))('runTitle') };
@@ -15,6 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** One import run: what it did, the lots it created and the links it read. */
 export default async function ImportRunPage({ params }: { params: Promise<{ id: string }> }) {
+  const money = await getMoney();
   const sourceLabel = await sourceLabels();
   const { id } = await params;
   const { db, user } = await authed();
@@ -73,7 +74,7 @@ export default async function ImportRunPage({ params }: { params: Promise<{ id: 
                     <span className="amount block truncate text-xs text-muted-foreground">
                       {[
                         holding.acquiredAt.slice(0, 10),
-                        formatJpy(holding.costTotalBase),
+                        money(holding.costTotalBase),
                         holding.quantity > 1 && `× ${holding.quantity}`,
                         lotConditionLabel(holding, product, t),
                         holding.status !== 'owned' && t(`status.${holding.status}`),

@@ -34,13 +34,13 @@ import {
   dateText,
   optEnum,
   optText,
-  optYen,
+  optAmount,
   parseForm,
   qty,
   reqEnum,
   reqText,
   runDomain,
-  yen,
+  amount,
 } from '@/lib/form';
 import { productInputFrom, productSchema } from '@/lib/schemas';
 
@@ -55,7 +55,7 @@ async function handle<S extends z.ZodType, T>(
   to: (value: T) => string,
 ): Promise<FormState> {
   const session = await authed();
-  const parsed = parseForm(schema, formData);
+  const parsed = await parseForm(schema, formData);
   if ('state' in parsed) return parsed.state;
   const result = await runDomain(() =>
     run(parsed.data, { db: session.db, userId: session.user.id, session }),
@@ -73,7 +73,7 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
       acquiredFrom: optText,
       acquisitionType: reqEnum(ACQUISITION_TYPES),
       quantity: qty,
-      costTotalBase: yen,
+      costTotalBase: amount,
       certNumber: optText,
       orderId: optText,
       notes: optText,
@@ -121,7 +121,7 @@ export async function gradeSubmitAction(id: string, _prev: FormState, formData: 
     z.object({
       quantity: qty,
       grader: reqEnum(GRADERS),
-      feeBase: yen,
+      feeBase: amount,
       service: optText,
       date: dateText,
     }),
@@ -144,7 +144,7 @@ export async function gradeReturnAction(id: string, _prev: FormState, formData: 
       grader: reqEnum(GRADERS),
       grade: reqText,
       certNumber: optText,
-      extraFeeBase: optYen,
+      extraFeeBase: optAmount,
       date: dateText,
     }),
     (d, { db, userId }) =>
@@ -164,8 +164,8 @@ export async function sellAction(id: string, _prev: FormState, formData: FormDat
     formData,
     z.object({
       quantity: qty,
-      priceBase: yen,
-      feesBase: optYen,
+      priceBase: amount,
+      feesBase: optAmount,
       platform: optText,
       date: dateText,
     }),
@@ -233,7 +233,7 @@ export async function editProductAction(
   _prev: FormState,
   formData: FormData,
 ) {
-  const parsed = parseForm(productSchema, formData);
+  const parsed = await parseForm(productSchema, formData);
   if ('state' in parsed) return parsed.state;
   const input = productInputFrom(parsed.data);
   if (!input) return { error: 'check', fields: ['name'] };
@@ -254,7 +254,7 @@ export async function addPullAction(
   formData: FormData,
 ): Promise<PullState> {
   const { db, user } = await authed();
-  const parsed = parseForm(
+  const parsed = await parseForm(
     z.object({
       productId: optText,
       name: optText,

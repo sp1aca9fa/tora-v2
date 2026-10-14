@@ -8,9 +8,10 @@ import { Suspense } from 'react';
 import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
-import { cn, formatJpy } from '@/lib/utils';
-import { PortfolioHeader, signedBase } from './_portfolio/header';
+import { cn } from '@/lib/utils';
+import { PortfolioHeader, signedAmount } from './_portfolio/header';
 import { Insights } from './_portfolio/insights';
+import { getMoney } from '@/lib/money-server';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
@@ -20,6 +21,7 @@ const card = 'rounded-xl border bg-card px-4 py-3';
 
 /** Portfolio, Summary tab (requirements S8): how the collection is doing, at a glance. */
 export default async function SummaryPage() {
+  const money = await getMoney();
   const { db, user } = await authed();
   const [portfolio, actions, t] = await Promise.all([
     portfolioValuation(db, user.id),
@@ -78,14 +80,14 @@ export default async function SummaryPage() {
                 <p className="font-medium">{t(`category.${c}`)}</p>
                 <p className="amount text-xs text-muted-foreground">
                   {t('portfolio.units', { count: s.units })} ·{' '}
-                  {t('portfolio.spentShort', { amount: formatJpy(s.costBase) })}
+                  {t('portfolio.spentShort', { amount: money(s.costBase) })}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold tabular-nums">{formatJpy(s.valueBase)}</p>
+                <p className="text-lg font-semibold tabular-nums">{money(s.valueBase)}</p>
                 {s.valuedCostBase > 0 && (
                   <p className="text-xs tabular-nums">
-                    {signedBase(pl)}{' '}
+                    {signedAmount(money, pl)}{' '}
                     <span className="text-muted-foreground">
                       ({Math.round((pl / s.valuedCostBase) * 1000) / 10}%)
                     </span>
@@ -121,9 +123,9 @@ export default async function SummaryPage() {
                           <span className="text-muted-foreground">× {b.count}</span>
                         </span>
                         <span className="tabular-nums">
-                          {formatJpy(b.valueBase)}{' '}
+                          {money(b.valueBase)}{' '}
                           <span className="text-xs text-muted-foreground">
-                            / {formatJpy(b.costBase)}
+                            / {money(b.costBase)}
                           </span>
                         </span>
                       </div>

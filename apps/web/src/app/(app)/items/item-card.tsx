@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { ProductImage } from '@/components/product-image';
 import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
-import { signedBase } from '../_portfolio/header';
+import { signedAmount } from '../_portfolio/header';
+import { getMoney } from '@/lib/money-server';
 
 /**
  * One item of the portfolio (requirements S8): a row on phones (bigger picture, the name on up to
@@ -22,6 +22,7 @@ export async function ItemCard({
   mode?: TrackingMode;
   version: string | undefined;
 }) {
+  const money = await getMoney();
   const t = await getTranslations();
   const { product } = s;
   const details = [
@@ -65,12 +66,12 @@ export async function ItemCard({
             <p className="text-xs text-muted-foreground">{t('tracking.short.untracked')}</p>
           ) : mode === 'cost_only' ? (
             <>
-              <p className="tabular-nums">{formatJpy(s.spentBase)}</p>
+              <p className="tabular-nums">{money(s.spentBase)}</p>
               <p className="text-xs text-muted-foreground">{t('tracking.short.cost_only')}</p>
             </>
           ) : s.valuedLots > 0 ? (
             <>
-              <p className="font-medium tabular-nums">{formatJpy(s.valueBase)}</p>
+              <p className="font-medium tabular-nums">{money(s.valueBase)}</p>
               <div className="md:text-right">
                 {mode === 'value_only' ? (
                   <p className="text-xs text-muted-foreground">{t('tracking.short.value_only')}</p>
@@ -78,7 +79,7 @@ export async function ItemCard({
                   <>
                     {pl !== null && (
                       <p className="text-xs tabular-nums">
-                        {signedBase(pl)}
+                        {signedAmount(money, pl)}
                         {s.valuedCostBase > 0 && (
                           <span className="text-muted-foreground">
                             {' '}
@@ -90,7 +91,7 @@ export async function ItemCard({
                     <p className="text-xs text-muted-foreground tabular-nums">
                       {s.valuedLots < s.lots.length
                         ? t('portfolio.lotsValued', { valued: s.valuedLots, total: s.lots.length })
-                        : t('portfolio.spentShort', { amount: formatJpy(s.spentBase) })}
+                        : t('portfolio.spentShort', { amount: money(s.spentBase) })}
                     </p>
                   </>
                 )}
@@ -98,7 +99,7 @@ export async function ItemCard({
             </>
           ) : (
             <>
-              <p className="tabular-nums">{formatJpy(s.spentBase)}</p>
+              <p className="tabular-nums">{money(s.spentBase)}</p>
               <p className="text-xs text-muted-foreground">
                 {statuses.length === 1 && statuses[0] !== 'owned'
                   ? t(`status.${statuses[0]}`)

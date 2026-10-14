@@ -7,6 +7,7 @@ import {
   type NoticeLevels,
   ITEM_CLASSES,
   type ProductClass,
+  type RateSetting,
   ROTATE_SECONDS,
   inClassOrder,
   identityChoices,
@@ -23,6 +24,9 @@ import {
   loadSourceRegistry,
   setNoticeLevels,
   setPreferences,
+  setRateSetting,
+  setExtraCurrency,
+  changeBaseCurrency,
   setMarketSettings,
   setSourceOrder,
   setSourceRoles,
@@ -32,6 +36,7 @@ import { after } from 'next/server';
 import { cookies } from 'next/headers';
 import { AMOUNTS_COOKIE } from '@/lib/amounts';
 import { authed } from '@/lib/auth/guard';
+import { type FormState, runDomain } from '@/lib/form';
 
 export type NoticeLevelsState = { saved?: boolean };
 
@@ -189,4 +194,42 @@ export async function setIdentitySourceAction(
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');
+}
+
+/** Where a currency's exchange rate comes from (admins, S16): a rate plug-in or a typed rate. */
+export async function setRateAction(code: string, setting: RateSetting | null) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !/^[A-Z]{3}$/.test(code)) return;
+  if (setting && 'manual' in setting && !(Number.isFinite(setting.manual) && setting.manual > 0)) {
+    return;
+  }
+  await setRateSetting(db, code, setting);
+  revalidatePath('/', 'layout');
+}
+
+/** Adds a currency to keep exchange rates for (admins), e.g. before making it the base. */
+export async function addCurrencyAction(code: string) {
+  const { db, user } = await authed();
+  code = code.trim().toUpperCase();
+  if (user.role !== 'admin' || !/^[A-Z]{3}$/.test(code)) return;
+  await setExtraCurrency(db, code, true);
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * Makes another currency the base (admins, S16): every stored amount is converted with the rate
+ * of its date, then the saved values are rebuilt after answering.
+ */
+export async function changeBaseAction(code: string): Promise<FormState> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !/^[A-Z]{3}$/.test(code)) return {};
+  const result = await runDomain(() => changeBaseCurrency(db, code));
+  if (!result.ok) return result.state;
+  await clearAllBucketValues(db);
+  after(async () => {
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+  return {};
 }

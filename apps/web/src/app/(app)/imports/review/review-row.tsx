@@ -4,9 +4,9 @@ import { GRADERS, RAW_GRADES } from '@tora/core';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-import { formatJpy } from '@/lib/utils';
 import type { ReviewRow } from '../actions';
 import type { ReviewItem } from './review-item';
+import { useMoney } from '@/components/money-context';
 
 export const initialRow = (item: ReviewItem): ReviewRow => ({
   id: item.id,
@@ -47,6 +47,7 @@ export function ReviewRowFields({
   /** Other lots it may be the same purchase as (none on the Actions page). */
   candidates: ReviewItem[];
 }) {
+  const money = useMoney();
   const t = useTranslations();
   return (
     <>
@@ -57,7 +58,7 @@ export function ReviewRowFields({
             item.details,
             item.acquiredAt,
             item.orderId && `#${item.orderId}`,
-            formatJpy(item.costBase),
+            money(item.costBase),
             item.quantity > 1 && `× ${item.quantity}`,
           ]
             .filter(Boolean)
@@ -115,7 +116,7 @@ export function ReviewRowFields({
             <option value="">{t('imports.sameAsNone')}</option>
             {candidates.map((o) => (
               <option key={o.id} value={o.id}>
-                {[o.name, o.acquiredAt, o.orderId && `#${o.orderId}`, formatJpy(o.costBase)]
+                {[o.name, o.acquiredAt, o.orderId && `#${o.orderId}`, money(o.costBase)]
                   .filter(Boolean)
                   .join(' · ')}
               </option>

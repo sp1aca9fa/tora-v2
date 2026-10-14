@@ -4,9 +4,9 @@ import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfidenceBadge } from '@/components/valuation-meta';
-import { formatJpy } from '@/lib/utils';
 import { ManualPriceForm } from './manual-price-form';
 import { clearManualPriceAction, setManualPriceAction } from './valuation-actions';
+import { getMoney } from '@/lib/money-server';
 
 /** Box view (requirements section 6): paid | value as received | pulls value | net. */
 export async function BoxCard({
@@ -18,23 +18,24 @@ export async function BoxCard({
   userId: string;
   holdingId: string;
 }) {
+  const money = await getMoney();
   const [t, view] = await Promise.all([getTranslations(), boxView(db, userId, holdingId)]);
   if (!view) return null;
   const cells = [
-    { label: t('box.paid'), value: formatJpy(view.paidBase) },
+    { label: t('box.paid'), value: money(view.paidBase) },
     {
       label: t('box.asReceived'),
-      value: view.asReceived.valueBase === null ? '-' : formatJpy(view.asReceived.valueBase),
+      value: view.asReceived.valueBase === null ? '-' : money(view.asReceived.valueBase),
       hint: view.receivedState ? t(`packaging.${view.receivedState}`) : null,
     },
     {
       label: t('box.pulls'),
-      value: formatJpy(view.pullsValueBase),
+      value: money(view.pullsValueBase),
       hint: t('box.pullsValued', { valued: view.pullsValued, total: view.pulls.length }),
     },
     {
       label: t('box.net'),
-      value: `${view.netBase > 0 ? '▲ +' : view.netBase < 0 ? '▼ ' : ''}${formatJpy(view.netBase)}`,
+      value: `${view.netBase > 0 ? '▲ +' : view.netBase < 0 ? '▼ ' : ''}${money(view.netBase)}`,
     },
   ];
 
@@ -117,7 +118,7 @@ export async function BoxCard({
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block tabular-nums">
-                      {valuation.valueBase === null ? '-' : formatJpy(valuation.valueBase)}
+                      {valuation.valueBase === null ? '-' : money(valuation.valueBase)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       <ConfidenceBadge confidence={valuation.confidence} />

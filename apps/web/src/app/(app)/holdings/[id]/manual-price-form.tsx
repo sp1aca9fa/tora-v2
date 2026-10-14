@@ -6,6 +6,7 @@ import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FormState } from '@/lib/form';
+import { useMoney } from '@/components/money-context';
 
 export function ManualPriceForm({
   action,
@@ -13,15 +14,16 @@ export function ManualPriceForm({
   action: (state: FormState, formData: FormData) => Promise<FormState>;
 }) {
   const t = useTranslations('valuation');
+  const money = useMoney();
   const [state, formAction, pending] = useActionState(action, {});
   return (
     <form action={formAction} className="space-y-2">
       <div className="flex gap-2">
         <Input
           name="priceBase"
-          inputMode="numeric"
+          inputMode="decimal"
           required
-          placeholder="¥"
+          placeholder={money.symbol}
           aria-label={t('manualPrice')}
           className="max-w-40"
         />

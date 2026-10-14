@@ -5,13 +5,14 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { sourceLabels } from '@/lib/sources';
-import { formatJpy } from '@/lib/utils';
+import { getMoney } from '@/lib/money-server';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.collectors.title') };
 }
 
 export default async function CollectorSettingsPage() {
+  const money = await getMoney();
   const { db } = await authed();
   const [sourceLabel, runs, health, t, format] = await Promise.all([
     sourceLabels(),
@@ -81,7 +82,7 @@ export default async function CollectorSettingsPage() {
                       {h.jumps.map((j) => (
                         <li key={`${j.product.id}-${j.bucket}`}>
                           {j.product.name} <code>{j.bucket ?? '-'}</code>:{' '}
-                          {formatJpy(Math.round(j.before))} → {formatJpy(Math.round(j.recent))}
+                          {money(Math.round(j.before))} → {money(Math.round(j.recent))}
                         </li>
                       ))}
                     </ul>

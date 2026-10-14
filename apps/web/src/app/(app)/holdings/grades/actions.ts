@@ -21,7 +21,7 @@ export async function setGradesAction(_: GradesState, formData: FormData): Promi
   const { db, user } = await authed();
   const ids = formData.getAll('ids').filter((v): v is string => typeof v === 'string');
   if (ids.length === 0) return { error: 'noneSelected' };
-  const parsed = parseForm(schema, formData);
+  const parsed = await parseForm(schema, formData);
   if ('state' in parsed) return parsed.state;
   const d = parsed.data;
   let grade: CardGrade | null = null;

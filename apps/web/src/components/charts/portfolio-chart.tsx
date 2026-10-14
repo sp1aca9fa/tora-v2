@@ -12,7 +12,8 @@ import {
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { useAmountsHidden } from '@/components/amounts-toggle';
-import { formatYen, tickMarkFormatter, useChartTheme } from './chart-theme';
+import { tickMarkFormatter, useChartTheme } from './chart-theme';
+import { useMoney } from '@/components/money-context';
 
 export interface PortfolioPoint {
   date: string;
@@ -30,6 +31,7 @@ export interface PortfolioPoint {
  * names both series and shows their values at the hovered day (latest day otherwise).
  */
 export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
+  const money = useMoney();
   const t = useTranslations('portfolio');
   const theme = useChartTheme();
   // Amounts hidden: the lines stay, the yen axis and hover labels go.
@@ -54,7 +56,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       rightPriceScale: { borderVisible: false, visible: !hidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
       crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !hidden } },
-      localization: { priceFormatter: formatYen },
+      localization: { priceFormatter: money },
       handleScroll: false,
       handleScale: false,
     });
@@ -81,7 +83,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       );
     });
     return () => chart.remove();
-  }, [points, theme, hidden]);
+  }, [points, theme, hidden, money]);
 
   return (
     <div className="space-y-2">
@@ -94,19 +96,17 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
           <span key={s.label} className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded-full" style={{ background: s.color }} aria-hidden />
             <span className="text-muted-foreground">{s.label}</span>
-            <span className="font-medium tabular-nums">
-              {s.v === undefined ? '-' : formatYen(s.v)}
-            </span>
+            <span className="font-medium tabular-nums">{s.v === undefined ? '-' : money(s.v)}</span>
           </span>
         ))}
         {shown && shown.estimatedBase > 0 && (
           <span className="amount text-amber-700 dark:text-amber-400">
-            {t('chartEstimated', { amount: formatYen(shown.estimatedBase) })}
+            {t('chartEstimated', { amount: money(shown.estimatedBase) })}
           </span>
         )}
         {shown && shown.atCostBase > 0 && (
           <span className="amount text-muted-foreground">
-            {t('chartAtCost', { amount: formatYen(shown.atCostBase) })}
+            {t('chartAtCost', { amount: money(shown.atCostBase) })}
           </span>
         )}
       </div>

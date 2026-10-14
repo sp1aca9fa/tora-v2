@@ -31,6 +31,7 @@ import {
   sellAction,
   splitAction,
 } from '../actions';
+import { getMoney } from '@/lib/money-server';
 
 const ACTIONS = {
   edit: editAction,
@@ -58,7 +59,7 @@ export default async function HoldingActionPage({
   const detail = await getHoldingDetail(db, user.id, id);
   if (!detail) notFound();
   const { holding, product, events } = detail;
-  const t = await getTranslations();
+  const [t, money] = await Promise.all([getTranslations(), getMoney()]);
   // Where it may be sold: the shops and sources the plug-ins describe, and a card shop.
   const PLATFORMS = [
     t('holding.cardShop'),
@@ -99,7 +100,13 @@ export default async function HoldingActionPage({
     );
 
   const yenInput = (name: string, required = true) => (
-    <Input id={name} name={name} inputMode="numeric" placeholder="¥" required={required} />
+    <Input
+      id={name}
+      name={name}
+      inputMode="decimal"
+      placeholder={money.symbol}
+      required={required}
+    />
   );
 
   let body: React.ReactNode;
@@ -162,7 +169,7 @@ export default async function HoldingActionPage({
               name="costTotalBase"
               inputMode="numeric"
               required
-              defaultValue={holding.costTotalBase}
+              defaultValue={money.input(holding.costTotalBase)}
             />
           </Field>
           {fields.grading && (

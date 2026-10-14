@@ -18,7 +18,7 @@ import { FormError } from '@/components/form-error';
 import { LEVEL_STYLE } from '@/components/notice-level';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn, formatJpy } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   type ReviewRow,
   confirmReviewAction,
@@ -39,6 +39,7 @@ import {
   setLotGradeAction,
   setSourceWarningAction,
 } from './actions';
+import { useMoney } from '@/components/money-context';
 
 /** One action as the page shows it (built on the server from `pendingActions`). */
 export interface ActionCardView {
@@ -446,6 +447,7 @@ function Candidate({
   candidate: NonNullable<ActionCardView['candidates']>[number];
   label: string;
 }) {
+  const money = useMoney();
   const t = useTranslations();
   return (
     <div className="flex gap-3 rounded-md border p-2">
@@ -461,7 +463,7 @@ function Candidate({
           {s.title} <ExternalLink className="inline size-3" />
         </a>
         <p className="text-xs text-muted-foreground">
-          {s.priceBase ? <span className="amount">{formatJpy(s.priceBase)} · </span> : ''}
+          {s.priceBase ? <span className="amount">{money(s.priceBase)} · </span> : ''}
           {t('sources.score', { score: Math.round(s.score * 100) })}
         </p>
       </div>

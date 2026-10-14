@@ -1,7 +1,14 @@
-import { fromMinor, marketCurrency } from '@tora/core';
+import {
+  type RateSetting,
+  baseCurrency,
+  fromMinor,
+  marketCurrency,
+  ratePair,
+  tokyoDate,
+} from '@tora/core';
 import { and, asc, desc, eq, gt, gte, lte, ne } from 'drizzle-orm';
 import type { Db } from './client';
-import { loadSourceRegistry } from './registry';
+import { loadSourceRegistry, setCurrencySettings } from './registry';
 import { type Product, fxRates, priceObservations, tcgSets } from './schema';
 
 export interface FxRate {
@@ -50,6 +57,49 @@ export async function fxRateOn(db: Db, pair: string, date: string): Promise<FxRa
     .orderBy(asc(fxRates.date))
     .limit(1);
   return after ?? null;
+}
+
+/**
+ * Where a currency's rate comes from (Settings > Markets; null: back to the first plug-in covering
+ * it). A typed rate is stored as today's rate: it applies from today until changed, earlier days
+ * keep theirs.
+ */
+export async function setRateSetting(
+  db: Db,
+  code: string,
+  setting: RateSetting | null,
+  now = new Date(),
+): Promise<void> {
+  const registry = await loadSourceRegistry(db);
+  const base = baseCurrency(registry);
+  const rates = { ...registry.currency?.rates };
+  if (setting) rates[code] = setting;
+  else delete rates[code];
+  await setCurrencySettings(db, { ...registry.currency, base, rates });
+  if (setting && 'manual' in setting) {
+    await saveFxRates(db, ratePair(code, base), [{ date: tokyoDate(now), rate: setting.manual }]);
+  }
+}
+
+/** Adds a currency to keep rates for (Settings > Markets), or removes one the admin added. */
+export async function setExtraCurrency(db: Db, code: string, keep: boolean): Promise<void> {
+  const registry = await loadSourceRegistry(db);
+  const base = baseCurrency(registry);
+  const extra = new Set(registry.currency?.extra ?? []);
+  if (keep && code !== base) extra.add(code);
+  else extra.delete(code);
+  await setCurrencySettings(db, { ...registry.currency, base, extra: [...extra].sort() });
+}
+
+/** The newest stored rate of each currency to the base. */
+export async function latestRates(db: Db, codes: string[]): Promise<Record<string, FxRate>> {
+  const base = baseCurrency(await loadSourceRegistry(db));
+  const out: Record<string, FxRate> = {};
+  for (const code of codes) {
+    const rate = await fxRateOn(db, ratePair(code, base), '9999-12-31');
+    if (rate) out[code] = rate;
+  }
+  return out;
 }
 
 /**

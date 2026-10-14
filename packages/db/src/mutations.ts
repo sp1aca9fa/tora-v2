@@ -62,7 +62,8 @@ export type DomainErrorCode =
   | 'not_at_grader'
   | 'no_change'
   | 'has_dependents'
-  | 'duplicate_order';
+  | 'duplicate_order'
+  | 'no_rate';
 
 /** Expected business-rule failure; actions map the code to a user-facing message. */
 export class DomainError extends Error {

@@ -97,3 +97,39 @@ it('lists migrations the database has not applied', async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+it('renames yen amounts to base ones, in columns and inside saved JSON (0023)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tora-mig-'));
+  try {
+    const before = join(dir, 'v22');
+    await cp(MIGRATIONS_FOLDER, before, { recursive: true });
+    const journalPath = join(before, 'meta', '_journal.json');
+    const journal = JSON.parse(await readFile(journalPath, 'utf8'));
+    journal.entries = journal.entries.filter((e: { idx: number }) => e.idx <= 22);
+    await writeFile(journalPath, JSON.stringify(journal));
+    const client = createClient({ url: `file:${join(dir, 'db.sqlite')}` });
+    const db = drizzle(client);
+    await migrate(db, { migrationsFolder: before });
+    const ts = '2026-10-01T00:00:00.000+09:00';
+    await client.batch([
+      `INSERT INTO products (id, category, kind, name, created_at, updated_at) VALUES ('P1', 'tcg', 'booster_box', 'Box', '${ts}', '${ts}')`,
+      `INSERT INTO product_sources (id, product_id, source, external_id, recent_sales, created_at, updated_at)
+       VALUES ('S1', 'P1', 'shop', '1', '[{"bucket":null,"priceJpy":5400,"observedAt":"${ts}"}]', '${ts}', '${ts}')`,
+      `INSERT INTO bucket_values (id, product_id, bucket, computed_at, value, created_at, updated_at)
+       VALUES ('B1', 'P1', 'sealed:shrink', '${ts}', '{"valuation":{"unitJpy":5400,"method":"median"}}', '${ts}', '${ts}')`,
+      `INSERT INTO price_observations (id, product_id, source, observation_type, price_jpy, observed_at, fetched_at, external_ref, created_at, updated_at)
+       VALUES ('O1', 'P1', 'shop', 'sold', 5400, '${ts}', '${ts}', 'r', '${ts}', '${ts}')`,
+    ]);
+    await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    const one = async (q: string) => (await client.execute(q)).rows[0];
+    expect(await one('SELECT recent_sales v FROM product_sources')).toMatchObject({
+      v: `[{"bucket":null,"priceBase":5400,"observedAt":"${ts}"}]`,
+    });
+    expect(await one('SELECT value v FROM bucket_values')).toMatchObject({
+      v: '{"valuation":{"unitBase":5400,"method":"median"}}',
+    });
+    expect(await one('SELECT price_base v FROM price_observations')).toMatchObject({ v: 5400 });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

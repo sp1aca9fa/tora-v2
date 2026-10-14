@@ -8,11 +8,11 @@ import { userActions } from '@/lib/actions';
 import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel, productMeta } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
 import { setSourceWarningAction } from './actions';
 import { reviewItemOf } from '../imports/review/review-item';
 import { SuggestionCard } from '../imports/suggestions/suggestion-card';
 import { type ActionCardView, ActionsList } from './actions-list';
+import { getMoney } from '@/lib/money-server';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('actions') };
@@ -23,6 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * settle it here, most urgent level first.
  */
 export default async function ActionsPage() {
+  const money = await getMoney();
   const sourceLabel = await sourceLabels();
   const { db, user } = await authed();
   const [items, dismissedIds, t, format] = await Promise.all([
@@ -98,7 +99,7 @@ export default async function ActionsPage() {
       const h = i.holding;
       const owned = [
         `×${h.quantity}`,
-        formatJpy(h.costTotalBase),
+        money(h.costTotalBase),
         date(h.acquiredAt),
         lotConditionLabel(h, i.product, t),
       ]
@@ -132,7 +133,7 @@ export default async function ActionsPage() {
       source: i.source,
       sourceLabel: sourceLabel(i.source),
       main: i.main,
-      owned: t('actions.owned', { units: i.units, amount: formatJpy(i.costBase) }),
+      owned: t('actions.owned', { units: i.units, amount: money(i.costBase) }),
       candidates: i.candidates.map((c) => ({
         id: c.id,
         title: c.title,

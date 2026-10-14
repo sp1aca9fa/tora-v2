@@ -13,10 +13,12 @@ export type RateSetting = { source: string } | { manual: number };
 
 /** The admin's currency settings (app_settings `currency`). */
 export interface CurrencySettings {
-  /** ISO 4217 code every amount is stored in; changed only by `pnpm base-currency`. */
+  /** ISO 4217 code every amount is stored in; the admin changes it in Settings > Markets. */
   base: string;
   /** Per currency (ISO 4217): where its rate comes from; not set: the first plug-in covering it. */
   rates?: Record<string, RateSetting>;
+  /** Currencies the admin added (rates kept although no market prices in them, e.g. a future base). */
+  extra?: string[];
 }
 
 /** A rate plug-in as the app sees it (saved by the collectors). */
@@ -63,7 +65,11 @@ export function convertMinor(minor: number, from: string, to: string, rate: numb
 
 /** The settings with what is not set filled in. */
 export function resolveCurrency(saved: Partial<CurrencySettings> | null | undefined) {
-  return { base: saved?.base || DEFAULT_BASE, rates: saved?.rates ?? {} };
+  return {
+    base: saved?.base || DEFAULT_BASE,
+    rates: saved?.rates ?? {},
+    extra: saved?.extra ?? [],
+  };
 }
 
 /** Where a currency's rate comes from: the admin's choice, else the first plug-in covering it. */
@@ -78,4 +84,20 @@ export function rateSettingFor(
     (p) => p.currencies.includes(code) && p.currencies.includes(settings.base),
   );
   return covering ? { source: covering.key } : null;
+}
+
+/** Every currency the app needs rates for, other than the base: its markets' and the admin's. */
+export function ratedCurrencies(
+  settings: CurrencySettings,
+  sources: { currency?: string; shopOnly?: boolean }[],
+): string[] {
+  return [
+    ...new Set([
+      ...sources.filter((s) => s.currency && !s.shopOnly).map((s) => s.currency!),
+      ...Object.keys(settings.rates ?? {}),
+      ...(settings.extra ?? []),
+    ]),
+  ]
+    .filter((c) => c !== settings.base)
+    .sort();
 }

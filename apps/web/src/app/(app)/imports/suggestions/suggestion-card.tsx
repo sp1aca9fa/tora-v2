@@ -5,9 +5,10 @@ import { getTranslations } from 'next-intl/server';
 import type { getTranslations as GetT } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { formatJpy } from '@/lib/utils';
 import { decideSuggestionAction } from './actions';
 import { sourceLabels } from '@/lib/sources';
+import type { Money } from '@/lib/money';
+import { getMoney } from '@/lib/money-server';
 
 /**
  * One data review suggestion: what it would change, why, and Accept / Dismiss with a note
@@ -23,6 +24,7 @@ export async function SuggestionCard({
   /** The item's name and link (the Actions card already shows them). */
   showProduct?: boolean;
 }) {
+  const money = await getMoney();
   const sourceLabel = await sourceLabels();
   const t = await getTranslations();
   const fieldLabel = (f: string) => (t.has(`fields.${f}`) ? t(`fields.${f}`) : f);
@@ -49,10 +51,10 @@ export async function SuggestionCard({
         <div className="space-y-0.5">
           <p className="amount">
             {t('suggestions.sale', {
-              price: formatJpy(Number(evidence.priceBase)),
+              price: money(Number(evidence.priceBase)),
               date: String(evidence.date ?? ''),
               source: sourceLabel(String(evidence.source ?? '')),
-              value: formatJpy(Number(evidence.valueBase)),
+              value: money(Number(evidence.valueBase)),
             })}
           </p>
           {evidence.title ? (
@@ -90,7 +92,7 @@ export async function SuggestionCard({
               <p className="text-xs text-muted-foreground">
                 {t('suggestions.wordListings', { kept: keptCount })}
               </p>
-              <ListingList listings={listings} t={t} />
+              <ListingList money={money} listings={listings} t={t} />
             </>
           )}
         </div>
@@ -116,7 +118,7 @@ export async function SuggestionCard({
           {listings.length > 0 && (
             <>
               <p className="text-xs text-muted-foreground">{t('suggestions.seenIn')}</p>
-              <ListingList listings={listings} t={t} />
+              <ListingList money={money} listings={listings} t={t} />
             </>
           )}
         </div>
@@ -164,9 +166,11 @@ export async function SuggestionCard({
 function ListingList({
   listings,
   t,
+  money,
 }: {
   listings: SuggestionListing[];
   t: Awaited<ReturnType<typeof GetT>>;
+  money: Money;
 }) {
   return (
     <ul className="space-y-1 text-xs">
@@ -193,7 +197,7 @@ function ListingList({
           ) : (
             <span className="min-w-0 truncate">{l.title}</span>
           )}
-          <span className="amount shrink-0 text-muted-foreground">{formatJpy(l.priceBase)}</span>
+          <span className="amount shrink-0 text-muted-foreground">{money(l.priceBase)}</span>
         </li>
       ))}
     </ul>

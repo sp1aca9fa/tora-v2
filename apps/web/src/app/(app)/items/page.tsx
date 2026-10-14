@@ -22,10 +22,11 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
-import { cn, formatJpy } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { PortfolioHeader } from '../_portfolio/header';
 import { ItemCard } from './item-card';
 import { ItemFilters } from './item-filters';
+import { getMoney } from '@/lib/money-server';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
@@ -48,6 +49,7 @@ function parseType(type: string | undefined): { category?: Category; kind?: Prod
  * are grouped by kind under slim sticky headers. Row cards on phones, vertical cards from 768 px.
  */
 export default async function ItemsPage({ searchParams }: { searchParams: SearchParams }) {
+  const money = await getMoney();
   const { db, user } = await authed();
   const sp = await searchParams;
   const { category, kind } = parseType(sp.type);
@@ -100,7 +102,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
         ? 'border-primary bg-primary text-primary-foreground'
         : 'text-muted-foreground hover:text-foreground',
     );
-  const money = (n: number) => <span className="tabular-nums opacity-80">{formatJpy(n)}</span>;
+  const total = (n: number) => <span className="tabular-nums opacity-80">{money(n)}</span>;
 
   // Tracking groups (investments first), then kinds in the catalog's order (category, kind).
   const modes = TRACKING_MODES.filter((m) => shown.some((s) => s.mode === m)).map((mode) => {
@@ -131,7 +133,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
         </Suspense>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
           <Link href={href(null)} className={chip(!category)}>
-            {t('actions.all')} {stats(all).count} {money(stats(all).valueBase)}
+            {t('actions.all')} {stats(all).count} {total(stats(all).valueBase)}
           </Link>
           {CATEGORIES.map((c) => {
             const list = all.filter((s) => s.product.category === c);
@@ -139,7 +141,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
             const st = stats(list);
             return (
               <Link key={c} href={href(c)} className={chip(category === c && !kind)}>
-                {t(`category.${c}`)} {st.count} {money(st.valueBase)}
+                {t(`category.${c}`)} {st.count} {total(st.valueBase)}
               </Link>
             );
           })}
@@ -200,7 +202,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
                         {(mode === 'investment' || mode === 'value_only') && (
                           <>
                             {' · '}
-                            <span className="amount">{formatJpy(st.valueBase)}</span>
+                            <span className="amount">{money(st.valueBase)}</span>
                           </>
                         )}
                       </span>

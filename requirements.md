@@ -27,7 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
-| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | todo (before S12; user, 2026-10-14) |
+| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: part 1 (currency) built 2026-10-14, migration 0023 to apply with the push; next part 2 (languages) |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
@@ -647,16 +647,15 @@ Markets:
 
 Languages:
 - A language is a translation file (about 950 texts today, English and Japanese). Adding one means translating that file (Claude can draft it); S12 explains how and how to check it (the message scan finds missing texts).
-- Settings > Admin preferences: the primary and secondary language, picked from the installed ones; each user picks theirs (today: English or Japanese).
+- Settings > Admin preferences: the admin sets the app's primary and secondary language, picked from the installed ones (user, 2026-10-14: languages are the admin's, like markets and currency; whether each user can still switch between those two, as with today's English / Japanese toggle, is decided when part 2 starts).
 - Item names: the two name fields follow the primary and secondary language instead of Japanese and English; collectors and search use both, as today.
 - Dates and numbers follow each language's formats.
 - Speed: each page loads one language (lighter still once S14 sends a page only its own texts).
 
 Currency:
 - Today every amount is stored in yen (costs, sales, saved values, value history): about 1,050 references in 83 files, and columns named `_jpy`.
-- A base currency chosen once at setup; every amount is stored in it (columns renamed to a neutral name; existing data is yen and stays as is). Changing it later is a terminal command that converts every stored amount, not a settings switch.
+- The admin sets the base currency for the whole app (user, 2026-10-14: currency is the admin's, like markets; users do not choose one); every amount is stored in it (columns renamed to a neutral name; existing data is yen and stays as is). Changing it in Settings converts every stored amount, after a confirmation.
 - Each market's currency is converted to the base with daily exchange rates, set by the admin (design session, 2026-10-14): per currency, either a rate source plug-in (today's USD to JPY one, from the European Central Bank's rates via Frankfurter, becomes one for any pair it covers) or a rate typed by hand. A market whose currency has no rate is flagged in Settings and its prices are not converted.
-- Optional display currency per user: amounts are converted when shown, labelled as converted.
 - Speed: a multiplication per amount; saved values stay in the base currency.
 
 Ground rules for heavy users (collectors on the home PC):
@@ -673,9 +672,11 @@ Part 1 design (2026-10-14):
 - Amounts are whole numbers in the base currency's smallest unit (yen: 1 yen, euro: 1 cent), so today's data stays as is.
 - Migration 0023 renames the 9 `_jpy` columns to `_base` (e.g. `price_base`, `cost_total_base`); code names follow (`priceBase`). Applied to production when the user pushes (the live site errors for about a minute until the deploy finishes; the home PC needs `git pull` before the next collect).
 - Plug-ins report prices in their own currency only; the collect converts them to the base with the stored rate of the sale's day and keeps the rate used. Rate plug-ins declare the currencies they cover and fetch any pair.
-- app_settings `currency`: the base, and per other currency its rate plug-in or a typed rate. Settings > Markets shows each market's currency with its rate and flags one with none.
-- Money shown through one formatter per request (server) or per page (client), in the base or the user's display currency (converted amounts marked as such); amount inputs accept the base's decimals.
-- `pnpm base-currency <code>` converts every stored amount with the rate of its own date and saves the new base (a new setup runs it once before adding anything).
+- app_settings `currency`: the base, per other currency its rate plug-in or a typed rate, and currencies the admin added. Settings > Markets > Currencies: the base menu, each market's currency with its rate (flagged when it has none), and a box to add a currency (e.g. a future base).
+- Money shown through one formatter per request (server) or per page (client), in the base; amount inputs accept the base's decimals.
+- Changing the base (Settings, admins, after a confirmation naming how many amounts): every stored amount is converted with the rate of its own date (the last on or before it, else the first after), amounts inside lot history and recent sales too, and rates are moved to the new base; saved values are rebuilt. Only currencies with stored rates can become the base. A new setup changes it before adding anything.
+
+Part 1 built (2026-10-14): migration 0023 (columns renamed; old `Jpy` keys inside saved JSON renamed too: recent sales, lot history, saved values, suggestions), plug-in contract in own currencies with the conversion at the collect's boundary, `frankfurter` rate plug-in for every ECB currency, Settings > Markets > Currencies (base menu with confirmation and conversion, rate source or typed rate per currency, add a currency), one money formatter, decimal amount inputs. Values use the primary market's currency instead of yen. Checked on the demo data: typed USD rate, base switched to USD and back (¥33,300 -> $222.00 -> ¥33,300). Not applied to production yet.
 
 Acceptance:
 - An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.

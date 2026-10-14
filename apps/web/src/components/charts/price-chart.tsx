@@ -12,7 +12,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAmountsHidden } from '@/components/amounts-toggle';
 import { useSourceDisplay } from '@/components/sources-context';
-import { formatYen, sourceColor, tickMarkFormatter, useChartTheme } from './chart-theme';
+import { sourceColor, tickMarkFormatter, useChartTheme } from './chart-theme';
+import { useMoney } from '@/components/money-context';
 
 export interface PriceChartPoint {
   day: string;
@@ -38,6 +39,7 @@ export function PriceChart({
   defaultBucket: string | null;
   sourceLabels: Record<string, string>;
 }) {
+  const money = useMoney();
   const t = useTranslations('valuation');
   const theme = useChartTheme();
   // Amounts hidden: the lines stay, the yen axis and hover labels go.
@@ -75,7 +77,7 @@ export function PriceChart({
       rightPriceScale: { borderVisible: false, visible: !amountsHidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
       crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !amountsHidden } },
-      localization: { priceFormatter: formatYen },
+      localization: { priceFormatter: money },
     });
     const seriesBySource = new Map<string, ReturnType<typeof chart.addSeries<'Line'>>>();
     for (const source of sources.filter((s) => !hidden.has(s))) {
@@ -111,7 +113,7 @@ export function PriceChart({
     });
     return () => chart.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, bucket, hidden, theme, sources, amountsHidden]);
+  }, [points, bucket, hidden, theme, sources, amountsHidden, money]);
 
   if (points.length === 0) return <p className="text-sm text-muted-foreground">{t('noHistory')}</p>;
   const estimatedDays = new Set(visible.filter((p) => p.estimated > 0).map((p) => p.day));
@@ -162,7 +164,7 @@ export function PriceChart({
             />
             <span>{sourceLabels[s] ?? s}</span>
             {hover?.values[s] !== undefined && (
-              <span className="font-medium tabular-nums">{formatYen(hover.values[s])}</span>
+              <span className="font-medium tabular-nums">{money(hover.values[s])}</span>
             )}
           </label>
         ))}

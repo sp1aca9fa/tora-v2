@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl';
 import { Field } from '@/components/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
+import { useMoney } from '@/components/money-context';
 
 export type ProductDefaults = Partial<
   Record<ProductField | 'name' | 'region', string | number | null>
@@ -40,13 +41,18 @@ export function ProductFields({
   onTyped?: (field: 'name' | 'setCode' | 'cardNumber', value: string) => void;
 }) {
   const t = useTranslations();
+  const money = useMoney();
   const shown = new Set(productFieldsFor(category, kind));
   if (!showSetFields) {
     shown.delete('setName');
     shown.delete('setCode');
   }
   const value = (name: keyof ProductDefaults) =>
-    defaults[name] === null || defaults[name] === undefined ? '' : String(defaults[name]);
+    defaults[name] === null || defaults[name] === undefined
+      ? ''
+      : name === 'retailPriceBase'
+        ? money.input(Number(defaults[name]))
+        : String(defaults[name]);
   const text = (name: ProductField, props: React.ComponentProps<typeof Input> = {}) => (
     <Field label={t(`fields.${name}`)} htmlFor={`p-${name}`}>
       <Input
@@ -112,7 +118,7 @@ export function ProductFields({
       {shown.has('rarity') && text('rarity', { placeholder: 'SAR' })}
       {shown.has('releaseDate') && text('releaseDate', { type: 'date' })}
       {shown.has('retailPriceBase') &&
-        text('retailPriceBase', { inputMode: 'numeric', placeholder: '¥' })}
+        text('retailPriceBase', { inputMode: 'decimal', placeholder: money.symbol })}
     </div>
   );
 }

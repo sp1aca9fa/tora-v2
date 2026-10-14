@@ -29,7 +29,7 @@ packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
 packages/collector-sdk   Collector interface, registry, `pnpm collect`
-collectors-public/       Publishable plug-ins (public APIs: TCGCSV and eBay prices, USD/JPY rates; shops)
+collectors-public/       Publishable plug-ins (public APIs: TCGCSV and eBay prices, ECB exchange rates; shops)
 collectors/              Optional private plug-ins (git submodule; not in this repo)
 ```
 
@@ -198,7 +198,7 @@ page from another source of that market that has them counts too. It need not be
 
 A value is the median of the reference's sales (30 days, widened to 90 / 180 / 365 when there are
 fewer than 3), else a supporting source's, else a shop's asking price in the same condition (at
-most 30 days old), else the retail price. Only prices in yen count.
+most 30 days old), else the retail price. Only the primary market's prices count.
 
 Each plug-in suggests its sources' roles; an admin can change them in **Settings > Price
 sources** (they apply to every account). The suggestions of the author's plug-ins make the
@@ -210,7 +210,7 @@ US):
 | SNKRDUNK           | Japan  | reference  | reference  | -             | cards, sealed | verified trades, raw grades and slabs apart                 |
 | Mercari            | Japan  | supporting | supporting | supporting    | -             | sold listings (searched; bundles, parts and fakes filtered) |
 | 駿河屋             | Japan  | -          | supporting | reference     | sealed, games | store and buy-back prices (no sales)                        |
-| TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices, converted to yen                          |
+| TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices, converted to the base currency            |
 | eBay               | US     | supporting | supporting | -             | -             | US asking prices (official API)                             |
 
 **Trust is earned, not declared.** After each collect, each supporting source's sales are compared
@@ -223,8 +223,8 @@ so Mercari is comparison only for cards; for sealed product it agrees.)
 Notes on the author's sources:
 
 - **US prices**: TCGplayer market prices through TCGCSV (public files, updated daily), for
-  Japanese and English Pokemon cards and sealed product, converted with that day's USD/JPY rate
-  (Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
+  Japanese and English Pokemon cards and sealed product, converted to the base currency with that
+  day's rate (ECB rates via Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
   US**. TCGplayer only prices ungraded cards.
 - **eBay asks**: eBay's official Browse API (active listings only; eBay closed its sold data to new
   developers and blocks scraping). Each collect stores, per condition (ungraded, PSA 10, ...), the
@@ -257,6 +257,16 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 
 The collectors save these descriptions to the database on each run; the app reads them there (it
 cannot load private plug-ins). Nothing in the app names a store.
+
+**Currencies.** A plug-in reports every amount in its own currency, in the currency's smallest unit
+(yen, cents): prices as `price` with `currency`, candidates' and recent sales' `price`, receipts'
+`total`. It never converts. The collect converts each amount to the base currency with the
+exchange rate of its day and keeps the rate used. A package may also export `rates`: exchange-rate
+plug-ins (`key`, `label`, the `currencies` they cover, a `rates` function for a pair and a date
+range); `collectors-public` has one for the European Central Bank's rates. The admin sets the base
+currency, where each currency's rate comes from (a rate plug-in or a typed rate) and adds
+currencies in Settings > Admin preferences > Markets > Currencies. Prices in a currency without a
+rate are not saved until it has one.
 
 **Your sources, your responsibility.** The app checks what it can (sales against the reference,
 outliers, the data review, the import review), but which sites you collect from, whether their

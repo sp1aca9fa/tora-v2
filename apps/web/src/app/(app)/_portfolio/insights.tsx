@@ -19,9 +19,9 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { ProductImage } from '@/components/product-image';
-import { formatJpy } from '@/lib/utils';
-import { signedBase } from './header';
+import { signedAmount } from './header';
 import { type InsightPanel, InsightsCard } from './insights-card';
+import { getMoney } from '@/lib/money-server';
 
 interface Row {
   product: Product;
@@ -61,6 +61,7 @@ export async function Insights({
   rows: PortfolioRow[];
   preferences: UserPreferences | null;
 }) {
+  const money = await getMoney();
   const prefs = summaryPrefs(preferences);
   const [movers, trades, t] = await Promise.all([
     moversByPeriod(db, userId, INSIGHT_PERIODS),
@@ -83,8 +84,8 @@ export async function Insights({
 
   const moverRow = (m: Mover, byYen = false): Row => ({
     product: m.product,
-    main: byYen ? signedBase(m.changeBase) : pct(m.pct),
-    sub: byYen ? pct(m.pct) : signedBase(m.changeBase),
+    main: byYen ? signedAmount(money, m.changeBase) : pct(m.pct),
+    sub: byYen ? pct(m.pct) : signedAmount(money, m.changeBase),
   });
   const upDown = (
     list: Mover[],
@@ -123,7 +124,7 @@ export async function Insights({
   };
   const plRow = (s: (typeof investments)[number]): Row => ({
     product: s.product,
-    main: signedBase(s.unrealizedBase!),
+    main: signedAmount(money, s.unrealizedBase!),
     sub:
       s.valuedCostBase > 0
         ? pct(Math.round((s.unrealizedBase! / s.valuedCostBase) * 1000) / 10)
@@ -176,7 +177,7 @@ export async function Insights({
               {
                 rows: top.map((s) => ({
                   product: s.product,
-                  main: formatJpy(s.valueBase),
+                  main: money(s.valueBase),
                   sub: t('portfolio.units', { count: s.units }),
                 })),
               },

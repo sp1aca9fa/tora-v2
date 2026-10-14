@@ -34,7 +34,7 @@ import {
   dateText,
   optEnum,
   optText,
-  optYen,
+  optAmount,
   parseForm,
   qty,
   reqEnum,
@@ -145,7 +145,7 @@ const holdingSchema = z.object({
   orderId: optText,
   quantity: qty,
   /** Optional when a retail price is known: blank means retail price x quantity. */
-  costTotalBase: optYen,
+  costTotalBase: optAmount,
   notes: optText,
 });
 
@@ -154,7 +154,7 @@ export async function createHoldingAction(
   formData: FormData,
 ): Promise<FormState> {
   const { db, user } = await authed();
-  const base = parseForm(holdingSchema, formData);
+  const base = await parseForm(holdingSchema, formData);
   if ('state' in base) return base.state;
   const d = base.data;
 
@@ -180,7 +180,7 @@ export async function createHoldingAction(
     };
     cls = 'sealed';
   } else {
-    const parsed = parseForm(productSchema, formData);
+    const parsed = await parseForm(productSchema, formData);
     if ('state' in parsed) return parsed.state;
     const product = productInputFrom(parsed.data);
     if (!product) return { error: 'check', fields: ['name'] };
@@ -192,7 +192,7 @@ export async function createHoldingAction(
     d.costTotalBase ?? (retailPriceBase !== null ? retailPriceBase * d.quantity : undefined);
   if (costTotalBase === undefined) return { error: 'check', fields: ['costTotalBase'] };
 
-  const condition = parseForm(conditionSchema, formData);
+  const condition = await parseForm(conditionSchema, formData);
   if ('state' in condition) return condition.state;
   const { input, missing } = conditionInputFrom(cls, condition.data);
   if (missing.length) return { error: 'check', fields: missing };

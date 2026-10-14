@@ -14,7 +14,7 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn, formatJpy } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { LinkUrlForm } from './link-url-form';
 import { SearchSource } from './search-source';
 import { type MarketTab, SourceTabs } from './source-tabs';
@@ -27,6 +27,7 @@ import {
 } from './source-actions';
 import { setSourceWarningAction } from '../../actions/actions';
 import { getRegistry, marketLabels, sourceLabels } from '@/lib/sources';
+import { getMoney } from '@/lib/money-server';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for
@@ -48,6 +49,7 @@ export async function PriceSources({
   /** The bucket most of the user's lots are in (highlighted). */
   bucket: string | null;
 }) {
+  const money = await getMoney();
   const sourceLabel = await sourceLabels();
   const [t, format, sources, candidates, stats, recent] = await Promise.all([
     getTranslations(),
@@ -124,7 +126,7 @@ export async function PriceSources({
                 <p className="text-xs text-muted-foreground">
                   {sourceLabel(c.source)}
                   {c.priceBase ? (
-                    <span className="amount"> · {formatJpy(c.priceBase)}</span>
+                    <span className="amount"> · {money(c.priceBase)}</span>
                   ) : (
                     ''
                   )} · {t('sources.score', { score: Math.round(c.score * 100) })}
@@ -298,7 +300,7 @@ export async function PriceSources({
                       )}
                     </td>
                     <td className="py-1 text-right tabular-nums">
-                      {x.medianBase === null ? '-' : formatJpy(Math.round(x.medianBase))}
+                      {x.medianBase === null ? '-' : money(Math.round(x.medianBase))}
                     </td>
                     <td className="py-1 text-right tabular-nums">{x.count}</td>
                   </tr>
@@ -318,7 +320,7 @@ export async function PriceSources({
                   <span className="text-muted-foreground">
                     {date(o.observedAt)} · <code className="text-xs">{o.bucket ?? '-'}</code>
                   </span>
-                  <span className="tabular-nums">{formatJpy(o.priceBase)}</span>
+                  <span className="tabular-nums">{money(o.priceBase)}</span>
                 </li>
               ))}
             </ul>

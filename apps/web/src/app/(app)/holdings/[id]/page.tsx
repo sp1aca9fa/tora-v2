@@ -9,11 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { productMeta } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
 import { BoxCard } from './box-card';
 import { EventList } from './event-list';
 import { TrackingForm } from './tracking-form';
 import { ValuationCard } from './valuation-card';
+import { getMoney } from '@/lib/money-server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,6 +24,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 export default async function HoldingPage({ params }: Params) {
+  const money = await getMoney();
   const { id } = await params;
   const { db, user } = await authed();
   const detail = await getHoldingDetail(db, user.id, id);
@@ -66,13 +67,13 @@ export default async function HoldingPage({ params }: Params) {
     [
       t('holding.costBasis'),
       <>
-        {formatJpy(holding.costTotalBase)}
+        {money(holding.costTotalBase)}
         {holding.quantity > 1 && (
           <span className="text-muted-foreground">
             {' '}
             (
             {t('common.perUnit', {
-              amount: formatJpy(unitCost(holding.costTotalBase, holding.quantity)),
+              amount: money(unitCost(holding.costTotalBase, holding.quantity)),
             })}
             )
           </span>
@@ -84,7 +85,7 @@ export default async function HoldingPage({ params }: Params) {
           [
             t('holding.estimatedCost'),
             <span key="est" className="text-muted-foreground">
-              {formatJpy(estimatedCost)} ({t('holding.referenceOnly')})
+              {money(estimatedCost)} ({t('holding.referenceOnly')})
             </span>,
           ] as [string, React.ReactNode],
         ]

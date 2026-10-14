@@ -1,4 +1,4 @@
-import { baseCurrency, ratePair, rateSettingFor, tokyoDate } from '@tora/core';
+import { baseCurrency, ratePair, rateSettingFor, ratedCurrencies, tokyoDate } from '@tora/core';
 import { type Db, latestFxDate, loadSourceRegistry, saveFxRates } from '@tora/db';
 import type { PoliteHttp } from './http';
 import type { RateSource } from './types';
@@ -11,7 +11,7 @@ const addDays = (date: string, days: number) =>
 
 /**
  * Fetches the days not stored yet of every currency the app needs (its markets' and the ones set
- * in Settings > Markets) to the base, from the rate plug-in chosen for it (default: the first
+ * in Settings > Markets, incl. ones added there) to the base, from the rate plug-in chosen for it (default: the first
  * covering it); rates typed by hand are left alone. Returns the days saved per pair.
  */
 export async function updateRates(
@@ -23,14 +23,9 @@ export async function updateRates(
   const registry = await loadSourceRegistry(db);
   const base = baseCurrency(registry);
   const settings = registry.currency ?? { base };
-  const needed = new Set([
-    ...registry.sources.filter((s) => s.currency && !s.shopOnly).map((s) => s.currency!),
-    ...Object.keys(settings.rates ?? {}),
-  ]);
-  needed.delete(base);
   const today = tokyoDate(now);
   const out = [];
-  for (const code of [...needed].sort()) {
+  for (const code of ratedCurrencies(settings, registry.sources)) {
     const pair = ratePair(code, base);
     const setting = rateSettingFor(settings, sources, code);
     if (setting && 'manual' in setting) continue;

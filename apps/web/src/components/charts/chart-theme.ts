@@ -37,9 +37,6 @@ export function useChartTheme(): ChartTheme {
   return dark ? DARK : LIGHT;
 }
 
-const yen = new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' });
-export const formatYen = (v: number) => yen.format(Math.round(v));
-
 /** Axis labels as M/D (the library default rendered a stray "0" at the year boundary). */
 export const tickMarkFormatter = (time: unknown) => {
   if (typeof time !== 'number') return '';

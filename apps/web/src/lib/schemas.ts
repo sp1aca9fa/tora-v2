@@ -13,7 +13,7 @@ import {
 } from '@tora/core';
 import type { HoldingInput, ProductInput } from '@tora/db';
 import { z } from 'zod';
-import { optDateText, optEnum, optText, optYen, reqEnum } from './form';
+import { optDateText, optEnum, optText, optAmount, reqEnum } from './form';
 
 export const productSchema = z.object({
   category: reqEnum(CATEGORIES),
@@ -29,7 +29,7 @@ export const productSchema = z.object({
   cardNumber: optText,
   rarity: optText,
   releaseDate: optDateText,
-  retailPriceBase: optYen,
+  retailPriceBase: optAmount,
 });
 
 /**

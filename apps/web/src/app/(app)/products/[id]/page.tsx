@@ -24,10 +24,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { lotConditionLabel, productMeta } from '@/lib/product-display';
-import { formatJpy } from '@/lib/utils';
 import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
+import { getMoney } from '@/lib/money-server';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -39,6 +39,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /** One product: what it is worth, every lot of it the user registered, and its market data. */
 export default async function ProductPage({ params }: Params) {
+  const money = await getMoney();
   const sourceLabel = await sourceLabels();
   const { id } = await params;
   const { db, user } = await authed();
@@ -85,7 +86,7 @@ export default async function ProductPage({ params }: Params) {
       ? inPl.reduce((n, h) => n + values.get(h.id)! - h.costTotalBase, 0) - openedInPl
       : null;
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
-  const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
+  const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${money(n)}`;
 
   return (
     <ItemLayout
@@ -126,8 +127,8 @@ export default async function ProductPage({ params }: Params) {
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
             {[
               [t('product.unitsOwned'), String(units)],
-              [t('portfolio.spent'), formatJpy(spent)],
-              [t('portfolio.marketValue'), valued.length || openedCost ? formatJpy(value) : '-'],
+              [t('portfolio.spent'), money(spent)],
+              [t('portfolio.marketValue'), valued.length || openedCost ? money(value) : '-'],
               [t('portfolio.unrealized'), pl === null ? '-' : signed(pl)],
             ].map(([label, v]) => (
               <div key={label} className="rounded-xl border bg-card px-4 py-3">
@@ -189,11 +190,11 @@ export default async function ProductPage({ params }: Params) {
                       </div>
                       <div className="shrink-0 text-right text-sm tabular-nums">
                         <p className={v != null ? 'font-medium' : undefined}>
-                          {v != null ? formatJpy(v) : formatJpy(h.costTotalBase)}
+                          {v != null ? money(v) : money(h.costTotalBase)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {v != null
-                            ? `${t('portfolio.spentShort', { amount: formatJpy(h.costTotalBase) })} · ${signed(v - h.costTotalBase)}`
+                            ? `${t('portfolio.spentShort', { amount: money(h.costTotalBase) })} · ${signed(v - h.costTotalBase)}`
                             : h.status === 'owned'
                               ? t('valuation.short.none')
                               : t('product.cost')}

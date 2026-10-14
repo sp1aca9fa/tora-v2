@@ -4,7 +4,7 @@ import { clearManualPrice, setManualPrice, userHoldsProduct } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
-import { type FormState, optText, parseForm, yen } from '@/lib/form';
+import { type FormState, optText, parseForm, amount } from '@/lib/form';
 
 /** Manual prices are per user and always win over computed values (requirements section 6). */
 export async function setManualPriceAction(
@@ -16,7 +16,7 @@ export async function setManualPriceAction(
 ): Promise<FormState> {
   const { db, user } = await authed();
   if (!(await userHoldsProduct(db, user.id, productId))) return { error: 'not_found' };
-  const parsed = parseForm(z.object({ priceBase: yen, note: optText }), formData);
+  const parsed = await parseForm(z.object({ priceBase: amount, note: optText }), formData);
   if ('state' in parsed) return parsed.state;
   await setManualPrice(db, user.id, productId, bucket, parsed.data.priceBase, parsed.data.note);
   revalidatePath(`/holdings/${holdingId}`);

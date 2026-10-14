@@ -28,8 +28,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { cn, formatJpy } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { type ProductSummary, type SetSummary, createHoldingAction } from './actions';
+import { useMoney } from '@/components/money-context';
 
 const STEPS = ['what', 'how', 'details'] as const;
 const MTG_VARIANTS = ['Play', 'Collector', 'Draft', 'Set', 'Jumpstart'];
@@ -101,6 +102,7 @@ export function AddFlow({
     orderId: string | null;
   } | null;
 }) {
+  const money = useMoney();
   const t = useTranslations();
   const [state, formAction, pending] = useActionState(createHoldingAction, {});
   const [step, setStep] = useState(initialProduct ? 1 : 0);
@@ -186,12 +188,10 @@ export function AddFlow({
       ? (selected?.retailPriceBase ?? null)
       : catalogMode
         ? null
-        : Number((draft.retailPriceBase ?? '').replace(/[^\d]/g, '')) || null;
+        : money.parse(draft.retailPriceBase) || null;
 
   const perUnit =
-    Number(quantity) > 1 && cost
-      ? unitCost(Number(cost.replace(/[^\d]/g, '')) || 0, Number(quantity))
-      : null;
+    Number(quantity) > 1 && cost ? unitCost(money.parse(cost) ?? 0, Number(quantity)) : null;
 
   const summary =
     mode === 'existing'
@@ -549,10 +549,10 @@ export function AddFlow({
             hint={
               !cost.trim() && retail
                 ? t('add.costFromRetail', {
-                    amount: formatJpy(retail * (Number(quantity) || 1)),
+                    amount: money(retail * (Number(quantity) || 1)),
                   })
                 : perUnit !== null
-                  ? t('common.perUnit', { amount: formatJpy(perUnit) })
+                  ? t('common.perUnit', { amount: money(perUnit) })
                   : t('add.costHint')
             }
             className="sm:col-span-2"
@@ -560,10 +560,9 @@ export function AddFlow({
             <Input
               id="costTotalBase"
               name="costTotalBase"
-              inputMode="numeric"
+              inputMode="decimal"
               required={!retail}
-              pattern="[\d,¥￥\s]*"
-              placeholder="¥"
+              placeholder={money.symbol}
               value={cost}
               onChange={(e) => setCost(e.target.value)}
             />

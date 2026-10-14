@@ -2,7 +2,7 @@ import { sourceInfo, valueUnit } from '@tora/core';
 import { type Db, type ProductSource, keptObservations, sourceObservations } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
-import { cn, formatJpy } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { QueryForm } from './query-form';
 import { ReferenceForm } from './reference-form';
 import {
@@ -11,6 +11,7 @@ import {
   unlinkSourceAction,
 } from './source-actions';
 import { getRegistry, sourceLabels } from '@/lib/sources';
+import { getMoney } from '@/lib/money-server';
 
 interface ReferenceInfo {
   name: string;
@@ -26,6 +27,7 @@ interface ReferenceInfo {
  * is a sale, and a listing that ends may have sold or been withdrawn.
  */
 export async function SearchSource({ db, link }: { db: Db; link: ProductSource }) {
+  const money = await getMoney();
   const [sourceLabel, registry] = await Promise.all([sourceLabels(), getRegistry()]);
   const asks = !sourceInfo(registry, link.source)?.priceKinds?.includes('sold');
   const [t, format, sales, kept] = await Promise.all([
@@ -67,7 +69,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
               ? ` · ${t('sources.search.without', { words: query.excludeKeywords.join(' ') })}`
               : ''}
             {query?.priceMin || query?.priceMax
-              ? ` · ${query.priceMin ? formatJpy(query.priceMin) : ''}–${query.priceMax ? formatJpy(query.priceMax) : ''}`
+              ? ` · ${query.priceMin ? money(query.priceMin) : ''}–${query.priceMax ? money(query.priceMax) : ''}`
               : ''}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -113,7 +115,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                     <code className="text-xs">{bucket}</code>
                   </td>
                   <td className="py-1 text-right font-medium tabular-nums">
-                    {v.unitBase === null ? '-' : formatJpy(v.unitBase)}
+                    {v.unitBase === null ? '-' : money(v.unitBase)}
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {t('valuation.medianOf', { count: v.sampleSize, days: v.windowDays ?? 0 })}
@@ -121,7 +123,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {latest
-                      ? `${formatJpy(latest.priceBase)} · ${format.dateTime(new Date(latest.observedAt), { dateStyle: 'medium' })}`
+                      ? `${money(latest.priceBase)} · ${format.dateTime(new Date(latest.observedAt), { dateStyle: 'medium' })}`
                       : '-'}
                   </td>
                 </tr>
@@ -155,7 +157,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                         </a>
                         <p className="amount text-muted-foreground">
                           {info
-                            ? `${formatJpy(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
+                            ? `${money(info.price)} · ${info.sold ? t('sources.search.sold') : t('sources.search.forSale')} · ${format.dateTime(new Date(info.updated * 1000), { dateStyle: 'medium' })}`
                             : t('sources.search.readNext')}
                         </p>
                       </div>
@@ -210,7 +212,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                     </a>
                     <p className="text-xs text-muted-foreground">
                       <span className="font-medium text-foreground tabular-nums">
-                        {formatJpy(s.priceBase)}
+                        {money(s.priceBase)}
                       </span>{' '}
                       · {format.dateTime(new Date(s.observedAt), { dateStyle: 'medium' })}
                       {s.bucket && (
