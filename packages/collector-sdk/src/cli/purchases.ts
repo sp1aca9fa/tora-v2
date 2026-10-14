@@ -62,7 +62,7 @@ const answers = rl[Symbol.asyncIterator]();
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
 const day = (iso: string) => tokyoDate(new Date(iso));
 const line = (r: PurchaseReceipt) =>
-  `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.totalBase)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
+  `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
 async function choose<T>(question: string, options: Record<string, T>): Promise<T> {
   for (;;) {
     process.stdout.write(`${question} `);

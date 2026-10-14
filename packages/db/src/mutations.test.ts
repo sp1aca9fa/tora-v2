@@ -429,7 +429,10 @@ describe('lot actions', () => {
       kind: 'edit',
       changes: { costTotalBase: { before: 10_000, after: 9_900 } },
     });
-    await expectDomainError(editHolding(db, uid, holding.id, { costTotalBase: 9_900 }), 'no_change');
+    await expectDomainError(
+      editHolding(db, uid, holding.id, { costTotalBase: 9_900 }),
+      'no_change',
+    );
     await addNote(db, uid, holding.id, { text: 'Box 3', occurredAt: day('10-01') });
     await expectDomainError(
       addNote(db, uid, holding.id, { text: ' ', occurredAt: day('10-01') }),
@@ -561,7 +564,12 @@ describe('setCardGrade', () => {
 
 describe('confirmImportReview', () => {
   it('applies grades, cert and packaging, then clears the review flag', async () => {
-    const input = { quantity: 1, costTotalBase: 500, acquiredAt: day('09-01'), reviewPending: true };
+    const input = {
+      quantity: 1,
+      costTotalBase: 500,
+      acquiredAt: day('09-01'),
+      reviewPending: true,
+    };
     const card = await createHolding(
       db,
       uid,

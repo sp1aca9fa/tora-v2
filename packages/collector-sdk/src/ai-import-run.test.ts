@@ -38,7 +38,7 @@ const row = (file: string): ExtractedRow => ({
   orderId: 'm12345678901',
   title: 'リザードンex SAR 201/165',
   url: null,
-  priceBase: 41000,
+  price: 41000,
   quantity: 1,
   date: '2026-09-01',
   dateApprox: false,

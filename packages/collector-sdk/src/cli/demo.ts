@@ -458,7 +458,9 @@ await lot(game('controller', 'Nintendo Switch Proコントローラー', 'switch
   days: 370,
 });
 await lot(
-  game('amiibo', 'amiibo リンク【ティアーズ オブ ザ キングダム】', null, { retailPriceBase: 3_300 }),
+  game('amiibo', 'amiibo リンク【ティアーズ オブ ザ キングダム】', null, {
+    retailPriceBase: 3_300,
+  }),
   { quantity: 1, costTotalBase: 3_300, days: 330, condition: 'new_unused' },
 );
 // No shop lists it: the "not linked" warning is turned off.

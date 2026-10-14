@@ -16,10 +16,11 @@ export interface CollectorContext {
   http: PoliteHttp;
   now: Date;
   log: (message: string) => void;
-  /** Stores observations as they are parsed (idempotent); returns how many were new. */
-  save: (rows: NewPriceObservation[]) => Promise<number>;
-  /** Exchange rate in effect on a Tokyo date (e.g. `USDJPY`: yen per dollar); null when none. */
-  fx?: (pair: string, date: string) => Promise<{ date: string; rate: number } | null>;
+  /**
+   * Stores observations as they are parsed (idempotent; converted to the base currency with the
+   * rate of their day); returns how many were new.
+   */
+  save: (rows: PriceInput[]) => Promise<number>;
   /**
    * The catalog set of a product (its own set code and release date first, else the catalog set
    * it points to or is named after); null when unknown.
@@ -29,6 +30,26 @@ export interface CollectorContext {
   linkedListings?: (productId: string) => Promise<{ source: string; title: string | null }[]>;
 }
 
+/**
+ * A price as a plug-in reports it: in its own currency, never converted (requirements S16); the
+ * collect converts it to the base currency and keeps the rate used.
+ */
+export type PriceInput = Omit<NewPriceObservation, 'priceBase' | 'fxRate' | 'currency'> & {
+  /** Per unit, in the currency's smallest unit (yen; cents for dollars). */
+  price: number;
+  /** ISO 4217 code of `price` and `priceOriginal`. */
+  currency: string;
+};
+
+/** A listing found by a search, its price in the source's own currency. */
+export type FoundCandidate = Omit<CandidateInput, 'priceBase'> & {
+  /** In the source's currency's smallest unit. */
+  price?: number | null;
+};
+
+/** A recent trade as the source shows it, its price in the source's own currency. */
+export type FoundSale = Omit<RecentSale, 'priceBase'> & { price: number };
+
 export interface CollectResult {
   /** Progress to persist on the product source (e.g. backfill cursor). */
   state: unknown;
@@ -37,7 +58,7 @@ export interface CollectResult {
   title?: string | null;
   url?: string | null;
   /** Newest trades as seen now (may have approximate times); shown as "last sale". */
-  recentSales?: RecentSale[];
+  recentSales?: FoundSale[];
   /** The listing's picture (stored on the listing; the product shows its first listing's). */
   imageUrl?: string | null;
   /** Search-based sources: the search actually run, when the collector filled it in. */
@@ -52,7 +73,7 @@ export interface Collector {
   /** Whether this source can price the product (e.g. SNKRDUNK: TCG only). */
   supports(product: Product): boolean;
   /** Searches the site for listings that may be this product, best first, with a 0-1 score. */
-  findCandidates(product: Product, ctx: CollectorContext): Promise<CandidateInput[]>;
+  findCandidates(product: Product, ctx: CollectorContext): Promise<FoundCandidate[]>;
   /**
    * Search-based sources (no listing per product, e.g. a flea market): the query a product starts
    * with. When defined, every supported product gets an active source with this query at once
@@ -95,10 +116,15 @@ export interface PurchaseReceipt {
   /** Item title as shown on the receipt (usually the listing title). */
   title: string;
   quantity: number;
-  /** Amount paid, fees and shipping included; becomes the holding's cost. */
-  totalBase: number;
+  /**
+   * Amount paid, fees and shipping included, in `currency`'s smallest unit; becomes the
+   * holding's cost (converted to the base currency).
+   */
+  total: number;
   /** Item price alone, when the receipt shows it (manual entries may have used it). */
-  itemPriceBase?: number | null;
+  itemPrice?: number | null;
+  /** ISO 4217 code of the amounts; default: the shop's (its source description), else the base. */
+  currency?: string | null;
   /** Listing at the marketplace (the price source to link the product to). */
   listing?: { externalId: string; url: string } | null;
   /** Condition as the marketplace shows it (e.g. "A", "PSA10"). */
@@ -162,13 +188,23 @@ export interface PurchaseImporter {
   ): Partial<HoldingInput>;
 }
 
-/** A daily exchange rate (e.g. USD/JPY), used to show foreign prices in yen. */
+/** Daily exchange rates (requirements S16): prices in other currencies are converted with them. */
 export interface RateSource {
-  /** Stored as `fx_rates.pair`, e.g. `USDJPY` (yen per dollar). */
-  pair: string;
+  /** Chosen in Settings > Markets per currency; never changes. */
+  key: string;
   label: string;
-  /** Rates for the days between two dates (inclusive); days without a rate are left out. */
-  rates(http: PoliteHttp, from: string, to: string): Promise<{ date: string; rate: number }[]>;
+  /** Currencies it has rates between (ISO 4217). */
+  currencies: string[];
+  /**
+   * Units of `to` per unit of `from` for the days between two dates (inclusive); days without a
+   * rate are left out.
+   */
+  rates(
+    http: PoliteHttp,
+    pair: { from: string; to: string },
+    start: string,
+    end: string,
+  ): Promise<{ date: string; rate: number }[]>;
 }
 
 /** Shape every collectors package (public or private) exports from its entry point. */

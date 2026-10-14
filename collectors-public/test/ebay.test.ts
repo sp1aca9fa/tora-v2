@@ -43,7 +43,7 @@ it('reads grades and keeps only listings of this one card, per condition', () =>
   expect(groups.get(null)!.map((i) => i.itemId)).toEqual(['1', '2']);
 });
 
-it('saves the median ask per condition in dollars and yen, with the search it built', async () => {
+it('saves the median ask per condition in dollars (converted by the collect), with the search it built', async () => {
   vi.stubEnv('EBAY_CLIENT_ID', 'id');
   vi.stubEnv('EBAY_CLIENT_SECRET', 'secret');
   vi.stubGlobal(
@@ -63,7 +63,6 @@ it('saves the median ask per condition in dollars and yen, with the search it bu
     now: new Date('2026-10-12T03:00:00Z'),
     log: () => {},
     save: async (rows) => (saved.push(...(rows as never[])), rows.length),
-    fx: async () => ({ date: '2026-10-09', rate: 150 }),
     linkedListings: async () => [{ source: 'tcgcsv', title: 'Pikachu - 208/S-P' }],
   };
   const link = {
@@ -81,7 +80,7 @@ it('saves the median ask per condition in dollars and yen, with the search it bu
     expect.objectContaining({
       bucket: null,
       priceOriginal: 4750,
-      priceBase: 7125,
+      price: 4750,
       currency: 'USD',
       observationType: 'listing',
       externalRef: 'P1|ungraded|2026-10-12',

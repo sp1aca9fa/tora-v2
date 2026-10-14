@@ -1,5 +1,7 @@
-import { and, desc, eq, gte, lte, ne } from 'drizzle-orm';
+import { fromMinor, marketCurrency } from '@tora/core';
+import { and, asc, desc, eq, gt, gte, lte, ne } from 'drizzle-orm';
 import type { Db } from './client';
+import { loadSourceRegistry } from './registry';
 import { type Product, fxRates, priceObservations, tcgSets } from './schema';
 
 export interface FxRate {
@@ -29,7 +31,10 @@ export async function saveFxRates(db: Db, pair: string, rates: FxRate[]): Promis
   return rates.length;
 }
 
-/** The rate in effect on a date: that day's, else the last one before (weekends, holidays). */
+/**
+ * The rate in effect on a date: that day's, else the last one before (weekends, holidays), else
+ * the first one after (a day before any stored rate, e.g. an old sale and a rate typed today).
+ */
 export async function fxRateOn(db: Db, pair: string, date: string): Promise<FxRate | null> {
   const [row] = await db
     .select({ date: fxRates.date, rate: fxRates.rate })
@@ -37,7 +42,14 @@ export async function fxRateOn(db: Db, pair: string, date: string): Promise<FxRa
     .where(and(eq(fxRates.pair, pair), lte(fxRates.date, date)))
     .orderBy(desc(fxRates.date))
     .limit(1);
-  return row ?? null;
+  if (row) return row;
+  const [after] = await db
+    .select({ date: fxRates.date, rate: fxRates.rate })
+    .from(fxRates)
+    .where(and(eq(fxRates.pair, pair), gt(fxRates.date, date)))
+    .orderBy(asc(fxRates.date))
+    .limit(1);
+  return after ?? null;
 }
 
 /**
@@ -70,7 +82,7 @@ export interface ForeignPrice {
   source: string;
   title: string | null;
   url: string | null;
-  /** In the source's currency (e.g. dollars), and converted to yen with the rate of `fxDate`. */
+  /** In the source's currency (e.g. dollars), and converted to the base with the rate of `fxDate`. */
   price: number;
   currency: string;
   priceBase: number;
@@ -85,7 +97,10 @@ export interface ForeignPrice {
   count: number | null;
 }
 
-/** Newest price per foreign listing of a product (e.g. TCGplayer), from the last `days`. */
+/**
+ * Newest price per listing of a product in another market's currency than the primary one (e.g.
+ * TCGplayer), from the last `days`.
+ */
 export async function foreignPrices(
   db: Db,
   productId: string,
@@ -93,6 +108,7 @@ export async function foreignPrices(
   days = 14,
 ): Promise<ForeignPrice[]> {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const primary = marketCurrency(await loadSourceRegistry(db));
   const rows = await db
     .select()
     .from(priceObservations)
@@ -100,7 +116,7 @@ export async function foreignPrices(
       and(
         eq(priceObservations.productId, productId),
         eq(priceObservations.excluded, false),
-        ne(priceObservations.currency, 'JPY'),
+        ne(priceObservations.currency, primary),
         gte(priceObservations.fetchedAt, since),
       ),
     )
@@ -116,7 +132,7 @@ export async function foreignPrices(
       source: o.source,
       title: o.title,
       url: o.url,
-      price: o.priceOriginal / 100,
+      price: fromMinor(o.priceOriginal, o.currency),
       currency: o.currency,
       priceBase: o.priceBase,
       fxRate: o.fxRate,

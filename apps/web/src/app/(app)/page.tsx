@@ -33,7 +33,13 @@ export default async function SummaryPage() {
   // Per category: units, value and P/L of the valued lots.
   const categories = new Map<
     Category,
-    { units: number; valueBase: number; costBase: number; plValueBase: number; valuedCostBase: number }
+    {
+      units: number;
+      valueBase: number;
+      costBase: number;
+      plValueBase: number;
+      valuedCostBase: number;
+    }
   >();
   for (const { holding, product, valuation } of portfolio.rows) {
     const c = categories.get(product.category) ?? {

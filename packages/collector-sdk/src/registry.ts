@@ -1,5 +1,5 @@
 import type { SourceInfo } from '@tora/core';
-import { type Db, saveSourceInfos } from '@tora/db';
+import { type Db, saveRateSources, saveSourceInfos } from '@tora/db';
 import { findRepoRoot } from '@tora/db/env';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -45,11 +45,15 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
 }
 
 /**
- * Loads the collector packages and saves their source descriptions for the app (every command
+ * Loads the collector packages and saves their source and rate descriptions for the app (every command
  * that runs collectors or imports starts with this).
  */
 export async function loadAndRegister(db: Db, root?: string): Promise<LoadedCollectors> {
   const loaded = await loadCollectors(root);
   await saveSourceInfos(db, loaded.sources);
+  await saveRateSources(
+    db,
+    loaded.rates.map(({ key, label, currencies }) => ({ key, label, currencies })),
+  );
   return loaded;
 }

@@ -1,4 +1,4 @@
-import { sourceInfo } from '@tora/core';
+import { baseCurrency, sourceInfo } from '@tora/core';
 // Import through Claude (S4c), second half: the rows Claude read go through the same import plan
 // as receipt emails, per shop. Nothing is asked: a likely match with an entry added by hand is
 // the same purchase (its ID is attached when there is one), a conflict keeps what is registered,
@@ -74,7 +74,11 @@ export async function planAiImport(
     const alone = kept.filter((k) => k.row.file === r.row.file).length === 1;
     if (!r.row.orderId && id && alone) r.row = { ...r.row, orderId: id };
   }
-  const rows = toReceipts(kept, fallbackDate);
+  const rows = toReceipts(
+    kept,
+    fallbackDate,
+    (shop) => sourceInfo(registry, shopKey(shop, registry))?.currency ?? baseCurrency(registry),
+  );
   const shops: ShopPlan[] = [];
   for (const shop of new Set(rows.map((r) => shopKey(r.row.shop, registry)))) {
     const mine = rows.filter((r) => shopKey(r.row.shop, registry) === shop);

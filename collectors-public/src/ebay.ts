@@ -1,6 +1,6 @@
-import type { Collector, CollectorContext } from '@tora/collector-sdk';
+import type { Collector, CollectorContext, PriceInput } from '@tora/collector-sdk';
 import { GRADERS, gradedBucket, median, tokyoDate, toTokyoIso, withoutOutliers } from '@tora/core';
-import type { NewPriceObservation, Product } from '@tora/db';
+import type { Product } from '@tora/db';
 
 /**
  * eBay asking prices through eBay's official Browse API (active listings only: sold data is closed
@@ -153,10 +153,8 @@ export const ebay: Collector = {
         !(query.excludeKeywords ?? []).some((w) => i.title.toLowerCase().includes(w.toLowerCase())),
     );
     const day = tokyoDate(ctx.now);
-    const fx = await ctx.fx?.('USDJPY', day);
-    if (!fx) throw new Error('no USD/JPY rate stored yet');
     const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(keywords)}&LH_BIN=1`;
-    const rows: NewPriceObservation[] = [];
+    const rows: PriceInput[] = [];
     for (const [bucket, list] of groupListings(product, items)) {
       const prices = list.map((i) => Number(i.price!.value)).filter((n) => n > 0);
       const kept = withoutOutliers(prices);
@@ -168,10 +166,9 @@ export const ebay: Collector = {
         // The day's median asking price of the active listings: not a sale.
         observationType: 'listing',
         bucket,
-        priceBase: Math.round(usd * fx.rate),
+        price: Math.round(usd * 100),
         priceOriginal: Math.round(usd * 100),
         currency: 'USD',
-        fxRate: fx.rate,
         observedAt: toTokyoIso(ctx.now),
         fetchedAt: toTokyoIso(ctx.now),
         externalRef: `${product.id}|${bucket ?? 'ungraded'}|${day}`,
@@ -182,7 +179,6 @@ export const ebay: Collector = {
           stat: 'median_ask',
           count: list.length,
           min: Math.min(...prices),
-          fxDate: fx.date,
           // Every listing seen today (kept 14 days, see the source description): those gone
           // before their end may have sold. No titles or links are kept (eBay's terms allow
           // copies only while needed).

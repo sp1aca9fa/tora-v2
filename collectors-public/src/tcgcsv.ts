@@ -172,8 +172,6 @@ export const tcgcsv: Collector = {
     // When TCGCSV last refreshed its prices (e.g. "2026-10-10T20:06:02+0000").
     const at = updated && !Number.isNaN(Date.parse(updated)) ? new Date(updated) : ctx.now;
     const day = tokyoDate(at);
-    const fx = await ctx.fx?.('USDJPY', day);
-    if (!fx) throw new Error('no USD/JPY rate stored yet');
     const rows = prices
       .filter((p) => p.productId === id)
       .flatMap((p) => {
@@ -186,10 +184,9 @@ export const tcgcsv: Collector = {
             // A daily market price (TCGplayer's estimate from recent sales), not one sale.
             observationType: 'listing' as const,
             bucket: null,
-            priceBase: Math.round(usd * fx.rate),
+            price: Math.round(usd * 100),
             priceOriginal: Math.round(usd * 100),
             currency: 'USD',
-            fxRate: fx.rate,
             observedAt: toTokyoIso(at),
             fetchedAt: toTokyoIso(ctx.now),
             externalRef: `${id}|${p.subTypeName}|${day}`,
@@ -201,7 +198,6 @@ export const tcgcsv: Collector = {
               low: p.lowPrice,
               mid: p.midPrice,
               high: p.highPrice,
-              fxDate: fx.date,
             },
           },
         ];

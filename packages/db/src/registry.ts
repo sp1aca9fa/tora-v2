@@ -1,7 +1,9 @@
 // The source registry (requirements S8, sources with roles): what the plug-ins describe, saved
 // by the collectors, read by the app.
 import {
+  type CurrencySettings,
   ITEM_CLASSES,
+  type RateSourceInfo,
   type MarketSettings,
   type ProductClass,
   QUALITY_MAX_GAP,
@@ -16,6 +18,7 @@ import {
   inClassOrder,
   median,
   productClass,
+  resolveCurrency,
   resolveMarkets,
   toTokyoIso,
 } from '@tora/core';
@@ -60,10 +63,11 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     db
       .select()
       .from(appSettings)
-      .where(inArray(appSettings.key, ['markets', 'sourceOrder'])),
+      .where(inArray(appSettings.key, ['markets', 'sourceOrder', 'currency', 'rateSources'])),
   ]);
   const markets = settings.find((r) => r.key === 'markets');
   const order = settings.find((r) => r.key === 'sourceOrder');
+  const setting = (key: string) => settings.find((r) => r.key === key)?.value;
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
   const infos = rows.map((r) => r.info);
   const quality = Object.fromEntries(
@@ -81,10 +85,13 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     declared,
     quality,
     markets: resolveMarkets(infos, markets?.value as Partial<MarketSettings> | undefined),
-    changedAt: [...rows, ...settings].reduce(
-      (max, r) => (r.updatedAt > max ? r.updatedAt : max),
-      '',
-    ),
+    // Rates only change how prices collected next are converted: saved values stay valid.
+    changedAt: [
+      ...rows,
+      ...settings.filter((r) => r.key === 'markets' || r.key === 'sourceOrder'),
+    ].reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), ''),
+    currency: resolveCurrency(setting('currency') as Partial<CurrencySettings> | undefined),
+    rateSources: (setting('rateSources') as RateSourceInfo[] | undefined) ?? [],
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;
@@ -108,6 +115,28 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
     .values({ key: 'markets', value })
     .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: at } });
   cache = new WeakMap();
+}
+
+/** Saves a setting (app_settings) and clears the registry cache. */
+async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
+  const at = toTokyoIso();
+  await db
+    .insert(appSettings)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: at } });
+  cache = new WeakMap();
+}
+
+/** The base currency and where each currency's rate comes from (S16). */
+export async function setCurrencySettings(db: Db, value: CurrencySettings): Promise<void> {
+  await saveSetting(db, 'currency', value);
+}
+
+/** The rate plug-ins installed (collectors, at the start of a run). */
+export async function saveRateSources(db: Db, infos: RateSourceInfo[]): Promise<void> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'rateSources'));
+  if (JSON.stringify(row?.value) !== JSON.stringify(infos))
+    await saveSetting(db, 'rateSources', infos);
 }
 
 /** The admin's order of the sources for a class (Settings > Price sources); values follow. */

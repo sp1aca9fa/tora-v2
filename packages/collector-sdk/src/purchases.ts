@@ -2,7 +2,7 @@
 // removed or silently changed: a transaction ID already registered is skipped when the data
 // agrees and asked about when it does not; an entry without ID that looks like the same purchase
 // is asked about too.
-import { orderSourceOf, tokyoDate } from '@tora/core';
+import { orderSourceOf, sourceInfo, tokyoDate } from '@tora/core';
 import {
   type Db,
   type Holding,
@@ -20,6 +20,7 @@ import {
   loadSourceRegistry,
 } from '@tora/db';
 import { termCoverage } from './match';
+import { baseConverter } from './money';
 import type { PurchaseImporter, PurchaseReceipt, ReceiptMail } from './types';
 
 const titleKey = (title: string) => title.normalize('NFKC').replace(/\s+/g, ' ').trim();
@@ -156,14 +157,14 @@ export type PlanEntry = (
 const dayNumber = (iso: string) => Date.parse(`${tokyoDate(new Date(iso))}T00:00:00Z`) / 86_400_000;
 const daysApart = (a: string, b: string) => Math.abs(dayNumber(a) - dayNumber(b));
 const paidAmounts = (r: PurchaseReceipt) =>
-  [r.totalBase, r.itemPriceBase].filter((n): n is number => n != null);
+  [r.total, r.itemPrice].filter((n): n is number => n != null);
 
 function compare(receipt: PurchaseReceipt, existing: Holding[]): Diff[] {
   const diffs: Diff[] = [];
   const cost = existing.reduce((s, h) => s + h.costTotalBase, 0);
   const quantity = existing.reduce((s, h) => s + h.quantity, 0);
   if (!paidAmounts(receipt).includes(cost)) {
-    diffs.push({ field: 'cost', existing: cost, imported: receipt.totalBase });
+    diffs.push({ field: 'cost', existing: cost, imported: receipt.total });
   }
   if (quantity !== receipt.quantity) {
     diffs.push({ field: 'quantity', existing: quantity, imported: receipt.quantity });
@@ -190,6 +191,17 @@ export async function planImport(
 ): Promise<PlanEntry[]> {
   const owned = await holdingsWithProducts(db, userId);
   const registry = await loadSourceRegistry(db);
+  // Receipts are in the shop's currency; costs are stored in the base (S16).
+  const toBase = await baseConverter(db);
+  const own = sourceInfo(registry, importer.source)?.currency;
+  const inBase = async (r: PurchaseReceipt): Promise<PurchaseReceipt> => {
+    const currency = r.currency || own;
+    const total = (await toBase(r.total, currency, r.orderedAt)).amount;
+    const itemPrice =
+      r.itemPrice == null ? r.itemPrice : (await toBase(r.itemPrice, currency, r.orderedAt)).amount;
+    return { ...r, total, itemPrice, currency: toBase.base };
+  };
+  gathered = { ...gathered, receipts: await Promise.all(gathered.receipts.map(inBase)) };
   // Receipts may carry no listing link; a listing's title is what the receipt shows.
   const byListingId = new Map<string, Product>();
   const byListingTitle = new Map<string, Product>();
@@ -341,7 +353,7 @@ export async function applyImport(
       existing ? { productId: existing.id } : { product: (ref as { create: ProductInput }).create },
       {
         quantity: receipt.quantity,
-        costTotalBase: receipt.totalBase,
+        costTotalBase: receipt.total,
         acquiredAt: receipt.orderedAt,
         acquiredFrom: importer.label,
         acquisitionType: 'purchase',
@@ -381,7 +393,7 @@ export async function applyImport(
       ) {
         const edit: Parameters<typeof editHolding>[3] = {};
         for (const d of entry.diffs) {
-          if (d.field === 'cost') edit.costTotalBase = receipt.totalBase;
+          if (d.field === 'cost') edit.costTotalBase = receipt.total;
           if (d.field === 'quantity') edit.quantity = receipt.quantity;
           if (d.field === 'date') edit.acquiredAt = receipt.orderedAt;
         }

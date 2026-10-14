@@ -82,7 +82,6 @@ const ctx: CollectorContext = {
   now: new Date('2026-10-11T03:00:00Z'),
   log: () => {},
   save: async (rows) => (saved.push(...rows), rows.length),
-  fx: async () => ({ date: '2026-10-09', rate: 150 }),
   setOf: async (p) =>
     p.setName === 'バトルパートナーズ' ? { code: 'SV9', releaseDate: '2025-01-24' } : null,
 };
@@ -121,7 +120,7 @@ it('finds a card by set code and number, and a box by its catalog set', async ()
   expect(pack.map((c) => c.externalId)).toEqual(['13']);
 });
 
-it('saves the market price in dollars and yen, finding the set from the listing link', async () => {
+it('saves the market price in dollars (converted by the collect), finding the set from the listing link', async () => {
   const link = {
     externalId: '11',
     url: 'https://www.tcgplayer.com/product/11/pokemon-japan-sv9-battle-partners-lillies-ribombee',
@@ -133,10 +132,9 @@ it('saves the market price in dollars and yen, finding the set from the listing 
     expect.objectContaining({
       source: 'tcgcsv',
       observationType: 'listing',
-      priceBase: 3525,
+      price: 2350,
       priceOriginal: 2350,
       currency: 'USD',
-      fxRate: 150,
       externalRef: '11|Holofoil|2026-10-11',
     }),
   ]);

@@ -125,7 +125,7 @@ for (const s of plan.shops) {
                 ? 'could not tell what item this is: not imported'
                 : 'cancelled';
     console.log(
-      `  ${tokyoDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.totalBase)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
+      `  ${tokyoDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
     );
     console.log(
       `      -> ${what}${entry.flags?.length ? `  [check: ${entry.flags.join(', ')}]` : ''}${row?.reviewedBy ? `  (Sonnet: ${row.reviewedBy})` : ''}`,

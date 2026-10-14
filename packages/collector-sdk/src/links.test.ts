@@ -43,7 +43,7 @@ const receipt = (id: string, title: string, price: number): PurchaseReceipt => (
   orderedAt: '2026-09-01T12:00:00.000+09:00',
   title,
   quantity: 1,
-  totalBase: price,
+  total: price,
   listing: null,
   reference: `https://shop.example/item/${id}`,
   dateApprox: true,

@@ -16,8 +16,10 @@ import {
   REGIONS,
   type Region,
   type SourceRegistry,
+  baseCurrency,
   shopOf,
   sourceName,
+  toMinor,
 } from '@tora/core';
 import {
   type Db,
@@ -42,8 +44,10 @@ export interface ExtractedRow {
   orderId: string | null;
   title: string;
   url: string | null;
-  /** Total paid for this item (shipping and fees included when shown). */
-  priceBase: number | null;
+  /** Total paid for this item (shipping and fees included when shown), as shown (e.g. 12.5). */
+  price: number | null;
+  /** ISO 4217 code of the price when the page shows it; null: the shop's currency. */
+  currency?: string | null;
   quantity: number;
   /** YYYY-MM-DD */
   date: string | null;
@@ -89,7 +93,8 @@ export const ROWS_SCHEMA = {
           orderId: str,
           title: { type: 'string' },
           url: str,
-          priceBase: { type: ['number', 'null'] },
+          price: { type: ['number', 'null'] },
+          currency: str,
           quantity: { type: 'integer' },
           date: str,
           dateApprox: { type: 'boolean' },
@@ -123,7 +128,8 @@ export const ROWS_SCHEMA = {
           'shop',
           'orderId',
           'title',
-          'priceBase',
+          'price',
+          'currency',
           'quantity',
           'date',
           'dateApprox',
@@ -198,7 +204,8 @@ One row per distinct item in an order. Several of the same item are one row with
 - shop: ${shopList(registry)}or the shop's name in lowercase.
 - orderId: exactly as shown (an order number, transaction ID or item ID${idHints(registry)}); null when none is shown.
 - title: the item's title as shown. url: when shown.
-- priceBase: what was paid for this item: item price plus shipping and fees when charged separately, minus coupons and discounts (クーポン利用, 割引). Points or balance used to pay (メルペイ残高, ポイント利用, PayPay) are a way of paying, not a discount. The item price when that is all there is. Several items in one order: each item's own price.
+- price: what was paid for this item: item price plus shipping and fees when charged separately, minus coupons and discounts (クーポン利用, 割引). Points or balance used to pay (メルペイ残高, ポイント利用, PayPay) are a way of paying, not a discount. The item price when that is all there is. Several items in one order: each item's own price.
+- currency: the ISO 4217 code of that price when the page shows it (¥ or 円: JPY; $ on a US site: USD; €: EUR), else null.
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
 - date: the order / purchase date as YYYY-MM-DD (購入日時, 注文日). An order date missing its year: your best guess with dateApprox true. A listing page's age or update time (半年以上前, 3日前, 更新) is not the purchase date: null. Not shown at all: null.
 - status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
@@ -277,7 +284,10 @@ export function checkRow(row: ExtractedRow, ctx: CheckContext): RowFlag[] {
   if (row.orderId && ctx.orderIds.has(row.orderId)) return [];
   const flags: RowFlag[] = [];
   if (row.unsure) flags.push('unsure');
-  if (!row.priceBase || row.priceBase <= 0) flags.push('no_price');
+  if (!row.price || row.price <= 0) flags.push('no_price');
+  // Prices in another currency than the base are not compared with values.
+  const base = baseCurrency(ctx.registry ?? EMPTY_REGISTRY);
+  const inBase = !row.currency || row.currency === base;
   if (!row.date || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) flags.push('no_date');
   if (!Number.isInteger(row.quantity) || row.quantity < 1 || row.quantity > 20) {
     flags.push('odd_quantity');
@@ -293,7 +303,8 @@ export function checkRow(row: ExtractedRow, ctx: CheckContext): RowFlag[] {
     );
     if (coverage < 0.5) flags.push('weak_match');
     const value = ctx.unitValue.get(product.id);
-    const unit = row.priceBase && row.quantity ? row.priceBase / row.quantity : null;
+    const unit =
+      inBase && row.price && row.quantity ? toMinor(row.price, base) / row.quantity : null;
     if (value && unit && (unit > value * 3 || unit < value / 3)) flags.push('price_far');
   }
   if (!product && row.product?.name) {
@@ -359,6 +370,8 @@ export interface ImportRow {
 export function toReceipts(
   rows: { row: ExtractedRow; flags: RowFlag[]; reviewedBy: string | null }[],
   fallbackDate: (file: string) => string,
+  /** The currency of a shop's prices (its source description, else the base). */
+  currencyOf: (shop: string) => string = () => 'JPY',
 ): ImportRow[] {
   // Several items of one order share its ID: each gets its own key ("<order>#2").
   const perOrder = new Map<string, number>();
@@ -377,7 +390,7 @@ export function toReceipts(
     const key =
       orderId ??
       `~${createHash('sha256')
-        .update([row.file, row.title, row.priceBase, row.date].join('|'))
+        .update([row.file, row.title, row.price, row.date].join('|'))
         .digest('hex')
         .slice(0, 16)}`;
     const receipt: PurchaseReceipt = {
@@ -387,7 +400,8 @@ export function toReceipts(
       orderedAt: date ? `${date}T12:00:00.000+09:00` : fallbackDate(row.file),
       title: row.title,
       quantity: row.quantity >= 1 && row.quantity <= 100 ? row.quantity : 1,
-      totalBase: Math.round(row.priceBase ?? 0),
+      total: toMinor(row.price ?? 0, row.currency || currencyOf(row.shop)),
+      currency: row.currency || currencyOf(row.shop),
       listing: null,
       dateApprox: row.dateApprox || !date,
     };
@@ -531,7 +545,7 @@ const sameDay = (a: string | null, b: string | null) => !a || !b || a === b;
 /** Nothing in two rows says they are different purchases. */
 function compatible(a: ExtractedRow, b: ExtractedRow, registry: SourceRegistry): boolean {
   if (shopKey(a.shop, registry) !== shopKey(b.shop, registry)) return false;
-  if (a.priceBase && b.priceBase && a.priceBase !== b.priceBase) return false;
+  if (a.price && b.price && a.price !== b.price) return false;
   if (a.orderId && b.orderId && a.orderId !== b.orderId) return false;
   // A guessed date says nothing against another page's date.
   return a.dateApprox || b.dateApprox || sameDay(a.date, b.date);
@@ -569,7 +583,7 @@ export function mergeRows(
       file: [...filesOf(a), ...filesOf(b)].join(' + '),
       orderId: a.orderId ?? b.orderId,
       url: full.url ?? other.url,
-      priceBase: full.priceBase ?? other.priceBase,
+      price: full.price ?? other.price,
       date: dated.date,
       dateApprox: dated.date ? dated.dateApprox : full.dateApprox,
       status: a.status === 'cancelled' || b.status === 'cancelled' ? 'cancelled' : full.status,
@@ -600,7 +614,7 @@ export function mergeRows(
     }
     // Look-alikes the model did not tag (e.g. read in different batches).
     const alike = out.find((o) => {
-      if (!distinctFiles(o, row) || !o.priceBase || o.priceBase !== row.priceBase) return false;
+      if (!distinctFiles(o, row) || !o.price || o.price !== row.price) return false;
       if (o.status === 'not_purchase' || row.status === 'not_purchase') return false;
       const [a, b] = [titleCore(o.title), titleCore(row.title)].sort((x, y) => x.length - y.length);
       return a!.length >= 6 && b!.startsWith(a!) && compatible(o, row, registry);
@@ -638,6 +652,12 @@ export async function readPurchases(
   const log = options.log ?? (() => {});
   const random = options.random ?? Math.random;
   const cache: ReadCache = (await options.loadCache?.()) ?? { version: 1, files: {} };
+  // Rows read before prices kept their currency (S16) named the price `priceJpy`.
+  for (const f of Object.values(cache.files)) {
+    for (const r of f.rows as (ExtractedRow & { priceJpy?: number | null })[]) {
+      if (r.price === undefined && r.priceJpy !== undefined) r.price = r.priceJpy;
+    }
+  }
   const result: ReadResult = {
     rows: [],
     files: files.length,
@@ -748,7 +768,7 @@ export async function readPurchases(
   const cache_pairs = (cache.pairs ??= {});
   const pairKey = (a: ExtractedRow, b: ExtractedRow) =>
     [a, b]
-      .map((r) => `${r.file}|${r.title}|${r.priceBase}`)
+      .map((r) => `${r.file}|${r.title}|${r.price}`)
       .sort()
       .join(' || ');
   const open = assemble().pairs.filter(([a, b]) => !cache_pairs[pairKey(a, b)]);
@@ -757,7 +777,7 @@ export async function readPurchases(
     const view = (r: ExtractedRow) => ({
       file: r.file,
       title: r.title,
-      priceBase: r.priceBase,
+      price: r.price,
       quantity: r.quantity,
       date: r.dateApprox ? null : r.date,
       orderId: r.orderId,

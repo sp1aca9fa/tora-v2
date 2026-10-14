@@ -269,7 +269,10 @@ describe('saved bucket values (S8 speed)', () => {
       .select()
       .from(priceObservations)
       .where(
-        and(eq(priceObservations.productId, mew.product.id), eq(priceObservations.priceBase, 1_000)),
+        and(
+          eq(priceObservations.productId, mew.product.id),
+          eq(priceObservations.priceBase, 1_000),
+        ),
       );
     await setObservationExcluded(db, outlier!.id, true);
     const values = await valueHoldings(db, uid, await owned(), now);

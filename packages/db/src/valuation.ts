@@ -19,6 +19,7 @@ import {
   sourceSummaries,
   trend,
   valuationOrder,
+  marketCurrency,
   valueUnit,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
@@ -88,6 +89,9 @@ export interface MarketData {
   order: Partial<Record<ProductClass, string[]>>;
 }
 
+/** The currency of the prices a valuation uses (the primary market's). */
+const valuedCurrency = async (db: Db) => marketCurrency(await loadSourceRegistry(db));
+
 /** The registry's valuation order per item class. */
 async function orderByClass(db: Db): Promise<Partial<Record<ProductClass, string[]>>> {
   const registry = await loadSourceRegistry(db);
@@ -113,6 +117,7 @@ export async function loadMarketData(
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   if (productIds.length === 0)
     return { observations, recent, manual, order: await orderByClass(db) };
+  const currency = await valuedCurrency(db);
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
     const rows = await db
@@ -131,10 +136,10 @@ export async function loadMarketData(
       .where(
         and(
           inArray(priceObservations.productId, ids),
-          // Sales and buy prices, plus shops' asking prices (a fallback); prices in yen only:
-          // foreign markets (e.g. TCGplayer in dollars) are shown beside the value, never in it.
+          // Sales and buy prices, plus shops' asking prices (a fallback); prices of the primary
+          // market only: other markets (e.g. TCGplayer in dollars) are shown beside the value.
           inArray(priceObservations.observationType, ['sold', 'buylist', 'listing']),
-          or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
+          or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
           eq(priceObservations.excluded, false),
           gte(priceObservations.observedAt, since),
         ),
@@ -165,11 +170,11 @@ export async function loadMarketData(
   return { observations, recent, manual, order: await orderByClass(db) };
 }
 
-/** Yen sales a valuation may use (the filters of `loadMarketData`). */
-const yenSales = () =>
+/** Sales a valuation may use (the filters of `loadMarketData`). */
+const valuedSales = (currency: string) =>
   and(
     eq(priceObservations.observationType, 'sold'),
-    or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
+    or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
     eq(priceObservations.excluded, false),
   );
 
@@ -194,6 +199,7 @@ export async function loadHoldingsMarketData(
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   if (productIds.length === 0)
     return { observations, recent, manual, order: await orderByClass(db) };
+  const currency = await valuedCurrency(db);
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
   // window are never used, so extra is safe).
   const exact = (days: number) => toTokyoIso(new Date(now.getTime() - days * DAY));
@@ -245,7 +251,7 @@ export async function loadHoldingsMarketData(
         .where(
           and(
             inArray(priceObservations.productId, ids),
-            yenSales(),
+            valuedSales(currency),
             gte(priceObservations.observedAt, since),
           ),
         )
@@ -260,7 +266,7 @@ export async function loadHoldingsMarketData(
           and(
             inArray(priceObservations.productId, ids),
             inArray(priceObservations.observationType, ['buylist', 'listing']),
-            or(isNull(priceObservations.currency), eq(priceObservations.currency, 'JPY')),
+            or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
             eq(priceObservations.excluded, false),
             gte(priceObservations.observedAt, c30),
           ),
@@ -313,7 +319,7 @@ export async function loadHoldingsMarketData(
           .where(
             and(
               sql`(${priceObservations.productId}, ${priceObservations.source}, ${priceObservations.bucket}) in (values ${rows})`,
-              yenSales(),
+              valuedSales(currency),
               gte(priceObservations.observedAt, at),
             ),
           ),

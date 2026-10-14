@@ -76,7 +76,11 @@ export async function listInventory(db: Db, userId: string, filter: InventoryFil
 /** Total paid for what the user still owns. Market value arrives with valuation (S5). */
 export async function ownedTotals(db: Db, userId: string) {
   const [row] = await db
-    .select({ spentBase: sum(holdings.costTotalBase), lots: count(), units: sum(holdings.quantity) })
+    .select({
+      spentBase: sum(holdings.costTotalBase),
+      lots: count(),
+      units: sum(holdings.quantity),
+    })
     .from(holdings)
     .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')));
   return {

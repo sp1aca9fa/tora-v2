@@ -1,4 +1,4 @@
-import type { CollectorRunStatus } from '@tora/core';
+import { type CollectorRunStatus, sourceInfo } from '@tora/core';
 import {
   type Db,
   activeSources,
@@ -7,8 +7,8 @@ import {
   finishRun,
   listProductSources,
   setSourceQuery,
-  fxRateOn,
   insertObservations,
+  loadSourceRegistry,
   productSetInfo,
   productsToMatch,
   productsWithoutSource,
@@ -27,6 +27,7 @@ import {
   RequestCapError,
   errorText,
 } from './http';
+import { baseConverter } from './money';
 import type { Collector, CollectorContext } from './types';
 
 export interface RunOptions {
@@ -67,16 +68,29 @@ export async function runCollector(
   const log = options.log ?? ((m: string) => console.log(`[${collector.source}] ${m}`));
   const http = new PoliteHttp(options.http);
   let added = 0;
+  const now = options.now ?? new Date();
+  // Plug-ins report amounts in their own currency; they are stored in the base (S16).
+  const toBase = await baseConverter(db);
+  const own = sourceInfo(await loadSourceRegistry(db), collector.source)?.currency;
   const ctx: CollectorContext = {
     http,
-    now: options.now ?? new Date(),
+    now,
     log,
     save: async (rows) => {
-      const n = await insertObservations(db, rows);
+      const converted = [];
+      for (const { price, ...row } of rows) {
+        const c = await toBase(price, row.currency, row.observedAt);
+        converted.push({
+          ...row,
+          priceBase: c.amount,
+          fxRate: c.rate,
+          raw: c.rateDate ? { ...(row.raw as object), fxDate: c.rateDate } : row.raw,
+        });
+      }
+      const n = await insertObservations(db, converted);
       added += n;
       return n;
     },
-    fx: (pair, date) => fxRateOn(db, pair, date),
     setOf: (product) => productSetInfo(db, product),
     linkedListings: async (productId) =>
       (await listProductSources(db, productId))
@@ -143,10 +157,15 @@ export async function runCollector(
             log(`match "${product.name}": ${known} suggested from a linked look-alike`);
             continue;
           }
-          const found = await collector.findCandidates(product, ctx);
-          const n = await saveCandidates(db, product.id, collector.source, found.slice(0, 8));
+          const found = [];
+          for (const { price, ...c } of (await collector.findCandidates(product, ctx)).slice(0, 8))
+            found.push({
+              ...c,
+              priceBase: price == null ? null : (await toBase(price, own, now)).amount,
+            });
+          const n = await saveCandidates(db, product.id, collector.source, found);
           summary.candidates += n;
-          log(`match "${product.name}": ${found.length} found, ${n} new`);
+          log(`match "${product.name}": ${found.length} kept, ${n} new`);
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
           fail(`match ${product.name}`, e);
@@ -198,7 +217,14 @@ export async function runCollector(
             success: true,
             title: result.title,
             url: result.url,
-            recentSales: result.recentSales,
+            recentSales:
+              result.recentSales &&
+              (await Promise.all(
+                result.recentSales.map(async ({ price, ...r }) => ({
+                  ...r,
+                  priceBase: (await toBase(price, own, r.observedAt)).amount,
+                })),
+              )),
             imageUrl: result.imageUrl,
           });
           const title = result.title ?? link.title;

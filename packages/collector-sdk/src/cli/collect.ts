@@ -61,7 +61,11 @@ if (withRates) {
   progress.next('exchange rates');
   try {
     for (const r of await updateRates(db, rates, new PoliteHttp({ maxRequests: 10 }))) {
-      log(`exchange rates: ${r.pair} ${r.saved} day(s) saved, latest ${r.latest ?? 'none'}`);
+      log(
+        r.source
+          ? `exchange rates: ${r.pair} ${r.saved} day(s) saved, latest ${r.latest ?? 'none'}`
+          : `exchange rates: ${r.pair} has no rate plug-in (Settings > Markets: pick one or type a rate)`,
+      );
     }
   } catch (error) {
     log(`exchange rates: stopped (${errorText(error)})`);

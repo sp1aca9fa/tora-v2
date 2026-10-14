@@ -686,7 +686,13 @@ export async function submitGrading(
   db: Db,
   userId: string,
   id: string,
-  input: { quantity: number; grader: Grader; feeBase: number; service?: string; occurredAt: string },
+  input: {
+    quantity: number;
+    grader: Grader;
+    feeBase: number;
+    service?: string;
+    occurredAt: string;
+  },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding, product } = await loadHolding(tx, userId, id);

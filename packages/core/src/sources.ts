@@ -1,6 +1,7 @@
 // Sources and roles (requirements S8, "bring your own sources"). Plug-in packages describe their
 // price sources and the shops purchases come from; collectors save these descriptions to the
 // database and the app reads them there. Nothing here names a store: the descriptions do.
+import type { CurrencySettings, RateSourceInfo } from './money';
 import type { ProductClass } from './taxonomy';
 
 /**
@@ -147,7 +148,26 @@ export interface SourceRegistry {
   order?: SourceOrder;
   /** When a source's description or roles last changed (values saved before are stale). */
   changedAt?: string;
+  /** The base currency and where other currencies' rates come from (S16); default: yen. */
+  currency?: CurrencySettings;
+  /** The rate plug-ins the collectors installed. */
+  rateSources?: RateSourceInfo[];
 }
+
+/**
+ * A market's currency (its sources'; default: the primary market's, else the base): the
+ * currency of the prices valued, other markets' prices are only compared.
+ */
+export function marketCurrency(
+  registry: SourceRegistry,
+  market: string | null | undefined = registry.markets?.primary,
+): string {
+  const source = registry.sources.find((s) => s.currency && !s.shopOnly && inMarket(s, market));
+  return source?.currency ?? baseCurrency(registry);
+}
+
+/** The currency every amount is stored in. */
+export const baseCurrency = (registry: SourceRegistry) => registry.currency?.base ?? 'JPY';
 
 export type SourceOrder = Partial<Record<ProductClass, string[]>>;
 

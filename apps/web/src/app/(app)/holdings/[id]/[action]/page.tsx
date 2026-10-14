@@ -290,7 +290,11 @@ export default async function HoldingActionPage({
         <>
           {quantityField()}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t('fields.priceBase')} htmlFor="priceBase" hint={t('lotActions.priceHint')}>
+            <Field
+              label={t('fields.priceBase')}
+              htmlFor="priceBase"
+              hint={t('lotActions.priceHint')}
+            >
               {yenInput('priceBase')}
             </Field>
             <Field label={t('fields.feesBase')} htmlFor="feesBase" hint={t('lotActions.feesHint')}>

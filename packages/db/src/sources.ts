@@ -935,7 +935,14 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
   const wanted = owned.flatMap(({ product, cost }) => {
     const identity = identityFor(product, Number(cost), registry);
     return identity
-      ? [{ product, costBase: Number(cost), source: identity.preferred, accepted: identity.accepted }]
+      ? [
+          {
+            product,
+            costBase: Number(cost),
+            source: identity.preferred,
+            accepted: identity.accepted,
+          },
+        ]
       : [];
   });
   if (wanted.length === 0) return [];
