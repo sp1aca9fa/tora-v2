@@ -25,8 +25,8 @@ export function isConsumedAfterOpening(cls: ProductClass, state: PackagingState)
 }
 
 /** Integer yen per unit, rounded. */
-export function unitCost(costTotalJpy: number, quantity: number): number {
-  return quantity > 0 ? Math.round(costTotalJpy / quantity) : 0;
+export function unitCost(costTotalBase: number, quantity: number): number {
+  return quantity > 0 ? Math.round(costTotalBase / quantity) : 0;
 }
 
 /**

@@ -57,10 +57,10 @@ describe('source registry', () => {
   });
 
   it('values from the order: a comparison source never counts', () => {
-    const sale = (source: string, priceJpy: number) => ({
+    const sale = (source: string, priceBase: number) => ({
       source,
       bucket: 'raw:A',
-      priceJpy,
+      priceBase,
       observedAt: new Date(Date.now() - 86_400_000).toISOString(),
       observationType: 'sold' as const,
     });
@@ -73,7 +73,7 @@ describe('source registry', () => {
       observations,
       sources: valuationOrder(registry, 'card'),
     });
-    expect(v).toMatchObject({ source: 'flea', unitJpy: 1_002 });
+    expect(v).toMatchObject({ source: 'flea', unitBase: 1_002 });
   });
 
   it('reads pasted listing links', () => {

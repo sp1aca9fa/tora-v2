@@ -49,7 +49,7 @@ const row = (over: Partial<ExtractedRow>): ExtractedRow => ({
   orderId: null,
   title: 'x',
   url: null,
-  priceJpy: 1000,
+  priceBase: 1000,
   quantity: 1,
   date: '2026-09-01',
   dateApprox: false,
@@ -96,24 +96,24 @@ it('flags rows with code checks, not the model', async () => {
     db,
     userId,
     { product: { category: 'tcg', kind: 'single', name: 'エリカの招待', cardNumber: '206/165' } },
-    { quantity: 1, costTotalJpy: 30000, acquiredAt: '2026-08-01T12:00:00.000+09:00' },
+    { quantity: 1, costTotalBase: 30000, acquiredAt: '2026-08-01T12:00:00.000+09:00' },
   );
   const ctx = await checkContext(db, userId);
   ctx.unitValue.set(product.id, 30000);
   expect(holding.id).toBeTruthy();
   expect(
     checkRow(
-      row({ title: 'エリカの招待 SAR 206/165', productId: product.id, priceJpy: 28000 }),
+      row({ title: 'エリカの招待 SAR 206/165', productId: product.id, priceBase: 28000 }),
       ctx,
     ),
   ).toEqual([]);
   expect(
-    checkRow(row({ title: 'リーリエ SAR', productId: product.id, priceJpy: 28000 }), ctx),
+    checkRow(row({ title: 'リーリエ SAR', productId: product.id, priceBase: 28000 }), ctx),
   ).toEqual(['weak_match']);
   expect(
-    checkRow(row({ title: 'エリカの招待 206/165', productId: product.id, priceJpy: 3000 }), ctx),
+    checkRow(row({ title: 'エリカの招待 206/165', productId: product.id, priceBase: 3000 }), ctx),
   ).toEqual(['price_far']);
-  expect(checkRow(row({ priceJpy: null, date: null, product: card('X', '1/1') }), ctx)).toEqual([
+  expect(checkRow(row({ priceBase: null, date: null, product: card('X', '1/1') }), ctx)).toEqual([
     'no_price',
     'no_date',
   ]);
@@ -121,7 +121,7 @@ it('flags rows with code checks, not the model', async () => {
     'maybe_registered',
   ]);
   // Not imported anyway: no checks.
-  expect(checkRow(row({ collectible: false, priceJpy: null }), ctx)).toEqual([]);
+  expect(checkRow(row({ collectible: false, priceBase: null }), ctx)).toEqual([]);
 });
 
 it('reads with Haiku, has Sonnet read flagged files again, and caches', async () => {
@@ -130,14 +130,14 @@ it('reads with Haiku, has Sonnet read flagged files again, and caches', async ()
     model === 'haiku'
       ? [
           row({ file: 'a.png', title: 'ピカチュウ', product: card('ピカチュウ', '001/030') }),
-          row({ file: 'b.png', title: '?', priceJpy: null, product: card('ミュウ', '151/165') }),
+          row({ file: 'b.png', title: '?', priceBase: null, product: card('ミュウ', '151/165') }),
         ]
       : prompt.includes('b.png')
         ? [
             row({
               file: 'b.png',
               title: 'ミュウ',
-              priceJpy: 5000,
+              priceBase: 5000,
               product: card('ミュウ', '151/165'),
             }),
           ]
@@ -158,7 +158,7 @@ it('reads with Haiku, has Sonnet read flagged files again, and caches', async ()
   // Sonnet got the first reading and what was wrong with it.
   expect(asked[1]!.prompt).toContain('no_price');
   expect(read.reviewed).toEqual([{ file: 'b.png', why: 'no_price' }]);
-  expect(read.rows.map((r) => [r.row.title, r.row.priceJpy, r.flags])).toEqual([
+  expect(read.rows.map((r) => [r.row.title, r.row.priceBase, r.flags])).toEqual([
     ['ピカチュウ', 1000, []],
     ['ミュウ', 5000, []],
   ]);
@@ -174,7 +174,7 @@ it('imports new lots, skips what is not a collectible, matches again on a second
     db,
     userId,
     { product: { category: 'tcg', kind: 'single', name: 'エリカの招待', cardNumber: '206/165' } },
-    { quantity: 1, costTotalJpy: 30000, acquiredAt: '2026-08-01T12:00:00.000+09:00' },
+    { quantity: 1, costTotalBase: 30000, acquiredAt: '2026-08-01T12:00:00.000+09:00' },
   );
   await addPurchaseLinks(db, userId, ['https://jp.mercari.com/item/m11111111111']);
   const [link] = await purchaseLinksOf(db, userId);
@@ -188,12 +188,12 @@ it('imports new lots, skips what is not a collectible, matches again on a second
   const ctx = await checkContext(db, userId);
   const rows = [
     // Mercari, no ID, a new card.
-    row({ title: 'ミミッキュ CHR', priceJpy: 6000, product: card('ミミッキュ', '075/071') }),
+    row({ title: 'ミミッキュ CHR', priceBase: 6000, product: card('ミミッキュ', '075/071') }),
     // Mercari, the deleted listing of a failed link, another copy of a card the user has.
     row({
       title: 'エリカの招待 SAR 206/165',
       orderId: 'm11111111111',
-      priceJpy: 29000,
+      priceBase: 29000,
       productId: erika.id,
     }),
     // Amazon: two items in one order, one of them not a collectible.
@@ -202,7 +202,7 @@ it('imports new lots, skips what is not a collectible, matches again on a second
       shop: 'Amazon.co.jp',
       orderId: '503-1234567-1234567',
       title: 'Nintendo Switch 2',
-      priceJpy: 49980,
+      priceBase: 49980,
       product: {
         ...card('Nintendo Switch 2', ''),
         category: 'game',
@@ -226,7 +226,7 @@ it('imports new lots, skips what is not a collectible, matches again on a second
       shop: 'Amazon.co.jp',
       orderId: '503-1234567-1234567',
       title: 'マリオカート ワールド',
-      priceJpy: 8000,
+      priceBase: 8000,
       product: {
         ...card('マリオカート ワールド', ''),
         category: 'game',
@@ -258,7 +258,7 @@ it('imports new lots, skips what is not a collectible, matches again on a second
     .select()
     .from(schema.holdings)
     .where(eq(schema.holdings.importRunId, outcome.runId));
-  const by = (t: number) => lots.find((l) => l.costTotalJpy === t)!;
+  const by = (t: number) => lots.find((l) => l.costTotalBase === t)!;
   expect(by(6000)).toMatchObject({ orderId: null, acquiredFrom: 'Mercari', reviewPending: true });
   expect(by(29000)).toMatchObject({ orderId: 'm11111111111', productId: erika.id });
   expect(by(49980)).toMatchObject({ orderId: '503-1234567-1234567#1', acquiredFrom: 'Amazon' });
@@ -285,7 +285,7 @@ it('joins rows the model is sure are one purchase; leaves the rest for the user 
   const listing = row({
     file: 'listing.png',
     title: 'ポケカWCS2023 ヨコハマ限定 デッキシールド 葛飾北斎',
-    priceJpy: 18000,
+    priceBase: 18000,
     quantity: 8,
     date: null,
     product: card('デッキシールド 葛飾北斎', ''),
@@ -295,13 +295,13 @@ it('joins rows the model is sure are one purchase; leaves the rest for the user 
   const deal = row({
     file: 'deal.png',
     title: 'ポケカWCS2023 ヨコハマ限定 デッ…',
-    priceJpy: 18000,
+    priceBase: 18000,
     orderId: 'm46676306959',
     date: '2023-10-13',
     samePurchase: 'p1',
     sameConfidence: 0.95,
   });
-  const other = row({ file: 'deal.png', title: 'ミュウ', priceJpy: 18000 });
+  const other = row({ file: 'deal.png', title: 'ミュウ', priceBase: 18000 });
   const { rows, merged, pairs } = mergeRows([listing, deal, other]);
   expect(merged).toEqual([['listing.png', 'deal.png']]);
   expect(rows).toHaveLength(2);
@@ -318,7 +318,7 @@ it('joins rows the model is sure are one purchase; leaves the rest for the user 
   const unsure = mergeRows([listing, { ...deal, sameConfidence: 0.6 }]);
   expect(unsure.rows).toHaveLength(2);
   expect(unsure.pairs).toHaveLength(1);
-  const otherPrice = mergeRows([listing, { ...deal, priceJpy: 17000 }]);
+  const otherPrice = mergeRows([listing, { ...deal, priceBase: 17000 }]);
   expect(otherPrice.rows).toHaveLength(2);
   expect(otherPrice.pairs).toHaveLength(1);
   // Not tagged by the model, but one title is the other cut short: offered too.
@@ -348,7 +348,7 @@ it('imports a pair the model was unsure of as two lots, which the user merges', 
   const listing = row({
     file: 'listing.png',
     title: 'ポケカWCS2023 ヨコハマ限定 デッキシールド 葛飾北斎',
-    priceJpy: 18000,
+    priceBase: 18000,
     quantity: 8,
     date: null,
     product: { ...card('デッキシールド 葛飾北斎', ''), kind: 'supply', cardNumber: null },
@@ -356,7 +356,7 @@ it('imports a pair the model was unsure of as two lots, which the user merges', 
   const deal = row({
     file: 'deal.png',
     title: 'ポケカWCS2023 ヨコハマ限定 デッ…',
-    priceJpy: 18000,
+    priceBase: 18000,
     orderId: 'm46676306959',
     date: '2023-10-13',
     product: { ...card('ポケカWCS2023 ヨコハマ限定 デッ', ''), kind: 'supply', cardNumber: null },
@@ -417,14 +417,14 @@ it('joins look-alikes of different batches when the model, asked separately, is 
   const listing = row({
     file: 'listing.png',
     title: 'Pokemon LEGENDS アルセウス',
-    priceJpy: 2999,
+    priceBase: 2999,
     date: '2026-04-12',
     dateApprox: true,
   });
   const deal = row({
     file: 'deal.png',
     title: 'Pokemon LEGENDS アル…',
-    priceJpy: 2999,
+    priceBase: 2999,
     date: '2022-08-24',
     orderId: 'm71075994789',
   });

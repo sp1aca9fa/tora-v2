@@ -59,7 +59,7 @@ export interface ProductSummary {
   rarity: string | null;
   platform: string | null;
   releaseDate: string | null;
-  retailPriceJpy: number | null;
+  retailPriceBase: number | null;
   /** Has an active price source (a listing). */
   linked: boolean;
 }
@@ -99,7 +99,7 @@ export async function searchProductsAction(
     rarity: p.rarity,
     platform: p.platform,
     releaseDate: p.releaseDate,
-    retailPriceJpy: p.retailPriceJpy,
+    retailPriceBase: p.retailPriceBase,
     linked: linked.has(p.id),
   }));
 }
@@ -145,7 +145,7 @@ const holdingSchema = z.object({
   orderId: optText,
   quantity: qty,
   /** Optional when a retail price is known: blank means retail price x quantity. */
-  costTotalJpy: optYen,
+  costTotalBase: optYen,
   notes: optText,
 });
 
@@ -160,13 +160,13 @@ export async function createHoldingAction(
 
   let ref: ProductRef;
   let cls: ProductClass;
-  let retailPriceJpy: number | null = null;
+  let retailPriceBase: number | null = null;
   if (d.mode === 'existing') {
     const product = d.productId ? await getProduct(db, d.productId) : null;
     if (!product) return { error: 'not_found' };
     ref = { productId: product.id };
     cls = productClass(product);
-    retailPriceJpy = product.retailPriceJpy;
+    retailPriceBase = product.retailPriceBase;
   } else if (d.mode === 'catalog') {
     const set = d.catalogSetId ? await getSet(db, d.catalogSetId) : null;
     if (!set || !d.catalogKind) return { error: 'check', fields: ['setName'] };
@@ -186,11 +186,11 @@ export async function createHoldingAction(
     if (!product) return { error: 'check', fields: ['name'] };
     ref = { product };
     cls = productClass(product);
-    retailPriceJpy = product.retailPriceJpy ?? null;
+    retailPriceBase = product.retailPriceBase ?? null;
   }
-  const costTotalJpy =
-    d.costTotalJpy ?? (retailPriceJpy !== null ? retailPriceJpy * d.quantity : undefined);
-  if (costTotalJpy === undefined) return { error: 'check', fields: ['costTotalJpy'] };
+  const costTotalBase =
+    d.costTotalBase ?? (retailPriceBase !== null ? retailPriceBase * d.quantity : undefined);
+  if (costTotalBase === undefined) return { error: 'check', fields: ['costTotalBase'] };
 
   const condition = parseForm(conditionSchema, formData);
   if ('state' in condition) return condition.state;
@@ -200,7 +200,7 @@ export async function createHoldingAction(
   const result = await runDomain(() =>
     createHolding(db, user.id, ref, {
       quantity: d.quantity,
-      costTotalJpy,
+      costTotalBase,
       acquisitionType: d.acquisitionType,
       ...input,
       acquiredAt: tokyoDateToIso(d.acquiredAt),

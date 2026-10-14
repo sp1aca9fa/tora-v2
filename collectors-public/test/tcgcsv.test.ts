@@ -133,7 +133,7 @@ it('saves the market price in dollars and yen, finding the set from the listing 
     expect.objectContaining({
       source: 'tcgcsv',
       observationType: 'listing',
-      priceJpy: 3525,
+      priceBase: 3525,
       priceOriginal: 2350,
       currency: 'USD',
       fxRate: 150,

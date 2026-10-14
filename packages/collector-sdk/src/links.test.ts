@@ -43,7 +43,7 @@ const receipt = (id: string, title: string, price: number): PurchaseReceipt => (
   orderedAt: '2026-09-01T12:00:00.000+09:00',
   title,
   quantity: 1,
-  totalJpy: price,
+  totalBase: price,
   listing: null,
   reference: `https://shop.example/item/${id}`,
   dateApprox: true,
@@ -118,7 +118,7 @@ describe('importPurchaseLinks', () => {
 
     const [lot] = await db.select().from(schema.holdings).where(eq(schema.holdings.orderId, 'a1'));
     expect(lot).toMatchObject({
-      costTotalJpy: 22000,
+      costTotalBase: 22000,
       acquiredFrom: 'Shop',
       reviewPending: true,
       reviewReason: 'date_approx,new_product',
@@ -154,7 +154,7 @@ describe('importPurchaseLinks', () => {
       { product: { category: 'game', kind: 'other', name: 'Retro Station' } },
       {
         quantity: 1,
-        costTotalJpy: 22000,
+        costTotalBase: 22000,
         acquiredAt: '2026-08-30T10:00:00.000+09:00',
         acquiredFrom: 'Shop',
       },
@@ -165,7 +165,7 @@ describe('importPurchaseLinks', () => {
       { product: { category: 'game', kind: 'other', name: 'Joy-Con' } },
       {
         quantity: 1,
-        costTotalJpy: 5000,
+        costTotalBase: 5000,
         acquiredAt: '2026-08-01T10:00:00.000+09:00',
         acquiredFrom: 'Shop',
         orderId: 'b2',
@@ -186,7 +186,7 @@ describe('importPurchaseLinks', () => {
     expect(summary.counts).toMatchObject({ imported: 0, matched: 1, duplicate: 1 });
     const lots = await db.select().from(schema.holdings);
     expect(lots).toHaveLength(2);
-    expect(lots.find((h) => h.costTotalJpy === 22000)!.orderId).toBe('b1');
+    expect(lots.find((h) => h.costTotalBase === 22000)!.orderId).toBe('b1');
   });
 
   it('leaves the rest pending when the site blocks', async () => {

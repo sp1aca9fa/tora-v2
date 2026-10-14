@@ -36,13 +36,13 @@ export async function PriceSources({
   db,
   product,
   bucket,
-  ownedCostJpy,
+  ownedCostBase,
   warningDismissed,
 }: {
   db: Db;
   product: Product;
   /** What the user paid for the lots they own (decides whether a main source is expected). */
-  ownedCostJpy: number;
+  ownedCostBase: number;
   /** The user turned the "not linked" warning off for this item. */
   warningDismissed: boolean;
   /** The bucket most of the user's lots are in (highlighted). */
@@ -75,7 +75,7 @@ export async function PriceSources({
   // No identity link yet (a stable product page: SNKRDUNK for cards, 駿河屋 for other items over
   // ¥3,000): say so and keep the paste box open, whatever else is linked.
   const registry = await getRegistry();
-  const identity = identityFor(product, ownedCostJpy, registry);
+  const identity = identityFor(product, ownedCostBase, registry);
   // Sources whose product links can be pasted here.
   const linkable = registry.sources
     .filter((s) => s.links?.length)
@@ -123,8 +123,8 @@ export async function PriceSources({
                 </a>
                 <p className="text-xs text-muted-foreground">
                   {sourceLabel(c.source)}
-                  {c.priceJpy ? (
-                    <span className="amount"> · {formatJpy(c.priceJpy)}</span>
+                  {c.priceBase ? (
+                    <span className="amount"> · {formatJpy(c.priceBase)}</span>
                   ) : (
                     ''
                   )} · {t('sources.score', { score: Math.round(c.score * 100) })}
@@ -298,7 +298,7 @@ export async function PriceSources({
                       )}
                     </td>
                     <td className="py-1 text-right tabular-nums">
-                      {x.medianJpy === null ? '-' : formatJpy(Math.round(x.medianJpy))}
+                      {x.medianBase === null ? '-' : formatJpy(Math.round(x.medianBase))}
                     </td>
                     <td className="py-1 text-right tabular-nums">{x.count}</td>
                   </tr>
@@ -318,7 +318,7 @@ export async function PriceSources({
                   <span className="text-muted-foreground">
                     {date(o.observedAt)} · <code className="text-xs">{o.bucket ?? '-'}</code>
                   </span>
-                  <span className="tabular-nums">{formatJpy(o.priceJpy)}</span>
+                  <span className="tabular-nums">{formatJpy(o.priceBase)}</span>
                 </li>
               ))}
             </ul>

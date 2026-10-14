@@ -32,16 +32,16 @@ describe('splitHolding', () => {
     id: 'H1',
     productId: 'P1',
     quantity: 3,
-    costTotalJpy: 10_000,
+    costTotalBase: 10_000,
     condition: 'new_unused' as const,
   };
 
   it('moves units and cost, conserving totals', () => {
     const { original, split } = splitHolding(lot, 1, { newHoldingId: 'H2' });
-    expect(original).toMatchObject({ id: 'H1', quantity: 2, costTotalJpy: 6667 });
-    expect(split).toMatchObject({ id: 'H2', quantity: 1, costTotalJpy: 3333 });
+    expect(original).toMatchObject({ id: 'H1', quantity: 2, costTotalBase: 6667 });
+    expect(split).toMatchObject({ id: 'H2', quantity: 1, costTotalBase: 3333 });
     expect(original.quantity + split.quantity).toBe(lot.quantity);
-    expect(original.costTotalJpy + split.costTotalJpy).toBe(lot.costTotalJpy);
+    expect(original.costTotalBase + split.costTotalBase).toBe(lot.costTotalBase);
   });
 
   it('copies all other fields to the new holding and does not mutate the input', () => {
@@ -64,15 +64,15 @@ describe('splitHolding', () => {
         role: 'source',
         toHoldingId: split.id,
         quantityMoved: 1,
-        costMovedJpy: 3333,
-        before: { quantity: 3, costTotalJpy: 10_000 },
-        after: { quantity: 2, costTotalJpy: 6667 },
+        costMovedBase: 3333,
+        before: { quantity: 3, costTotalBase: 10_000 },
+        after: { quantity: 2, costTotalBase: 6667 },
       },
     });
     expect(target).toMatchObject({
       holdingId: split.id,
       type: 'split',
-      payload: { role: 'target', fromHoldingId: 'H1', quantity: 1, costTotalJpy: 3333 },
+      payload: { role: 'target', fromHoldingId: 'H1', quantity: 1, costTotalBase: 3333 },
     });
   });
 });

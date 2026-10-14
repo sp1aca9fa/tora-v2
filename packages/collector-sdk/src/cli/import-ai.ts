@@ -116,7 +116,7 @@ for (const s of plan.shops) {
           ? `new lot of "${entry.ref.existing.name}"`
           : `new lot, new item "${entry.ref.create.name}"`
         : entry.type === 'likely'
-          ? `already registered (${tokyoDate(new Date(entry.existing.acquiredAt))}, ${yen(entry.existing.costTotalJpy)})${r.noOrderId ? '' : ': its order ID is added'}`
+          ? `already registered (${tokyoDate(new Date(entry.existing.acquiredAt))}, ${yen(entry.existing.costTotalBase)})${r.noOrderId ? '' : ': its order ID is added'}`
           : entry.type === 'duplicate'
             ? 'already registered'
             : entry.type === 'conflict'
@@ -125,7 +125,7 @@ for (const s of plan.shops) {
                 ? 'could not tell what item this is: not imported'
                 : 'cancelled';
     console.log(
-      `  ${tokyoDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.totalJpy)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
+      `  ${tokyoDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.totalBase)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
     );
     console.log(
       `      -> ${what}${entry.flags?.length ? `  [check: ${entry.flags.join(', ')}]` : ''}${row?.reviewedBy ? `  (Sonnet: ${row.reviewedBy})` : ''}`,

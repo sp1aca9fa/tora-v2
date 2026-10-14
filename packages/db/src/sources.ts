@@ -250,7 +250,7 @@ export interface BucketStat {
   source: string;
   bucket: string | null;
   count: number;
-  medianJpy: number | null;
+  medianBase: number | null;
   latest: string;
 }
 
@@ -266,7 +266,7 @@ export async function bucketStats(
     .select({
       source: priceObservations.source,
       bucket: priceObservations.bucket,
-      price: priceObservations.priceJpy,
+      price: priceObservations.priceBase,
       at: priceObservations.observedAt,
     })
     .from(priceObservations)
@@ -290,7 +290,7 @@ export async function bucketStats(
       source: g[0]!.source,
       bucket: g[0]!.bucket,
       count: g.length,
-      medianJpy: median(g.map((r) => r.price)),
+      medianBase: median(g.map((r) => r.price)),
       latest: g
         .map((r) => r.at)
         .sort()
@@ -365,7 +365,7 @@ export interface CandidateInput {
   title: string;
   url?: string | null;
   imageUrl?: string | null;
-  priceJpy?: number | null;
+  priceBase?: number | null;
   score: number;
 }
 
@@ -597,7 +597,7 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
       .select({
         productId: priceObservations.productId,
         bucket: priceObservations.bucket,
-        price: priceObservations.priceJpy,
+        price: priceObservations.priceBase,
         at: priceObservations.observedAt,
       })
       .from(priceObservations)
@@ -813,7 +813,7 @@ export async function keptObservations(db: Db, productId: string, source: string
     .select({
       source: priceObservations.source,
       bucket: priceObservations.bucket,
-      priceJpy: priceObservations.priceJpy,
+      priceBase: priceObservations.priceBase,
       observedAt: priceObservations.observedAt,
       observationType: priceObservations.observationType,
       excluded: priceObservations.excluded,
@@ -885,12 +885,12 @@ export const STORE_LINK_MIN_COST = 3000;
  */
 export function identityFor(
   product: Pick<Product, 'category' | 'kind'>,
-  costJpy: number,
+  costBase: number,
   registry: SourceRegistry,
   market: string | null | undefined = registry.markets?.primary,
 ): { preferred: string; accepted: string[] } | null {
   const cls = productClass(product);
-  if (cls === 'item' && costJpy <= STORE_LINK_MIN_COST) return null;
+  if (cls === 'item' && costBase <= STORE_LINK_MIN_COST) return null;
   const accepted = identitySources(registry, cls, market);
   return accepted.length ? { preferred: accepted[0]!, accepted } : null;
 }
@@ -898,10 +898,10 @@ export function identityFor(
 /** The source an item's identity link is looked for on (see `identityFor`). */
 export function stableSourceFor(
   product: Pick<Product, 'category' | 'kind'>,
-  costJpy: number,
+  costBase: number,
   registry: SourceRegistry,
 ): string | null {
-  return identityFor(product, costJpy, registry)?.preferred ?? null;
+  return identityFor(product, costBase, registry)?.preferred ?? null;
 }
 
 export interface MissingSource {
@@ -909,7 +909,7 @@ export interface MissingSource {
   /** The main source this item should be linked to. */
   source: string;
   /** What the user paid for the lots they own. */
-  costJpy: number;
+  costBase: number;
   /** Suggestions from that source waiting for confirmation. */
   suggestions: number;
 }
@@ -920,7 +920,7 @@ export interface MissingSource {
  */
 export async function missingPriceSources(db: Db, userId: string): Promise<MissingSource[]> {
   const owned = await db
-    .select({ product: products, cost: sql<number>`sum(${holdings.costTotalJpy})` })
+    .select({ product: products, cost: sql<number>`sum(${holdings.costTotalBase})` })
     .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
     .where(
@@ -935,7 +935,7 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
   const wanted = owned.flatMap(({ product, cost }) => {
     const identity = identityFor(product, Number(cost), registry);
     return identity
-      ? [{ product, costJpy: Number(cost), source: identity.preferred, accepted: identity.accepted }]
+      ? [{ product, costBase: Number(cost), source: identity.preferred, accepted: identity.accepted }]
       : [];
   });
   if (wanted.length === 0) return [];
@@ -968,7 +968,7 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
       suggestions:
         pending.find((p) => p.productId === w.product.id && p.source === w.source)?.n ?? 0,
     }))
-    .sort((a, b) => b.costJpy - a.costJpy);
+    .sort((a, b) => b.costBase - a.costBase);
 }
 
 /** Items the user asked not to be warned about (no stable source expected). */

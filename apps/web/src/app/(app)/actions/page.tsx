@@ -98,7 +98,7 @@ export default async function ActionsPage() {
       const h = i.holding;
       const owned = [
         `×${h.quantity}`,
-        formatJpy(h.costTotalJpy),
+        formatJpy(h.costTotalBase),
         date(h.acquiredAt),
         lotConditionLabel(h, i.product, t),
       ]
@@ -132,7 +132,7 @@ export default async function ActionsPage() {
       source: i.source,
       sourceLabel: sourceLabel(i.source),
       main: i.main,
-      owned: t('actions.owned', { units: i.units, amount: formatJpy(i.costJpy) }),
+      owned: t('actions.owned', { units: i.units, amount: formatJpy(i.costBase) }),
       candidates: i.candidates.map((c) => ({
         id: c.id,
         title: c.title,
@@ -140,7 +140,7 @@ export default async function ActionsPage() {
         image:
           c.imageUrl ??
           (c.linkedImage ? productImageUrl(c.linkedImage.productId, c.linkedImage.version) : null),
-        priceJpy: c.priceJpy,
+        priceBase: c.priceBase,
         score: c.score,
       })),
     };

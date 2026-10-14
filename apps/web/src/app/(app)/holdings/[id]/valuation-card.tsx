@@ -40,7 +40,7 @@ export async function ValuationCard({
     }
     return format.dateTime(at, { dateStyle: 'medium' });
   };
-  const pl = v.valueJpy === null ? null : v.valueJpy - holding.costTotalJpy;
+  const pl = v.valueBase === null ? null : v.valueBase - holding.costTotalBase;
 
   return (
     <Card>
@@ -49,11 +49,11 @@ export async function ValuationCard({
           <div>
             <p className="text-xs text-muted-foreground">{t('title')}</p>
             <p className="text-2xl font-semibold tabular-nums">
-              {v.valueJpy === null ? '-' : formatJpy(v.valueJpy)}
+              {v.valueBase === null ? '-' : formatJpy(v.valueBase)}
             </p>
-            {holding.quantity > 1 && v.unitJpy !== null && (
+            {holding.quantity > 1 && v.unitBase !== null && (
               <p className="amount text-xs text-muted-foreground">
-                {t('perUnit', { amount: formatJpy(v.unitJpy), qty: holding.quantity })}
+                {t('perUnit', { amount: formatJpy(v.unitBase), qty: holding.quantity })}
               </p>
             )}
           </div>
@@ -70,7 +70,7 @@ export async function ValuationCard({
         {v.last && (
           <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
             <span className="text-muted-foreground">{t('lastSale')}</span>
-            <span className="font-medium tabular-nums">{formatJpy(v.last.priceJpy)}</span>
+            <span className="font-medium tabular-nums">{formatJpy(v.last.priceBase)}</span>
             <span className="text-xs text-muted-foreground">
               {sourceLabel(v.last.source)} · {when(v.last.observedAt, v.last.approximate)}
             </span>
@@ -102,17 +102,17 @@ export async function ValuationCard({
                 <p className="flex items-baseline justify-between gap-2">
                   <span className="text-xs text-muted-foreground">{t('lastSale')}</span>
                   <span className="font-medium tabular-nums">
-                    {src.last ? formatJpy(src.last.priceJpy) : '-'}
+                    {src.last ? formatJpy(src.last.priceBase) : '-'}
                   </span>
                 </p>
                 <p className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
                   <span>
-                    {src.medianJpy === null
+                    {src.medianBase === null
                       ? t('noMedian')
                       : t('medianOf', { count: src.sampleSize, days: src.windowDays ?? 0 })}
                   </span>
                   <span className="tabular-nums">
-                    {src.medianJpy === null ? '' : formatJpy(src.medianJpy)}{' '}
+                    {src.medianBase === null ? '' : formatJpy(src.medianBase)}{' '}
                     <Trend pct={src.trendPct} />
                   </span>
                 </p>
@@ -129,7 +129,7 @@ export async function ValuationCard({
         {v.buylist && (
           <p className="amount text-sm">
             {t('buylist', {
-              price: formatJpy(v.buylist.priceJpy),
+              price: formatJpy(v.buylist.priceBase),
               source: sourceLabel(v.buylist.source),
               date: format.dateTime(new Date(v.buylist.observedAt), { dateStyle: 'medium' }),
             })}

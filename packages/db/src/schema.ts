@@ -59,7 +59,7 @@ function oneOf(column: AnySQLiteColumn, values: readonly string[]): SQL {
 
 export interface RecentSale {
   bucket: string | null;
-  priceJpy: number;
+  priceBase: number;
   observedAt: string;
   /** True when the site only gave a relative time ("5時間前"). */
   approximate?: boolean;
@@ -162,7 +162,7 @@ export const products = sqliteTable(
     cardNumber: text('card_number'),
     rarity: text('rarity'),
     releaseDate: text('release_date'),
-    retailPriceJpy: integer('retail_price_jpy'),
+    retailPriceBase: integer('retail_price_base'),
     imageUrl: text('image_url'),
     notes: text('notes'),
     /** Null for products generated from the catalog. */
@@ -245,7 +245,7 @@ export const sourceCandidates = sqliteTable(
     title: text('title').notNull(),
     url: text('url'),
     imageUrl: text('image_url'),
-    priceJpy: integer('price_jpy'),
+    priceBase: integer('price_base'),
     score: real('score').notNull().default(0),
     status: text('status', { enum: CANDIDATE_STATUSES }).notNull().default('pending'),
     ...timestamps,
@@ -268,7 +268,7 @@ export const holdings = sqliteTable(
       .notNull()
       .references(() => products.id),
     quantity: integer('quantity').notNull().default(1),
-    costTotalJpy: integer('cost_total_jpy').notNull().default(0),
+    costTotalBase: integer('cost_total_base').notNull().default(0),
     acquiredAt: text('acquired_at').notNull(),
     acquiredFrom: text('acquired_from'),
     acquisitionType: text('acquisition_type', { enum: ACQUISITION_TYPES })
@@ -307,7 +307,7 @@ export const holdings = sqliteTable(
   },
   (t) => [
     check('holdings_quantity_check', sql`${t.quantity} >= 1`),
-    check('holdings_cost_check', sql`${t.costTotalJpy} >= 0`),
+    check('holdings_cost_check', sql`${t.costTotalBase} >= 0`),
     check('holdings_acquisition_type_check', oneOf(t.acquisitionType, ACQUISITION_TYPES)),
     check('holdings_condition_check', oneOf(t.condition, CONDITIONS)),
     check('holdings_packaging_state_check', oneOf(t.packagingState, PACKAGING_STATES)),
@@ -454,8 +454,8 @@ export const holdingEvents = sqliteTable(
       .references(() => holdings.id),
     type: text('type', { enum: HOLDING_EVENT_TYPES }).notNull(),
     occurredAt: text('occurred_at').notNull(),
-    amountJpy: integer('amount_jpy'),
-    feesJpy: integer('fees_jpy'),
+    amountBase: integer('amount_base'),
+    feesBase: integer('fees_base'),
     payload: text('payload', { mode: 'json' }).$type<Record<string, unknown>>(),
     ...timestamps,
   },
@@ -475,7 +475,7 @@ export const priceObservations = sqliteTable(
     source: text('source').notNull(),
     observationType: text('observation_type', { enum: OBSERVATION_TYPES }).notNull(),
     bucket: text('bucket'),
-    priceJpy: integer('price_jpy').notNull(),
+    priceBase: integer('price_base').notNull(),
     /** Price as the source showed it, in the currency's smallest unit (yen; cents for dollars). */
     priceOriginal: integer('price_original'),
     currency: text('currency'),
@@ -489,7 +489,7 @@ export const priceObservations = sqliteTable(
     excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
     excludedReason: text('excluded_reason', { enum: EXCLUDED_REASONS }),
     /**
-     * The source did not report how many units the trade covered: `price_jpy` is
+     * The source did not report how many units the trade covered: `price_base` is
      * `price_original` divided by an estimated lot size (see `inferLotSizes`).
      */
     quantityInferred: integer('quantity_inferred', { mode: 'boolean' }).notNull().default(false),
@@ -514,7 +514,7 @@ export const manualPrices = sqliteTable(
       .notNull()
       .references(() => products.id),
     bucket: text('bucket').notNull(),
-    priceJpy: integer('price_jpy').notNull(),
+    priceBase: integer('price_base').notNull(),
     setAt: text('set_at').notNull(),
     note: text('note'),
     ...timestamps,
@@ -530,7 +530,7 @@ export const valuationSnapshots = sqliteTable(
     holdingId: text('holding_id')
       .notNull()
       .references(() => holdings.id),
-    valueJpy: integer('value_jpy'),
+    valueBase: integer('value_base'),
     method: text('method').notNull(),
     source: text('source'),
     sampleSize: integer('sample_size').notNull().default(0),

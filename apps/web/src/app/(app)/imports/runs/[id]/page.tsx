@@ -73,7 +73,7 @@ export default async function ImportRunPage({ params }: { params: Promise<{ id: 
                     <span className="amount block truncate text-xs text-muted-foreground">
                       {[
                         holding.acquiredAt.slice(0, 10),
-                        formatJpy(holding.costTotalJpy),
+                        formatJpy(holding.costTotalBase),
                         holding.quantity > 1 && `× ${holding.quantity}`,
                         lotConditionLabel(holding, product, t),
                         holding.status !== 'owned' && t(`status.${holding.status}`),

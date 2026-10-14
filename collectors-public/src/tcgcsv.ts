@@ -186,7 +186,7 @@ export const tcgcsv: Collector = {
             // A daily market price (TCGplayer's estimate from recent sales), not one sale.
             observationType: 'listing' as const,
             bucket: null,
-            priceJpy: Math.round(usd * fx.rate),
+            priceBase: Math.round(usd * fx.rate),
             priceOriginal: Math.round(usd * 100),
             currency: 'USD',
             fxRate: fx.rate,

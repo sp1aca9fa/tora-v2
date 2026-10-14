@@ -3,7 +3,7 @@ import { newId, toTokyoIso } from './time';
 export interface Lot {
   id: string;
   quantity: number;
-  costTotalJpy: number;
+  costTotalBase: number;
 }
 
 export interface SplitEvent {
@@ -11,8 +11,8 @@ export interface SplitEvent {
   holdingId: string;
   type: 'split';
   occurredAt: string;
-  amountJpy: null;
-  feesJpy: null;
+  amountBase: null;
+  feesBase: null;
   payload: SplitSourcePayload | SplitTargetPayload;
 }
 
@@ -20,16 +20,16 @@ export interface SplitSourcePayload {
   role: 'source';
   toHoldingId: string;
   quantityMoved: number;
-  costMovedJpy: number;
-  before: { quantity: number; costTotalJpy: number };
-  after: { quantity: number; costTotalJpy: number };
+  costMovedBase: number;
+  before: { quantity: number; costTotalBase: number };
+  after: { quantity: number; costTotalBase: number };
 }
 
 export interface SplitTargetPayload {
   role: 'target';
   fromHoldingId: string;
   quantity: number;
-  costTotalJpy: number;
+  costTotalBase: number;
 }
 
 export interface SplitResult<H extends Lot> {
@@ -46,19 +46,19 @@ export interface SplitResult<H extends Lot> {
  * Proportional, integer yen, rounded down so the remainder stays on the original lot.
  */
 export function allocateSplitCost(
-  costTotalJpy: number,
+  costTotalBase: number,
   quantity: number,
   splitQuantity: number,
 ): number {
-  assertInt(costTotalJpy, 'costTotalJpy');
+  assertInt(costTotalBase, 'costTotalBase');
   assertInt(quantity, 'quantity');
   assertInt(splitQuantity, 'splitQuantity');
-  if (costTotalJpy < 0) throw new RangeError('costTotalJpy must be >= 0');
+  if (costTotalBase < 0) throw new RangeError('costTotalBase must be >= 0');
   if (quantity < 2) throw new RangeError('a lot needs at least 2 units to split');
   if (splitQuantity < 1 || splitQuantity >= quantity) {
     throw new RangeError(`splitQuantity must be between 1 and ${quantity - 1}`);
   }
-  return Math.floor((costTotalJpy * splitQuantity) / quantity);
+  return Math.floor((costTotalBase * splitQuantity) / quantity);
 }
 
 /** Split `splitQuantity` units of a lot into a new holding (requirements section 5, lot rules). */
@@ -67,20 +67,20 @@ export function splitHolding<H extends Lot>(
   splitQuantity: number,
   options: { occurredAt?: string; newHoldingId?: string } = {},
 ): SplitResult<H> {
-  const costMovedJpy = allocateSplitCost(holding.costTotalJpy, holding.quantity, splitQuantity);
+  const costMovedBase = allocateSplitCost(holding.costTotalBase, holding.quantity, splitQuantity);
   const occurredAt = options.occurredAt ?? toTokyoIso();
   const splitId = options.newHoldingId ?? newId();
 
   const original: H = {
     ...holding,
     quantity: holding.quantity - splitQuantity,
-    costTotalJpy: holding.costTotalJpy - costMovedJpy,
+    costTotalBase: holding.costTotalBase - costMovedBase,
   };
   const split: H = {
     ...holding,
     id: splitId,
     quantity: splitQuantity,
-    costTotalJpy: costMovedJpy,
+    costTotalBase: costMovedBase,
   };
 
   return {
@@ -92,15 +92,15 @@ export function splitHolding<H extends Lot>(
         holdingId: holding.id,
         type: 'split',
         occurredAt,
-        amountJpy: null,
-        feesJpy: null,
+        amountBase: null,
+        feesBase: null,
         payload: {
           role: 'source',
           toHoldingId: splitId,
           quantityMoved: splitQuantity,
-          costMovedJpy,
-          before: { quantity: holding.quantity, costTotalJpy: holding.costTotalJpy },
-          after: { quantity: original.quantity, costTotalJpy: original.costTotalJpy },
+          costMovedBase,
+          before: { quantity: holding.quantity, costTotalBase: holding.costTotalBase },
+          after: { quantity: original.quantity, costTotalBase: original.costTotalBase },
         },
       },
       {
@@ -108,13 +108,13 @@ export function splitHolding<H extends Lot>(
         holdingId: splitId,
         type: 'split',
         occurredAt,
-        amountJpy: null,
-        feesJpy: null,
+        amountBase: null,
+        feesBase: null,
         payload: {
           role: 'target',
           fromHoldingId: holding.id,
           quantity: splitQuantity,
-          costTotalJpy: costMovedJpy,
+          costTotalBase: costMovedBase,
         },
       },
     ],

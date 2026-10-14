@@ -29,7 +29,7 @@ export const productSchema = z.object({
   cardNumber: optText,
   rarity: optText,
   releaseDate: optDateText,
-  retailPriceJpy: optYen,
+  retailPriceBase: optYen,
 });
 
 /**
@@ -56,7 +56,7 @@ export function productInputFrom(data: z.infer<typeof productSchema>): ProductIn
     cardNumber: pick('cardNumber'),
     rarity: pick('rarity'),
     releaseDate: pick('releaseDate'),
-    retailPriceJpy: pick('retailPriceJpy'),
+    retailPriceBase: pick('retailPriceBase'),
   };
 }
 

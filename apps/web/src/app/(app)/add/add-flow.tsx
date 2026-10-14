@@ -76,7 +76,7 @@ const DRAFT_FIELDS = new Set([
   'rarity',
   'variant',
   'releaseDate',
-  'retailPriceJpy',
+  'retailPriceBase',
   'platform',
   'franchise',
   'notes',
@@ -183,10 +183,10 @@ export function AddFlow({
   ].find((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today);
   const retail =
     mode === 'existing'
-      ? (selected?.retailPriceJpy ?? null)
+      ? (selected?.retailPriceBase ?? null)
       : catalogMode
         ? null
-        : Number((draft.retailPriceJpy ?? '').replace(/[^\d]/g, '')) || null;
+        : Number((draft.retailPriceBase ?? '').replace(/[^\d]/g, '')) || null;
 
   const perUnit =
     Number(quantity) > 1 && cost
@@ -544,8 +544,8 @@ export function AddFlow({
             />
           </Field>
           <Field
-            label={t('fields.costTotalJpy')}
-            htmlFor="costTotalJpy"
+            label={t('fields.costTotalBase')}
+            htmlFor="costTotalBase"
             hint={
               !cost.trim() && retail
                 ? t('add.costFromRetail', {
@@ -558,8 +558,8 @@ export function AddFlow({
             className="sm:col-span-2"
           >
             <Input
-              id="costTotalJpy"
-              name="costTotalJpy"
+              id="costTotalBase"
+              name="costTotalBase"
               inputMode="numeric"
               required={!retail}
               pattern="[\d,¥￥\s]*"

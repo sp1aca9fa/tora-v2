@@ -20,7 +20,7 @@ import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { ProductImage } from '@/components/product-image';
 import { formatJpy } from '@/lib/utils';
-import { signedJpy } from './header';
+import { signedBase } from './header';
 import { type InsightPanel, InsightsCard } from './insights-card';
 
 interface Row {
@@ -36,7 +36,7 @@ const pct = (n: number) => `${n > 0 ? '+' : ''}${n}%`;
 /** Panels whose numbers change with the period picked on the card. */
 const BY_PERIOD: readonly SummaryPanel[] = [
   'movers_pct',
-  'movers_jpy',
+  'movers_amount',
   'movers_sealed',
   'most_traded',
   'market_movers',
@@ -83,12 +83,12 @@ export async function Insights({
 
   const moverRow = (m: Mover, byYen = false): Row => ({
     product: m.product,
-    main: byYen ? signedJpy(m.changeJpy) : pct(m.pct),
-    sub: byYen ? pct(m.pct) : signedJpy(m.changeJpy),
+    main: byYen ? signedBase(m.changeBase) : pct(m.pct),
+    sub: byYen ? pct(m.pct) : signedBase(m.changeBase),
   });
   const upDown = (
     list: Mover[],
-    key: 'pct' | 'changeJpy',
+    key: 'pct' | 'changeBase',
     labels: [string, string] = [t('portfolio.insights.up'), t('portfolio.insights.down')],
   ): Columns | null => {
     const up = list
@@ -101,8 +101,8 @@ export async function Insights({
       .slice(0, 3);
     if (up.length + down.length === 0) return null;
     return [
-      { label: labels[0], rows: up.map((m) => moverRow(m, key === 'changeJpy')) },
-      { label: labels[1], rows: down.map((m) => moverRow(m, key === 'changeJpy')) },
+      { label: labels[0], rows: up.map((m) => moverRow(m, key === 'changeBase')) },
+      { label: labels[1], rows: down.map((m) => moverRow(m, key === 'changeBase')) },
     ];
   };
   const traded = (days: number, mineOnly: boolean): Columns | null => {
@@ -123,13 +123,13 @@ export async function Insights({
   };
   const plRow = (s: (typeof investments)[number]): Row => ({
     product: s.product,
-    main: signedJpy(s.unrealizedJpy!),
+    main: signedBase(s.unrealizedBase!),
     sub:
-      s.valuedCostJpy > 0
-        ? pct(Math.round((s.unrealizedJpy! / s.valuedCostJpy) * 1000) / 10)
+      s.valuedCostBase > 0
+        ? pct(Math.round((s.unrealizedBase! / s.valuedCostBase) * 1000) / 10)
         : undefined,
   });
-  const withPl = investments.filter((s) => s.unrealizedJpy !== null && s.unrealizedJpy !== 0);
+  const withPl = investments.filter((s) => s.unrealizedBase !== null && s.unrealizedBase !== 0);
 
   /** A panel's columns for a period (the period is ignored by panels that do not move). */
   const content = (id: SummaryPanel, days: number): Columns | null => {
@@ -137,8 +137,8 @@ export async function Insights({
     switch (id) {
       case 'movers_pct':
         return upDown(mine, 'pct');
-      case 'movers_jpy':
-        return upDown(mine, 'changeJpy');
+      case 'movers_amount':
+        return upDown(mine, 'changeBase');
       case 'movers_sealed':
         return upDown(
           mine.filter((m) => productClass(m.product) === 'sealed'),
@@ -152,12 +152,12 @@ export async function Insights({
         return traded(days, false);
       case 'gains': {
         const up = withPl
-          .filter((s) => s.unrealizedJpy! > 0)
-          .toSorted((a, b) => b.unrealizedJpy! - a.unrealizedJpy!)
+          .filter((s) => s.unrealizedBase! > 0)
+          .toSorted((a, b) => b.unrealizedBase! - a.unrealizedBase!)
           .slice(0, 3);
         const down = withPl
-          .filter((s) => s.unrealizedJpy! < 0)
-          .toSorted((a, b) => a.unrealizedJpy! - b.unrealizedJpy!)
+          .filter((s) => s.unrealizedBase! < 0)
+          .toSorted((a, b) => a.unrealizedBase! - b.unrealizedBase!)
           .slice(0, 3);
         return up.length + down.length
           ? [
@@ -168,15 +168,15 @@ export async function Insights({
       }
       case 'most_valuable': {
         const top = items
-          .filter((s) => s.valueJpy > 0)
-          .toSorted((a, b) => b.valueJpy - a.valueJpy)
+          .filter((s) => s.valueBase > 0)
+          .toSorted((a, b) => b.valueBase - a.valueBase)
           .slice(0, 6);
         return top.length
           ? [
               {
                 rows: top.map((s) => ({
                   product: s.product,
-                  main: formatJpy(s.valueJpy),
+                  main: formatJpy(s.valueBase),
                   sub: t('portfolio.units', { count: s.units }),
                 })),
               },

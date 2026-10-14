@@ -62,10 +62,10 @@ export interface SaleCase {
   case: string;
   product: Details;
   bucket: string;
-  valueJpy: number;
+  valueBase: number;
   salesInValue: number;
-  sale: { source: string; priceJpy: number; date: string; title: string | null };
-  otherSalesInBucket: { priceJpy: number; date: string; source: string }[];
+  sale: { source: string; priceBase: number; date: string; title: string | null };
+  otherSalesInBucket: { priceBase: number; date: string; source: string }[];
 }
 
 export interface SearchCase {
@@ -76,8 +76,8 @@ export interface SearchCase {
   excludeKeywords: string[];
   kept: number;
   found: number;
-  excludedSamples: { title: string | null; priceJpy: number; why: string | null }[];
-  keptSamples: { title: string | null; priceJpy: number }[];
+  excludedSamples: { title: string | null; priceBase: number; why: string | null }[];
+  keptSamples: { title: string | null; priceBase: number }[];
 }
 
 /** What the model sees, and what each case points to (kept out of the prompt). */
@@ -199,16 +199,16 @@ export async function buildReviewCases(
       case: id,
       product: details(o.product),
       bucket: o.bucket,
-      valueJpy: o.valueJpy,
+      valueBase: o.valueBase,
       salesInValue: v.sampleSize,
-      sale: { source: o.source, priceJpy: o.priceJpy, date: day(o.observedAt), title },
+      sale: { source: o.source, priceBase: o.priceBase, date: day(o.observedAt), title },
       otherSalesInBucket: (market.observations.get(o.product.id) ?? [])
         .filter(
           (x) => x.bucket === o.bucket && x.observationType === 'sold' && x.id !== o.observationId,
         )
         .sort((a, b) => b.observedAt.localeCompare(a.observedAt))
         .slice(0, 12)
-        .map((x) => ({ priceJpy: x.priceJpy, date: day(x.observedAt), source: x.source })),
+        .map((x) => ({ priceBase: x.priceBase, date: day(x.observedAt), source: x.source })),
     });
     out.targets.set(id, {
       productId: o.product.id,
@@ -234,7 +234,7 @@ export async function buildReviewCases(
       .select({
         excluded: priceObservations.excluded,
         excludedReason: priceObservations.excludedReason,
-        priceJpy: priceObservations.priceJpy,
+        priceBase: priceObservations.priceBase,
         raw: priceObservations.raw,
       })
       .from(priceObservations)
@@ -260,10 +260,10 @@ export async function buildReviewCases(
       found: obs.length,
       excludedSamples: excluded.map((o) => ({
         title: titleOf(o.raw),
-        priceJpy: o.priceJpy,
+        priceBase: o.priceBase,
         why: ((o.raw ?? {}) as { filter?: string }).filter ?? o.excludedReason,
       })),
-      keptSamples: kept.slice(0, 5).map((o) => ({ title: titleOf(o.raw), priceJpy: o.priceJpy })),
+      keptSamples: kept.slice(0, 5).map((o) => ({ title: titleOf(o.raw), priceBase: o.priceBase })),
     });
     out.targets.set(id, {
       productId: product.id,
@@ -546,7 +546,7 @@ export async function runReview(
         productId: target.productId,
         payload: { observationId: target.observationId, unsure: v.verdict === 'unsure' },
         reason: v.reason,
-        evidence: { ...c.sale, url: target.url, valueJpy: c.valueJpy, bucket: c.bucket },
+        evidence: { ...c.sale, url: target.url, valueBase: c.valueBase, bucket: c.bucket },
         model: v.model,
         confidence: v.confidence,
       })

@@ -124,7 +124,7 @@ server.registerTool(
   {
     title: 'Collected sales',
     description:
-      'Individual collected sales of a product, newest first: price (per unit; lotPriceJpy when a lot was divided), condition bucket, kept or left out (and why), listing title, whether the lot size was estimated or the user pasted it, Mercari category, link.',
+      'Individual collected sales of a product, newest first: price (per unit; lotPriceBase when a lot was divided), condition bucket, kept or left out (and why), listing title, whether the lot size was estimated or the user pasted it, Mercari category, link.',
     inputSchema: {
       productId: z.string(),
       source: z.string().optional(),
@@ -173,7 +173,7 @@ server.registerTool(
   {
     title: 'Read-only SQL',
     description:
-      'One SELECT (or WITH ... SELECT) on the SQLite (libSQL) database, run read-only with a row limit, for questions the other tools do not cover. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_jpy, acquired_at, ...), price_observations (product_id, source, bucket, price_jpy, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_jpy, method), holding_events. Times are ISO strings in Tokyo time.',
+      'One SELECT (or WITH ... SELECT) on the SQLite (libSQL) database, run read-only with a row limit, for questions the other tools do not cover. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_base, acquired_at, ...), price_observations (product_id, source, bucket, price_base, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_base, method), holding_events. Times are ISO strings in Tokyo time.',
     inputSchema: {
       sql: z.string().max(4000),
       limit: z.number().int().min(1).max(1000).optional().describe('default 200'),

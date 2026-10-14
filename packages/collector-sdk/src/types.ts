@@ -96,9 +96,9 @@ export interface PurchaseReceipt {
   title: string;
   quantity: number;
   /** Amount paid, fees and shipping included; becomes the holding's cost. */
-  totalJpy: number;
+  totalBase: number;
   /** Item price alone, when the receipt shows it (manual entries may have used it). */
-  itemPriceJpy?: number | null;
+  itemPriceBase?: number | null;
   /** Listing at the marketplace (the price source to link the product to). */
   listing?: { externalId: string; url: string } | null;
   /** Condition as the marketplace shows it (e.g. "A", "PSA10"). */

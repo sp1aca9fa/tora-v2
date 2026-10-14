@@ -19,7 +19,7 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
       .where(eq(priceObservations.quantityInferred, true))
   ).map((r) => r.id);
   let checked = 0;
-  const updates: { id: string; priceJpy: number }[] = [];
+  const updates: { id: string; priceBase: number }[] = [];
   const changed = new Set<string>();
   for (let i = 0; i < productIds.length; i += 50) {
     const rows = await db
@@ -29,7 +29,7 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
         source: priceObservations.source,
         bucket: priceObservations.bucket,
         observedAt: priceObservations.observedAt,
-        priceJpy: priceObservations.priceJpy,
+        priceBase: priceObservations.priceBase,
         priceOriginal: priceObservations.priceOriginal,
         quantityInferred: priceObservations.quantityInferred,
       })
@@ -55,7 +55,7 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
           t: Date.parse(r.observedAt),
           // What one unit sold for, as far as is known: reported lots are already per unit;
           // unreported ones are mostly single units, so their lot price is the reference.
-          reference: r.quantityInferred ? (r.priceOriginal ?? r.priceJpy) : r.priceJpy,
+          reference: r.quantityInferred ? (r.priceOriginal ?? r.priceBase) : r.priceBase,
         }))
         .sort((a, b) => a.t - b.t);
       let from = 0;
@@ -68,9 +68,9 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
         const references: number[] = [];
         for (let j = from; j < to; j++) if (j !== index) references.push(trades[j]!.reference);
         const units = estimateLotSize(trade.priceOriginal, references);
-        const priceJpy = Math.round(trade.priceOriginal / units);
-        if (priceJpy !== trade.priceJpy) {
-          updates.push({ id: trade.id, priceJpy });
+        const priceBase = Math.round(trade.priceOriginal / units);
+        if (priceBase !== trade.priceBase) {
+          updates.push({ id: trade.id, priceBase });
           changed.add(trade.productId);
         }
       }
@@ -79,12 +79,12 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
   for (let i = 0; i < updates.length; i += 200) {
     const chunk = updates.slice(i, i + 200);
     const cases = sql.join(
-      chunk.map((u) => sql`when ${u.id} then ${u.priceJpy}`),
+      chunk.map((u) => sql`when ${u.id} then ${u.priceBase}`),
       sql` `,
     );
     await db
       .update(priceObservations)
-      .set({ priceJpy: sql`case ${priceObservations.id} ${cases} end` })
+      .set({ priceBase: sql`case ${priceObservations.id} ${cases} end` })
       .where(
         inArray(
           priceObservations.id,

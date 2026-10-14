@@ -31,7 +31,7 @@ const card = (name: string, cardNumber: string) => ({
 });
 const lot = (extra: Record<string, unknown> = {}) => ({
   quantity: 1,
-  costTotalJpy: 1000,
+  costTotalBase: 1000,
   acquiredAt: ago(30),
   grading: 'raw' as const,
   rawGrade: 'A' as const,
@@ -47,7 +47,7 @@ it('summarizes, lists sales (kept ones behind newer left-out ones) and runs chec
     source: 'mercari',
     observationType: 'sold' as const,
     bucket: 'raw:A',
-    priceJpy: price,
+    priceBase: price,
     currency: 'JPY',
     observedAt: ago(d),
     fetchedAt: ago(0),
@@ -64,12 +64,12 @@ it('summarizes, lists sales (kept ones behind newer left-out ones) and runs chec
   ]);
 
   const kept = await sales(db, a.product.id, { status: 'kept' });
-  expect(kept.map((s) => s.priceJpy)).toEqual([2000, 2100, 2200]);
+  expect(kept.map((s) => s.priceBase)).toEqual([2000, 2100, 2200]);
   const left = await sales(db, a.product.id, { status: 'excluded', limit: 2 });
   expect(left[0]).toMatchObject({ kept: false, why: 'bundle' });
 
   const summary = await portfolioSummary(db, uid);
-  expect(summary.totals).toMatchObject({ spentJpy: 3000, total: 3 });
+  expect(summary.totals).toMatchObject({ spentBase: 3000, total: 3 });
 
   const checks = Object.fromEntries((await dataChecks(db, uid, now)).map((c) => [c.check, c]));
   // The two ピカチュウ 020 / 20 are look-alikes; ミュウ has no grade, so no value.

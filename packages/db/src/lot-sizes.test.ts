@@ -30,7 +30,7 @@ const trade = (ref: string, day: string, price: number, inferred = true) => ({
   source: 'snkrdunk',
   observationType: 'sold' as const,
   bucket: 'graded:PSA:10',
-  priceJpy: price,
+  priceBase: price,
   priceOriginal: price,
   currency: 'JPY',
   observedAt: `2026-10-${day}T12:00:00.000+09:00`,
@@ -52,7 +52,7 @@ it('divides trades priced at a multiple of the going rate, and is re-runnable', 
   ]);
   expect(await inferLotSizes(db)).toEqual({ checked: 6, updated: 2 });
   const price = new Map(
-    (await db.select().from(priceObservations)).map((r) => [r.externalRef, r.priceJpy]),
+    (await db.select().from(priceObservations)).map((r) => [r.externalRef, r.priceBase]),
   );
   expect(price.get('c')).toBe(10_400);
   expect(price.get('e')).toBe(10_150);

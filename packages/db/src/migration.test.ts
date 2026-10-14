@@ -58,7 +58,7 @@ it('maps old products and assigns old holdings to the placeholder owner', async 
     expect(holding).toMatchObject({
       id: 'H1',
       user_id: '00000000000000000000000000',
-      cost_total_jpy: 5400,
+      cost_total_base: 5400,
     });
     const [owner] = (await client.execute('SELECT * FROM users')).rows;
     expect(owner).toMatchObject({ username: 'owner', password_hash: null, role: 'admin' });

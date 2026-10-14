@@ -63,7 +63,7 @@ it('a pulled card typed like an existing card reuses it', async () => {
         region: 'jp',
       },
     },
-    { quantity: 1, costTotalJpy: 1000, acquiredAt: at, packagingState: 'sealed_shrink' },
+    { quantity: 1, costTotalBase: 1000, acquiredAt: at, packagingState: 'sealed_shrink' },
   );
   const pull = await addPull(
     db,
@@ -137,7 +137,7 @@ it('merges a duplicate into an existing product', async () => {
   await linkSource(db, dup.id, { source: 'mercari', externalId: 'm1' });
   const lot = {
     quantity: 1,
-    costTotalJpy: 500,
+    costTotalBase: 500,
     acquiredAt: at,
     grading: 'raw' as const,
     rawGrade: 'A' as const,
@@ -189,7 +189,7 @@ it('pasted sales are included even when stored excluded before; references are k
     source: 'mercari',
     observationType: 'sold' as const,
     bucket: 'cond:good',
-    priceJpy: 30000,
+    priceBase: 30000,
     currency: 'JPY',
     observedAt: at,
     fetchedAt: at,

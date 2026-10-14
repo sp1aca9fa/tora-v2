@@ -38,7 +38,7 @@ beforeEach(async () => {
 
 const lot = (cost: number) => ({
   quantity: 1,
-  costTotalJpy: cost,
+  costTotalBase: cost,
   acquiredAt: '2026-10-01T12:00:00.000+09:00',
 });
 
@@ -113,7 +113,7 @@ it('keeps foreign prices out of the valuation data and shows the newest per list
     source: 'tcgcsv',
     observationType: 'listing' as const,
     bucket: null,
-    priceJpy: Math.round(cents * 1.5),
+    priceBase: Math.round(cents * 1.5),
     priceOriginal: cents,
     currency: 'USD',
     fxRate: 150,
@@ -127,7 +127,7 @@ it('keeps foreign prices out of the valuation data and shows the newest per list
   const market = await loadMarketData(db, userId, [product.id], now);
   expect(market.observations.get(product.id) ?? []).toEqual([]);
   expect(await foreignPrices(db, product.id, now)).toEqual([
-    expect.objectContaining({ price: 23.5, currency: 'USD', priceJpy: 3525, variant: 'Holofoil' }),
+    expect.objectContaining({ price: 23.5, currency: 'USD', priceBase: 3525, variant: 'Holofoil' }),
   ]);
 });
 
@@ -203,13 +203,13 @@ it("follows the user's notice levels; quiet ones are listed but not counted", as
 });
 
 it('keeps one ungraded foreign price per source, the middle one', () => {
-  const row = (source: string, priceJpy: number, bucket: string | null = null): ForeignPrice => ({
+  const row = (source: string, priceBase: number, bucket: string | null = null): ForeignPrice => ({
     source,
     title: null,
     url: null,
-    price: priceJpy / 150,
+    price: priceBase / 150,
     currency: 'USD',
-    priceJpy,
+    priceBase,
     fxRate: 150,
     fxDate: null,
     observedAt: '2026-10-01',
@@ -224,7 +224,7 @@ it('keeps one ungraded foreign price per source, the middle one', () => {
     row('ebay', 9000, 'graded:PSA:10'),
     row('ebay', 1500),
   ]);
-  expect(out.map((f) => [f.source, f.priceJpy, f.of])).toEqual([
+  expect(out.map((f) => [f.source, f.priceBase, f.of])).toEqual([
     ['tcgcsv', 2000, 3],
     ['ebay', 1500, 1],
   ]);

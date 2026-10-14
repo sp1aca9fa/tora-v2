@@ -18,7 +18,7 @@ export function ManualPriceForm({
     <form action={formAction} className="space-y-2">
       <div className="flex gap-2">
         <Input
-          name="priceJpy"
+          name="priceBase"
           inputMode="numeric"
           required
           placeholder="¥"

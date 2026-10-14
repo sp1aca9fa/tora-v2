@@ -59,7 +59,7 @@ const sold = (productId: string, bucket: string, price: number, daysAgo: number)
   source: 'snkrdunk',
   observationType: 'sold' as const,
   bucket,
-  priceJpy: price,
+  priceBase: price,
   observedAt: ago(daysAgo),
   fetchedAt: now.toISOString(),
   externalRef: `r${ref++}`,
@@ -73,7 +73,7 @@ async function scenario() {
     { product: { category: 'tcg', kind: 'booster_box', name: 'BP BOX', setName: 'BP' } },
     {
       quantity: 1,
-      costTotalJpy: 5_400,
+      costTotalBase: 5_400,
       acquiredAt: ago(60),
       packagingState: 'box_opened_contents_sealed',
     },
@@ -101,8 +101,8 @@ async function scenario() {
   const amiibo = await createHolding(
     db,
     uid,
-    { product: { category: 'game', kind: 'amiibo', name: 'Link', retailPriceJpy: 3_300 } },
-    { quantity: 3, costTotalJpy: 9_900, acquiredAt: ago(30), condition: 'new_unused' },
+    { product: { category: 'game', kind: 'amiibo', name: 'Link', retailPriceBase: 3_300 } },
+    { quantity: 3, costTotalBase: 9_900, acquiredAt: ago(30), condition: 'new_unused' },
   );
 
   await insertObservations(db, [
@@ -125,19 +125,19 @@ describe('box view (scenario 5)', () => {
     // No market data for opened-box-with-sealed-packs: not valued as a shrink-wrapped box.
     expect(view?.asReceived).toMatchObject({
       bucket: 'sealed:box_opened_contents_sealed',
-      valueJpy: null,
+      valueBase: null,
     });
-    expect(view?.paidJpy).toBe(5_400);
+    expect(view?.paidBase).toBe(5_400);
     // ピカチュウ 3,100 + ミュウ 925 (IQR drops 20,000) x 2
-    expect(view?.pullsValueJpy).toBe(3_100 + 925 * 2);
-    expect(view?.netJpy).toBe(3_100 + 925 * 2 - 5_400);
+    expect(view?.pullsValueBase).toBe(3_100 + 925 * 2);
+    expect(view?.netBase).toBe(3_100 + 925 * 2 - 5_400);
 
     await setManualPrice(db, uid, box.product.id, 'sealed:box_opened_contents_sealed', 9_000);
     // The manual price is set at the real current time, so value at the real time too.
     const withManual = await boxView(db, uid, box.holding.id, new Date());
-    expect(withManual?.asReceived).toMatchObject({ method: 'manual', valueJpy: 9_000 });
+    expect(withManual?.asReceived).toMatchObject({ method: 'manual', valueBase: 9_000 });
     await clearManualPrice(db, uid, box.product.id, 'sealed:box_opened_contents_sealed');
-    expect((await boxView(db, uid, box.holding.id, now))?.asReceived.valueJpy).toBeNull();
+    expect((await boxView(db, uid, box.holding.id, now))?.asReceived.valueBase).toBeNull();
   });
 });
 
@@ -150,19 +150,19 @@ describe('portfolio (scenario 7)', () => {
     expect(p.totals).toMatchObject({
       total: 3,
       valued: 3,
-      spentJpy: 9_900 + 5_400,
-      openedCostJpy: 5_400,
+      spentBase: 9_900 + 5_400,
+      openedCostBase: 5_400,
     });
-    expect(p.totals.valueJpy).toBe(3_100 + 925 * 2 + 9_900);
-    expect(p.totals.unrealizedJpy).toBe(p.totals.valueJpy - 9_900 - 5_400);
+    expect(p.totals.valueBase).toBe(3_100 + 925 * 2 + 9_900);
+    expect(p.totals.unrealizedBase).toBe(p.totals.valueBase - 9_900 - 5_400);
     const row = p.rows.find((r) => r.holding.id === amiibo.holding.id);
     expect(row?.valuation).toMatchObject({ method: 'retail', confidence: 'low' });
     expect(p.breakdown.map((b) => b.kind).sort()).toEqual(['amiibo', 'booster_box', 'single']);
 
     await sellHolding(db, uid, amiibo.holding.id, {
       quantity: 3,
-      priceJpy: 12_000,
-      feesJpy: 0,
+      priceBase: 12_000,
+      feesBase: 0,
       occurredAt: ago(1),
     });
     expect((await portfolioValuation(db, uid, now)).totals.total).toBe(2);
@@ -175,7 +175,7 @@ describe('portfolio (scenario 7)', () => {
       db,
       uid,
       { product: { category: 'tcg', kind: 'single', name: 'ミュウツー' } },
-      { quantity: 1, costTotalJpy: 700, acquiredAt: ago(5) },
+      { quantity: 1, costTotalBase: 700, acquiredAt: ago(5) },
     );
     const run = await runSnapshots(db, now);
     // The box was bought 60 days ago: every day since then, today included.
@@ -185,13 +185,13 @@ describe('portfolio (scenario 7)', () => {
       series.find((s) => s.date === tokyoDate(new Date(now.getTime() - daysAgo * 86_400_000)));
     expect(series[0]?.date).toBe(ago(60).slice(0, 10));
     expect(on(0)).toMatchObject({
-      valueJpy: 3_100 + 925 * 2 + 9_900 + 700,
+      valueBase: 3_100 + 925 * 2 + 9_900 + 700,
       // The opened box stays in the cost line (its value moved to the pulls).
-      costJpy: 9_900 + 700 + 5_400,
-      atCostJpy: 700,
+      costBase: 9_900 + 700 + 5_400,
+      atCostBase: 700,
     });
     // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
-    expect(on(39)?.valueJpy).toBe(2_000);
+    expect(on(39)?.valueBase).toBe(2_000);
 
     // Re-running writes nothing new; moving a purchase date later removes the days before it.
     expect(await runSnapshots(db, now)).toMatchObject({ rows: 0, removed: 0 });
@@ -216,17 +216,17 @@ describe('portfolio (scenario 7)', () => {
       db,
       uid,
       { productId: mew.product.id },
-      { quantity: 1, costTotalJpy: 1_000, acquiredAt: ago(3), grading: 'raw', rawGrade: 'A' },
+      { quantity: 1, costTotalBase: 1_000, acquiredAt: ago(3), grading: 'raw', rawGrade: 'A' },
     );
     const p = await portfolioValuation(db, uid, now);
     const valuations = new Map(p.rows.map((r) => [r.holding.id, r.valuation]));
     const summary = summarizeByProduct(p.rows, valuations);
     const m = summary.find((s) => s.product.id === mew.product.id)!;
     expect(m.lots.map((l) => l.holding.id)).toContain(second.holding.id);
-    expect(m).toMatchObject({ units: 3, spentJpy: 1_000, valuedLots: 2, valueJpy: 925 * 3 });
-    expect(m.unrealizedJpy).toBe(925 * 3 - 1_000);
+    expect(m).toMatchObject({ units: 3, spentBase: 1_000, valuedLots: 2, valueBase: 925 * 3 });
+    expect(m.unrealizedBase).toBe(925 * 3 - 1_000);
     // Highest value first.
-    expect(summary[0]!.valueJpy).toBeGreaterThanOrEqual(summary.at(-1)!.valueJpy);
+    expect(summary[0]!.valueBase).toBeGreaterThanOrEqual(summary.at(-1)!.valueBase);
   });
 
   it('builds daily medians for the price chart', async () => {
@@ -269,18 +269,18 @@ describe('saved bucket values (S8 speed)', () => {
       .select()
       .from(priceObservations)
       .where(
-        and(eq(priceObservations.productId, mew.product.id), eq(priceObservations.priceJpy, 1_000)),
+        and(eq(priceObservations.productId, mew.product.id), eq(priceObservations.priceBase, 1_000)),
       );
     await setObservationExcluded(db, outlier!.id, true);
     const values = await valueHoldings(db, uid, await owned(), now);
     expect(values).toEqual(await full());
     // 800, 900, 950 (20,000 dropped as an outlier)
-    expect(values.get(mew.holding.id)?.valueJpy).toBe(900 * 2);
+    expect(values.get(mew.holding.id)?.valueBase).toBe(900 * 2);
 
     await setManualPrice(db, uid, mew.product.id, 'raw:A', 1_500);
     const later = new Date();
     const withManual = await valueHoldings(db, uid, await owned(), later);
-    expect(withManual.get(mew.holding.id)).toMatchObject({ method: 'manual', valueJpy: 3_000 });
+    expect(withManual.get(mew.holding.id)).toMatchObject({ method: 'manual', valueBase: 3_000 });
   });
 });
 
@@ -310,15 +310,15 @@ describe('tracking switches (S8)', () => {
     // Bought to use: worth still shown, cost and P/L left out.
     await setLotTracking(db, uid, amiibo.holding.id, { countInCost: false, countInValue: true });
     let after = (await portfolioValuation(db, uid, now)).totals;
-    expect(after.spentJpy).toBe(before.spentJpy - 9_900);
-    expect(after.valueJpy).toBe(before.valueJpy);
-    expect(after.unrealizedJpy).toBe(before.unrealizedJpy - (3_300 * 3 - 9_900));
+    expect(after.spentBase).toBe(before.spentBase - 9_900);
+    expect(after.valueBase).toBe(before.valueBase);
+    expect(after.unrealizedBase).toBe(before.unrealizedBase - (3_300 * 3 - 9_900));
     expect(after.notInvestment).toBe(1);
     // ミュウ (pulled, cost 0, worth 925 x 2) out of the P/L: its gain no longer counts.
     await setLotTracking(db, uid, mew.holding.id, { countInCost: true, countInValue: false });
     after = (await portfolioValuation(db, uid, now)).totals;
-    expect(after.valueJpy).toBe(before.valueJpy - 925 * 2);
-    expect(after.unrealizedJpy).toBe(before.unrealizedJpy - 925 * 2);
+    expect(after.valueBase).toBe(before.valueBase - 925 * 2);
+    expect(after.unrealizedBase).toBe(before.unrealizedBase - 925 * 2);
   });
 
   it('applies to every lot of the item on request', async () => {
@@ -327,7 +327,7 @@ describe('tracking switches (S8)', () => {
       db,
       uid,
       { productId: amiibo.product.id },
-      { quantity: 1, costTotalJpy: 3_300, acquiredAt: ago(5), condition: 'new_unused' },
+      { quantity: 1, costTotalBase: 3_300, acquiredAt: ago(5), condition: 'new_unused' },
     );
     const off = { countInCost: false, countInValue: false };
     expect(await setLotTracking(db, uid, amiibo.holding.id, off)).toBe(1);

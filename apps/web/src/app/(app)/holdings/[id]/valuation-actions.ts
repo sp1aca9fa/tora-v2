@@ -16,9 +16,9 @@ export async function setManualPriceAction(
 ): Promise<FormState> {
   const { db, user } = await authed();
   if (!(await userHoldsProduct(db, user.id, productId))) return { error: 'not_found' };
-  const parsed = parseForm(z.object({ priceJpy: yen, note: optText }), formData);
+  const parsed = parseForm(z.object({ priceBase: yen, note: optText }), formData);
   if ('state' in parsed) return parsed.state;
-  await setManualPrice(db, user.id, productId, bucket, parsed.data.priceJpy, parsed.data.note);
+  await setManualPrice(db, user.id, productId, bucket, parsed.data.priceBase, parsed.data.note);
   revalidatePath(`/holdings/${holdingId}`);
   revalidatePath('/');
   return {};

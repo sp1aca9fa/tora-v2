@@ -111,8 +111,8 @@ export function ProductFields({
       {shown.has('cardNumber') && text('cardNumber', { placeholder: '123/100' })}
       {shown.has('rarity') && text('rarity', { placeholder: 'SAR' })}
       {shown.has('releaseDate') && text('releaseDate', { type: 'date' })}
-      {shown.has('retailPriceJpy') &&
-        text('retailPriceJpy', { inputMode: 'numeric', placeholder: '¥' })}
+      {shown.has('retailPriceBase') &&
+        text('retailPriceBase', { inputMode: 'numeric', placeholder: '¥' })}
     </div>
   );
 }

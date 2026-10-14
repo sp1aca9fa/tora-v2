@@ -3,7 +3,7 @@
 /** Panels of the Portfolio Summary's rotating card, in their default order. */
 export const SUMMARY_PANELS = [
   'movers_pct',
-  'movers_jpy',
+  'movers_amount',
   'movers_sealed',
   'most_traded',
   'gains',
@@ -34,7 +34,10 @@ export interface UserPreferences {
 /** The Summary card's settings with the defaults filled in. */
 export function summaryPrefs(prefs: UserPreferences | null | undefined) {
   const s = prefs?.summary ?? {};
-  const panels = (s.panels ?? []).filter((p) => (SUMMARY_PANELS as readonly string[]).includes(p));
+  const panels = (s.panels ?? [])
+    // Saved before amounts left yen (S16).
+    .map((p) => ((p as string) === 'movers_jpy' ? 'movers_amount' : p))
+    .filter((p) => (SUMMARY_PANELS as readonly string[]).includes(p));
   return {
     rotate: s.rotate ?? true,
     seconds: (ROTATE_SECONDS as readonly number[]).includes(s.seconds ?? 0) ? s.seconds! : 8,

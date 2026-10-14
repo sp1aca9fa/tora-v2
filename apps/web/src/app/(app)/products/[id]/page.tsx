@@ -67,22 +67,22 @@ export default async function ProductPage({ params }: Params) {
     foreignPrices(db, product.id),
     dismissedSourceWarnings(db, user.id),
   ]);
-  const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueJpy ?? null]));
+  const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueBase ?? null]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
   // By each lot's tracking switches (S8): spent counts lots counted in cost, value those counted
   // in value, P/L those counted in both. Opened items keep their cost (their value moved to the
   // pulls logged from them).
   const opened = lots.filter((h) => h.status === 'consumed' && h.countInCost);
-  const openedCost = opened.reduce((n, h) => n + h.costTotalJpy, 0);
+  const openedCost = opened.reduce((n, h) => n + h.costTotalBase, 0);
   const spent =
-    owned.filter((h) => h.countInCost).reduce((n, h) => n + h.costTotalJpy, 0) + openedCost;
+    owned.filter((h) => h.countInCost).reduce((n, h) => n + h.costTotalBase, 0) + openedCost;
   const valued = owned.filter((h) => h.countInValue && values.get(h.id) != null);
   const value = valued.reduce((n, h) => n + values.get(h.id)!, 0);
   const inPl = valued.filter((h) => h.countInCost);
-  const openedInPl = opened.filter((h) => h.countInValue).reduce((n, h) => n + h.costTotalJpy, 0);
+  const openedInPl = opened.filter((h) => h.countInValue).reduce((n, h) => n + h.costTotalBase, 0);
   const pl =
     inPl.length || openedInPl
-      ? inPl.reduce((n, h) => n + values.get(h.id)! - h.costTotalJpy, 0) - openedInPl
+      ? inPl.reduce((n, h) => n + values.get(h.id)! - h.costTotalBase, 0) - openedInPl
       : null;
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
   const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
@@ -189,11 +189,11 @@ export default async function ProductPage({ params }: Params) {
                       </div>
                       <div className="shrink-0 text-right text-sm tabular-nums">
                         <p className={v != null ? 'font-medium' : undefined}>
-                          {v != null ? formatJpy(v) : formatJpy(h.costTotalJpy)}
+                          {v != null ? formatJpy(v) : formatJpy(h.costTotalBase)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {v != null
-                            ? `${t('portfolio.spentShort', { amount: formatJpy(h.costTotalJpy) })} · ${signed(v - h.costTotalJpy)}`
+                            ? `${t('portfolio.spentShort', { amount: formatJpy(h.costTotalBase) })} · ${signed(v - h.costTotalBase)}`
                             : h.status === 'owned'
                               ? t('valuation.short.none')
                               : t('product.cost')}
@@ -241,7 +241,7 @@ export default async function ProductPage({ params }: Params) {
           db={db}
           product={product}
           bucket={mainBucket}
-          ownedCostJpy={owned.reduce((n, h) => n + h.costTotalJpy, 0)}
+          ownedCostBase={owned.reduce((n, h) => n + h.costTotalBase, 0)}
           warningDismissed={dismissed.has(product.id)}
         />
       }

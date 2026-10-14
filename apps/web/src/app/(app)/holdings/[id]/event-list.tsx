@@ -20,14 +20,14 @@ export async function EventList({ events }: { events: HoldingEvent[] }) {
       case 'acquired':
         return t('events.acquiredSummary', {
           qty: Number(p.quantity ?? 0),
-          cost: formatJpy(e.amountJpy ?? 0),
+          cost: formatJpy(e.amountBase ?? 0),
         });
       case 'split':
         return p.role === 'source' ? (
           <>
             {t('events.splitSource', {
               qty: Number(p.quantityMoved),
-              cost: formatJpy(Number(p.costMovedJpy)),
+              cost: formatJpy(Number(p.costMovedBase)),
             })}{' '}
             <Link className="underline" href={`/holdings/${String(p.toHoldingId)}`}>
               {t('events.viewLot')}
@@ -46,7 +46,7 @@ export async function EventList({ events }: { events: HoldingEvent[] }) {
       case 'grading_submitted':
         return t('events.gradingSubmittedSummary', {
           grader: String(p.grader),
-          fee: formatJpy(e.amountJpy ?? 0),
+          fee: formatJpy(e.amountBase ?? 0),
         });
       case 'grading_returned': {
         const after = (p.after ?? {}) as Payload;
@@ -68,8 +68,8 @@ export async function EventList({ events }: { events: HoldingEvent[] }) {
       case 'sold':
         return t('events.soldSummary', {
           qty: Number(p.quantity ?? 1),
-          price: formatJpy(e.amountJpy ?? 0),
-          fees: formatJpy(e.feesJpy ?? 0),
+          price: formatJpy(e.amountBase ?? 0),
+          fees: formatJpy(e.feesBase ?? 0),
           platform: String(p.platform ?? '-'),
         });
       case 'note':

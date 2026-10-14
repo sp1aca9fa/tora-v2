@@ -64,7 +64,7 @@ async function amiiboLot(quantity = 3, cost = 10_000, user = uid) {
     { product: { category: 'game', kind: 'amiibo', name: 'amiibo Link', region: 'jp' } },
     {
       quantity,
-      costTotalJpy: cost,
+      costTotalBase: cost,
       acquiredAt: day('08-01'),
       condition: 'new_unused',
       packagingState: 'sealed_no_shrink',
@@ -88,7 +88,7 @@ async function box() {
     },
     {
       quantity: 1,
-      costTotalJpy: 5_400,
+      costTotalBase: 5_400,
       acquiredAt: day('09-28'),
       acquiredFrom: 'Yodobashi',
       packagingState: 'box_opened_contents_sealed',
@@ -117,14 +117,14 @@ describe('createHolding', () => {
       db,
       uid,
       { productId: product.id },
-      { quantity: 1, costTotalJpy: 3000, acquiredAt: day('08-02') },
+      { quantity: 1, costTotalBase: 3000, acquiredAt: day('08-02') },
     );
     expect(second.product.id).toBe(product.id);
-    expect(await ownedTotals(db, uid)).toEqual({ spentJpy: 13_000, lots: 2, units: 4 });
+    expect(await ownedTotals(db, uid)).toEqual({ spentBase: 13_000, lots: 2, units: 4 });
   });
 
   it('validates input', async () => {
-    const h = { quantity: 1, costTotalJpy: 0, acquiredAt: day('01-01') };
+    const h = { quantity: 1, costTotalBase: 0, acquiredAt: day('01-01') };
     await expectDomainError(
       createHolding(db, uid, { product: { category: 'game', kind: 'amiibo', name: ' ' } }, h),
       'invalid_input',
@@ -190,7 +190,7 @@ describe('catalog products', () => {
     const sets = await seedSets();
     const h = {
       quantity: 1,
-      costTotalJpy: 5_000,
+      costTotalBase: 5_000,
       acquiredAt: day('09-01'),
       packagingState: 'sealed_shrink' as const,
     };
@@ -293,7 +293,7 @@ describe('pulls (scenarios 4-5)', () => {
     const { holding, product } = await pull(boxHolding.id, 'ピカチュウ');
     expect(holding).toMatchObject({
       parentHoldingId: boxHolding.id,
-      costTotalJpy: 0,
+      costTotalBase: 0,
       acquisitionType: 'pull',
       acquiredFrom: 'Yodobashi',
       userId: uid,
@@ -333,8 +333,8 @@ describe('lot actions', () => {
     const { holding } = await amiiboLot(3, 10_000);
     const split = await splitOff(db, uid, holding.id, 1, day('09-01'));
     const [original] = await db.select().from(holdings).where(eq(holdings.id, holding.id));
-    expect(original).toMatchObject({ quantity: 2, costTotalJpy: 6667 });
-    expect(split).toMatchObject({ quantity: 1, costTotalJpy: 3333, userId: uid });
+    expect(original).toMatchObject({ quantity: 2, costTotalBase: 6667 });
+    expect(split).toMatchObject({ quantity: 1, costTotalBase: 3333, userId: uid });
     expect((await getHoldingDetail(db, uid, split.id))?.events.map((e) => e.type)).toEqual([
       'split',
     ]);
@@ -345,29 +345,29 @@ describe('lot actions', () => {
     const { holding } = await amiiboLot(3, 9_000);
     const sold = await sellHolding(db, uid, holding.id, {
       quantity: 1,
-      priceJpy: 5_000,
-      feesJpy: 500,
+      priceBase: 5_000,
+      feesBase: 500,
       platform: 'Mercari',
       occurredAt: day('10-01'),
     });
-    expect(sold).toMatchObject({ status: 'sold', quantity: 1, costTotalJpy: 3_000 });
+    expect(sold).toMatchObject({ status: 'sold', quantity: 1, costTotalBase: 3_000 });
     expect((await getHoldingDetail(db, uid, sold.id))?.events.at(-1)).toMatchObject({
       type: 'sold',
-      amountJpy: 5_000,
-      feesJpy: 500,
-      payload: { platform: 'Mercari', costBasisJpy: 3_000 },
+      amountBase: 5_000,
+      feesBase: 500,
+      payload: { platform: 'Mercari', costBasisBase: 3_000 },
     });
     await expectDomainError(
       sellHolding(db, uid, sold.id, {
         quantity: 1,
-        priceJpy: 1,
-        feesJpy: 0,
+        priceBase: 1,
+        feesBase: 0,
         occurredAt: day('10-02'),
       }),
       'not_owned',
     );
     expect(await listInventory(db, uid, { status: 'owned' })).toHaveLength(1);
-    expect((await ownedTotals(db, uid)).spentJpy).toBe(6_000);
+    expect((await ownedTotals(db, uid)).spentBase).toBe(6_000);
   });
 
   it('changes condition of part of a lot', async () => {
@@ -377,7 +377,7 @@ describe('lot actions', () => {
       condition: 'minor_damage',
       occurredAt: day('10-01'),
     });
-    expect(changed).toMatchObject({ condition: 'minor_damage', quantity: 1, costTotalJpy: 3_000 });
+    expect(changed).toMatchObject({ condition: 'minor_damage', quantity: 1, costTotalBase: 3_000 });
     await expectDomainError(
       changeCondition(db, uid, changed.id, {
         quantity: 1,
@@ -393,7 +393,7 @@ describe('lot actions', () => {
       db,
       uid,
       { product: { category: 'tcg', kind: 'single', name: 'ピカチュウ 長場雄' } },
-      { quantity: 3, costTotalJpy: 7_050, acquiredAt: day('09-01') },
+      { quantity: 3, costTotalBase: 7_050, acquiredAt: day('09-01') },
     );
     const changed = await changeCondition(db, uid, holding.id, {
       quantity: 3,
@@ -409,12 +409,12 @@ describe('lot actions', () => {
     };
     await createHolding(db, uid, card, {
       quantity: 1,
-      costTotalJpy: 800,
+      costTotalBase: 800,
       acquiredAt: day('09-01'),
     });
     await createHolding(db, uid, card, {
       quantity: 1,
-      costTotalJpy: 800,
+      costTotalBase: 800,
       acquiredAt: day('09-02'),
       reviewPending: true,
     });
@@ -423,13 +423,13 @@ describe('lot actions', () => {
 
   it('edits facts and logs before/after; adds notes', async () => {
     const { holding } = await amiiboLot();
-    await editHolding(db, uid, holding.id, { costTotalJpy: 9_900, acquiredFrom: 'Amazon' });
+    await editHolding(db, uid, holding.id, { costTotalBase: 9_900, acquiredFrom: 'Amazon' });
     const detail = await getHoldingDetail(db, uid, holding.id);
     expect(detail?.events.at(-1)?.payload).toMatchObject({
       kind: 'edit',
-      changes: { costTotalJpy: { before: 10_000, after: 9_900 } },
+      changes: { costTotalBase: { before: 10_000, after: 9_900 } },
     });
-    await expectDomainError(editHolding(db, uid, holding.id, { costTotalJpy: 9_900 }), 'no_change');
+    await expectDomainError(editHolding(db, uid, holding.id, { costTotalBase: 9_900 }), 'no_change');
     await addNote(db, uid, holding.id, { text: 'Box 3', occurredAt: day('10-01') });
     await expectDomainError(
       addNote(db, uid, holding.id, { text: ' ', occurredAt: day('10-01') }),
@@ -457,12 +457,12 @@ describe('grading (scenario 6)', () => {
     const atPsa = await submitGrading(db, uid, mew.id, {
       quantity: 1,
       grader: 'PSA',
-      feeJpy: 4_000,
+      feeBase: 4_000,
       occurredAt: day('10-01'),
     });
     expect(atPsa).toMatchObject({
       quantity: 1,
-      costTotalJpy: 4_000,
+      costTotalBase: 4_000,
       parentHoldingId: boxHolding.id,
     });
     expect(pendingGrading((await getHoldingDetail(db, uid, atPsa.id))!.events)).toMatchObject({
@@ -472,7 +472,7 @@ describe('grading (scenario 6)', () => {
       submitGrading(db, uid, atPsa.id, {
         quantity: 1,
         grader: 'PSA',
-        feeJpy: 1,
+        feeBase: 1,
         occurredAt: day('10-02'),
       }),
       'already_at_grader',
@@ -485,10 +485,10 @@ describe('grading (scenario 6)', () => {
       grader: 'PSA',
       grade: '10',
       certNumber: '12345678',
-      extraFeeJpy: 500,
+      extraFeeBase: 500,
       occurredAt: day('11-15'),
     });
-    expect(graded).toMatchObject({ grading: 'graded', grade: '10', costTotalJpy: 4_500 });
+    expect(graded).toMatchObject({ grading: 'graded', grade: '10', costTotalBase: 4_500 });
     expect(deriveBucket({ productClass: 'card', ...graded })).toBe('graded:PSA:10');
     expect((await getHoldingDetail(db, uid, atPsa.id))?.events.map((e) => e.type)).toEqual([
       'split',
@@ -503,7 +503,7 @@ describe('grading (scenario 6)', () => {
       submitGrading(db, uid, holding.id, {
         quantity: 1,
         grader: 'PSA',
-        feeJpy: 0,
+        feeBase: 0,
         occurredAt: day('10-01'),
       }),
       'not_a_card',
@@ -529,7 +529,7 @@ describe('setCardGrade', () => {
     const card = {
       product: { category: 'tcg' as const, kind: 'single' as const, name: 'ピカチュウ' },
     };
-    const input = { quantity: 1, costTotalJpy: 500, acquiredAt: day('09-01') };
+    const input = { quantity: 1, costTotalBase: 500, acquiredAt: day('09-01') };
     const a = await createHolding(db, uid, card, input);
     const b = await createHolding(db, uid, card, { ...input, grading: 'raw', rawGrade: 'B' });
     const grade = { grading: 'graded', grader: 'PSA', grade: '10' } as const;
@@ -561,7 +561,7 @@ describe('setCardGrade', () => {
 
 describe('confirmImportReview', () => {
   it('applies grades, cert and packaging, then clears the review flag', async () => {
-    const input = { quantity: 1, costTotalJpy: 500, acquiredAt: day('09-01'), reviewPending: true };
+    const input = { quantity: 1, costTotalBase: 500, acquiredAt: day('09-01'), reviewPending: true };
     const card = await createHolding(
       db,
       uid,
@@ -628,13 +628,13 @@ describe('confirmImportReview', () => {
       db,
       uid,
       { product: { category: 'game', kind: 'other', name: 'Retro Station' } },
-      { quantity: 1, costTotalJpy: 22000, acquiredAt: day('09-05'), reviewPending: true },
+      { quantity: 1, costTotalBase: 22000, acquiredAt: day('09-05'), reviewPending: true },
     );
     await confirmImportReview(db, uid, [
       { id: lot.holding.id, acquiredAt: day('09-02'), quantity: 3 },
     ]);
     const { holding } = (await getHoldingDetail(db, uid, lot.holding.id))!;
-    expect(holding).toMatchObject({ acquiredAt: day('09-02'), quantity: 3, costTotalJpy: 22000 });
+    expect(holding).toMatchObject({ acquiredAt: day('09-02'), quantity: 3, costTotalBase: 22000 });
   });
 });
 
@@ -642,7 +642,7 @@ describe('cancelled orders and review flags', () => {
   const card = { product: { category: 'tcg' as const, kind: 'single' as const, name: 'ミュウ' } };
   const input = (orderId: string) => ({
     quantity: 3,
-    costTotalJpy: 3000,
+    costTotalBase: 3000,
     acquiredAt: day('09-01'),
     acquiredFrom: 'SNKRDUNK',
     orderId,
@@ -682,7 +682,7 @@ describe('order IDs', () => {
   const card = { product: { category: 'tcg' as const, kind: 'single' as const, name: 'ミュウ' } };
   const h = (orderId: string | null, acquiredFrom = 'SNKRDUNK') => ({
     quantity: 1,
-    costTotalJpy: 1000,
+    costTotalBase: 1000,
     acquiredAt: day('09-01'),
     acquiredFrom,
     orderId,
@@ -705,7 +705,7 @@ describe('order IDs', () => {
     const lot = await createHolding(db, uid, card, {
       ...h('111'),
       quantity: 2,
-      costTotalJpy: 2000,
+      costTotalBase: 2000,
     });
     const split = await splitOff(db, uid, lot.holding.id, 1);
     expect(split.orderId).toBe('111');

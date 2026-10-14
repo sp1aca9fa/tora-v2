@@ -140,7 +140,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
       kind: products.kind,
       source: priceObservations.source,
       bucket: priceObservations.bucket,
-      priceJpy: priceObservations.priceJpy,
+      priceBase: priceObservations.priceBase,
     })
     .from(priceObservations)
     .innerJoin(products, eq(products.id, priceObservations.productId))
@@ -157,7 +157,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
     if (!s.bucket) continue;
     const key = `${s.productId}|${s.bucket}`;
     const e = byKey.get(key) ?? { cls: productClass(s), by: new Map<string, number[]>() };
-    e.by.set(s.source, [...(e.by.get(s.source) ?? []), s.priceJpy]);
+    e.by.set(s.source, [...(e.by.get(s.source) ?? []), s.priceBase]);
     byKey.set(key, e);
   }
   const at = toTokyoIso(now);

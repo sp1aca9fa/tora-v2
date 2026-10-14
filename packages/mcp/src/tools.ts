@@ -42,8 +42,8 @@ const pct = (part: number, whole: number) =>
 /** What a valuation says, in a few fields. */
 function valuationFacts(v: ReturnType<typeof valueHolding>) {
   return {
-    valueJpy: v.valueJpy,
-    unitJpy: v.unitJpy,
+    valueBase: v.valueBase,
+    unitBase: v.unitBase,
     method: v.method,
     source: v.source,
     bucket: v.bucket,
@@ -53,7 +53,7 @@ function valuationFacts(v: ReturnType<typeof valueHolding>) {
     confidence: v.confidence,
     estimatedLotSales: v.estimatedSamples,
     lastSale: v.last
-      ? { priceJpy: v.last.priceJpy, source: v.last.source, at: day(v.last.observedAt) }
+      ? { priceBase: v.last.priceBase, source: v.last.source, at: day(v.last.observedAt) }
       : null,
   };
 }
@@ -64,17 +64,17 @@ export async function portfolioSummary(db: Db, userId: string) {
   const p = await portfolioValuation(db, userId);
   const valuations = new Map(p.rows.map((r) => [r.holding.id, r.valuation]));
   const summaries = summarizeByProduct(p.rows, valuations);
-  const withPl = summaries.filter((s) => s.unrealizedJpy !== null);
-  const byPl = withPl.toSorted((a, b) => b.unrealizedJpy! - a.unrealizedJpy!);
+  const withPl = summaries.filter((s) => s.unrealizedBase !== null);
+  const byPl = withPl.toSorted((a, b) => b.unrealizedBase! - a.unrealizedBase!);
   const row = (s: (typeof summaries)[number]) => ({
     productId: s.product.id,
     name: s.product.name,
     kind: s.product.kind,
     units: s.units,
-    spentJpy: s.spentJpy,
-    valueJpy: s.valuedLots ? s.valueJpy : null,
-    unrealizedJpy: s.unrealizedJpy,
-    unrealizedPct: s.unrealizedJpy === null ? null : pct(s.unrealizedJpy, s.valuedCostJpy),
+    spentBase: s.spentBase,
+    valueBase: s.valuedLots ? s.valueBase : null,
+    unrealizedBase: s.unrealizedBase,
+    unrealizedPct: s.unrealizedBase === null ? null : pct(s.unrealizedBase, s.valuedCostBase),
   });
   const series = await portfolioSeries(db, userId);
   // The chart, thinned: the first of each month, plus every day of the last 30.
@@ -83,9 +83,9 @@ export async function portfolioSummary(db: Db, userId: string) {
     .filter((s) => s.date.endsWith('-01') || s.date >= recentFrom)
     .map((s) => ({
       date: s.date,
-      valueJpy: Number(s.valueJpy),
-      costJpy: Number(s.costJpy),
-      atCostJpy: Number(s.atCostJpy),
+      valueBase: Number(s.valueBase),
+      costBase: Number(s.costBase),
+      atCostBase: Number(s.atCostBase),
     }));
   return {
     totals: p.totals,
@@ -137,9 +137,9 @@ export async function listProducts(
         franchise: s.product.franchise,
         lots: s.lots.length,
         units: s.units,
-        spentJpy: s.spentJpy,
-        valueJpy: s.valuedLots ? s.valueJpy : null,
-        unrealizedJpy: s.unrealizedJpy,
+        spentBase: s.spentBase,
+        valueBase: s.valuedLots ? s.valueBase : null,
+        unrealizedBase: s.unrealizedBase,
         valuedLots: s.valuedLots,
         valuation: {
           method: first.method,
@@ -170,7 +170,7 @@ export async function productDetail(db: Db, userId: string, productId: string) {
       holdingId: h.id,
       status: h.status,
       quantity: h.quantity,
-      costJpy: h.costTotalJpy,
+      costBase: h.costTotalBase,
       acquiredAt: day(h.acquiredAt),
       acquiredFrom: h.acquiredFrom,
       orderId: h.orderId,
@@ -270,8 +270,8 @@ export async function sales(
     return {
       at: day(r.observedAt),
       source: r.source,
-      priceJpy: r.priceJpy,
-      lotPriceJpy: r.priceOriginal !== r.priceJpy ? r.priceOriginal : undefined,
+      priceBase: r.priceBase,
+      lotPriceBase: r.priceOriginal !== r.priceBase ? r.priceOriginal : undefined,
       bucket: r.bucket,
       kept: !r.excluded,
       why: r.excluded ? (raw.filter ?? r.excludedReason) : undefined,
@@ -369,7 +369,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       'warn',
       'Owned lots with no market value (no condition / grade, or no sales and no retail price).',
       valued
-        .filter((x) => x.v.valueJpy === null)
+        .filter((x) => x.v.valueBase === null)
         .map((x) => ({
           ...lot(x.holding, x.product),
           bucket: holdingBucket(x.holding, x.product),
@@ -418,8 +418,8 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       oddSales(valued, market, now).map((o) => ({
         ...lot(o.holding, o.product),
         source: o.source,
-        priceJpy: o.priceJpy,
-        valueJpy: o.valueJpy,
+        priceBase: o.priceBase,
+        valueBase: o.valueBase,
         at: day(o.observedAt),
       })),
     ),
@@ -566,7 +566,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
         productId: m.product.id,
         name: m.product.name,
         needs: m.source,
-        costJpy: m.costJpy,
+        costBase: m.costBase,
         suggestions: m.suggestions,
       })),
     ),

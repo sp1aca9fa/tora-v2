@@ -73,14 +73,14 @@ export interface HoldingValuation extends Valuation {
   /** Each source's last sale and median, for side-by-side comparison. */
   sources: SourceSummary[];
   /** Unit value x quantity. */
-  valueJpy: number | null;
-  buylist: { priceJpy: number; source: string; observedAt: string } | null;
+  valueBase: number | null;
+  buylist: { priceBase: number; source: string; observedAt: string } | null;
 }
 
 export interface MarketData {
   observations: Map<string, ValuationObservation[]>;
   recent: Map<string, RecentSaleInput[]>;
-  manual: Map<string, { bucket: string; priceJpy: number; setAt: string }[]>;
+  manual: Map<string, { bucket: string; priceBase: number; setAt: string }[]>;
   /**
    * Sources valued per item class, best first (the source registry's roles); empty when no
    * source is described yet (then every source counts).
@@ -110,7 +110,7 @@ export async function loadMarketData(
 ): Promise<MarketData> {
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
-  const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
+  const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   if (productIds.length === 0)
     return { observations, recent, manual, order: await orderByClass(db) };
   for (let i = 0; i < productIds.length; i += 200) {
@@ -121,7 +121,7 @@ export async function loadMarketData(
         productId: priceObservations.productId,
         source: priceObservations.source,
         bucket: priceObservations.bucket,
-        priceJpy: priceObservations.priceJpy,
+        priceBase: priceObservations.priceBase,
         observedAt: priceObservations.observedAt,
         observationType: priceObservations.observationType,
         excluded: priceObservations.excluded,
@@ -191,7 +191,7 @@ export async function loadHoldingsMarketData(
   const productIds = [...new Set(wanted.map((w) => w.productId))];
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
-  const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
+  const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   if (productIds.length === 0)
     return { observations, recent, manual, order: await orderByClass(db) };
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
@@ -212,7 +212,7 @@ export async function loadHoldingsMarketData(
     productId: priceObservations.productId,
     source: priceObservations.source,
     bucket: priceObservations.bucket,
-    priceJpy: priceObservations.priceJpy,
+    priceBase: priceObservations.priceBase,
     observedAt: priceObservations.observedAt,
     observationType: priceObservations.observationType,
     excluded: priceObservations.excluded,
@@ -372,7 +372,7 @@ function bucketValueOf(
     valuation: valueUnit({
       bucket,
       observations,
-      retailPriceJpy: product.retailPriceJpy,
+      retailPriceBase: product.retailPriceBase,
       now,
       sources: market.order[productClass(product)],
     }),
@@ -546,7 +546,7 @@ export async function valueHoldings(
   const productIds = [...new Set(rows.map((r) => r.product.id))];
   if (productIds.length === 0) return out;
   const wanted = rows.map((r) => ({ ...r, bucket: holdingBucket(r.holding, r.product) }));
-  const manual = new Map<string, { bucket: string; priceJpy: number; setAt: string }[]>();
+  const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   const [saved] = await Promise.all([
     savedBucketValues(db, wanted, now),
     (async () => {
@@ -577,10 +577,10 @@ export async function valueHoldings(
     out.set(holding.id, {
       ...v,
       bucket,
-      valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
+      valueBase: v.unitBase === null ? null : v.unitBase * holding.quantity,
       buylist: value.buylist,
       last: value.last,
-      trendPct: v.method === 'median' ? trend(value.last?.priceJpy, v.unitJpy) : null,
+      trendPct: v.method === 'median' ? trend(value.last?.priceBase, v.unitBase) : null,
       sources: value.sources,
     });
   }
@@ -614,7 +614,7 @@ export function valueHolding(
     bucket,
     observations,
     manualPrices: market.manual.get(product.id),
-    retailPriceJpy: product.retailPriceJpy,
+    retailPriceBase: product.retailPriceBase,
     now,
     sources: market.order[productClass(product)],
   });
@@ -623,10 +623,10 @@ export function valueHolding(
   return {
     ...v,
     bucket,
-    valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
+    valueBase: v.unitBase === null ? null : v.unitBase * holding.quantity,
     buylist: buylistFloor(observations, bucket, now),
     last,
-    trendPct: v.method === 'median' ? trend(last?.priceJpy, v.unitJpy) : null,
+    trendPct: v.method === 'median' ? trend(last?.priceBase, v.unitBase) : null,
     sources: sourceSummaries(
       observations,
       recent,
@@ -643,9 +643,9 @@ export interface OddSale {
   product: Product;
   source: string;
   bucket: string;
-  priceJpy: number;
+  priceBase: number;
   /** The lot's unit value the sale is far from. */
-  valueJpy: number;
+  valueBase: number;
   observedAt: string;
 }
 
@@ -662,12 +662,12 @@ export function oddSales(
   const since = now.getTime() - 30 * DAY;
   const seen = new Set<string>();
   for (const { holding, product, v } of valued) {
-    if (v.unitJpy === null || v.method !== 'median' || !v.bucket) continue;
+    if (v.unitBase === null || v.method !== 'median' || !v.bucket) continue;
     for (const o of market.observations.get(product.id) ?? []) {
       if (o.bucket !== v.bucket || o.observationType !== 'sold' || Date.parse(o.observedAt) < since)
         continue;
-      const ratio = o.priceJpy / v.unitJpy;
-      const key = o.id ?? `${product.id}|${o.source}|${o.priceJpy}|${o.observedAt}`;
+      const ratio = o.priceBase / v.unitBase;
+      const key = o.id ?? `${product.id}|${o.source}|${o.priceBase}|${o.observedAt}`;
       if ((ratio > 3 || ratio < 1 / 3) && !seen.has(key)) {
         seen.add(key);
         odd.push({
@@ -676,8 +676,8 @@ export function oddSales(
           product,
           source: o.source,
           bucket: v.bucket,
-          priceJpy: o.priceJpy,
-          valueJpy: v.unitJpy,
+          priceBase: o.priceBase,
+          valueBase: v.unitBase,
           observedAt: o.observedAt,
         });
       }
@@ -712,75 +712,75 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
     valuation: values.get(r.holding.id)!,
   }));
 
-  // Each lot counts by its tracking switches (S8): cost in `spentJpy`, value in `valueJpy`, and
+  // Each lot counts by its tracking switches (S8): cost in `spentBase`, value in `valueBase`, and
   // only lots counted in both in the P/L.
   const totals = {
-    spentJpy: 0,
-    valueJpy: 0,
+    spentBase: 0,
+    valueBase: 0,
     /** Cost of the lots in the P/L (counted in both, valued, or opened). */
-    valuedCostJpy: 0,
+    valuedCostBase: 0,
     /** Value of those lots. */
-    plValueJpy: 0,
+    plValueBase: 0,
     /** Lots counted in value, and how many of them have a value. */
     valued: 0,
     total: 0,
     /** Owned lots, whatever they count in. */
     lots: valued.length,
     units: 0,
-    /** Cost of opened items, included in `spentJpy` and the P/L base. */
-    openedCostJpy: 0,
+    /** Cost of opened items, included in `spentBase` and the P/L base. */
+    openedCostBase: 0,
     /** Lots not counted as investments (value only, cost only, not tracked). */
     notInvestment: 0,
   };
   const breakdown = new Map<
     string,
-    { category: string; kind: string; costJpy: number; valueJpy: number; count: number }
+    { category: string; kind: string; costBase: number; valueBase: number; count: number }
   >();
-  const addToBreakdown = (product: Product, costJpy: number, valueJpy: number, count: number) => {
+  const addToBreakdown = (product: Product, costBase: number, valueBase: number, count: number) => {
     const key = `${product.category}:${product.kind}`;
     const b = breakdown.get(key) ?? {
       category: product.category,
       kind: product.kind,
-      costJpy: 0,
-      valueJpy: 0,
+      costBase: 0,
+      valueBase: 0,
       count: 0,
     };
-    b.costJpy += costJpy;
-    b.valueJpy += valueJpy;
+    b.costBase += costBase;
+    b.valueBase += valueBase;
     b.count += count;
     breakdown.set(key, b);
   };
   for (const { holding, product, valuation } of valued) {
-    const cost = holding.countInCost ? holding.costTotalJpy : 0;
-    const value = holding.countInValue ? (valuation.valueJpy ?? 0) : 0;
+    const cost = holding.countInCost ? holding.costTotalBase : 0;
+    const value = holding.countInValue ? (valuation.valueBase ?? 0) : 0;
     totals.units += holding.quantity;
-    totals.spentJpy += cost;
+    totals.spentBase += cost;
     if (!holding.countInCost || !holding.countInValue) totals.notInvestment++;
     if (holding.countInValue) {
       totals.total++;
-      if (valuation.valueJpy !== null) {
-        totals.valueJpy += valuation.valueJpy;
+      if (valuation.valueBase !== null) {
+        totals.valueBase += valuation.valueBase;
         totals.valued++;
       }
     }
-    if (holding.countInCost && holding.countInValue && valuation.valueJpy !== null) {
-      totals.plValueJpy += valuation.valueJpy;
-      totals.valuedCostJpy += holding.costTotalJpy;
+    if (holding.countInCost && holding.countInValue && valuation.valueBase !== null) {
+      totals.plValueBase += valuation.valueBase;
+      totals.valuedCostBase += holding.costTotalBase;
     }
     addToBreakdown(product, cost, value, holding.quantity);
   }
   for (const { holding, product } of opened) {
     if (!holding.countInCost) continue;
-    totals.spentJpy += holding.costTotalJpy;
-    totals.openedCostJpy += holding.costTotalJpy;
-    if (holding.countInValue) totals.valuedCostJpy += holding.costTotalJpy;
-    addToBreakdown(product, holding.costTotalJpy, 0, 0);
+    totals.spentBase += holding.costTotalBase;
+    totals.openedCostBase += holding.costTotalBase;
+    if (holding.countInValue) totals.valuedCostBase += holding.costTotalBase;
+    addToBreakdown(product, holding.costTotalBase, 0, 0);
   }
   return {
     rows: valued,
-    totals: { ...totals, unrealizedJpy: totals.plValueJpy - totals.valuedCostJpy },
+    totals: { ...totals, unrealizedBase: totals.plValueBase - totals.valuedCostBase },
     breakdown: [...breakdown.values()].sort(
-      (a, b) => b.valueJpy + b.costJpy - (a.valueJpy + a.costJpy),
+      (a, b) => b.valueBase + b.costBase - (a.valueBase + a.costBase),
     ),
   };
 }
@@ -824,17 +824,17 @@ export async function boxView(db: Db, userId: string, holdingId: string, now = n
     valuation: valueHolding(p.holding, p.product, market, now),
   }));
   // Pulls that were sold count at their sale price; others at current value.
-  const pullsValueJpy = pullRows.reduce((sum, p) => sum + (p.valuation.valueJpy ?? 0), 0);
+  const pullsValueBase = pullRows.reduce((sum, p) => sum + (p.valuation.valueBase ?? 0), 0);
   return {
     box,
     receivedState,
     asReceivedBucket: receivedBucket,
-    paidJpy: box.holding.costTotalJpy,
+    paidBase: box.holding.costTotalBase,
     asReceived,
     pulls: pullRows,
-    pullsValueJpy,
-    pullsValued: pullRows.filter((p) => p.valuation.valueJpy !== null).length,
-    netJpy: pullsValueJpy - box.holding.costTotalJpy,
+    pullsValueBase,
+    pullsValued: pullRows.filter((p) => p.valuation.valueBase !== null).length,
+    netBase: pullsValueBase - box.holding.costTotalBase,
   };
 }
 
@@ -846,13 +846,13 @@ export async function setManualPrice(
   userId: string,
   productId: string,
   bucket: string,
-  priceJpy: number,
+  priceBase: number,
   note?: string | null,
 ): Promise<void> {
-  if (!Number.isSafeInteger(priceJpy) || priceJpy < 0) throw new RangeError('invalid price');
+  if (!Number.isSafeInteger(priceBase) || priceBase < 0) throw new RangeError('invalid price');
   await db
     .insert(manualPrices)
-    .values({ userId, productId, bucket, priceJpy, setAt: toTokyoIso(), note: note ?? null });
+    .values({ userId, productId, bucket, priceBase, setAt: toTokyoIso(), note: note ?? null });
 }
 
 export async function clearManualPrice(db: Db, userId: string, productId: string, bucket: string) {
@@ -988,7 +988,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
         bucket,
         observations: s.observations.slice(from, to),
         manualPrices: markets.get(userId)!.manual.get(product.id),
-        retailPriceJpy: product.retailPriceJpy,
+        retailPriceBase: product.retailPriceBase,
         now: at,
         sources: markets.get(userId)!.order[productClass(product)],
       });
@@ -1010,7 +1010,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
           wanted.set(`${day}|${holding.id}`, {
             date: day,
             holdingId: holding.id,
-            valueJpy: 0,
+            valueBase: 0,
             method: 'opened',
             source: null,
             sampleSize: 0,
@@ -1024,7 +1024,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
       wanted.set(`${day}|${holding.id}`, {
         date: day,
         holdingId: holding.id,
-        valueJpy: v.unitJpy === null ? null : v.unitJpy * holding.quantity,
+        valueBase: v.unitBase === null ? null : v.unitBase * holding.quantity,
         method: v.method,
         source: v.source,
         sampleSize: v.sampleSize,
@@ -1042,7 +1042,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
     const w = wanted.get(key);
     if (!w) stale.push(e.id);
     else if (
-      w.valueJpy === e.valueJpy &&
+      w.valueBase === e.valueBase &&
       w.method === e.method &&
       w.source === e.source &&
       w.sampleSize === e.sampleSize &&
@@ -1061,7 +1061,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
         .onConflictDoUpdate({
           target: [valuationSnapshots.date, valuationSnapshots.holdingId],
           set: {
-            valueJpy: sql`excluded.value_jpy`,
+            valueBase: sql`excluded.value_base`,
             method: sql`excluded.method`,
             source: sql`excluded.source`,
             sampleSize: sql`excluded.sample_size`,
@@ -1082,7 +1082,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
 
 /**
  * Value and cost per day for the user's chart. Cost is everything held that day; value is the
- * market value, with holdings that have no market value yet counted at cost (`atCostJpy`).
+ * market value, with holdings that have no market value yet counted at cost (`atCostBase`).
  */
 export async function portfolioSeries(
   db: Db,
@@ -1096,10 +1096,10 @@ export async function portfolioSeries(
       date: valuationSnapshots.date,
       // Lots count by their tracking switches (S8): value lines sum lots counted in value, cost
       // lots counted in cost.
-      valueJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} then coalesce(${valuationSnapshots.valueJpy}, ${holdings.costTotalJpy}) end), 0)`,
-      costJpy: sql<number>`coalesce(sum(case when ${holdings.countInCost} then ${holdings.costTotalJpy} end), 0)`,
-      atCostJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.valueJpy} is null then ${holdings.costTotalJpy} end), 0)`,
-      estimatedJpy: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueJpy} end), 0)`,
+      valueBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} then coalesce(${valuationSnapshots.valueBase}, ${holdings.costTotalBase}) end), 0)`,
+      costBase: sql<number>`coalesce(sum(case when ${holdings.countInCost} then ${holdings.costTotalBase} end), 0)`,
+      atCostBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.valueBase} is null then ${holdings.costTotalBase} end), 0)`,
+      estimatedBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueBase} end), 0)`,
     })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
@@ -1112,7 +1112,7 @@ export interface PricePoint {
   day: string;
   source: string;
   bucket: string | null;
-  medianJpy: number;
+  medianBase: number;
   count: number;
   /** Trades of that day whose lot size was estimated. */
   estimated: number;
@@ -1131,7 +1131,7 @@ export async function priceHistory(
       observedAt: priceObservations.observedAt,
       source: priceObservations.source,
       bucket: priceObservations.bucket,
-      priceJpy: priceObservations.priceJpy,
+      priceBase: priceObservations.priceBase,
       quantityInferred: priceObservations.quantityInferred,
     })
     .from(priceObservations)
@@ -1157,7 +1157,7 @@ export async function priceHistory(
       prices: [],
       estimated: 0,
     };
-    g.prices.push(r.priceJpy);
+    g.prices.push(r.priceBase);
     if (r.quantityInferred) g.estimated++;
     groups.set(key, g);
   }
@@ -1166,7 +1166,7 @@ export async function priceHistory(
       day: g.day,
       source: g.source,
       bucket: g.bucket,
-      medianJpy: Math.round(median(g.prices)!),
+      medianBase: Math.round(median(g.prices)!),
       count: g.prices.length,
       estimated: g.estimated,
     }))
@@ -1178,20 +1178,20 @@ export interface ProductSummary<R extends { holding: Holding; product: Product }
   /** The product's lots in the list, newest first. */
   lots: R[];
   units: number;
-  spentJpy: number;
+  spentBase: number;
   /** Market value of the lots that have one. */
-  valueJpy: number;
+  valueBase: number;
   valuedLots: number;
   /** Cost of the valued lots (the base for P/L). */
-  valuedCostJpy: number;
+  valuedCostBase: number;
   /** Value minus cost of the valued lots; null when none is valued. */
-  unrealizedJpy: number | null;
+  unrealizedBase: number | null;
 }
 
 /** Portfolio rows combined per product (requirements S5c), highest value (else cost) first. */
 export function summarizeByProduct<R extends { holding: Holding; product: Product }>(
   rows: R[],
-  valuations: Map<string, Pick<HoldingValuation, 'valueJpy'>>,
+  valuations: Map<string, Pick<HoldingValuation, 'valueBase'>>,
 ): ProductSummary<R>[] {
   const byProduct = new Map<string, ProductSummary<R>>();
   for (const row of rows) {
@@ -1202,29 +1202,29 @@ export function summarizeByProduct<R extends { holding: Holding; product: Produc
         product,
         lots: [],
         units: 0,
-        spentJpy: 0,
-        valueJpy: 0,
+        spentBase: 0,
+        valueBase: 0,
         valuedLots: 0,
-        valuedCostJpy: 0,
-        unrealizedJpy: null,
+        valuedCostBase: 0,
+        unrealizedBase: null,
       };
       byProduct.set(product.id, s);
     }
     s.lots.push(row);
     s.units += holding.quantity;
-    s.spentJpy += holding.costTotalJpy;
-    const value = valuations.get(holding.id)?.valueJpy;
+    s.spentBase += holding.costTotalBase;
+    const value = valuations.get(holding.id)?.valueBase;
     if (value != null) {
-      s.valueJpy += value;
+      s.valueBase += value;
       s.valuedLots++;
-      s.valuedCostJpy += holding.costTotalJpy;
+      s.valuedCostBase += holding.costTotalBase;
     }
   }
   const list = [...byProduct.values()];
-  for (const s of list) s.unrealizedJpy = s.valuedLots ? s.valueJpy - s.valuedCostJpy : null;
+  for (const s of list) s.unrealizedBase = s.valuedLots ? s.valueBase - s.valuedCostBase : null;
   return list.sort(
     (a, b) =>
-      (b.valuedLots ? b.valueJpy : b.spentJpy) - (a.valuedLots ? a.valueJpy : a.spentJpy) ||
+      (b.valuedLots ? b.valueBase : b.spentBase) - (a.valuedLots ? a.valueBase : a.spentBase) ||
       a.product.name.localeCompare(b.product.name),
   );
 }
@@ -1257,21 +1257,21 @@ export async function estimatedPullCosts(
     [...new Set(pulls.map((p) => p.product.id))],
     now,
   );
-  const units = pulls.map((p) => valueHolding(p.holding, p.product, market, now).unitJpy);
+  const units = pulls.map((p) => valueHolding(p.holding, p.product, market, now).unitBase);
   const fallback = median(units.filter((u): u is number => u !== null)) ?? 1;
   const weights = pulls.map((p, i) => (units[i] ?? fallback) * p.holding.quantity);
   const total = weights.reduce((a, b) => a + b, 0) || 1;
   return new Map(
-    pulls.map((p, i) => [p.holding.id, Math.round((parent.costTotalJpy * weights[i]!) / total)]),
+    pulls.map((p, i) => [p.holding.id, Math.round((parent.costTotalBase * weights[i]!) / total)]),
   );
 }
 
 export interface Mover {
   product: Product;
   /** Value of the lots held now, today and `days` ago (same lots, from the daily snapshots). */
-  nowJpy: number;
-  thenJpy: number;
-  changeJpy: number;
+  nowBase: number;
+  thenBase: number;
+  changeBase: number;
   pct: number;
 }
 
@@ -1303,7 +1303,7 @@ export async function moversByPeriod(
       countInValue: holdings.countInValue,
       quantity: holdings.quantity,
       date: valuationSnapshots.date,
-      valueJpy: valuationSnapshots.valueJpy,
+      valueBase: valuationSnapshots.valueBase,
     })
     .from(valuationSnapshots)
     .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
@@ -1317,17 +1317,17 @@ export async function moversByPeriod(
   const valueOn = new Map<string, number>(); // holdingId|date -> value
   const lots = new Map<string, (typeof rows)[number]>();
   for (const r of rows) {
-    if (r.valueJpy === null) continue;
-    valueOn.set(`${r.holdingId}|${r.date}`, r.valueJpy);
+    if (r.valueBase === null) continue;
+    valueOn.set(`${r.holdingId}|${r.date}`, r.valueBase);
     lots.set(r.holdingId, r);
   }
   const finish = (list: Mover[]) =>
     list
-      .filter((m) => m.thenJpy >= 1_000 && m.nowJpy !== m.thenJpy)
+      .filter((m) => m.thenBase >= 1_000 && m.nowBase !== m.thenBase)
       .map((m) => ({
         ...m,
-        changeJpy: m.nowJpy - m.thenJpy,
-        pct: Math.round(((m.nowJpy - m.thenJpy) / m.thenJpy) * 1000) / 10,
+        changeBase: m.nowBase - m.thenBase,
+        pct: Math.round(((m.nowBase - m.thenBase) / m.thenBase) * 1000) / 10,
       }));
   for (const days of periods) {
     const then = thenOf(days);
@@ -1340,13 +1340,13 @@ export async function moversByPeriod(
       if (lot.userId === userId && lot.countInValue) {
         const m = own.get(lot.product.id) ?? {
           product: lot.product,
-          nowJpy: 0,
-          thenJpy: 0,
-          changeJpy: 0,
+          nowBase: 0,
+          thenBase: 0,
+          changeBase: 0,
           pct: 0,
         };
-        m.nowJpy += now;
-        m.thenJpy += before;
+        m.nowBase += now;
+        m.thenBase += before;
         own.set(lot.product.id, m);
       }
       const u = units.get(lot.product.id) ?? { product: lot.product, now: [], then: [] };
@@ -1360,9 +1360,9 @@ export async function moversByPeriod(
       finish(
         [...units.values()].map((u) => ({
           product: u.product,
-          nowJpy: Math.round(median(u.now)!),
-          thenJpy: Math.round(median(u.then)!),
-          changeJpy: 0,
+          nowBase: Math.round(median(u.now)!),
+          thenBase: Math.round(median(u.then)!),
+          changeBase: 0,
           pct: 0,
         })),
       ),

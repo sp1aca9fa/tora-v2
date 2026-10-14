@@ -78,7 +78,7 @@ export default async function AddPage({
             rarity: product.rarity,
             platform: product.platform,
             releaseDate: product.releaseDate,
-            retailPriceJpy: product.retailPriceJpy,
+            retailPriceBase: product.retailPriceBase,
             linked: false,
           }
         }

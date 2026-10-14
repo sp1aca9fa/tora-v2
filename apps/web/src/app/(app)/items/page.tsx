@@ -81,9 +81,9 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
   // Items (an item split across groups counts once) and the value of what counts in value.
   const stats = (list: typeof all) => ({
     count: new Set(list.map((s) => s.product.id)).size,
-    valueJpy: list
+    valueBase: list
       .filter((s) => s.mode === 'investment' || s.mode === 'value_only')
-      .reduce((n, s) => n + s.valueJpy, 0),
+      .reduce((n, s) => n + s.valueBase, 0),
   });
   const href = (type: string | null) => {
     const next = new URLSearchParams();
@@ -131,7 +131,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
         </Suspense>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
           <Link href={href(null)} className={chip(!category)}>
-            {t('actions.all')} {stats(all).count} {money(stats(all).valueJpy)}
+            {t('actions.all')} {stats(all).count} {money(stats(all).valueBase)}
           </Link>
           {CATEGORIES.map((c) => {
             const list = all.filter((s) => s.product.category === c);
@@ -139,7 +139,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
             const st = stats(list);
             return (
               <Link key={c} href={href(c)} className={chip(category === c && !kind)}>
-                {t(`category.${c}`)} {st.count} {money(st.valueJpy)}
+                {t(`category.${c}`)} {st.count} {money(st.valueBase)}
               </Link>
             );
           })}
@@ -200,7 +200,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
                         {(mode === 'investment' || mode === 'value_only') && (
                           <>
                             {' · '}
-                            <span className="amount">{formatJpy(st.valueJpy)}</span>
+                            <span className="amount">{formatJpy(st.valueBase)}</span>
                           </>
                         )}
                       </span>

@@ -168,7 +168,7 @@ export const ebay: Collector = {
         // The day's median asking price of the active listings: not a sale.
         observationType: 'listing',
         bucket,
-        priceJpy: Math.round(usd * fx.rate),
+        priceBase: Math.round(usd * fx.rate),
         priceOriginal: Math.round(usd * 100),
         currency: 'USD',
         fxRate: fx.rate,

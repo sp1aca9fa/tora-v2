@@ -38,7 +38,7 @@ export interface ListingSuggestion {
   /** The listing's own picture, else the stored one of a product already linked to it. */
   imageUrl: string | null;
   linkedImage: { productId: string; version: string } | null;
-  priceJpy: number | null;
+  priceBase: number | null;
   score: number;
 }
 
@@ -59,7 +59,7 @@ export type ActionItem = ActionBase &
         /** The source the item's identity link is looked for on (see `identityFor`). */
         main: boolean;
         /** What the user paid for the lots they own, and how many units. */
-        costJpy: number;
+        costBase: number;
         units: number;
         /** Best first; empty when nothing was found (paste a link). */
         candidates: ListingSuggestion[];
@@ -91,7 +91,7 @@ export async function pendingActions(
     db
       .select({
         product: products,
-        cost: sql<number>`sum(${holdings.costTotalJpy})`,
+        cost: sql<number>`sum(${holdings.costTotalBase})`,
         units: sql<number>`sum(${holdings.quantity})`,
       })
       .from(holdings)
@@ -164,8 +164,8 @@ export async function pendingActions(
   const items: ActionItem[] = [];
   const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
   for (const { product, cost, units } of owned) {
-    const costJpy = Number(cost);
-    const identity = identityFor(product, costJpy, registry);
+    const costBase = Number(cost);
+    const identity = identityFor(product, costBase, registry);
     // No identity link yet: the preferred identity source is the one asked for.
     const main =
       identity && !identity.accepted.some((source) => has.has(`${product.id}|${source}`))
@@ -184,7 +184,7 @@ export async function pendingActions(
       bySource.set(main, bySource.get(main) ?? []);
     }
     // The same in the secondary market (S11), as its own notice type.
-    const abroad = identityFor(product, costJpy, registry, registry.markets?.secondary ?? null);
+    const abroad = identityFor(product, costBase, registry, registry.markets?.secondary ?? null);
     const second =
       registry.markets?.secondary &&
       abroad &&
@@ -213,7 +213,7 @@ export async function pendingActions(
         source,
         // An identity link asked for (either market): the card stays until linked or dismissed.
         main: isMain || source === second,
-        costJpy,
+        costBase,
         units: Number(units),
         candidates: candidates
           .toSorted((a, b) => b.score - a.score)
@@ -223,7 +223,7 @@ export async function pendingActions(
             url: c.url,
             imageUrl: c.imageUrl,
             linkedImage: c.imageUrl ? null : (known.get(`${c.source}|${c.externalId}`) ?? null),
-            priceJpy: c.priceJpy,
+            priceBase: c.priceBase,
             score: c.score,
           })),
       });
@@ -300,7 +300,7 @@ export async function pendingActions(
     if (product && 'imageVersion' in i) i.imageVersion = versions.get(product.id) ?? null;
   }
   const cost = (i: ActionItem) =>
-    i.kind === 'source' ? i.costJpy : i.kind === 'lot' ? i.holding.costTotalJpy : 0;
+    i.kind === 'source' ? i.costBase : i.kind === 'lot' ? i.holding.costTotalBase : 0;
   return items.sort(
     (a, b) =>
       noticeRank(a.level) - noticeRank(b.level) ||

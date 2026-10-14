@@ -65,7 +65,7 @@ export interface ActionCardView {
     title: string;
     url: string | null;
     image: string | null;
-    priceJpy: number | null;
+    priceBase: number | null;
     score: number;
   }[];
   holdingId?: string;
@@ -461,7 +461,7 @@ function Candidate({
           {s.title} <ExternalLink className="inline size-3" />
         </a>
         <p className="text-xs text-muted-foreground">
-          {s.priceJpy ? <span className="amount">{formatJpy(s.priceJpy)} · </span> : ''}
+          {s.priceBase ? <span className="amount">{formatJpy(s.priceBase)} · </span> : ''}
           {t('sources.score', { score: Math.round(s.score * 100) })}
         </p>
       </div>

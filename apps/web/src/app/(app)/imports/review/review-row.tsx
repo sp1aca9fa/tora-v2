@@ -57,7 +57,7 @@ export function ReviewRowFields({
             item.details,
             item.acquiredAt,
             item.orderId && `#${item.orderId}`,
-            formatJpy(item.costJpy),
+            formatJpy(item.costBase),
             item.quantity > 1 && `× ${item.quantity}`,
           ]
             .filter(Boolean)
@@ -115,7 +115,7 @@ export function ReviewRowFields({
             <option value="">{t('imports.sameAsNone')}</option>
             {candidates.map((o) => (
               <option key={o.id} value={o.id}>
-                {[o.name, o.acquiredAt, o.orderId && `#${o.orderId}`, formatJpy(o.costJpy)]
+                {[o.name, o.acquiredAt, o.orderId && `#${o.orderId}`, formatJpy(o.costBase)]
                   .filter(Boolean)
                   .join(' · ')}
               </option>

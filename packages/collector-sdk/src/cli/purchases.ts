@@ -62,7 +62,7 @@ const answers = rl[Symbol.asyncIterator]();
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
 const day = (iso: string) => tokyoDate(new Date(iso));
 const line = (r: PurchaseReceipt) =>
-  `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.totalJpy)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
+  `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.totalBase)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
 async function choose<T>(question: string, options: Record<string, T>): Promise<T> {
   for (;;) {
     process.stdout.write(`${question} `);
@@ -162,7 +162,7 @@ for (const importer of selected) {
     console.log(`Possibly already registered without its order ID:`);
     console.log(line(e.receipt));
     console.log(
-      `    registered: ${day(h.acquiredAt)}  ${yen(h.costTotalJpy)}  ${e.product.name}${h.acquiredFrom ? ` (${h.acquiredFrom})` : ''}`,
+      `    registered: ${day(h.acquiredAt)}  ${yen(h.costTotalBase)}  ${e.product.name}${h.acquiredFrom ? ` (${h.acquiredFrom})` : ''}`,
     );
     const options: Record<string, Decision> = { s: 'same', k: 'skip' };
     if (e.ref) options.d = 'different';

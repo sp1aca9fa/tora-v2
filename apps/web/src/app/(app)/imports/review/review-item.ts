@@ -10,7 +10,7 @@ export interface ReviewItem {
   details: string;
   acquiredAt: string;
   orderId: string | null;
-  costJpy: number;
+  costBase: number;
   quantity: number;
   packagingState: string | null;
   /** Why it was flagged (e.g. `deadline_missed`, `no_delivery`). */
@@ -34,7 +34,7 @@ export function reviewItemOf(holding: Holding, product: Product): ReviewItem {
     details: [product.rarity, product.setCode, product.cardNumber].filter(Boolean).join(' '),
     acquiredAt: holding.acquiredAt.slice(0, 10),
     orderId: holding.orderId,
-    costJpy: holding.costTotalJpy,
+    costBase: holding.costTotalBase,
     quantity: holding.quantity,
     packagingState: holding.packagingState,
     reasons: (holding.reviewReason ?? '').split(',').filter(Boolean),

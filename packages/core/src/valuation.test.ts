@@ -18,7 +18,7 @@ const sold = (
 ): ValuationObservation => ({
   source,
   bucket,
-  priceJpy: price,
+  priceBase: price,
   observedAt: daysAgo(ago),
   observationType: 'sold',
 });
@@ -41,7 +41,7 @@ describe('valueUnit fallbacks for rare items', () => {
       at('mercari', 28_000, 300, 'cond:like_new'),
     ];
     expect(valueUnit({ bucket: 'cond:like_new', observations: obs, now })).toMatchObject({
-      unitJpy: 28_000,
+      unitBase: 28_000,
       windowDays: 365,
       pooled: false,
       confidence: 'low',
@@ -55,7 +55,7 @@ describe('valueUnit fallbacks for rare items', () => {
       at('mercari', 25_000, 60, 'cond:fair'),
     ];
     expect(valueUnit({ bucket: 'cond:like_new', observations: obs, now })).toMatchObject({
-      unitJpy: 25_000,
+      unitBase: 25_000,
       sampleSize: 3,
       pooled: true,
       confidence: 'low',
@@ -67,7 +67,7 @@ describe('valueUnit fallbacks for rare items', () => {
       at('snkrdunk', 4_200, 8, 'graded:PSA:9'),
     ];
     expect(valueUnit({ bucket: 'graded:PSA:10', observations: slabs, now })).toMatchObject({
-      unitJpy: 10_000,
+      unitBase: 10_000,
       sampleSize: 1,
       pooled: false,
     });
@@ -82,7 +82,7 @@ describe('valueUnit fallbacks for rare items', () => {
     ];
     expect(valueUnit({ bucket: 'cond:new', observations: obs, now })).toMatchObject({
       source: 'mercari',
-      unitJpy: 3_000,
+      unitBase: 3_000,
     });
   });
 });
@@ -103,7 +103,7 @@ describe('valueUnit', () => {
     );
     const v = valueUnit({ bucket: 'sealed:shrink', observations: obs, now });
     expect(v).toMatchObject({
-      unitJpy: 10_000,
+      unitBase: 10_000,
       method: 'median',
       source: 'snkrdunk',
       windowDays: 30,
@@ -119,13 +119,13 @@ describe('valueUnit', () => {
       observations: [sold('snkrdunk', 1, 10), sold('snkrdunk', 2, 50), sold('snkrdunk', 3, 80)],
       now,
     });
-    expect(v90).toMatchObject({ windowDays: 90, unitJpy: 2, confidence: 'medium' });
+    expect(v90).toMatchObject({ windowDays: 90, unitBase: 2, confidence: 'medium' });
     const v180 = valueUnit({
       bucket: 'sealed:shrink',
       observations: [sold('snkrdunk', 5, 100), sold('snkrdunk', 7, 170)],
       now,
     });
-    expect(v180).toMatchObject({ windowDays: 180, unitJpy: 6, confidence: 'low', sampleSize: 2 });
+    expect(v180).toMatchObject({ windowDays: 180, unitBase: 6, confidence: 'low', sampleSize: 2 });
   });
 
   it('ignores other buckets, excluded and future observations', () => {
@@ -139,7 +139,7 @@ describe('valueUnit', () => {
       ],
       now,
     });
-    expect(v).toMatchObject({ unitJpy: 500, sampleSize: 1 });
+    expect(v).toMatchObject({ unitBase: 500, sampleSize: 1 });
   });
 
   it('falls back by source: SNKRDUNK, then Mercari, then 駿河屋, then retail', () => {
@@ -158,11 +158,11 @@ describe('valueUnit', () => {
       }).source,
     ).toBe('mercari');
     expect(
-      valueUnit({ bucket: 'cond:new', observations: [], retailPriceJpy: 8980, now }),
-    ).toMatchObject({ method: 'retail', unitJpy: 8980, confidence: 'low' });
+      valueUnit({ bucket: 'cond:new', observations: [], retailPriceBase: 8980, now }),
+    ).toMatchObject({ method: 'retail', unitBase: 8980, confidence: 'low' });
     expect(valueUnit({ bucket: null, observations: [], now })).toMatchObject({
       method: 'none',
-      unitJpy: null,
+      unitBase: null,
     });
   });
 
@@ -170,18 +170,18 @@ describe('valueUnit', () => {
     const store = (price: number, ago: number, bucket = 'cond:good'): ValuationObservation => ({
       source: 'surugaya',
       bucket,
-      priceJpy: price,
+      priceBase: price,
       observedAt: daysAgo(ago),
       observationType: 'listing',
     });
     const v = valueUnit({
       bucket: 'cond:good',
       observations: [store(4180, 1), store(3900, 9), store(9000, 0, 'cond:new'), store(100, 40)],
-      retailPriceJpy: 8778,
+      retailPriceBase: 8778,
       now,
     });
     expect(v).toMatchObject({
-      unitJpy: 4180,
+      unitBase: 4180,
       method: 'store',
       source: 'surugaya',
       confidence: 'low',
@@ -193,13 +193,13 @@ describe('valueUnit', () => {
         observations: [store(4180, 1), sold('mercari', 3000, 300, 'cond:good')],
         now,
       }),
-    ).toMatchObject({ unitJpy: 3000, method: 'median' });
+    ).toMatchObject({ unitBase: 3000, method: 'median' });
     // Too old: the retail price.
     expect(
       valueUnit({
         bucket: 'cond:good',
         observations: [store(4180, 31)],
-        retailPriceJpy: 8778,
+        retailPriceBase: 8778,
         now,
       }),
     ).toMatchObject({ method: 'retail' });
@@ -210,13 +210,13 @@ describe('valueUnit', () => {
       bucket: 'sealed:box_opened_contents_sealed',
       observations: [sold('snkrdunk', 1, 1, 'sealed:box_opened_contents_sealed')],
       manualPrices: [
-        { bucket: 'sealed:box_opened_contents_sealed', priceJpy: 9000, setAt: daysAgo(10) },
-        { bucket: 'sealed:box_opened_contents_sealed', priceJpy: 9500, setAt: daysAgo(2) },
-        { bucket: 'sealed:shrink', priceJpy: 1, setAt: daysAgo(1) },
+        { bucket: 'sealed:box_opened_contents_sealed', priceBase: 9000, setAt: daysAgo(10) },
+        { bucket: 'sealed:box_opened_contents_sealed', priceBase: 9500, setAt: daysAgo(2) },
+        { bucket: 'sealed:shrink', priceBase: 1, setAt: daysAgo(1) },
       ],
       now,
     });
-    expect(v).toMatchObject({ method: 'manual', unitJpy: 9500, ageDays: 2 });
+    expect(v).toMatchObject({ method: 'manual', unitBase: 9500, ageDays: 2 });
   });
 });
 
@@ -226,7 +226,7 @@ describe('buylistFloor', () => {
       { ...sold('surugaya', 7000, 3), observationType: 'buylist' },
       { ...sold('surugaya', 6500, 10), observationType: 'buylist' },
     ];
-    expect(buylistFloor(obs, 'sealed:shrink', now)?.priceJpy).toBe(7000);
+    expect(buylistFloor(obs, 'sealed:shrink', now)?.priceBase).toBe(7000);
     expect(valueUnit({ bucket: 'sealed:shrink', observations: obs, now }).method).toBe('none');
   });
 });
@@ -242,14 +242,14 @@ describe('last sale and per-source summaries', () => {
     {
       source: 'snkrdunk',
       bucket: 'sealed:shrink',
-      priceJpy: 10_800,
+      priceBase: 10_800,
       observedAt: daysAgo(0.2),
       approximate: true,
     },
     {
       source: 'snkrdunk',
       bucket: 'sealed:no_shrink',
-      priceJpy: 8_000,
+      priceBase: 8_000,
       observedAt: daysAgo(0.1),
       approximate: true,
     },
@@ -257,11 +257,11 @@ describe('last sale and per-source summaries', () => {
 
   it('takes the newest real sale in the bucket, including fresh recent trades', () => {
     expect(lastSale(obs, recent, 'sealed:shrink', undefined, now)).toMatchObject({
-      priceJpy: 10_800,
+      priceBase: 10_800,
       approximate: true,
     });
     expect(lastSale(obs, [], 'sealed:shrink', 'mercari', now)).toMatchObject({
-      priceJpy: 9_000,
+      priceBase: 9_000,
       approximate: false,
     });
     expect(lastSale(obs, recent, null, undefined, now)).toBeNull();
@@ -271,11 +271,11 @@ describe('last sale and per-source summaries', () => {
     const s = sourceSummaries(obs, recent, 'sealed:shrink', now, ['snkrdunk', 'mercari']);
     expect(s.map((x) => x.source)).toEqual(['snkrdunk', 'mercari']);
     expect(s[0]).toMatchObject({
-      medianJpy: 10_000,
+      medianBase: 10_000,
       sampleSize: 3,
-      last: { priceJpy: 10_800 },
+      last: { priceBase: 10_800 },
       trendPct: 8,
     });
-    expect(s[1]).toMatchObject({ medianJpy: 9_000, sampleSize: 1, trendPct: 0 });
+    expect(s[1]).toMatchObject({ medianBase: 9_000, sampleSize: 1, trendPct: 0 });
   });
 });

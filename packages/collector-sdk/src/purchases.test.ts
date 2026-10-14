@@ -72,8 +72,8 @@ const receipt = (orderId: string, over: Partial<PurchaseReceipt> = {}): Purchase
   orderedAt: '2026-03-04T21:00:00.000+09:00',
   title: `Item ${orderId}`,
   quantity: 1,
-  totalJpy: 6000,
-  itemPriceJpy: 5500,
+  totalBase: 6000,
+  itemPriceBase: 5500,
   listing: { externalId: `L${orderId}`, url: `https://shop.example/${orderId}` },
   ...over,
 });
@@ -92,7 +92,7 @@ const box = (name: string) =>
   ({ product: { category: 'tcg', kind: 'booster_box', name } }) as const;
 const holdingInput = (over: Record<string, unknown> = {}) => ({
   quantity: 1,
-  costTotalJpy: 6000,
+  costTotalBase: 6000,
   acquiredAt: '2026-03-04T00:00:00.000+09:00',
   acquisitionType: 'purchase' as const,
   ...over,
@@ -110,13 +110,13 @@ describe('purchase import', () => {
       db,
       userId,
       box('Item 101'),
-      holdingInput({ acquiredFrom: 'スニダン', orderId: '101', costTotalJpy: 9999 }),
+      holdingInput({ acquiredFrom: 'スニダン', orderId: '101', costTotalBase: 9999 }),
     );
     const manual = await createHolding(
       db,
       userId,
       box('Battle Partners BOX'),
-      holdingInput({ acquiredAt: '2026-03-06T00:00:00.000+09:00', costTotalJpy: 5500 }),
+      holdingInput({ acquiredAt: '2026-03-06T00:00:00.000+09:00', costTotalBase: 5500 }),
     );
     await createHolding(
       db,
@@ -135,7 +135,7 @@ describe('purchase import', () => {
       db,
       userId,
       box('Titled'),
-      holdingInput({ costTotalJpy: 1 }),
+      holdingInput({ costTotalBase: 1 }),
     );
     await linkSource(db, titled.product.id, {
       source: 'snkrdunk',
@@ -155,8 +155,8 @@ describe('purchase import', () => {
       { kind: 'cancel', orderId: '103' },
       { kind: 'purchase', receipt: receipt('104') },
       { kind: 'cancel', orderId: '104' },
-      { kind: 'purchase', receipt: receipt('105', { totalJpy: 7000 }) },
-      { kind: 'purchase', receipt: receipt('106', { totalJpy: 1234 }) },
+      { kind: 'purchase', receipt: receipt('105', { totalBase: 7000 }) },
+      { kind: 'purchase', receipt: receipt('106', { totalBase: 1234 }) },
       { kind: 'purchase', receipt: receipt('107', { title: '???', listing: null }) },
       { kind: 'purchase', receipt: receipt('108', { title: 'Listing Title &', listing: null }) },
       { kind: 'unreadable', subject: 'odd', reason: 'no price' },
@@ -192,7 +192,7 @@ describe('purchase import', () => {
 
     const rows = await db.select().from(schema.holdings).where(eq(schema.holdings.userId, userId));
     const byId = new Map(rows.map((h) => [h.id, h]));
-    expect(byId.get(conflict.holding.id)?.costTotalJpy).toBe(6000);
+    expect(byId.get(conflict.holding.id)?.costTotalBase).toBe(6000);
     expect(byId.get(manual.holding.id)).toMatchObject({
       orderSource: 'snkrdunk',
       orderId: '102',
@@ -200,7 +200,7 @@ describe('purchase import', () => {
     });
     const created105 = rows.find((h) => h.orderId === '105')!;
     expect(created105).toMatchObject({
-      costTotalJpy: 7000,
+      costTotalBase: 7000,
       acquiredFrom: 'SNKRDUNK',
       orderSource: 'snkrdunk',
       packagingState: 'sealed_shrink',
@@ -238,7 +238,7 @@ describe('purchase import', () => {
       db,
       userId,
       box('Item 200'),
-      holdingInput({ costTotalJpy: 1 }),
+      holdingInput({ costTotalBase: 1 }),
     );
     const plan = await planImport(
       db,

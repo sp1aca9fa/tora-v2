@@ -44,7 +44,7 @@ async function seed() {
     { product: { category: 'tcg', kind: 'booster_box', name: '30th BOX', franchise: 'pokemon' } },
     {
       quantity: 1,
-      costTotalJpy: 20000,
+      costTotalBase: 20000,
       acquiredAt: ago(60),
       packagingState: 'sealed_shrink',
     },
@@ -55,7 +55,7 @@ async function seed() {
     source: 'mercari',
     observationType: 'sold' as const,
     bucket: 'sealed:shrink',
-    priceJpy: price,
+    priceBase: price,
     currency: 'JPY',
     observedAt: ago(d),
     fetchedAt: ago(0),

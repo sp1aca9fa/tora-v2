@@ -81,7 +81,7 @@ it('saves the median ask per condition in dollars and yen, with the search it bu
     expect.objectContaining({
       bucket: null,
       priceOriginal: 4750,
-      priceJpy: 7125,
+      priceBase: 7125,
       currency: 'USD',
       observationType: 'listing',
       externalRef: 'P1|ungraded|2026-10-12',

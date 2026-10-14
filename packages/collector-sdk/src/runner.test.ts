@@ -56,7 +56,7 @@ function fakeCollector(overrides: Partial<Collector> = {}): Collector {
           source: 'fake',
           observationType: 'sold' as const,
           bucket: 'sealed:shrink',
-          priceJpy: price,
+          priceBase: price,
           observedAt: `${day}T12:00:00.000+09:00`,
           fetchedAt: ctx.now.toISOString(),
           externalRef: `${link.externalId}|${day}|${i}`,
@@ -75,7 +75,7 @@ async function box() {
     { product: { category: 'tcg', kind: 'booster_box', name: 'BP BOX', setName: 'BP' } },
     {
       quantity: 1,
-      costTotalJpy: 5000,
+      costTotalBase: 5000,
       acquiredAt: '2026-09-01T00:00:00.000+09:00',
       packagingState: 'sealed_shrink',
     },
@@ -90,7 +90,7 @@ it('matches, waits for confirmation, then collects idempotently', async () => {
     { product: { category: 'game', kind: 'amiibo', name: 'amiibo' } },
     {
       quantity: 1,
-      costTotalJpy: 1000,
+      costTotalBase: 1000,
       acquiredAt: '2026-09-01T00:00:00.000+09:00',
       condition: 'new_unused',
     },
@@ -134,7 +134,7 @@ it('matches, waits for confirmation, then collects idempotently', async () => {
   expect(source?.lastSuccessAt).toBeTruthy();
   const stats = await bucketStats(db, product.id, 30, new Date('2026-10-09T00:00:00Z'));
   expect(stats).toEqual([
-    expect.objectContaining({ bucket: 'sealed:shrink', count: 3, medianJpy: 11_000 }),
+    expect.objectContaining({ bucket: 'sealed:shrink', count: 3, medianBase: 11_000 }),
   ]);
 
   const runs = await db.select().from(schema.collectorRuns);
@@ -186,7 +186,7 @@ it('offers a linked look-alike instead of searching the site', async () => {
     { product: { category: 'tcg', kind: 'booster_box', name: 'BP  BOX' } },
     {
       quantity: 1,
-      costTotalJpy: 5000,
+      costTotalBase: 5000,
       acquiredAt: '2026-10-01T12:00:00.000+09:00',
       packagingState: 'sealed_shrink',
     },
@@ -234,7 +234,7 @@ it('replaces auto-made queries of an older version, but keeps edited ones', asyn
     { product: { category: 'tcg', kind: 'booster_box', name: 'Other BOX' } },
     {
       quantity: 1,
-      costTotalJpy: 1,
+      costTotalBase: 1,
       acquiredAt: '2026-10-01T12:00:00.000+09:00',
       packagingState: 'sealed_shrink',
     },
@@ -271,7 +271,7 @@ it('searches newer items too when older ones are of a kind the source does not h
       db,
       userId,
       { product: { category: 'game', kind: 'software', name: `Game ${i}` } },
-      { quantity: 1, costTotalJpy: 1000, acquiredAt: '2026-09-01T00:00:00.000+09:00' },
+      { quantity: 1, costTotalBase: 1000, acquiredAt: '2026-09-01T00:00:00.000+09:00' },
     );
   }
   const { product } = await box();

@@ -66,13 +66,13 @@ export default async function HoldingPage({ params }: Params) {
     [
       t('holding.costBasis'),
       <>
-        {formatJpy(holding.costTotalJpy)}
+        {formatJpy(holding.costTotalBase)}
         {holding.quantity > 1 && (
           <span className="text-muted-foreground">
             {' '}
             (
             {t('common.perUnit', {
-              amount: formatJpy(unitCost(holding.costTotalJpy, holding.quantity)),
+              amount: formatJpy(unitCost(holding.costTotalBase, holding.quantity)),
             })}
             )
           </span>

@@ -21,20 +21,20 @@ export async function BoxCard({
   const [t, view] = await Promise.all([getTranslations(), boxView(db, userId, holdingId)]);
   if (!view) return null;
   const cells = [
-    { label: t('box.paid'), value: formatJpy(view.paidJpy) },
+    { label: t('box.paid'), value: formatJpy(view.paidBase) },
     {
       label: t('box.asReceived'),
-      value: view.asReceived.valueJpy === null ? '-' : formatJpy(view.asReceived.valueJpy),
+      value: view.asReceived.valueBase === null ? '-' : formatJpy(view.asReceived.valueBase),
       hint: view.receivedState ? t(`packaging.${view.receivedState}`) : null,
     },
     {
       label: t('box.pulls'),
-      value: formatJpy(view.pullsValueJpy),
+      value: formatJpy(view.pullsValueBase),
       hint: t('box.pullsValued', { valued: view.pullsValued, total: view.pulls.length }),
     },
     {
       label: t('box.net'),
-      value: `${view.netJpy > 0 ? '▲ +' : view.netJpy < 0 ? '▼ ' : ''}${formatJpy(view.netJpy)}`,
+      value: `${view.netBase > 0 ? '▲ +' : view.netBase < 0 ? '▼ ' : ''}${formatJpy(view.netBase)}`,
     },
   ];
 
@@ -57,12 +57,12 @@ export async function BoxCard({
           ))}
         </dl>
         {view.asReceivedBucket && (
-          <details className="text-sm" open={view.asReceived.valueJpy === null}>
+          <details className="text-sm" open={view.asReceived.valueBase === null}>
             <summary className="cursor-pointer text-muted-foreground">
               {t('box.manualTitle')}
             </summary>
             <div className="mt-2 space-y-2">
-              {view.asReceived.valueJpy === null && (
+              {view.asReceived.valueBase === null && (
                 <p className="text-xs text-muted-foreground">{t('box.asReceivedHint')}</p>
               )}
               {view.asReceived.method === 'manual' && (
@@ -117,7 +117,7 @@ export async function BoxCard({
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block tabular-nums">
-                      {valuation.valueJpy === null ? '-' : formatJpy(valuation.valueJpy)}
+                      {valuation.valueBase === null ? '-' : formatJpy(valuation.valueBase)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       <ConfidenceBadge confidence={valuation.confidence} />

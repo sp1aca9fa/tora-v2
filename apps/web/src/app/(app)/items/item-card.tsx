@@ -6,7 +6,7 @@ import { getTranslations } from 'next-intl/server';
 import { ProductImage } from '@/components/product-image';
 import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
 import { formatJpy } from '@/lib/utils';
-import { signedJpy } from '../_portfolio/header';
+import { signedBase } from '../_portfolio/header';
 
 /**
  * One item of the portfolio (requirements S8): a row on phones (bigger picture, the name on up to
@@ -40,7 +40,7 @@ export async function ItemCard({
     ...[...conditions].map(([label, n]) => (n > 1 ? `${label} ×${n}` : label)),
   ].join(' · ');
   const statuses = [...new Set(s.lots.map((l) => l.holding.status))];
-  const pl = s.unrealizedJpy;
+  const pl = s.unrealizedBase;
 
   return (
     <li className="md:flex">
@@ -65,12 +65,12 @@ export async function ItemCard({
             <p className="text-xs text-muted-foreground">{t('tracking.short.untracked')}</p>
           ) : mode === 'cost_only' ? (
             <>
-              <p className="tabular-nums">{formatJpy(s.spentJpy)}</p>
+              <p className="tabular-nums">{formatJpy(s.spentBase)}</p>
               <p className="text-xs text-muted-foreground">{t('tracking.short.cost_only')}</p>
             </>
           ) : s.valuedLots > 0 ? (
             <>
-              <p className="font-medium tabular-nums">{formatJpy(s.valueJpy)}</p>
+              <p className="font-medium tabular-nums">{formatJpy(s.valueBase)}</p>
               <div className="md:text-right">
                 {mode === 'value_only' ? (
                   <p className="text-xs text-muted-foreground">{t('tracking.short.value_only')}</p>
@@ -78,11 +78,11 @@ export async function ItemCard({
                   <>
                     {pl !== null && (
                       <p className="text-xs tabular-nums">
-                        {signedJpy(pl)}
-                        {s.valuedCostJpy > 0 && (
+                        {signedBase(pl)}
+                        {s.valuedCostBase > 0 && (
                           <span className="text-muted-foreground">
                             {' '}
-                            ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
+                            ({Math.round((pl / s.valuedCostBase) * 1000) / 10}%)
                           </span>
                         )}
                       </p>
@@ -90,7 +90,7 @@ export async function ItemCard({
                     <p className="text-xs text-muted-foreground tabular-nums">
                       {s.valuedLots < s.lots.length
                         ? t('portfolio.lotsValued', { valued: s.valuedLots, total: s.lots.length })
-                        : t('portfolio.spentShort', { amount: formatJpy(s.spentJpy) })}
+                        : t('portfolio.spentShort', { amount: formatJpy(s.spentBase) })}
                     </p>
                   </>
                 )}
@@ -98,7 +98,7 @@ export async function ItemCard({
             </>
           ) : (
             <>
-              <p className="tabular-nums">{formatJpy(s.spentJpy)}</p>
+              <p className="tabular-nums">{formatJpy(s.spentBase)}</p>
               <p className="text-xs text-muted-foreground">
                 {statuses.length === 1 && statuses[0] !== 'owned'
                   ? t(`status.${statuses[0]}`)

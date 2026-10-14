@@ -45,18 +45,18 @@ async function cardsSoldOnBoth(items: number, factor: number) {
       { product: { category: 'tcg', kind: 'single', name: `Card ${i}`, cardNumber: String(i) } },
       {
         quantity: 1,
-        costTotalJpy: 1000,
+        costTotalBase: 1000,
         acquiredAt: new Date().toISOString(),
         grading: 'raw',
         rawGrade: 'A',
       },
     );
-    const sale = (source: string, priceJpy: number, day: number) => ({
+    const sale = (source: string, priceBase: number, day: number) => ({
       productId: product.id,
       source,
       observationType: 'sold' as const,
       bucket: 'raw:A',
-      priceJpy,
+      priceBase,
       observedAt: new Date(Date.now() - day * 86_400_000).toISOString(),
       fetchedAt: new Date().toISOString(),
       externalRef: `r${ref++}`,
@@ -119,7 +119,7 @@ it('drops listing details of sources that keep them only for a while', async () 
     { product: { category: 'tcg', kind: 'single', name: 'X', cardNumber: '1' } },
     {
       quantity: 1,
-      costTotalJpy: 1,
+      costTotalBase: 1,
       acquiredAt: new Date().toISOString(),
       grading: 'raw',
       rawGrade: 'A',
@@ -130,7 +130,7 @@ it('drops listing details of sources that keep them only for a while', async () 
     source: 'asks',
     observationType: 'listing' as const,
     bucket: null,
-    priceJpy: 100,
+    priceBase: 100,
     observedAt: new Date(Date.now() - days * 86_400_000).toISOString(),
     fetchedAt: new Date().toISOString(),
     externalRef: `a${days}`,

@@ -49,10 +49,10 @@ export async function SuggestionCard({
         <div className="space-y-0.5">
           <p className="amount">
             {t('suggestions.sale', {
-              price: formatJpy(Number(evidence.priceJpy)),
+              price: formatJpy(Number(evidence.priceBase)),
               date: String(evidence.date ?? ''),
               source: sourceLabel(String(evidence.source ?? '')),
-              value: formatJpy(Number(evidence.valueJpy)),
+              value: formatJpy(Number(evidence.valueBase)),
             })}
           </p>
           {evidence.title ? (
@@ -193,7 +193,7 @@ function ListingList({
           ) : (
             <span className="min-w-0 truncate">{l.title}</span>
           )}
-          <span className="amount shrink-0 text-muted-foreground">{formatJpy(l.priceJpy)}</span>
+          <span className="amount shrink-0 text-muted-foreground">{formatJpy(l.priceBase)}</span>
         </li>
       ))}
     </ul>

@@ -190,7 +190,7 @@ export async function decideSuggestion(
 export interface SuggestionListing {
   title: string;
   url: string | null;
-  priceJpy: number;
+  priceBase: number;
   /** Counted in the value now (else already left out by the filter or by hand). */
   kept: boolean;
 }
@@ -211,7 +211,7 @@ export async function suggestionListings(
     .select({
       url: priceObservations.url,
       raw: priceObservations.raw,
-      priceJpy: priceObservations.priceJpy,
+      priceBase: priceObservations.priceBase,
       excluded: priceObservations.excluded,
     })
     .from(priceObservations)
@@ -229,7 +229,7 @@ export async function suggestionListings(
     .map((r) => ({
       title: ((r.raw ?? {}) as { name?: string }).name ?? '',
       url: r.url,
-      priceJpy: r.priceJpy,
+      priceBase: r.priceBase,
       kept: !r.excluded,
     }))
     .filter((l) => l.title && (!word || fold(l.title).includes(word)))

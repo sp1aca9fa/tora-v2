@@ -6,7 +6,7 @@ export interface ValuationObservation {
   id?: string;
   source: string;
   bucket: string | null;
-  priceJpy: number;
+  priceBase: number;
   observedAt: string;
   observationType: 'sold' | 'listing' | 'buylist' | 'retail';
   excluded?: boolean | null;
@@ -16,7 +16,7 @@ export interface ValuationObservation {
 
 export interface ManualPriceInput {
   bucket: string;
-  priceJpy: number;
+  priceBase: number;
   setAt: string;
 }
 
@@ -26,7 +26,7 @@ export type Confidence = 'high' | 'medium' | 'low';
 
 export interface Valuation {
   /** Value of one unit; null when nothing is known. */
-  unitJpy: number | null;
+  unitBase: number | null;
   method: ValuationMethod;
   source: string | null;
   sampleSize: number;
@@ -115,14 +115,14 @@ export function valueUnit(input: {
   bucket: string | null;
   observations: readonly ValuationObservation[];
   manualPrices?: readonly ManualPriceInput[];
-  retailPriceJpy?: number | null;
+  retailPriceBase?: number | null;
   now?: Date;
   /** Sources valued from, best first (the registry's order for the item's class). */
   sources?: readonly string[];
 }): Valuation {
   const now = input.now ?? new Date();
   const none: Valuation = {
-    unitJpy: null,
+    unitBase: null,
     method: 'none',
     source: null,
     sampleSize: 0,
@@ -140,7 +140,7 @@ export function valueUnit(input: {
   if (manual) {
     return {
       ...none,
-      unitJpy: manual.priceJpy,
+      unitBase: manual.priceBase,
       method: 'manual',
       source: 'manual',
       newestAt: manual.setAt,
@@ -184,14 +184,14 @@ export function valueUnit(input: {
       const chosen = step ?? steps.find((s) => take(s).length > 0);
       if (!chosen) continue;
       const samples = take(chosen);
-      const prices = withoutOutliers(samples.map((o) => o.priceJpy));
+      const prices = withoutOutliers(samples.map((o) => o.priceBase));
       const newestAt = samples
         .map((o) => o.observedAt)
         .sort()
         .at(-1)!;
       const own = (days: number) => take({ days, pooled: false }).length;
       const valuation: Valuation = {
-        unitJpy: Math.round(median(prices)!),
+        unitBase: Math.round(median(prices)!),
         method: 'median',
         source,
         sampleSize: samples.length,
@@ -230,7 +230,7 @@ export function valueUnit(input: {
     if (store) {
       return {
         ...none,
-        unitJpy: store.priceJpy,
+        unitBase: store.priceBase,
         method: 'store',
         source: store.source,
         sampleSize: 1,
@@ -241,10 +241,10 @@ export function valueUnit(input: {
     }
   }
 
-  if (input.retailPriceJpy) {
+  if (input.retailPriceBase) {
     return {
       ...none,
-      unitJpy: input.retailPriceJpy,
+      unitBase: input.retailPriceBase,
       method: 'retail',
       source: 'retail',
       confidence: 'low',
@@ -258,7 +258,7 @@ export function buylistFloor(
   observations: readonly ValuationObservation[],
   bucket: string | null,
   now: Date = new Date(),
-): { priceJpy: number; source: string; observedAt: string } | null {
+): { priceBase: number; source: string; observedAt: string } | null {
   const latest = observations
     .filter(
       (o) =>
@@ -269,7 +269,7 @@ export function buylistFloor(
     )
     .toSorted((a, b) => b.observedAt.localeCompare(a.observedAt))[0];
   return latest
-    ? { priceJpy: latest.priceJpy, source: latest.source, observedAt: latest.observedAt }
+    ? { priceBase: latest.priceBase, source: latest.source, observedAt: latest.observedAt }
     : null;
 }
 
@@ -277,14 +277,14 @@ export function buylistFloor(
 export interface RecentSaleInput {
   source: string;
   bucket: string | null;
-  priceJpy: number;
+  priceBase: number;
   observedAt: string;
   approximate?: boolean;
 }
 
 export interface LastSale {
   source: string;
-  priceJpy: number;
+  priceBase: number;
   observedAt: string;
   approximate: boolean;
 }
@@ -303,7 +303,7 @@ export function lastSale(
       .filter((o) => o.observationType === 'sold' && !o.excluded && o.bucket === bucket)
       .map((o) => ({
         source: o.source,
-        priceJpy: o.priceJpy,
+        priceBase: o.priceBase,
         observedAt: o.observedAt,
         approximate: false,
       })),
@@ -311,7 +311,7 @@ export function lastSale(
       .filter((r) => r.bucket === bucket)
       .map((r) => ({
         source: r.source,
-        priceJpy: r.priceJpy,
+        priceBase: r.priceBase,
         observedAt: r.observedAt,
         approximate: Boolean(r.approximate),
       })),
@@ -323,7 +323,7 @@ export interface SourceSummary {
   source: string;
   last: LastSale | null;
   /** Median in the bucket for this source (same windows and IQR as valuation). */
-  medianJpy: number | null;
+  medianBase: number | null;
   sampleSize: number;
   windowDays: number | null;
   confidence: Confidence | null;
@@ -357,11 +357,11 @@ export function sourceSummaries(
     return {
       source,
       last,
-      medianJpy: v.method === 'median' ? v.unitJpy : null,
+      medianBase: v.method === 'median' ? v.unitBase : null,
       sampleSize: v.sampleSize,
       windowDays: v.windowDays,
       confidence: v.confidence,
-      trendPct: trend(last?.priceJpy, v.method === 'median' ? v.unitJpy : null),
+      trendPct: trend(last?.priceBase, v.method === 'median' ? v.unitBase : null),
     };
   });
 }

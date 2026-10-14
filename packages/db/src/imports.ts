@@ -109,9 +109,9 @@ export async function mergeImportedLots(
   if (drop.productId !== keep.productId && reasons(drop).includes('new_product')) {
     await deleteUnusedProduct(db, drop.productId);
   }
-  const edit: { orderId?: string; acquiredAt?: string; costTotalJpy?: number } = {};
+  const edit: { orderId?: string; acquiredAt?: string; costTotalBase?: number } = {};
   if (!keep.orderId && drop.orderId) edit.orderId = drop.orderId;
-  if (!keep.costTotalJpy && drop.costTotalJpy) edit.costTotalJpy = drop.costTotalJpy;
+  if (!keep.costTotalBase && drop.costTotalBase) edit.costTotalBase = drop.costTotalBase;
   if (dateTaken) edit.acquiredAt = drop.acquiredAt;
   if (Object.keys(edit).length) await editHolding(db, userId, keepId, edit);
   const left = reasons(keep).filter(

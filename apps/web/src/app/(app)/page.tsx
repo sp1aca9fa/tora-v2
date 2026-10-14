@@ -9,7 +9,7 @@ import { PortfolioChart } from '@/components/charts/portfolio-chart';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 import { cn, formatJpy } from '@/lib/utils';
-import { PortfolioHeader, signedJpy } from './_portfolio/header';
+import { PortfolioHeader, signedBase } from './_portfolio/header';
 import { Insights } from './_portfolio/insights';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -28,28 +28,28 @@ export default async function SummaryPage() {
   ]);
   const maxBreakdown = Math.max(
     1,
-    ...portfolio.breakdown.map((b) => Math.max(b.valueJpy, b.costJpy)),
+    ...portfolio.breakdown.map((b) => Math.max(b.valueBase, b.costBase)),
   );
   // Per category: units, value and P/L of the valued lots.
   const categories = new Map<
     Category,
-    { units: number; valueJpy: number; costJpy: number; plValueJpy: number; valuedCostJpy: number }
+    { units: number; valueBase: number; costBase: number; plValueBase: number; valuedCostBase: number }
   >();
   for (const { holding, product, valuation } of portfolio.rows) {
     const c = categories.get(product.category) ?? {
       units: 0,
-      valueJpy: 0,
-      costJpy: 0,
-      plValueJpy: 0,
-      valuedCostJpy: 0,
+      valueBase: 0,
+      costBase: 0,
+      plValueBase: 0,
+      valuedCostBase: 0,
     };
     // By the lot's tracking switches, like the totals.
     c.units += holding.quantity;
-    if (holding.countInCost) c.costJpy += holding.costTotalJpy;
-    if (holding.countInValue && valuation.valueJpy !== null) c.valueJpy += valuation.valueJpy;
-    if (holding.countInCost && holding.countInValue && valuation.valueJpy !== null) {
-      c.plValueJpy += valuation.valueJpy;
-      c.valuedCostJpy += holding.costTotalJpy;
+    if (holding.countInCost) c.costBase += holding.costTotalBase;
+    if (holding.countInValue && valuation.valueBase !== null) c.valueBase += valuation.valueBase;
+    if (holding.countInCost && holding.countInValue && valuation.valueBase !== null) {
+      c.plValueBase += valuation.valueBase;
+      c.valuedCostBase += holding.costTotalBase;
     }
     categories.set(product.category, c);
   }
@@ -61,7 +61,7 @@ export default async function SummaryPage() {
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {CATEGORIES.filter((c) => categories.has(c)).map((c) => {
           const s = categories.get(c)!;
-          const pl = s.plValueJpy - s.valuedCostJpy;
+          const pl = s.plValueBase - s.valuedCostBase;
           return (
             <Link
               key={c}
@@ -72,16 +72,16 @@ export default async function SummaryPage() {
                 <p className="font-medium">{t(`category.${c}`)}</p>
                 <p className="amount text-xs text-muted-foreground">
                   {t('portfolio.units', { count: s.units })} ·{' '}
-                  {t('portfolio.spentShort', { amount: formatJpy(s.costJpy) })}
+                  {t('portfolio.spentShort', { amount: formatJpy(s.costBase) })}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold tabular-nums">{formatJpy(s.valueJpy)}</p>
-                {s.valuedCostJpy > 0 && (
+                <p className="text-lg font-semibold tabular-nums">{formatJpy(s.valueBase)}</p>
+                {s.valuedCostBase > 0 && (
                   <p className="text-xs tabular-nums">
-                    {signedJpy(pl)}{' '}
+                    {signedBase(pl)}{' '}
                     <span className="text-muted-foreground">
-                      ({Math.round((pl / s.valuedCostJpy) * 1000) / 10}%)
+                      ({Math.round((pl / s.valuedCostBase) * 1000) / 10}%)
                     </span>
                   </p>
                 )}
@@ -115,16 +115,16 @@ export default async function SummaryPage() {
                           <span className="text-muted-foreground">× {b.count}</span>
                         </span>
                         <span className="tabular-nums">
-                          {formatJpy(b.valueJpy)}{' '}
+                          {formatJpy(b.valueBase)}{' '}
                           <span className="text-xs text-muted-foreground">
-                            / {formatJpy(b.costJpy)}
+                            / {formatJpy(b.costBase)}
                           </span>
                         </span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-muted" aria-hidden>
                         <div
                           className="h-1.5 rounded-full bg-[#2a78d6] dark:bg-[#3987e5]"
-                          style={{ width: `${(b.valueJpy / maxBreakdown) * 100}%` }}
+                          style={{ width: `${(b.valueBase / maxBreakdown) * 100}%` }}
                         />
                       </div>
                     </Link>
@@ -152,10 +152,10 @@ async function ValueOverTime({ db, userId }: { db: Db; userId: string }) {
   if (series.length < 2) return null;
   const points = series.map((s) => ({
     date: s.date,
-    valueJpy: Number(s.valueJpy),
-    costJpy: Number(s.costJpy),
-    atCostJpy: Number(s.atCostJpy),
-    estimatedJpy: Number(s.estimatedJpy),
+    valueBase: Number(s.valueBase),
+    costBase: Number(s.costBase),
+    atCostBase: Number(s.atCostBase),
+    estimatedBase: Number(s.estimatedBase),
   }));
   return (
     <section className={cn(card, 'h-full space-y-2')}>

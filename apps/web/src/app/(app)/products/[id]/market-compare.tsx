@@ -50,8 +50,8 @@ export async function MarketCompare({
   const markets = { primary: marketLabel(primary), secondary: marketLabel(secondary) };
   // A market comparison: a retail price is no market value.
   const jp =
-    japan && japan.method !== 'retail' ? japan : { unitJpy: null, source: null, method: 'none' };
-  const spread = jp.unitJpy ? Math.round(((f.priceJpy - jp.unitJpy) / jp.unitJpy) * 100) : null;
+    japan && japan.method !== 'retail' ? japan : { unitBase: null, source: null, method: 'none' };
+  const spread = jp.unitBase ? Math.round(((f.priceBase - jp.unitBase) / jp.unitBase) * 100) : null;
   const money = (n: number, currency: string) =>
     format.number(n, { style: 'currency', currency, maximumFractionDigits: 2 });
   return (
@@ -78,7 +78,7 @@ export async function MarketCompare({
               )}
             </span>
             <span className="font-medium tabular-nums">
-              {jp.unitJpy === null ? t('compare.noJapan', markets) : formatJpy(jp.unitJpy)}
+              {jp.unitBase === null ? t('compare.noJapan', markets) : formatJpy(jp.unitBase)}
             </span>
           </li>
           <li className="space-y-0.5 py-2">
@@ -101,7 +101,7 @@ export async function MarketCompare({
                 </span>
               </span>
               <span className="text-right tabular-nums">
-                <span className="font-medium">{formatJpy(f.priceJpy)}</span>
+                <span className="font-medium">{formatJpy(f.priceBase)}</span>
                 {spread !== null && (
                   <span className="ml-2 text-xs text-muted-foreground">
                     {t('compare.spread', {

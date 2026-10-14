@@ -16,12 +16,12 @@ import { formatYen, tickMarkFormatter, useChartTheme } from './chart-theme';
 
 export interface PortfolioPoint {
   date: string;
-  valueJpy: number;
-  costJpy: number;
+  valueBase: number;
+  costBase: number;
   /** Part of the value counted at cost (holdings without a market price that day). */
-  atCostJpy: number;
+  atCostBase: number;
   /** Part of the value based on sales whose lot size was estimated. */
-  estimatedJpy: number;
+  estimatedBase: number;
 }
 
 /**
@@ -38,7 +38,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
   const latest = points.at(-1);
   const [hover, setHover] = useState<PortfolioPoint | null>(null);
   const shown = hover ?? latest;
-  const lastEstimated = points.findLast((p) => p.estimatedJpy > 0)?.date;
+  const lastEstimated = points.findLast((p) => p.estimatedBase > 0)?.date;
 
   useEffect(() => {
     if (!el.current) return;
@@ -71,8 +71,8 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
     const value = line(theme.series[0]!);
     const cost = line(theme.series[1]!);
     const ts = (date: string) => (Date.parse(`${date}T00:00:00Z`) / 1000) as UTCTimestamp;
-    value.setData(points.map((p) => ({ time: ts(p.date), value: p.valueJpy })));
-    cost.setData(points.map((p) => ({ time: ts(p.date), value: p.costJpy })));
+    value.setData(points.map((p) => ({ time: ts(p.date), value: p.valueBase })));
+    cost.setData(points.map((p) => ({ time: ts(p.date), value: p.costBase })));
     chart.timeScale().fitContent();
     const byTime = new Map(points.map((p) => [ts(p.date), p]));
     chart.subscribeCrosshairMove((param) => {
@@ -88,8 +88,8 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs">
         <span className="text-muted-foreground">{shown?.date}</span>
         {[
-          { label: t('chartValue'), color: theme.series[0], v: shown?.valueJpy },
-          { label: t('chartCost'), color: theme.series[1], v: shown?.costJpy },
+          { label: t('chartValue'), color: theme.series[0], v: shown?.valueBase },
+          { label: t('chartCost'), color: theme.series[1], v: shown?.costBase },
         ].map((s) => (
           <span key={s.label} className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 rounded-full" style={{ background: s.color }} aria-hidden />
@@ -99,14 +99,14 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
             </span>
           </span>
         ))}
-        {shown && shown.estimatedJpy > 0 && (
+        {shown && shown.estimatedBase > 0 && (
           <span className="amount text-amber-700 dark:text-amber-400">
-            {t('chartEstimated', { amount: formatYen(shown.estimatedJpy) })}
+            {t('chartEstimated', { amount: formatYen(shown.estimatedBase) })}
           </span>
         )}
-        {shown && shown.atCostJpy > 0 && (
+        {shown && shown.atCostBase > 0 && (
           <span className="amount text-muted-foreground">
-            {t('chartAtCost', { amount: formatYen(shown.atCostJpy) })}
+            {t('chartAtCost', { amount: formatYen(shown.atCostBase) })}
           </span>
         )}
       </div>

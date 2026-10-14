@@ -153,16 +153,16 @@ export default async function HoldingActionPage({
             />
           </Field>
           <Field
-            label={t('fields.costTotalJpy')}
-            htmlFor="costTotalJpy"
+            label={t('fields.costTotalBase')}
+            htmlFor="costTotalBase"
             hint={t('lotActions.editCostHint')}
           >
             <Input
-              id="costTotalJpy"
-              name="costTotalJpy"
+              id="costTotalBase"
+              name="costTotalBase"
               inputMode="numeric"
               required
-              defaultValue={holding.costTotalJpy}
+              defaultValue={holding.costTotalBase}
             />
           </Field>
           {fields.grading && (
@@ -243,8 +243,8 @@ export default async function HoldingActionPage({
                 ))}
               </NativeSelect>
             </Field>
-            <Field label={t('fields.feeJpy')} htmlFor="feeJpy" hint={t('lotActions.feeHint')}>
-              {yenInput('feeJpy')}
+            <Field label={t('fields.feeBase')} htmlFor="feeBase" hint={t('lotActions.feeHint')}>
+              {yenInput('feeBase')}
             </Field>
             <Field label={t('fields.service')} htmlFor="service">
               <Input id="service" name="service" placeholder="Value / Regular" />
@@ -274,11 +274,11 @@ export default async function HoldingActionPage({
             <Input id="certNumber" name="certNumber" inputMode="numeric" />
           </Field>
           <Field
-            label={t('fields.extraFeeJpy')}
-            htmlFor="extraFeeJpy"
+            label={t('fields.extraFeeBase')}
+            htmlFor="extraFeeBase"
             hint={t('lotActions.extraFeeHint')}
           >
-            {yenInput('extraFeeJpy', false)}
+            {yenInput('extraFeeBase', false)}
           </Field>
           {dateField}
         </div>
@@ -290,11 +290,11 @@ export default async function HoldingActionPage({
         <>
           {quantityField()}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t('fields.priceJpy')} htmlFor="priceJpy" hint={t('lotActions.priceHint')}>
-              {yenInput('priceJpy')}
+            <Field label={t('fields.priceBase')} htmlFor="priceBase" hint={t('lotActions.priceHint')}>
+              {yenInput('priceBase')}
             </Field>
-            <Field label={t('fields.feesJpy')} htmlFor="feesJpy" hint={t('lotActions.feesHint')}>
-              {yenInput('feesJpy', false)}
+            <Field label={t('fields.feesBase')} htmlFor="feesBase" hint={t('lotActions.feesHint')}>
+              {yenInput('feesBase', false)}
             </Field>
             <Field label={t('fields.platform')} htmlFor="platform">
               <Input id="platform" name="platform" list="platforms" autoComplete="off" />

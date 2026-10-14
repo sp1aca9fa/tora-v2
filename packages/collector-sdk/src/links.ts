@@ -167,7 +167,7 @@ export async function importPurchaseLinks(
       } else if (entry.type === 'likely') {
         status = 'matched';
         const h = entry.existing;
-        message = `Matched the entry you added on ${h.acquiredAt.slice(0, 10)} (${yen(h.costTotalJpy)}); its order ID was added.`;
+        message = `Matched the entry you added on ${h.acquiredAt.slice(0, 10)} (${yen(h.costTotalBase)}); its order ID was added.`;
       } else if (entry.type === 'duplicate' || entry.type === 'conflict') {
         status = 'duplicate';
         message =

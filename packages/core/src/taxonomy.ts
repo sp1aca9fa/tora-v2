@@ -126,18 +126,18 @@ export type ProductField =
   | 'cardNumber'
   | 'rarity'
   | 'releaseDate'
-  | 'retailPriceJpy';
+  | 'retailPriceBase';
 
 /** Optional product fields shown for a category + kind (name and region are always shown). */
 export function productFieldsFor(category: Category, kind: ProductKind): readonly ProductField[] {
-  if (category === 'game') return ['franchise', 'platform', 'releaseDate', 'retailPriceJpy'];
+  if (category === 'game') return ['franchise', 'platform', 'releaseDate', 'retailPriceBase'];
   switch (productClass({ category, kind })) {
     case 'card':
       return ['setName', 'setCode', 'cardNumber', 'rarity'];
     case 'sealed':
-      return ['setName', 'setCode', 'variant', 'releaseDate', 'retailPriceJpy'];
+      return ['setName', 'setCode', 'variant', 'releaseDate', 'retailPriceBase'];
     default:
-      return ['releaseDate', 'retailPriceJpy'];
+      return ['releaseDate', 'retailPriceBase'];
   }
 }
 

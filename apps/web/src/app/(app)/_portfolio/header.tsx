@@ -10,7 +10,7 @@ import { cn, formatJpy } from '@/lib/utils';
 type Totals = Awaited<ReturnType<typeof portfolioValuation>>['totals'];
 
 /** "▲ +¥1,200" / "▼ ¥300" */
-export const signedJpy = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
+export const signedBase = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${formatJpy(n)}`;
 
 /**
  * The top of both Portfolio tabs (requirements S8): the totals, the Actions line, and the
@@ -26,7 +26,7 @@ export async function PortfolioHeader({
   tab: 'summary' | 'items';
 }) {
   const t = await getTranslations();
-  const pl = totals.unrealizedJpy;
+  const pl = totals.unrealizedBase;
   const waiting = actionTotal(actions);
   const tile = 'rounded-xl border bg-card px-4 py-3';
   return (
@@ -46,32 +46,32 @@ export async function PortfolioHeader({
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div className={tile}>
           <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
-          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.valueJpy)}</p>
+          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.valueBase)}</p>
           <p className="text-xs text-muted-foreground">
             {t('portfolio.valuedOf', { valued: totals.valued, total: totals.total })}
           </p>
         </div>
         <div className={tile}>
           <p className="text-xs text-muted-foreground">{t('portfolio.unrealized')}</p>
-          <p className="text-xl font-semibold tabular-nums">{signedJpy(pl)}</p>
+          <p className="text-xl font-semibold tabular-nums">{signedBase(pl)}</p>
           <p className="amount text-xs text-muted-foreground">
-            {totals.valuedCostJpy > 0
+            {totals.valuedCostBase > 0
               ? t('portfolio.vsCost', {
-                  pct: Math.round((pl / totals.valuedCostJpy) * 1000) / 10,
-                  cost: formatJpy(totals.valuedCostJpy),
+                  pct: Math.round((pl / totals.valuedCostBase) * 1000) / 10,
+                  cost: formatJpy(totals.valuedCostBase),
                 })
               : '-'}
           </p>
         </div>
         <div className={cn(tile, 'col-span-2 sm:col-span-1')}>
           <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
-          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentJpy)}</p>
+          <p className="text-xl font-semibold tabular-nums">{formatJpy(totals.spentBase)}</p>
           <p className="text-xs text-muted-foreground">
             {t('portfolio.itemsValue', { units: totals.units, lots: totals.lots })}
           </p>
-          {totals.openedCostJpy > 0 && (
+          {totals.openedCostBase > 0 && (
             <p className="amount text-xs text-muted-foreground">
-              {t('portfolio.inclOpened', { amount: formatJpy(totals.openedCostJpy) })}
+              {t('portfolio.inclOpened', { amount: formatJpy(totals.openedCostBase) })}
             </p>
           )}
         </div>

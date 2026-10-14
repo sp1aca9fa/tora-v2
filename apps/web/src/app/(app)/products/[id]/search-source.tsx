@@ -113,7 +113,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                     <code className="text-xs">{bucket}</code>
                   </td>
                   <td className="py-1 text-right font-medium tabular-nums">
-                    {v.unitJpy === null ? '-' : formatJpy(v.unitJpy)}
+                    {v.unitBase === null ? '-' : formatJpy(v.unitBase)}
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {t('valuation.medianOf', { count: v.sampleSize, days: v.windowDays ?? 0 })}
@@ -121,7 +121,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                   </td>
                   <td className="py-1 text-right text-xs text-muted-foreground tabular-nums">
                     {latest
-                      ? `${formatJpy(latest.priceJpy)} · ${format.dateTime(new Date(latest.observedAt), { dateStyle: 'medium' })}`
+                      ? `${formatJpy(latest.priceBase)} · ${format.dateTime(new Date(latest.observedAt), { dateStyle: 'medium' })}`
                       : '-'}
                   </td>
                 </tr>
@@ -210,7 +210,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                     </a>
                     <p className="text-xs text-muted-foreground">
                       <span className="font-medium text-foreground tabular-nums">
-                        {formatJpy(s.priceJpy)}
+                        {formatJpy(s.priceBase)}
                       </span>{' '}
                       · {format.dateTime(new Date(s.observedAt), { dateStyle: 'medium' })}
                       {s.bucket && (

@@ -81,7 +81,7 @@ export type ProductInput = Omit<NewProduct, 'id' | 'createdAt' | 'updatedAt' | '
 
 export interface HoldingInput {
   quantity: number;
-  costTotalJpy: number;
+  costTotalBase: number;
   acquiredAt: string;
   acquiredFrom?: string | null;
   acquisitionType?: AcquisitionType;
@@ -176,7 +176,7 @@ async function takeUnits(
   const result = splitHolding(holding, quantity, { occurredAt });
   await tx
     .update(holdings)
-    .set({ quantity: result.original.quantity, costTotalJpy: result.original.costTotalJpy })
+    .set({ quantity: result.original.quantity, costTotalBase: result.original.costTotalBase })
     .where(eq(holdings.id, holding.id));
   const { createdAt: _c, updatedAt: _u, ...split } = result.split;
   const [inserted] = await tx.insert(holdings).values(split).returning();
@@ -296,7 +296,7 @@ async function insertHolding(
   input: HoldingInput,
 ): Promise<Holding> {
   assertQuantity(input.quantity);
-  assertYen(input.costTotalJpy);
+  assertYen(input.costTotalBase);
   if ((input.acquisitionType === 'pull') !== Boolean(input.parentHoldingId)) {
     throw new DomainError('invalid_input');
   }
@@ -309,7 +309,7 @@ async function insertHolding(
     holdingId: holding!.id,
     type: 'acquired',
     occurredAt: holding!.acquiredAt,
-    amountJpy: holding!.costTotalJpy,
+    amountBase: holding!.costTotalBase,
     // Snapshot of the state as received; a box's "value as received" bucket comes from here.
     payload: {
       quantity: holding!.quantity,
@@ -424,7 +424,7 @@ export async function addPull(
     );
     const holding = await insertHolding(tx, userId, product.id, {
       quantity: input.quantity,
-      costTotalJpy: 0,
+      costTotalBase: 0,
       acquiredAt: input.acquiredAt,
       acquiredFrom: parent.holding.acquiredFrom,
       acquisitionType: 'pull',
@@ -442,7 +442,7 @@ export type HoldingEdit = Partial<
     | 'acquiredAt'
     | 'acquiredFrom'
     | 'acquisitionType'
-    | 'costTotalJpy'
+    | 'costTotalBase'
     | 'quantity'
     | 'certNumber'
     | 'notes'
@@ -461,7 +461,7 @@ export async function editHolding(
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
     if (edit.quantity !== undefined) assertQuantity(edit.quantity);
-    if (edit.costTotalJpy !== undefined) assertYen(edit.costTotalJpy);
+    if (edit.costTotalBase !== undefined) assertYen(edit.costTotalBase);
     const nextType = edit.acquisitionType ?? holding.acquisitionType;
     if ((nextType === 'pull') !== Boolean(holding.parentHoldingId)) {
       throw new DomainError('invalid_input');
@@ -686,33 +686,33 @@ export async function submitGrading(
   db: Db,
   userId: string,
   id: string,
-  input: { quantity: number; grader: Grader; feeJpy: number; service?: string; occurredAt: string },
+  input: { quantity: number; grader: Grader; feeBase: number; service?: string; occurredAt: string },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding, product } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    assertYen(input.feeJpy);
+    assertYen(input.feeBase);
     if (productClass(product) !== 'card') throw new DomainError('not_a_card');
     const events = await tx.select().from(holdingEvents).where(eq(holdingEvents.holdingId, id));
     if (pendingGrading(events)) throw new DomainError('already_at_grader');
 
     const target = await takeUnits(tx, holding, input.quantity, input.occurredAt);
-    const costAfter = target.costTotalJpy + input.feeJpy;
+    const costAfter = target.costTotalBase + input.feeBase;
     const [updated] = await tx
       .update(holdings)
-      .set({ costTotalJpy: costAfter })
+      .set({ costTotalBase: costAfter })
       .where(eq(holdings.id, target.id))
       .returning();
     await insertEvent(tx, {
       holdingId: target.id,
       type: 'grading_submitted',
       occurredAt: input.occurredAt,
-      amountJpy: input.feeJpy,
+      amountBase: input.feeBase,
       payload: {
         quantity: input.quantity,
         grader: input.grader,
         service: input.service ?? null,
-        costBefore: target.costTotalJpy,
+        costBefore: target.costTotalBase,
         costAfter,
       },
     });
@@ -729,14 +729,14 @@ export async function returnGrading(
     grader: Grader;
     grade: string;
     certNumber?: string | null;
-    extraFeeJpy?: number;
+    extraFeeBase?: number;
     occurredAt: string;
   },
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    const extraFee = input.extraFeeJpy ?? 0;
+    const extraFee = input.extraFeeBase ?? 0;
     assertYen(extraFee);
     const grade = input.grade.trim();
     if (!grade) throw new DomainError('invalid_input');
@@ -748,21 +748,21 @@ export async function returnGrading(
       grader: input.grader,
       grade,
       certNumber: input.certNumber?.trim() || null,
-      costTotalJpy: holding.costTotalJpy + extraFee,
+      costTotalBase: holding.costTotalBase + extraFee,
     };
     const [updated] = await tx.update(holdings).set(after).where(eq(holdings.id, id)).returning();
     await insertEvent(tx, {
       holdingId: id,
       type: 'grading_returned',
       occurredAt: input.occurredAt,
-      amountJpy: extraFee || null,
+      amountBase: extraFee || null,
       payload: {
         before: {
           grading: holding.grading,
           rawGrade: holding.rawGrade,
           grader: holding.grader,
           grade: holding.grade,
-          costTotalJpy: holding.costTotalJpy,
+          costTotalBase: holding.costTotalBase,
         },
         after,
       },
@@ -777,8 +777,8 @@ export async function sellHolding(
   id: string,
   input: {
     quantity: number;
-    priceJpy: number;
-    feesJpy: number;
+    priceBase: number;
+    feesBase: number;
     platform?: string | null;
     occurredAt: string;
   },
@@ -786,8 +786,8 @@ export async function sellHolding(
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
     assertOwned(holding);
-    assertYen(input.priceJpy);
-    assertYen(input.feesJpy);
+    assertYen(input.priceBase);
+    assertYen(input.feesBase);
     const target = await takeUnits(tx, holding, input.quantity, input.occurredAt);
     const [updated] = await tx
       .update(holdings)
@@ -798,12 +798,12 @@ export async function sellHolding(
       holdingId: target.id,
       type: 'sold',
       occurredAt: input.occurredAt,
-      amountJpy: input.priceJpy,
-      feesJpy: input.feesJpy,
+      amountBase: input.priceBase,
+      feesBase: input.feesBase,
       payload: {
         quantity: input.quantity,
         platform: input.platform?.trim() || null,
-        costBasisJpy: target.costTotalJpy,
+        costBasisBase: target.costTotalBase,
       },
     });
     return updated!;

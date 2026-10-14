@@ -55,7 +55,7 @@ export async function seedCollection(db: Db, userId: string) {
     }),
     {
       quantity: 1,
-      costTotalJpy: 19_800,
+      costTotalBase: 19_800,
       acquiredAt: at('2026-09-20'),
       acquiredFrom: 'My Nintendo Store',
       condition: 'new_unused',
@@ -70,7 +70,7 @@ export async function seedCollection(db: Db, userId: string) {
     }),
     {
       quantity: 3,
-      costTotalJpy: 9_900,
+      costTotalBase: 9_900,
       acquiredAt: at('2026-08-01'),
       acquiredFrom: 'Yodobashi',
       condition: 'new_unused',
@@ -86,7 +86,7 @@ export async function seedCollection(db: Db, userId: string) {
     }),
     {
       quantity: 1,
-      costTotalJpy: 12_000,
+      costTotalBase: 12_000,
       acquiredAt: at('2026-07-10'),
       acquiredFrom: 'Mercari',
       condition: 'no_noticeable_damage',
@@ -123,7 +123,7 @@ export async function seedCollection(db: Db, userId: string) {
         },
     {
       quantity: 1,
-      costTotalJpy: 5_400,
+      costTotalBase: 5_400,
       acquiredAt: at('2026-09-28'),
       acquiredFrom: 'Yodobashi',
       packagingState: 'box_opened_contents_sealed',

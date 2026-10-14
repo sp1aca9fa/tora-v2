@@ -73,7 +73,7 @@ export interface ForeignPrice {
   /** In the source's currency (e.g. dollars), and converted to yen with the rate of `fxDate`. */
   price: number;
   currency: string;
-  priceJpy: number;
+  priceBase: number;
   fxRate: number | null;
   fxDate: string | null;
   observedAt: string;
@@ -118,7 +118,7 @@ export async function foreignPrices(
       url: o.url,
       price: o.priceOriginal / 100,
       currency: o.currency,
-      priceJpy: o.priceJpy,
+      priceBase: o.priceBase,
       fxRate: o.fxRate,
       fxDate: raw.fxDate ?? null,
       observedAt: o.observedAt,
@@ -142,7 +142,7 @@ export function foreignEstimates(prices: ForeignPrice[]): (ForeignPrice & { of: 
     bySource.set(p.source, [...(bySource.get(p.source) ?? []), p]);
   }
   return [...bySource.values()].map((list) => {
-    const sorted = list.toSorted((a, b) => a.priceJpy - b.priceJpy);
+    const sorted = list.toSorted((a, b) => a.priceBase - b.priceBase);
     return { ...sorted[Math.floor((sorted.length - 1) / 2)]!, of: sorted.length };
   });
 }

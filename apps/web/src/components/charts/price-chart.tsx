@@ -18,7 +18,7 @@ export interface PriceChartPoint {
   day: string;
   source: string;
   bucket: string | null;
-  medianJpy: number;
+  medianBase: number;
   count: number;
   /** Trades that day whose lot size was estimated (the source did not report it). */
   estimated: number;
@@ -94,7 +94,7 @@ export function PriceChart({
           .filter((p) => p.source === source && p.bucket === bucket)
           .map((p) => ({
             time: (Date.parse(`${p.day}T00:00:00Z`) / 1000) as UTCTimestamp,
-            value: p.medianJpy,
+            value: p.medianBase,
           })),
       );
       seriesBySource.set(source, series);

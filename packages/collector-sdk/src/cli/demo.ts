@@ -149,7 +149,7 @@ async function productRef(p: ProductInput) {
 
 /** What each item should look like once settled (see the header). */
 type State = 'complete' | 'confirm' | 'missing';
-const states = new Map<string, { state: State; costJpy: number }>();
+const states = new Map<string, { state: State; costBase: number }>();
 
 async function lot(
   p: ProductInput,
@@ -165,7 +165,7 @@ async function lot(
   states.set(made.product.id, {
     // Another lot of the item (e.g. one in the import review) keeps the item's state.
     state: had ? had.state : state,
-    costJpy: (had?.costJpy ?? 0) + rest.costTotalJpy,
+    costBase: (had?.costBase ?? 0) + rest.costTotalBase,
   });
   return made;
 }
@@ -176,19 +176,19 @@ const raw = (rawGrade: 'S' | 'A' | 'B') => ({ grading: 'raw' as const, rawGrade 
 // Cards: graded, raw, and some without a grade (not valued until they get one).
 await lot(card('リザードンex', 'SV2a', S151, '201/165', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 68_000,
+  costTotalBase: 68_000,
   days: 400,
   ...graded('10'),
 });
 await lot(card('ミュウex', 'SV2a', S151, '205/165', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 18_000,
+  costTotalBase: 18_000,
   days: 380,
   ...raw('A'),
 });
 await lot(card('フシギバナex', 'SV2a', S151, '200/165', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 12_500,
+  costTotalBase: 12_500,
   state: 'confirm',
   days: 210,
   ...raw('A'),
@@ -196,54 +196,54 @@ await lot(card('フシギバナex', 'SV2a', S151, '200/165', 'SAR'), {
 // Imported with a bare name: the data review suggests its set and number.
 const blastoise = await lot(
   { category: 'tcg', kind: 'single', ...jp, name: 'カメックスex' },
-  { quantity: 1, costTotalJpy: 13_000, days: 120 },
+  { quantity: 1, costTotalBase: 13_000, days: 120 },
 );
 await lot(card('ナンジャモ', 'SV4a', SHINY, '350/190', 'SAR'), {
   quantity: 2,
-  costTotalJpy: 11_000,
+  costTotalBase: 11_000,
   days: 300,
   ...raw('S'),
 });
 await lot(card('サーナイトex', 'SV4a', SHINY, '348/190', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 21_000,
+  costTotalBase: 21_000,
   days: 280,
   ...graded('9'),
 });
 await lot(card('ブラッキーVMAX', 'S6a', '強化拡張パック「イーブイヒーローズ」', '095/069', 'HR'), {
   quantity: 1,
-  costTotalJpy: 380_000,
+  costTotalBase: 380_000,
   days: 330,
   ...graded('10'),
 });
 const marnie = await lot(card('マリィ', 'S1H', '拡張パック「シールド」', '068/060', 'SR'), {
   quantity: 1,
-  costTotalJpy: 25_000,
+  costTotalBase: 25_000,
   days: 250,
   ...raw('B'),
 });
 await lot(card('ピカチュウex', 'SV8', '拡張パック「超電ブレイカー」', '132/106', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 42_000,
+  costTotalBase: 42_000,
   state: 'missing',
   days: 60,
   ...raw('A'),
 });
 await lot(card('ブラッキーex', 'SV8a', TERA, '217/187', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 29_000,
+  costTotalBase: 29_000,
   state: 'confirm',
   days: 45,
 });
 await lot(card('ニンフィアex', 'SV8a', TERA, '212/187', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 11_800,
+  costTotalBase: 11_800,
   days: 90,
   ...raw('A'),
 });
 const dragapult = await lot(card('ドラパルトex', 'SV8a', TERA, '221/187', 'SAR'), {
   quantity: 2,
-  costTotalJpy: 5_200,
+  costTotalBase: 5_200,
   days: 200,
   ...raw('A'),
 });
@@ -251,7 +251,7 @@ const rayquaza = await lot(
   card('レックウザVMAX', 'S7R', '拡張パック「蒼空ストリーム」', '083/067', 'HR'),
   {
     quantity: 1,
-    costTotalJpy: 300_000,
+    costTotalBase: 300_000,
     days: 420,
     ...graded('10'),
   },
@@ -265,14 +265,14 @@ const box151 = sealed(
 );
 await lot(box151, {
   quantity: 2,
-  costTotalJpy: 27_000,
+  costTotalBase: 27_000,
   days: 410,
   packagingState: 'sealed_shrink',
 });
 // One box opened, with what came out of it.
 const opened = await lot(box151, {
   quantity: 1,
-  costTotalJpy: 14_000,
+  costTotalBase: 14_000,
   days: 395,
   packagingState: 'sealed_shrink',
 });
@@ -299,7 +299,7 @@ await lot(
   sealed('booster_box', `ポケモンカードゲーム スカーレット&バイオレット ${SHINY}ボックス`, 'SV4a'),
   {
     quantity: 1,
-    costTotalJpy: 9_800,
+    costTotalBase: 9_800,
     days: 310,
     packagingState: 'sealed_shrink',
   },
@@ -312,7 +312,7 @@ await lot(
   ),
   {
     quantity: 1,
-    costTotalJpy: 7_500,
+    costTotalBase: 7_500,
     days: 360,
     packagingState: 'sealed_no_shrink',
   },
@@ -325,7 +325,7 @@ await lot(
   ),
   {
     quantity: 1,
-    costTotalJpy: 16_500,
+    costTotalBase: 16_500,
     state: 'confirm',
     days: 430,
     packagingState: 'sealed_shrink',
@@ -339,7 +339,7 @@ await lot(
   ),
   {
     quantity: 2,
-    costTotalJpy: 11_000,
+    costTotalBase: 11_000,
     state: 'missing',
     days: 150,
     packagingState: 'sealed_shrink',
@@ -353,7 +353,7 @@ await lot(
   ),
   {
     quantity: 1,
-    costTotalJpy: 6_200,
+    costTotalBase: 6_200,
     days: 440,
     packagingState: 'sealed_shrink',
   },
@@ -365,7 +365,7 @@ await lot(
   ),
   {
     quantity: 1,
-    costTotalJpy: 1_650,
+    costTotalBase: 1_650,
     days: 100,
     packagingState: 'sealed_shrink',
   },
@@ -377,7 +377,7 @@ await lot(
   ),
   {
     quantity: 1,
-    costTotalJpy: 5_500,
+    costTotalBase: 5_500,
     state: 'confirm',
     days: 95,
     packagingState: 'sealed_shrink',
@@ -385,7 +385,7 @@ await lot(
 );
 await lot(sealed('supply', 'ポケモンカードゲーム デッキシールド ピカチュウ'), {
   quantity: 2,
-  costTotalJpy: 1_320,
+  costTotalBase: 1_320,
   days: 70,
   condition: 'new_unused',
 });
@@ -393,78 +393,78 @@ await lot(sealed('supply', 'ポケモンカードゲーム デッキシールド
 // Games: some without a condition (not valued until they get one).
 await lot(game('software', 'ゼルダの伝説 ティアーズ オブ ザ キングダム', 'switch'), {
   quantity: 1,
-  costTotalJpy: 5_500,
+  costTotalBase: 5_500,
   days: 340,
   condition: 'like_new',
 });
 await lot(game('software', 'スプラトゥーン3', 'switch'), {
   quantity: 1,
-  costTotalJpy: 4_800,
+  costTotalBase: 4_800,
   days: 300,
   condition: 'new_unused',
 });
 await lot(game('software', 'ポケットモンスター スカーレット', 'switch'), {
   quantity: 1,
-  costTotalJpy: 4_200,
+  costTotalBase: 4_200,
   state: 'confirm',
   days: 280,
 });
 await lot(game('software', 'マリオカート8 デラックス', 'switch'), {
   quantity: 1,
-  costTotalJpy: 2_500,
+  costTotalBase: 2_500,
   days: 260,
   condition: 'no_noticeable_damage',
 });
 await lot(game('software', '大乱闘スマッシュブラザーズ SPECIAL', 'switch'), {
   quantity: 1,
-  costTotalJpy: 4_000,
+  costTotalBase: 4_000,
   state: 'confirm',
   days: 240,
 });
 await lot(game('software', 'ELDEN RING エルデンリング', 'ps5'), {
   quantity: 1,
-  costTotalJpy: 3_900,
+  costTotalBase: 3_900,
   state: 'missing',
   days: 220,
   condition: 'like_new',
 });
 const ff16 = await lot(game('software', 'ファイナルファンタジーXVI', 'ps5'), {
   quantity: 1,
-  costTotalJpy: 6_800,
+  costTotalBase: 6_800,
   days: 330,
   condition: 'like_new',
 });
 // Platform missing: the data review suggests it.
 const mario64 = await lot(game('software', 'スーパーマリオ64', null), {
   quantity: 1,
-  costTotalJpy: 3_500,
+  costTotalBase: 3_500,
   days: 180,
   condition: 'minor_damage',
 });
 await lot(game('software', 'ポケットモンスター X', '3ds'), {
   quantity: 1,
-  costTotalJpy: 1_800,
+  costTotalBase: 1_800,
   days: 160,
 });
 await lot(game('console', 'Nintendo Switch 有機ELモデル ホワイト', 'switch'), {
   quantity: 1,
-  costTotalJpy: 32_000,
+  costTotalBase: 32_000,
   days: 390,
   condition: 'like_new',
 });
 await lot(game('controller', 'Nintendo Switch Proコントローラー', 'switch'), {
   quantity: 1,
-  costTotalJpy: 6_000,
+  costTotalBase: 6_000,
   days: 370,
 });
 await lot(
-  game('amiibo', 'amiibo リンク【ティアーズ オブ ザ キングダム】', null, { retailPriceJpy: 3_300 }),
-  { quantity: 1, costTotalJpy: 3_300, days: 330, condition: 'new_unused' },
+  game('amiibo', 'amiibo リンク【ティアーズ オブ ザ キングダム】', null, { retailPriceBase: 3_300 }),
+  { quantity: 1, costTotalBase: 3_300, days: 330, condition: 'new_unused' },
 );
 // No shop lists it: the "not linked" warning is turned off.
 const watch = await lot(game('other', 'ポケモン ピカチュウ 腕時計 (非売品)', null), {
   quantity: 1,
-  costTotalJpy: 8_000,
+  costTotalBase: 8_000,
   state: 'missing',
   days: 200,
   condition: 'like_new',
@@ -474,22 +474,22 @@ await setSourceWarningDismissed(db, uid, watch.product.id, true);
 // Sold: realized gains and losses.
 await sellHolding(db, uid, rayquaza.holding.id, {
   quantity: 1,
-  priceJpy: 455_000,
-  feesJpy: 31_850,
+  priceBase: 455_000,
+  feesBase: 31_850,
   platform: 'SNKRDUNK',
   occurredAt: ago(30),
 });
 await sellHolding(db, uid, dragapult.holding.id, {
   quantity: 1,
-  priceJpy: 2_300,
-  feesJpy: 230,
+  priceBase: 2_300,
+  feesBase: 230,
   platform: 'メルカリ',
   occurredAt: ago(20),
 });
 await sellHolding(db, uid, ff16.holding.id, {
   quantity: 1,
-  priceJpy: 3_200,
-  feesJpy: 320,
+  priceBase: 3_200,
+  feesBase: 320,
   platform: 'メルカリ',
   occurredAt: ago(50),
 });
@@ -500,7 +500,7 @@ await setManualPrice(db, uid, marnie.product.id, 'raw:B', 30_000);
 // Notices from imports: lots to review, a link that failed, a data review suggestion.
 await lot(card('リザードンex', 'SV2a', S151, '201/165', 'SAR'), {
   quantity: 1,
-  costTotalJpy: 41_000,
+  costTotalBase: 41_000,
   days: 5,
   ...raw('A'),
   reviewPending: true,
@@ -509,7 +509,7 @@ await lot(card('リザードンex', 'SV2a', S151, '201/165', 'SAR'), {
 });
 await lot(game('software', 'スプラトゥーン3', 'switch'), {
   quantity: 1,
-  costTotalJpy: 3_600,
+  costTotalBase: 3_600,
   days: 4,
   condition: 'like_new',
   reviewPending: true,
@@ -563,13 +563,13 @@ for (const collector of collectors) {
 }
 /** A suggestion is confirmed for a complete item only when it scores at least this. */
 const CONFIRM_MIN = 0.85;
-for (const [productId, { state, costJpy }] of states) {
+for (const [productId, { state, costBase }] of states) {
   const product = await getProduct(db, productId);
   if (!product) continue;
   const linked = new Set(
     (await listProductSources(db, productId)).filter((l) => l.active).map((l) => l.source),
   );
-  const main = stableSourceFor(product, costJpy, registry);
+  const main = stableSourceFor(product, costBase, registry);
   const bySource = new Map<string, Awaited<ReturnType<typeof listPendingCandidates>>>();
   for (const c of await listPendingCandidates(db, productId)) {
     if (!linked.has(c.source)) bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);
