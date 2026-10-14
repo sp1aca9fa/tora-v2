@@ -954,12 +954,13 @@
     "noOthers": "Every source prices in the base currency: no exchange rates needed.",
     "latest": "1 {code} = {rate} ({date})",
     "missing": "No rate yet: prices in this currency are not saved until one is set. Pick a rate source (rates arrive with the next collect) or type a rate.",
-    "source": "Where the {code} rate comes from",
+    "source": "{code} rate from",
     "none": "No rate source",
     "manual": "Typed rate",
     "typedLabel": "1 {code} =",
     "save": "Save",
     "manualInfo": "Used from today until changed; earlier days keep their rates.",
-    "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running."
+    "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running.",
+    "noPlugins": "No rate plug-in covers {code} yet. Plug-ins are listed after the home PC's next collect; until then you can type a rate."
   }
 }

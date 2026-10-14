@@ -143,26 +143,34 @@ function RateRow({
             <span className="block text-xs text-amber-700 dark:text-amber-400">{t('missing')}</span>
           )}
         </div>
-        <NativeSelect
-          value={value}
-          disabled={pending}
-          aria-label={t('source', { code: row.code })}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === 'manual') return setTyping(true);
-            setTyping(false);
-            save(v ? { source: v } : null);
-          }}
-          className="h-9 w-full sm:w-64"
-        >
-          {!row.setting && <option value="">{t('none')}</option>}
-          {row.choices.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-          <option value="manual">{t('manual')}</option>
-        </NativeSelect>
+        <div className="w-full space-y-1 sm:w-64">
+          <label htmlFor={`source-${row.code}`} className="text-xs text-muted-foreground">
+            {t('source', { code: row.code })}
+          </label>
+          <NativeSelect
+            id={`source-${row.code}`}
+            value={value}
+            disabled={pending}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === 'manual') return setTyping(true);
+              setTyping(false);
+              save(v ? { source: v } : null);
+            }}
+            className="h-9 w-full"
+          >
+            {!row.setting && <option value="">{t('none')}</option>}
+            {row.choices.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+            <option value="manual">{t('manual')}</option>
+          </NativeSelect>
+          {row.choices.length === 0 && (
+            <p className="text-xs text-muted-foreground">{t('noPlugins', { code: row.code })}</p>
+          )}
+        </div>
       </div>
       {typing && (
         <form
