@@ -27,7 +27,8 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
-| S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S11; user, 2026-10-13) |
+| S16 | Admin-defined product categories (from scratch: kinds, fields, price condition) and markets; ground rules for running many collectors | todo (before S12; user, 2026-10-14) |
+| S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
@@ -625,6 +626,37 @@ Added at the user's request (2026-10-13), to close the loop on shops and markets
 Built (2026-10-14): `app_settings` table (migration 0022, key `markets`: primary, secondary, identity per market and class); `valuationOrder`, `referenceSource` and `identitySources` take a market (default the primary); the quality gate compares within a market; TCGplayer suggested as the US reference (identity page for cards and sealed), eBay as supporting; the `secondary_identity` notice type (blue); Settings > Markets and price sources (market pickers, a tab per market with roles and an identity page row); the item page's market tabs and the compare card follow the setting. Production: 6 cards without a TCGplayer link for the user.
 
 Acceptance: switch a US source between reference and comparison in Settings and see the item page's secondary price follow; set an identity source per market and see the notices follow; the portfolio value unchanged by any secondary-market setting.
+
+## S16: Admin-defined product categories and markets
+
+Added at the user's request (2026-10-14). The admin creates product categories from scratch in Settings, and adds markets; whoever adds a complex category builds collectors to match (S12 explains how). Planned for up to 10 categories across 5 markets. Before S12, so the documentation covers it.
+
+Today, categories are code: 2 categories (TCG, games and other), 13 kinds, and 3 behaviours (cards, sealed TCG, games and other). A behaviour decides the condition fields, grades or shrink, the price buckets, which conditions may be pooled for rare items, and the source roles. About 38 files depend on it. Markets come from plug-ins: a market exists when a collector for it is installed.
+
+Categories (Settings > Admin preferences > Categories):
+- The admin writes everything: the category's name (English and Japanese), its sub-categories (kinds, e.g. booster box, single), and the information its items have: fields with a type (text, number, date, choice list, yes/no), required or not, shown on the item page or not.
+- The price condition: which field or fields decide the price bucket (e.g. grade, condition, shrink), the order of their values best first, and which values may be pooled when an item has too few sales. This is what lets the valuation work for a category it has never seen.
+- TCG and games become two built-in templates written in this same format (one way of doing things, not two); existing items keep their data through a migration.
+- Roles and store order are set per category in Settings > Price sources (the item type switch lists the categories).
+- A category can be edited later; removing a field or a value already used by items asks first and says how many items it touches; a category with items cannot be deleted, only hidden.
+- Plug-ins say which categories they collect (by key), like they declare classes today.
+
+Markets:
+- A market appears when a collector for it is installed and describes itself (S11). The admin gives it a display name, checks its currency has exchange rates, and picks primary and secondary.
+- To decide in the design session: whether the item page compares all the markets, or keeps primary against secondary.
+
+Ground rules for heavy users (collectors on the home PC):
+- Measure first: Settings > Collectors shows each collector's run time and the night's total; a run longer than its window gets a warning.
+- Up to about 3 markets and 10 collectors: one nightly `pnpm collect`, as today.
+- More than that: run one market or one collector at a time (`pnpm collect --market us`, `--source x`), spread across the night by the scheduler, with an example schedule in the docs.
+- Too many items for one night: refresh each item every few days in turns, items you hold first, then watched ones.
+- Collectors for different sites may run side by side; never several requests at once to the same site; each site's rate limit is set in its plug-in.
+- These rules go into S12's documentation with a table (markets, collectors, items) and the suggested way to run them.
+
+Acceptance:
+- An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.
+- A third market added by a test plug-in shows in Markets, Price sources and Identity pages.
+- The ground rules are measured on S14's large data and written down.
 
 ## S12: Documentation for others
 
