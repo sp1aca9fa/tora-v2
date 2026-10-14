@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
-import { addCurrencyAction, changeBaseAction, setRateAction } from './actions';
+import { changeBaseAction, setRateAction } from './actions';
 
 export interface CurrencyRow {
   code: string;
@@ -39,7 +39,6 @@ export function CurrencyForm({
   const locale = useLocale();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState('');
   const name = (code: string) => {
     try {
       return new Intl.DisplayNames([locale], { type: 'currency' }).of(code) ?? code;
@@ -100,31 +99,6 @@ export function CurrencyForm({
           ))}
         </div>
       )}
-      <form
-        className="flex flex-wrap items-center gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!/^[A-Za-z]{3}$/.test(adding.trim())) return;
-          startTransition(() => addCurrencyAction(adding));
-          setAdding('');
-        }}
-      >
-        <label htmlFor="add-currency" className="text-xs text-muted-foreground">
-          {t('add')}
-        </label>
-        <Input
-          id="add-currency"
-          value={adding}
-          onChange={(e) => setAdding(e.target.value)}
-          placeholder="EUR"
-          maxLength={3}
-          className="h-9 w-24 uppercase"
-        />
-        <Button type="submit" variant="outline" size="sm" disabled={pending}>
-          {t('addButton')}
-        </Button>
-        <span className="w-full text-xs text-muted-foreground">{t('addInfo')}</span>
-      </form>
     </div>
   );
 }

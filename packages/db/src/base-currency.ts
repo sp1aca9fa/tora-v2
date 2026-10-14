@@ -43,9 +43,13 @@ export async function storedAmounts(db: Db): Promise<number> {
   return n;
 }
 
-/** Currencies the base can change to: those with a stored rate to the current base. */
+/**
+ * Currencies the base can change to: any while nothing is stored (setting up), else those with a
+ * stored rate to the current base (another market's).
+ */
 export async function baseChoices(db: Db): Promise<string[]> {
   const base = baseCurrency(await loadSourceRegistry(db));
+  if ((await storedAmounts(db)) === 0) return Intl.supportedValuesOf('currency');
   const rows = await db
     .selectDistinct({ pair: fxRates.pair })
     .from(fxRates)
@@ -57,7 +61,7 @@ export async function baseChoices(db: Db): Promise<string[]> {
 }
 
 /**
- * Converts every stored amount from the current base to `to` with the rate of its date (the last
+ * Makes `to` the base. At setup (nothing stored) any currency; later, converts every stored amount from the current base to `to` with the rate of its date (the last
  * one on or before it, else the first after), then makes `to` the base. Exchange rates follow:
  * each currency's rates to the old base become rates to the new one. Saved values per condition
  * are not converted: the caller clears and rebuilds them.
@@ -66,6 +70,13 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   const registry = await loadSourceRegistry(db);
   const from = baseCurrency(registry);
   if (to === from) return 0;
+  // Setting up (nothing stored yet): any currency, nothing to convert.
+  if ((await storedAmounts(db)) === 0) {
+    if (!Intl.supportedValuesOf('currency').includes(to)) throw new DomainError('no_rate');
+    const { [to]: _, ...rates } = registry.currency?.rates ?? {};
+    await setCurrencySettings(db, { base: to, rates });
+    return 0;
+  }
   // Units of the old base per unit of the new one.
   const pair = ratePair(to, from);
   if (!(await fxRateOn(db, pair, tokyoDate(now)))) throw new DomainError('no_rate');
@@ -151,7 +162,6 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   const toSetting = rates[to];
   delete rates[to];
   if (toSetting) rates[from] = 'manual' in toSetting ? { manual: 1 / toSetting.manual } : toSetting;
-  const extra = [...(registry.currency?.extra ?? []).filter((c) => c !== to), from].sort();
-  await setCurrencySettings(db, { base: to, rates, extra });
+  await setCurrencySettings(db, { base: to, rates });
   return storedAmounts(db);
 }

@@ -25,7 +25,6 @@ import {
   setNoticeLevels,
   setPreferences,
   setRateSetting,
-  setExtraCurrency,
   changeBaseCurrency,
   setMarketSettings,
   setSourceOrder,
@@ -204,15 +203,6 @@ export async function setRateAction(code: string, setting: RateSetting | null) {
     return;
   }
   await setRateSetting(db, code, setting);
-  revalidatePath('/', 'layout');
-}
-
-/** Adds a currency to keep exchange rates for (admins), e.g. before making it the base. */
-export async function addCurrencyAction(code: string) {
-  const { db, user } = await authed();
-  code = code.trim().toUpperCase();
-  if (user.role !== 'admin' || !/^[A-Z]{3}$/.test(code)) return;
-  await setExtraCurrency(db, code, true);
   revalidatePath('/', 'layout');
 }
 

@@ -950,7 +950,7 @@
     "title": "Currencies",
     "info": "Every amount is stored in the base currency. Prices in other currencies are converted with the exchange rate of their day when they are collected.",
     "base": "Base currency",
-    "baseInfo": "Every amount is stored in it. Another currency can become the base once it has exchange rates (add it below and wait for the next collect).",
+    "baseInfo": "Every amount is stored in it. Choose it when setting up, before adding anything: any currency, usually your primary market's. Changing it later converts every stored amount, and is offered only for a currency with exchange rates (another market's).",
     "noOthers": "Every source prices in the base currency: no exchange rates needed.",
     "latest": "1 {code} = {rate} ({date})",
     "missing": "No rate yet: prices in this currency are not saved until one is set. Pick a rate source (rates arrive with the next collect) or type a rate.",
@@ -960,9 +960,6 @@
     "typedLabel": "1 {code} =",
     "save": "Save",
     "manualInfo": "Used from today until changed; earlier days keep their rates.",
-    "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running.",
-    "add": "Add a currency",
-    "addButton": "Add",
-    "addInfo": "Its exchange rates are collected from the next collect on, e.g. to make it the base later."
+    "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running."
   }
 }

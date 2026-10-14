@@ -35,7 +35,6 @@ it('converts every amount with the rate of its own date and moves the rates to t
   ]);
   await saveFxRates(db, 'USDJPY', [{ date: '2026-10-05', rate: 150 }]);
   await setCurrencySettings(db, { base: 'JPY', rates: { EUR: { source: 'ecb' } } });
-  expect(await baseChoices(db)).toEqual(['EUR', 'USD']);
 
   const { product, holding } = await createHolding(
     db,
@@ -70,6 +69,7 @@ it('converts every amount with the rate of its own date and moves the rates to t
       externalRef: 'b',
     },
   ]);
+  expect(await baseChoices(db)).toEqual(['EUR', 'USD']);
   const before = await storedAmounts(db);
 
   await changeBaseCurrency(db, 'EUR', new Date('2026-10-07T03:00:00Z'));
@@ -89,13 +89,20 @@ it('converts every amount with the rate of its own date and moves the rates to t
   expect((await fxRateOn(db, 'USDEUR', '2026-10-06'))!.rate).toBeCloseTo(150 / 170);
   expect((await fxRateOn(db, 'JPYEUR', '2026-10-06'))!.rate).toBeCloseTo(1 / 170);
   // The yen's rate now comes from where the euro's did.
-  expect((await loadSourceRegistry(db)).currency).toMatchObject({
-    rates: { JPY: { source: 'ecb' } },
-    extra: ['JPY'],
-  });
+  expect((await loadSourceRegistry(db)).currency?.rates).toEqual({ JPY: { source: 'ecb' } });
   expect(await storedAmounts(db)).toBe(before);
 });
 
-it('refuses a currency without a rate', async () => {
+it('takes any currency at setup, and later only one with a rate', async () => {
+  expect(await baseChoices(db)).toContain('KRW');
+  await changeBaseCurrency(db, 'EUR');
+  expect(baseCurrency(await loadSourceRegistry(db))).toBe('EUR');
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+    { quantity: 1, costTotalBase: 1000, acquiredAt: '2026-10-02T12:00:00.000+09:00' },
+  );
+  expect(await baseChoices(db)).toEqual([]);
   await expect(changeBaseCurrency(db, 'GBP')).rejects.toThrow('no_rate');
 });

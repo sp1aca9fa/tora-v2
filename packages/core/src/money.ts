@@ -17,8 +17,6 @@ export interface CurrencySettings {
   base: string;
   /** Per currency (ISO 4217): where its rate comes from; not set: the first plug-in covering it. */
   rates?: Record<string, RateSetting>;
-  /** Currencies the admin added (rates kept although no market prices in them, e.g. a future base). */
-  extra?: string[];
 }
 
 /** A rate plug-in as the app sees it (saved by the collectors). */
@@ -68,7 +66,6 @@ export function resolveCurrency(saved: Partial<CurrencySettings> | null | undefi
   return {
     base: saved?.base || DEFAULT_BASE,
     rates: saved?.rates ?? {},
-    extra: saved?.extra ?? [],
   };
 }
 
@@ -86,7 +83,7 @@ export function rateSettingFor(
   return covering ? { source: covering.key } : null;
 }
 
-/** Every currency the app needs rates for, other than the base: its markets' and the admin's. */
+/** Every currency the app needs rates for, other than the base: its markets' (and any with a rate set). */
 export function ratedCurrencies(
   settings: CurrencySettings,
   sources: { currency?: string; shopOnly?: boolean }[],
@@ -95,7 +92,6 @@ export function ratedCurrencies(
     ...new Set([
       ...sources.filter((s) => s.currency && !s.shopOnly).map((s) => s.currency!),
       ...Object.keys(settings.rates ?? {}),
-      ...(settings.extra ?? []),
     ]),
   ]
     .filter((c) => c !== settings.base)

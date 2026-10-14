@@ -81,16 +81,6 @@ export async function setRateSetting(
   }
 }
 
-/** Adds a currency to keep rates for (Settings > Markets), or removes one the admin added. */
-export async function setExtraCurrency(db: Db, code: string, keep: boolean): Promise<void> {
-  const registry = await loadSourceRegistry(db);
-  const base = baseCurrency(registry);
-  const extra = new Set(registry.currency?.extra ?? []);
-  if (keep && code !== base) extra.add(code);
-  else extra.delete(code);
-  await setCurrencySettings(db, { ...registry.currency, base, extra: [...extra].sort() });
-}
-
 /** The newest stored rate of each currency to the base. */
 export async function latestRates(db: Db, codes: string[]): Promise<Record<string, FxRate>> {
   const base = baseCurrency(await loadSourceRegistry(db));
