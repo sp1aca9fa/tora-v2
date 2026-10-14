@@ -542,7 +542,8 @@
       "usedAsks": "Asks used",
       "lastAsk": "Latest ask",
       "asksNote": "{source} gives asking prices of listings still for sale (the median per condition each day), not sales. Nothing here is a sale: a listing that ends may have sold or been withdrawn, so Tora never counts it as sold. Asking prices usually run above what items sell for."
-    }
+    },
+    "mainReference": "Reference: this market's price for the item is based on it"
   },
   "valuation": {
     "title": "Market value (median)",
@@ -916,7 +917,16 @@
     "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup (the Japan collectibles preset), not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
     "perClass": "Each column is its own kind of item: a change under Cards applies to cards only (sealed product and games keep their own roles). Values and the value history follow a change within seconds.",
     "identityNone": "None",
-    "asksOnly": "Asking or store prices, not sales: usually above what items sell for."
+    "asksOnly": "Asking or store prices, not sales: usually above what items sell for.",
+    "group": {
+      "reference": "Reference",
+      "supporting": "Supporting",
+      "comparison": "Comparison only",
+      "off": "Off"
+    },
+    "orderNote": "Sources are grouped by their most important role. Within a group, the arrows set the order: it is the order values try sources that share a role (with two references, the first one is the main one), and the order item pages list them in.",
+    "moveUp": "Move {source} up",
+    "moveDown": "Move {source} down"
   },
   "markets": {
     "title": "Markets",

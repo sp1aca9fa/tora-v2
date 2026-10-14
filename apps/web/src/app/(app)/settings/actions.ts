@@ -8,6 +8,7 @@ import {
   ITEM_CLASSES,
   type ProductClass,
   ROTATE_SECONDS,
+  bestRole,
   identityChoices,
   marketsOf,
   SOURCE_ROLES,
@@ -23,6 +24,7 @@ import {
   setNoticeLevels,
   setPreferences,
   setMarketSettings,
+  setSourceOrder,
   setSourceRoles,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
@@ -100,6 +102,37 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   await setSourceRoles(db, key, { ...(registry.declared ?? registry.roles)[key], [cls]: role });
   await clearAllBucketValues(db);
   // The value-over-time history follows too (about 10 s), right after answering.
+  after(async () => {
+    await runSnapshots(db);
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * Moves a source one place up or down within its group (its most important role) in its market
+ * (admins; the whole app). The order is also the order values try sources sharing a role, so
+ * values are rebuilt as for a role change.
+ */
+export async function moveSourceAction(key: string, step: -1 | 1) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || (step !== -1 && step !== 1)) return;
+  const registry = await loadSourceRegistry(db);
+  const roles = registry.declared ?? registry.roles;
+  const me = registry.sources.find((s) => s.key === key);
+  if (!me) return;
+  // The same list Settings shows: this market's priced sources in the same group.
+  const group = registry.sources.filter(
+    (s) => s.market === me.market && !s.shopOnly && bestRole(roles[s.key]) === bestRole(roles[key]),
+  );
+  const other = group[group.findIndex((s) => s.key === key) + step];
+  if (!other) return;
+  const keys = registry.sources.map((s) => s.key);
+  const [a, b] = [keys.indexOf(key), keys.indexOf(other.key)];
+  [keys[a], keys[b]] = [keys[b]!, keys[a]!];
+  await setSourceOrder(db, keys);
+  await clearAllBucketValues(db);
   after(async () => {
     await runSnapshots(db);
     await refreshBucketValues(db);

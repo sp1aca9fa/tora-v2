@@ -9,7 +9,7 @@ import {
   identityFor,
 } from '@tora/db';
 import type { Product } from '@tora/db';
-import { productClass, roleOf, valuationOrder } from '@tora/core';
+import { byRole, productClass, referenceSource, roleOf, valuationOrder } from '@tora/core';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { productImageUrl } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
@@ -167,15 +167,19 @@ export async function PriceSources({
   const marketKeys = [registry.markets?.primary, registry.markets?.secondary].filter(
     (m): m is string => !!m,
   );
-  const tabSources = registry.sources
-    .filter(
+  // In the order values use them: reference, supporting, comparison, then off with data;
+  // within a role, the admin's order (Settings > Price sources).
+  const tabSources = byRole(
+    registry,
+    cls,
+    registry.sources.filter(
       (x) =>
         x.market &&
         marketKeys.includes(x.market) &&
         !x.shopOnly &&
         (roleOf(registry, x.key, cls) !== 'off' || hasAny(x.key)),
-    )
-    .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key));
+    ),
+  );
   const marketLabel = await marketLabels();
 
   const panel = (key: string) => {
@@ -332,6 +336,7 @@ export async function PriceSources({
       .map((x) => ({
         key: x.key,
         label: sourceLabel(x.key),
+        main: x.key === referenceSource(registry, cls, m),
         // Suggestions for a source without a linked listing yet are what needs a look.
         waiting: linked.has(x.key) ? 0 : candidates.filter((c) => c.source === x.key).length,
         content: panel(x.key),
@@ -363,7 +368,9 @@ export async function PriceSources({
             </form>
           </div>
         )}
-        {initial && <SourceTabs markets={markets} initial={initial} />}
+        {initial && (
+          <SourceTabs markets={markets} initial={initial} mainTitle={t('sources.mainReference')} />
+        )}
       </CardContent>
     </Card>
   );

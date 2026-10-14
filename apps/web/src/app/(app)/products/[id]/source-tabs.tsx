@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 export interface SourceTab {
   key: string;
   label: string;
+  /** The market's reference for this item (its main source): coloured apart. */
+  main: boolean;
   /** Suggestions waiting on this source (shown as a count). */
   waiting: number;
   content: ReactNode;
@@ -21,8 +23,11 @@ export interface MarketTab {
 export function SourceTabs({
   markets,
   initial,
+  mainTitle,
 }: {
   markets: MarketTab[];
+  /** The main source's tooltip. */
+  mainTitle: string;
   /** The source shown first (its market opens with it). */
   initial: string;
 }) {
@@ -70,12 +75,18 @@ export function SourceTabs({
             type="button"
             role="tab"
             aria-selected={s.key === source}
+            title={s.main ? mainTitle : undefined}
             onClick={() => setChosen({ ...chosen, [current.key]: s.key })}
             className={cn(
               'rounded-full border px-3 py-1 text-sm transition-colors',
-              s.key === source
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
+              // The reference comes first whatever the order: its own colour says why.
+              s.main
+                ? s.key === source
+                  ? 'border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500 dark:text-emerald-950'
+                  : 'border-emerald-600/50 text-emerald-700 hover:bg-emerald-600/10 dark:border-emerald-400/50 dark:text-emerald-400'
+                : s.key === source
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {s.label}

@@ -243,8 +243,9 @@ description per price source or shop (`SourceInfo` in `packages/core/src/sources
 - `key`, `label`, `badge`: how it is stored and shown;
 - `market`, `currency`, `priceKinds`: where its prices are from and what they are (sales, asking
   prices, buy-back prices);
-- `roles` (per item class) and `priority`: its suggested role in its market, and its order among
-  sources of the same role;
+- `roles` (per item class) and `priority`: its suggested role in its market, and its default order
+  among sources of the same role (an admin can reorder them in Settings > Admin preferences >
+  Price sources);
 - `identity`: the item classes it has one stable product page per item for (it can be an item's
   identity page);
 - `links`: the shape of its product links (pasting one on an item links that listing);

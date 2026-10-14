@@ -12,11 +12,12 @@ import {
   type SourceRole,
   effectiveRoles,
   median,
+  orderSources,
   productClass,
   resolveMarkets,
   toTokyoIso,
 } from '@tora/core';
-import { and, eq, gte, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { appSettings, priceObservations, products, sources } from './schema';
 
@@ -52,26 +53,29 @@ const TTL_MS = 5_000;
 export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<SourceRegistry> {
   const hit = cache.get(db);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.registry;
-  const [rows, [markets]] = await Promise.all([
+  const [rows, settings] = await Promise.all([
     db.select().from(sources),
-    db.select().from(appSettings).where(eq(appSettings.key, 'markets')),
+    db
+      .select()
+      .from(appSettings)
+      .where(inArray(appSettings.key, ['markets', 'sourceOrder'])),
   ]);
+  const markets = settings.find((r) => r.key === 'markets');
+  const order = settings.find((r) => r.key === 'sourceOrder');
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
   const infos = rows.map((r) => r.info);
   const quality = Object.fromEntries(
     rows.map((r) => [r.key, (r.quality ?? {}) as Partial<Record<ProductClass, SourceQuality>>]),
   );
   const registry: SourceRegistry = {
-    sources: rows
-      .map((r) => r.info)
-      .toSorted((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key)),
+    sources: orderSources(infos, (order?.value as string[] | undefined) ?? []),
     roles: Object.fromEntries(
       rows.map((r) => [r.key, effectiveRoles(declared[r.key]!, quality[r.key])]),
     ),
     declared,
     quality,
     markets: resolveMarkets(infos, markets?.value as Partial<MarketSettings> | undefined),
-    changedAt: [...rows, ...(markets ? [markets] : [])].reduce(
+    changedAt: [...rows, ...settings].reduce(
       (max, r) => (r.updatedAt > max ? r.updatedAt : max),
       '',
     ),
@@ -100,6 +104,16 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
   cache = new WeakMap();
 }
 
+/** The admin's order of the sources (Settings > Price sources); values follow. */
+export async function setSourceOrder(db: Db, keys: string[]): Promise<void> {
+  const at = toTokyoIso();
+  await db
+    .insert(appSettings)
+    .values({ key: 'sourceOrder', value: keys })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: keys, updatedAt: at } });
+  cache = new WeakMap();
+}
+
 /**
  * The quality gate (requirements S8): each supporting source's sales against its class's
  * reference source's in the same market, like for like (same item and condition, the last 90 days, 3+ sales each).
@@ -108,7 +122,11 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
  * Returns the sources and classes now valued differently (into or out of "disagrees").
  */
 export async function checkSourceQuality(db: Db, now = new Date()): Promise<string[]> {
-  const rows = await db.select().from(sources);
+  // In the registry's order: with two references, the first one is the one compared against.
+  const order = (await loadSourceRegistry(db)).sources.map((x) => x.key);
+  const rows = (await db.select().from(sources)).toSorted(
+    (a, b) => order.indexOf(a.key) - order.indexOf(b.key),
+  );
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
   const since = toTokyoIso(new Date(now.getTime() - 90 * 86_400_000));
   const sales = await db
