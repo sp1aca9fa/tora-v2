@@ -635,7 +635,7 @@ Today, categories are code: 2 categories (TCG, games and other), 13 kinds, and 3
 
 Categories (Settings > Admin preferences > Categories):
 - The admin writes everything: the category's name (English and Japanese), its sub-categories (kinds, e.g. booster box, single), and the information its items have: fields with a type (text, number, date, choice list, yes/no), required or not, shown on the item page or not.
-- The price condition: which field or fields decide the price bucket (e.g. grade, condition, shrink), the order of their values best first, and which values may be pooled when an item has too few sales. This is what lets the valuation work for a category it has never seen.
+- The price condition: one condition list per kind (design session, 2026-10-14): its values best first, and which values may be pooled when an item has too few sales. The admin picks a ready list (card grades with slabs, sealed packaging, item condition) or writes a new one. This is what lets the valuation work for a category it has never seen.
 - TCG and games become two built-in templates written in this same format (one way of doing things, not two); existing items keep their data through a migration.
 - Roles and store order are set per category in Settings > Price sources (the item type switch lists the categories).
 - A category can be edited later; removing a field or a value already used by items asks first and says how many items it touches; a category with items cannot be deleted, only hidden.
@@ -643,7 +643,7 @@ Categories (Settings > Admin preferences > Categories):
 
 Markets:
 - A market appears when a collector for it is installed and describes itself (S11). The admin gives it a display name, checks its currency has exchange rates, and picks primary and secondary.
-- To decide in the design session: whether the item page compares all the markets, or keeps primary against secondary.
+- What item pages compare is the admin's choice (design session, 2026-10-14): primary against secondary (default, as today) or every market, each converted to the base currency.
 
 Languages:
 - A language is a translation file (about 950 texts today, English and Japanese). Adding one means translating that file (Claude can draft it); S12 explains how and how to check it (the message scan finds missing texts).
@@ -655,7 +655,7 @@ Languages:
 Currency:
 - Today every amount is stored in yen (costs, sales, saved values, value history): about 1,050 references in 83 files, and columns named `_jpy`.
 - A base currency chosen once at setup; every amount is stored in it (columns renamed to a neutral name; existing data is yen and stays as is). Changing it later is a terminal command that converts every stored amount, not a settings switch.
-- Each market's currency is converted to the base with daily exchange rates. Today only USD to JPY is collected; a free source covering every pair (e.g. the European Central Bank's daily rates) replaces it.
+- Each market's currency is converted to the base with daily exchange rates, set by the admin (design session, 2026-10-14): per currency, either a rate source plug-in (today's USD to JPY one, from the European Central Bank's rates via Frankfurter, becomes one for any pair it covers) or a rate typed by hand. A market whose currency has no rate is flagged in Settings and its prices are not converted.
 - Optional display currency per user: amounts are converted when shown, labelled as converted.
 - Speed: a multiplication per amount; saved values stay in the base currency.
 
@@ -666,6 +666,16 @@ Ground rules for heavy users (collectors on the home PC):
 - Too many items for one night: refresh each item every few days in turns, items you hold first, then watched ones.
 - Collectors for different sites may run side by side; never several requests at once to the same site; each site's rate limit is set in its plug-in.
 - These rules go into S12's documentation with a table (markets, collectors, items) and the suggested way to run them.
+
+Build order (design session, 2026-10-14), each part usable on its own: 1. base currency and exchange rates (touches every amount, best done before more code is added); 2. languages; 3. categories; 4. markets and the heavy-user rules.
+
+Part 1 design (2026-10-14):
+- Amounts are whole numbers in the base currency's smallest unit (yen: 1 yen, euro: 1 cent), so today's data stays as is.
+- Migration 0023 renames the 9 `_jpy` columns to `_base` (e.g. `price_base`, `cost_total_base`); code names follow (`priceBase`). Applied to production when the user pushes (the live site errors for about a minute until the deploy finishes; the home PC needs `git pull` before the next collect).
+- Plug-ins report prices in their own currency only; the collect converts them to the base with the stored rate of the sale's day and keeps the rate used. Rate plug-ins declare the currencies they cover and fetch any pair.
+- app_settings `currency`: the base, and per other currency its rate plug-in or a typed rate. Settings > Markets shows each market's currency with its rate and flags one with none.
+- Money shown through one formatter per request (server) or per page (client), in the base or the user's display currency (converted amounts marked as such); amount inputs accept the base's decimals.
+- `pnpm base-currency <code>` converts every stored amount with the rate of its own date and saves the new base (a new setup runs it once before adding anything).
 
 Acceptance:
 - An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.
