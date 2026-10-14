@@ -12,7 +12,8 @@ const ADMIN = SETTINGS_SECTIONS.find((s) => s.key === 'admin')!;
 /**
  * A settings page's header. Phones: the menus (Settings, Admin preferences) are pages of their
  * own, and a section has a way back. From half-screen widths there is no menu page: a menu path
- * shows its first section, and the sections are a row of links on top.
+ * shows its first section, and the sections are a row of links on top; a group's pages
+ * (Admin preferences) are a second row of tabs under it.
  */
 export function SettingsShell({
   titles,
@@ -34,7 +35,6 @@ export function SettingsShell({
       : at?.entry.key === 'admin'
         ? { entry: ADMIN.children![0]!, parent: ADMIN }
         : at!;
-  const row = wide.parent?.children ?? sectionsFor(admin);
   const phoneTitle = at ? titles[at.entry.key] : titles.title;
   return (
     <div className="space-y-4">
@@ -47,33 +47,50 @@ export function SettingsShell({
           {at.parent ? titles[at.parent.key] : titles.title}
         </Link>
       )}
-      <nav className="hidden flex-wrap gap-1.5 md:flex" aria-label={titles.title}>
+      <div className="hidden space-y-3 md:block">
+        <nav className="flex flex-wrap gap-1.5" aria-label={titles.title}>
+          {sectionsFor(admin).map(({ key, href, icon: Icon }) => {
+            const on = key === (wide.parent ?? wide.entry).key;
+            return (
+              <Link
+                key={key}
+                href={href}
+                aria-current={on && !wide.parent ? 'page' : undefined}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                  on
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="size-3.5" />
+                {titles[key]}
+              </Link>
+            );
+          })}
+        </nav>
+        {/* A group's own pages (Admin preferences): a second, tab-like row under the first. */}
         {wide.parent && (
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="size-4" />
-            {titles.title}
-          </Link>
+          <nav className="flex flex-wrap gap-x-5 border-b" aria-label={titles[wide.parent.key]}>
+            {wide.parent.children!.map(({ key, href, icon: Icon }) => (
+              <Link
+                key={key}
+                href={href}
+                aria-current={key === wide.entry.key ? 'page' : undefined}
+                className={cn(
+                  '-mb-px inline-flex items-center gap-1.5 border-b-2 py-2 text-sm transition-colors',
+                  key === wide.entry.key
+                    ? 'border-primary font-medium text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="size-3.5" />
+                {titles[key]}
+              </Link>
+            ))}
+          </nav>
         )}
-        {row.map(({ key, href, icon: Icon }) => (
-          <Link
-            key={key}
-            href={href}
-            aria-current={key === wide.entry.key ? 'page' : undefined}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
-              key === wide.entry.key
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <Icon className="size-3.5" />
-            {titles[key]}
-          </Link>
-        ))}
-      </nav>
+      </div>
       <h1 className="text-2xl font-semibold tracking-tight">
         <span className="md:hidden">{phoneTitle}</span>
         <span className="hidden md:inline">{titles[wide.entry.key]}</span>

@@ -32,6 +32,8 @@
 | S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
+| S14 | Added by user, so no detailed breakdown: Speed improvement again. The tool is feeling sluggish again. We need to have the tool ready to handle different sizes of data from different markets and sources reliably while keeping speed in common UX thresholds even under significant data available. | todo (user, 2026-10-14) |
+| S15 | Added by user, so no detailed breakdown: stress test and bug hunting. Stress test the tool and hunt for different types of bugs trying all imaginable edge use cases that might break the app fully or partially. | todo (user, 2026-10-14) |
 
 ### Decision log
 
@@ -597,7 +599,8 @@ Settings review (user, 2026-10-14, built; revised the same day): phones keep the
 Asking prices labelled as such (user, 2026-10-14): the eBay search panel used the sold-search wording ("sold items", "Sales used", "Last sale"); eBay gives only asking prices of active listings (a day's median per condition), and Tora never infers a sale from a listing that ends. Sources without sold prices now say "asking prices" with a warning, hide the listings-you-added box (Mercari only), and Settings notes "asking or store prices, not sales" next to a reference or supporting role. eBay can be a market's price reference; it cannot be an identity page (no product page per item), which the Identity pages page explains.
 To do next session (user, 2026-10-14):
 - Identity pages and search sources: eBay, Mercari and Yahoo Auctions have no product page per item, so they are not offered as identity pages today. Confirm with the user: keep them out (current), or offer them with a recommendation against it.
-- Admin preferences navigation on half and full screens: opening Admin preferences replaces the row of settings links with its own row (Markets, Price sources, Identity pages) in the same style, so it is unclear the user is one level deeper. Keep the settings row on top (Admin preferences highlighted) and add a second, visually distinct row under it for the admin pages.
+- (Built 2026-10-14) Admin preferences navigation on half and full screens: opening Admin preferences replaces the row of settings links with its own row (Markets, Price sources, Identity pages) in the same style, so it is unclear the user is one level deeper. Keep the settings row on top (Admin preferences highlighted) and add a second, visually distinct row under it for the admin pages. Built: the settings row stays, and the admin pages are a row of underlined tabs under it.
+- (Fixed 2026-10-14, user report) Lot pages: the order ID shows in the lot details (it showed only in Edit); the lot form texts (cancel order, delete, split, sell hints) were lost when the Actions page reused their name and showed as raw keys, now restored under their own name. A scan of the code for texts missing from the message files finds none.
 5. (Built 2026-10-14) Settings > Collectors: each collector starts collapsed, its status on the right (OK, or Partial in red); expanding shows the details (why a run was partial).
 
 Then S11 (primary and secondary markets), then S12 (documentation).
