@@ -32,8 +32,8 @@
 | S10 | Reliability, consistency, efficacy and function review, incl. a full setup in another market (e.g. France + China) | todo (after S6, before S9; user, 2026-10-13) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
-| S14 | Added by user, so no detailed breakdown: Speed improvement again. The tool is feeling sluggish again. We need to have the tool ready to handle different sizes of data from different markets and sources reliably while keeping speed in common UX thresholds even under significant data available. | todo (user, 2026-10-14) |
-| S15 | Added by user, so no detailed breakdown: stress test and bug hunting. Stress test the tool and hunt for different types of bugs trying all imaginable edge use cases that might break the app fully or partially. | todo (user, 2026-10-14) |
+| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check | todo (user, 2026-10-14) |
+| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 
 ### Decision log
 
@@ -685,6 +685,70 @@ Added at the user's request (2026-10-12; own chapter 2026-10-13). After S9, on i
 - Tora proposes items to buy on its own, not only from the watchlist: items in their buy zone, expected moves before the date, liquidity to sell later.
 - The user sets a budget and a target date; Tora suggests what to buy and when within them.
 - Open: where candidates come from (items similar to what the user holds or watches, sets the user follows, top movers on the sources), how to split a budget across items, how to show the reasoning and the uncertainty (never financial advice, never a sure thing), rules first and a model on top (as in S9).
+
+## S14: Speed at any size
+
+Added at the user's request (2026-10-14): the app feels sluggish again. Make it fast now and keep it fast as data grows: more items, users, markets and sources, without dropping below common UX thresholds.
+
+Where we are (production, 2026-10-14): 2 users, 96 items, 139 lots, 350 linked sources, 178,681 price rows (one box alone has ~9,000 SNKRDUNK sales), 61,738 daily value rows. S8 already moved the valuation to saved `bucket_values` (2,100 ms -> 25-100 ms); the rest of each page was never measured.
+
+Targets (phone on 4G and a PC; warm means the database has answered in the last minutes, cold means Turso wakes up):
+- A tap or click shows a reaction within 100 ms (pressed state, loading placeholder), and nothing freezes the screen (INP under 200 ms).
+- A page's main content is shown within 1 s warm and 2.5 s cold (LCP under 2.5 s); slower cards (charts, notices) stream in after, without moving the page (CLS under 0.1).
+- A save (edit, role, toggle) answers within 300 ms; heavy follow-ups (rebuilding values) run after the answer, as today.
+- The nightly collect finishes within its window as sources and items grow.
+
+Steps:
+1. Measure first. Time every main page (Portfolio, Items, an item, a lot, Actions, Imports, Settings) warm and cold, server and browser: database round trips and their time per request, bytes of HTML and JavaScript sent, Web Vitals. A script (`pnpm perf`) repeats it and writes a baseline table into this chapter.
+2. Data at scale: a generator (`pnpm stress-data <size>`) fills a local or test database (never production) with realistic data in three sizes, then the same measurements run on each:
+   - today: as production;
+   - medium: 5 users, 1,000 items, 2,000 lots, 1 million price rows, 2 markets, 6 sources, a year of daily values;
+   - large: 20 users, 5,000 items, 10,000 lots, 5 million price rows, 3 markets (Japan, US, one more), 10 sources, two years of daily values.
+3. Fix the slowest first, each change measured before and after. Suspects to check (not decided until measured):
+   - Every page sends all texts of the app (about 43 KB per language) to the browser; send each page only its own.
+   - Shared reads (source registry, markets, FX) are cached only 5 s per connection; nothing is cached across requests. Cache with tags cleared by the writes that change them.
+   - Daily value rows grow per lot per day (10,000 lots x 2 years = 7 million rows): chart totals per user per day instead of per lot.
+   - Pages that read all of an item's sales (price sources card, charts): read summaries, page the lists.
+   - The Actions page and the nav badge work out every notice on each load: save the counts when the data changes.
+   - Repeated queries per row (one per lot or item) and missing indexes: check the slow queries' plans.
+   - Long lists (Items, Actions, observations): page or load as you scroll.
+   - Client JavaScript size per page, image sizes, and the distance between the Vercel and Turso regions.
+   - A role or market change clears every saved value and rebuilds them (about 10 s today); at large size, rebuild only what changed.
+   - Collector writes: batch inserts and per-source timings at large size.
+4. Guard: `pnpm perf` runs before each release; a page more than 30 % slower than the baseline, or over a target, is reported.
+
+Acceptance:
+- Targets met on production and on the large dataset; the baseline and after tables recorded here.
+- User check on phone and PC: it feels fast.
+
+## S15: Stress test and bug hunting
+
+Added at the user's request (2026-10-14): try every edge case we can think of that could break the app fully or partially, and fix what breaks. S10 reviews whether the app works as designed in normal use (including a France + China setup); S15 tries to break it on purpose. It reuses S14's data generator.
+
+Rules:
+- Never on production: runs use local or test databases; production only gets read-only checks (the MCP data checks).
+- Every bug found gets a test that fails first, then the fix. Bugs are logged in a table in this chapter: what, how found, severity, commit.
+- Severity: 1 wrong or lost data (values, costs, lots) or another user's data shown; 2 crash or blocked flow; 3 wrong display (raw text keys, overflow, wrong number formatting); 4 cosmetic. 1 and 2 are fixed in S15; 3 and 4 fixed or moved to Open issues with the user.
+
+Automated checks (kept and run before each release, one command `pnpm check:all`):
+- A crawler (Playwright, demo data, phone, half-screen and wide widths, light and dark): opens every page and link, and fails on a server error, a console error, a raw message key (like today's `actions.cancelOrderConfirm`), text missing in Japanese, or the page scrolling sideways.
+- The message scan: every text the code asks for exists in English and Japanese.
+- Rules that must always hold, tried on thousands of random cases (property-based tests): splitting or partly selling a lot keeps the total cost; the costs of an order's lots add up to what was paid; values never use excluded sales; FX conversion back and forth stays within rounding; a market change rebuilds the same values as a full valuation.
+- Every server action called directly with bad or missing input, as a logged-out user, as a member on admin actions, and as user A on user B's lots, items and imports.
+- Load: many users at once on the large dataset (requests per second, errors, slowest times), and a collect running while users edit.
+- Collector faults: saved pages with broken HTML, timeouts, 403s, rate limits, a source's site changed; the run reports partial and keeps what it got.
+
+Edge cases to try by hand or by script:
+- Input: empty and very long names, emoji, full-width digits and spaces, mixed scripts, HTML or SQL in names and notes, zero, negative, decimal and huge quantities and prices, dates in the future or long ago, around midnight in Tokyo and UTC, daylight saving time for other markets' sources.
+- Items and lots: no sales, one sale, all sales excluded, outliers only; an item with no source; selling more than held; splitting down to zero; pulls from a box that is then deleted; cancelling an order with some lots already sold or split; grading sent and never returned; merging look-alike items that both have lots.
+- Markets and sources: switching the primary market back and forth; a market with no reference source; a plug-in removed or renamed; a source with no market or currency; a day with no FX rate; a currency with no FX at all.
+- Imports: the same file twice, a huge file, wrong formats, screenshots that are not receipts, an order that changes after import.
+- Accounts: an expired session, a revoked device, a third device, lockout after failed logins, a reused 2FA code, two tabs editing the same lot, double submits, going offline mid-save.
+- Layout: 320 px to 2560 px wide, browser zoom at 200 %, very long numbers and names, dark mode.
+- Database: Turso slow, down or timing out; a page should say so instead of breaking.
+
+Acceptance:
+- `pnpm check:all` passes; no severity 1 or 2 bug left open; the bug log and what is left for Open issues reviewed with the user.
 
 ---
 
