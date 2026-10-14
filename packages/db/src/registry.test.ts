@@ -1,4 +1,4 @@
-import { bestRole, identitySources, valuationOrder } from '@tora/core';
+import { identitySources, valuationOrder } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -179,18 +179,17 @@ it('values each market with its own sources and identity choice', async () => {
   expect(valuationOrder(registry, 'card')).toEqual(['tcgcsv']);
 });
 
-it("keeps the admin's order within a role, never across roles", async () => {
-  // Both supporting for sealed items: the plug-ins' priority first, then the admin's order.
+it("keeps the admin's order per class within a role, never across roles", async () => {
   let registry = await loadSourceRegistry(db);
   expect(valuationOrder(registry, 'sealed')).toEqual(['snkrdunk', 'mercari', 'surugaya']);
-  await setSourceOrder(db, ['surugaya', 'snkrdunk']);
+  // Sealed items try 駿河屋 before Mercari; cards keep their order; the reference stays first.
+  await setSourceOrder(db, 'sealed', ['surugaya', 'snkrdunk', 'mercari']);
   registry = await loadSourceRegistry(db);
-  expect(registry.sources.slice(0, 3).map((s) => s.key)).toEqual([
-    'surugaya',
-    'snkrdunk',
-    'mercari',
-  ]);
-  // The reference stays first; the supporting ones follow the admin's order.
   expect(valuationOrder(registry, 'sealed')).toEqual(['snkrdunk', 'surugaya', 'mercari']);
-  expect(bestRole(registry.roles.surugaya)).toBe('reference');
+  expect(valuationOrder(registry, 'item')).toEqual(['surugaya', 'mercari']);
+  expect(valuationOrder(registry, 'card')).toEqual(['snkrdunk', 'mercari']);
+  await setSourceOrder(db, 'item', ['mercari', 'surugaya']);
+  registry = await loadSourceRegistry(db);
+  expect(valuationOrder(registry, 'item')).toEqual(['surugaya', 'mercari']);
+  expect(registry.order?.sealed?.[0]).toBe('surugaya');
 });

@@ -140,9 +140,16 @@ export interface SourceRegistry {
   declared?: Record<string, Partial<Record<ProductClass, SourceRole>>>;
   /** The last quality check per source and class. */
   quality?: Record<string, Partial<Record<ProductClass, SourceQuality>>>;
+  /**
+   * The admin's order of the sources per class (Settings > Price sources): the order values
+   * try sources sharing a role, and item pages list them in. Not listed: the plug-ins' priority.
+   */
+  order?: SourceOrder;
   /** When a source's description or roles last changed (values saved before are stale). */
   changedAt?: string;
 }
+
+export type SourceOrder = Partial<Record<ProductClass, string[]>>;
 
 export const EMPTY_REGISTRY: SourceRegistry = { sources: [], roles: {} };
 
@@ -172,39 +179,35 @@ export function roleOf(registry: SourceRegistry, key: string, cls: ProductClass)
 
 const rank = (role: SourceRole) => SOURCE_ROLES.indexOf(role);
 
-/** A source's most important role over the item classes: its group in Settings. */
-export function bestRole(roles: Partial<Record<ProductClass, SourceRole>> | undefined): SourceRole {
-  return SOURCE_ROLES[Math.min(...ITEM_CLASSES.map((c) => rank(roles?.[c] ?? 'off')))]!;
-}
-
-/**
- * Sources in the admin's order (Settings > Price sources), the others after them by their
- * plug-in's priority. The registry keeps this order; role-sorted lists keep it within a role.
- */
-export function orderSources(sources: SourceInfo[], order: string[] = []): SourceInfo[] {
-  const at = (key: string) => {
-    const i = order.indexOf(key);
-    return i < 0 ? order.length : i;
-  };
+/** Sources by their plug-in's priority (the registry's order). */
+export function byPriority(sources: SourceInfo[]): SourceInfo[] {
   return sources.toSorted(
-    (a, b) =>
-      at(a.key) - at(b.key) ||
-      (a.priority ?? 100) - (b.priority ?? 100) ||
-      a.key.localeCompare(b.key),
+    (a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.key.localeCompare(b.key),
   );
 }
 
-/** Sorts sources by their role for a class, keeping the registry's order within a role. */
+/** Sources in a class's order: the admin's, then the others in the registry's order. */
+export function inClassOrder<T extends { key: string }>(
+  registry: SourceRegistry,
+  cls: ProductClass,
+  sources: T[],
+): T[] {
+  const order = registry.order?.[cls] ?? [];
+  const at = (key: string) => {
+    const i = order.indexOf(key);
+    return i < 0 ? order.length + registry.sources.findIndex((s) => s.key === key) : i;
+  };
+  return sources.toSorted((a, b) => at(a.key) - at(b.key));
+}
+
+/** Sorts sources by their role for a class, in the class's order within a role. */
 export function byRole<T extends { key: string }>(
   registry: SourceRegistry,
   cls: ProductClass,
   sources: T[],
 ): T[] {
-  const at = (key: string) => registry.sources.findIndex((s) => s.key === key);
-  return sources.toSorted(
-    (a, b) =>
-      rank(roleOf(registry, a.key, cls)) - rank(roleOf(registry, b.key, cls)) ||
-      at(a.key) - at(b.key),
+  return inClassOrder(registry, cls, sources).toSorted(
+    (a, b) => rank(roleOf(registry, a.key, cls)) - rank(roleOf(registry, b.key, cls)),
   );
 }
 
@@ -214,7 +217,7 @@ const inMarket = (s: SourceInfo, market: string | null | undefined) =>
 
 /**
  * Sources valued for a class in a market (default: the primary one), best first: references,
- * then supporting ones, each in the registry's order (the admin's, else the plug-ins' priority).
+ * then supporting ones, each in the class's order (the admin's, else the plug-ins' priority).
  */
 export function valuationOrder(
   registry: SourceRegistry,
@@ -244,7 +247,7 @@ export function referenceSource(
 
 /**
  * Sources whose product pages can be an item's identity link in a market (default: the primary
- * one), the one to look for first: the admin's choice, else those declaring it in the registry's order. A
+ * one), the one to look for first: the admin's choice, else those declaring it in the class's order. A
  * link from any of them identifies the item. Empty when the admin chose none.
  */
 export function identitySources(
@@ -252,9 +255,11 @@ export function identitySources(
   cls: ProductClass,
   market: string | null | undefined = registry.markets?.primary,
 ): string[] {
-  const declared = registry.sources
-    .filter((s) => s.identity?.includes(cls) && inMarket(s, market))
-    .map((s) => s.key);
+  const declared = inClassOrder(
+    registry,
+    cls,
+    registry.sources.filter((s) => s.identity?.includes(cls) && inMarket(s, market)),
+  ).map((s) => s.key);
   const chosen = market ? registry.markets?.identity?.[market]?.[cls] : undefined;
   if (chosen === null) return [];
   const linkable = registry.sources.some(

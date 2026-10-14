@@ -1,4 +1,3 @@
-import { orderSources } from '@tora/core';
 import { actionTotal } from '@tora/db';
 import { Nav } from '@/components/nav';
 import { PageWidth } from '@/components/page-width';
@@ -16,11 +15,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       items.filter((i) => i.type === 'import_review' || i.type === 'failed_link'),
     ),
   }));
-  // Names, badges and colour slots of the described sources, for client components. Colours
-  // follow the plug-ins' priority, so reordering sources in Settings keeps them.
+  // Names, badges and colour slots of the described sources, for client components (colours by
+  // the plug-ins' priority, so reordering sources in Settings keeps them).
   const registry = await getRegistry();
   const sources = Object.fromEntries(
-    orderSources(registry.sources)
+    registry.sources
       .filter((s) => !s.shopOnly)
       .map((s, i) => [
         s.key,

@@ -1,3 +1,4 @@
+import { ITEM_CLASSES, type ProductClass, inClassOrder } from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,9 @@ export default async function SourceSettingsPage() {
     getTranslations(),
   ]);
   const labels = Object.fromEntries(registry.sources.map((s) => [s.key, s.label]));
+  const order = Object.fromEntries(
+    ITEM_CLASSES.map((c) => [c, inClassOrder(registry, c, registry.sources).map((s) => s.key)]),
+  ) as Record<ProductClass, string[]>;
   const { primary = null, secondary = null } = registry.markets ?? {};
   const tabs = [
     ...(primary ? [{ key: 'primary', market: primary }] : []),
@@ -38,6 +42,7 @@ export default async function SourceSettingsPage() {
     content: (
       <SourcesForm
         sources={registry.sources.filter((s) => s.market === market)}
+        order={order}
         roles={registry.declared ?? registry.roles}
         quality={registry.quality ?? {}}
         labels={labels}

@@ -11,8 +11,10 @@ import {
   type SourceRegistry,
   type SourceRole,
   effectiveRoles,
+  type SourceOrder,
+  byPriority,
+  inClassOrder,
   median,
-  orderSources,
   productClass,
   resolveMarkets,
   toTokyoIso,
@@ -68,7 +70,11 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     rows.map((r) => [r.key, (r.quality ?? {}) as Partial<Record<ProductClass, SourceQuality>>]),
   );
   const registry: SourceRegistry = {
-    sources: orderSources(infos, (order?.value as string[] | undefined) ?? []),
+    sources: byPriority(infos),
+    // One list for every class before orders were per class.
+    order: Array.isArray(order?.value)
+      ? Object.fromEntries(ITEM_CLASSES.map((c) => [c, order.value as string[]]))
+      : ((order?.value as SourceOrder | undefined) ?? {}),
     roles: Object.fromEntries(
       rows.map((r) => [r.key, effectiveRoles(declared[r.key]!, quality[r.key])]),
     ),
@@ -104,13 +110,14 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
   cache = new WeakMap();
 }
 
-/** The admin's order of the sources (Settings > Price sources); values follow. */
-export async function setSourceOrder(db: Db, keys: string[]): Promise<void> {
+/** The admin's order of the sources for a class (Settings > Price sources); values follow. */
+export async function setSourceOrder(db: Db, cls: ProductClass, keys: string[]): Promise<void> {
   const at = toTokyoIso();
+  const value: SourceOrder = { ...(await loadSourceRegistry(db)).order, [cls]: keys };
   await db
     .insert(appSettings)
-    .values({ key: 'sourceOrder', value: keys })
-    .onConflictDoUpdate({ target: appSettings.key, set: { value: keys, updatedAt: at } });
+    .values({ key: 'sourceOrder', value })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: at } });
   cache = new WeakMap();
 }
 
@@ -122,11 +129,8 @@ export async function setSourceOrder(db: Db, keys: string[]): Promise<void> {
  * Returns the sources and classes now valued differently (into or out of "disagrees").
  */
 export async function checkSourceQuality(db: Db, now = new Date()): Promise<string[]> {
-  // In the registry's order: with two references, the first one is the one compared against.
-  const order = (await loadSourceRegistry(db)).sources.map((x) => x.key);
-  const rows = (await db.select().from(sources)).toSorted(
-    (a, b) => order.indexOf(a.key) - order.indexOf(b.key),
-  );
+  const registry = await loadSourceRegistry(db);
+  const rows = await db.select().from(sources);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
   const since = toTokyoIso(new Date(now.getTime() - 90 * 86_400_000));
   const sales = await db
@@ -162,8 +166,9 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
     const next: Partial<Record<ProductClass, SourceQuality>> = {};
     for (const cls of ITEM_CLASSES) {
       if (declared[row.key]?.[cls] !== 'supporting') continue;
+      // In the class's order: with two references, the first one is compared against.
       const reference =
-        rows.find(
+        inClassOrder(registry, cls, rows).find(
           (r) => declared[r.key]?.[cls] === 'reference' && r.info.market === row.info.market,
         )?.key ?? null;
       const gaps: number[] = [];
