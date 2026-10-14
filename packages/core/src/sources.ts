@@ -2,6 +2,7 @@
 // price sources and the shops purchases come from; collectors save these descriptions to the
 // database and the app reads them there. Nothing here names a store: the descriptions do.
 import type { CurrencySettings, RateSourceInfo } from './money';
+import type { LanguageSettings } from './names';
 import type { ProductClass } from './taxonomy';
 
 /**
@@ -152,6 +153,8 @@ export interface SourceRegistry {
   currency?: CurrencySettings;
   /** The rate plug-ins the collectors installed. */
   rateSources?: RateSourceInfo[];
+  /** The admin's languages as saved (app_settings `languages`; checked against the installed ones by the app). */
+  languages?: Partial<LanguageSettings> | null;
 }
 
 /**

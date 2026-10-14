@@ -27,7 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
-| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: part 1 (currency) built 2026-10-14, migration 0023 to apply with the push; next part 2 (languages) |
+| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: part 1 (currency) live 2026-10-14; part 2 (languages) built 2026-10-14; next part 3 (categories) |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
@@ -648,7 +648,7 @@ Markets:
 Languages:
 - A language is a translation file (about 950 texts today, English and Japanese). Adding one means translating that file (Claude can draft it); S12 explains how and how to check it (the message scan finds missing texts).
 - Settings > Admin preferences: the admin sets the app's primary and secondary language, picked from the installed ones (user, 2026-10-14: languages are the admin's, like markets and currency); each user switches between those two with the toggle, as with English / Japanese today (user, 2026-10-14).
-- Item names: the two name fields follow the primary and secondary language instead of Japanese and English; collectors and search use both, as today.
+- Item names follow the markets, not the app's languages (user, 2026-10-14): the name is as sold in the primary market (Japanese here, so collectors match it on that market's sites), the second name is the secondary market's (e.g. English); both editable, both searched, the second shown under the name on item pages. The app's language does not change which name is shown.
 - Dates and numbers follow each language's formats.
 - Speed: each page loads one language (lighter still once S14 sends a page only its own texts).
 
@@ -676,7 +676,9 @@ Part 1 design (2026-10-14):
 - Money shown through one formatter per request (server) or per page (client), in the base; amount inputs accept the base's decimals.
 - Changing the base (Settings, admins, after a confirmation naming how many amounts): every stored amount is converted with the rate of its own date (the last on or before it, else the first after), amounts inside lot history and recent sales too, and rates are moved to the new base; saved values are rebuilt. At setup (nothing stored) any currency can be chosen without a rate; later only currencies with stored rates.
 
-Part 1 built (2026-10-14): migration 0023 (columns renamed; old `Jpy` keys inside saved JSON renamed too: recent sales, lot history, saved values, suggestions), plug-in contract in own currencies with the conversion at the collect's boundary, `frankfurter` rate plug-in for every ECB currency, Settings > Markets > Currencies (base menu: free choice at setup, conversion with confirmation later; rate source or typed rate per currency), one money formatter, decimal amount inputs. Values use the primary market's currency instead of yen. Checked on the demo data: typed USD rate, base switched to USD and back (¥33,300 -> $222.00 -> ¥33,300). Not applied to production yet.
+Part 1 built (2026-10-14): migration 0023 (columns renamed; old `Jpy` keys inside saved JSON renamed too: recent sales, lot history, saved values, suggestions), plug-in contract in own currencies with the conversion at the collect's boundary, `frankfurter` rate plug-in for every ECB currency, Settings > Markets > Currencies (base menu: free choice at setup, conversion with confirmation later; rate source or typed rate per currency), one money formatter, decimal amount inputs. Values use the primary market's currency instead of yen. Checked on the demo data: typed USD rate, base switched to USD and back (¥33,300 -> $222.00 -> ¥33,300). Applied to production 2026-10-14.
+
+Part 2 built (2026-10-14): Settings > Admin preferences > Languages (primary and secondary picked from the installed translation files; secondary can be none, then no toggle); the toggle shows the admin's two; whoever has not chosen, and the sign-in page, gets the primary; a choice outside the two falls back to it. Installed languages are listed in `apps/web/src/i18n/locale.ts` (one line and one `messages/{code}.json` each); a test fails when a file misses a text of en.json or the code asks for a text en.json lacks. Dates, numbers and charts follow the page's language. Item forms have an editable second name. Checked on the demo data: Japanese only (no toggle), back to English and Japanese, toggle, sign-in page, second name shown and found by search.
 
 Acceptance:
 - An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.
@@ -695,6 +697,7 @@ Added at the user's request (2026-10-13); replaces "documentation first" under O
 - Primary and secondary markets: choosing them, roles and identity per market, what the value counts.
 - Currency at setup (user, 2026-10-14): pick the base currency first, before adding anything (Settings > Markets > Currencies). A secondary market in another currency needs a rate plug-in; rules for building one, with `collectors-public/src/fx.ts` (ECB via Frankfurter) as the template: daily rates (working days are enough), expressed as units of the base per unit of the other currency, a year of history on the first run, a free source whose terms allow it, the currencies it covers declared. One currency only: nothing to set up. Changing the base later is rare and converts every stored amount.
 - Tora does not judge a site (user, 2026-10-14): it follows what each plug-in declares. A per-item link pattern (`links`) makes a source an identity choice; its price kinds decide the asking-price warnings; the only automatic check is the quality gate (a supporting source against its market's reference). The docs spell out the requirements for each role and what goes wrong when a plug-in declares them wrongly (for example a search page given as an item link).
+- Adding a language (S16): translate `apps/web/messages/en.json` into `{code}.json` (Claude can draft it), add the code to `LANGUAGES` in `apps/web/src/i18n/locale.ts`, run the tests (missing or extra texts fail), then pick it in Settings > Admin preferences > Languages.
 - Terms and responsibility: each site's terms are the builder's responsibility; sources whose terms forbid AI use are marked noAi.
 - Checked in S10 by the France + China setup.
 

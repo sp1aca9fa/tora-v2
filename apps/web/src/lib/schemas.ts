@@ -19,6 +19,7 @@ export const productSchema = z.object({
   category: reqEnum(CATEGORIES),
   kind: reqEnum(PRODUCT_KINDS),
   name: optText,
+  nameAlias: optText,
   franchise: optText,
   region: optEnum(REGIONS),
   platform: optText,
@@ -45,6 +46,8 @@ export function productInputFrom(data: z.infer<typeof productSchema>): ProductIn
     category: data.category,
     kind: data.kind,
     name: data.name,
+    // The name as sold in the secondary market (S16), when the item has one.
+    nameAlias: data.nameAlias ?? null,
     // TCG franchise comes from the franchise chips, so it is always kept.
     franchise: data.franchise ?? null,
     region: data.region ?? null,

@@ -9,7 +9,7 @@ import {
   type UTCTimestamp,
   createChart,
 } from 'lightweight-charts';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { useAmountsHidden } from '@/components/amounts-toggle';
 import { tickMarkFormatter, useChartTheme } from './chart-theme';
@@ -32,6 +32,7 @@ export interface PortfolioPoint {
  */
 export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
   const money = useMoney();
+  const locale = useLocale();
   const t = useTranslations('portfolio');
   const theme = useChartTheme();
   // Amounts hidden: the lines stay, the yen axis and hover labels go.
@@ -56,7 +57,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       rightPriceScale: { borderVisible: false, visible: !hidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
       crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !hidden } },
-      localization: { priceFormatter: money },
+      localization: { priceFormatter: money, locale },
       handleScroll: false,
       handleScale: false,
     });
@@ -83,7 +84,7 @@ export function PortfolioChart({ points }: { points: PortfolioPoint[] }) {
       );
     });
     return () => chart.remove();
-  }, [points, theme, hidden, money]);
+  }, [points, theme, hidden, money, locale]);
 
   return (
     <div className="space-y-2">

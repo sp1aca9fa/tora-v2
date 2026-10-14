@@ -7,7 +7,7 @@ import {
   type UTCTimestamp,
   createChart,
 } from 'lightweight-charts';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAmountsHidden } from '@/components/amounts-toggle';
@@ -40,6 +40,7 @@ export function PriceChart({
   sourceLabels: Record<string, string>;
 }) {
   const money = useMoney();
+  const locale = useLocale();
   const t = useTranslations('valuation');
   const theme = useChartTheme();
   // Amounts hidden: the lines stay, the yen axis and hover labels go.
@@ -77,7 +78,7 @@ export function PriceChart({
       rightPriceScale: { borderVisible: false, visible: !amountsHidden },
       timeScale: { borderVisible: false, tickMarkFormatter },
       crosshair: { mode: CrosshairMode.Magnet, horzLine: { labelVisible: !amountsHidden } },
-      localization: { priceFormatter: money },
+      localization: { priceFormatter: money, locale },
     });
     const seriesBySource = new Map<string, ReturnType<typeof chart.addSeries<'Line'>>>();
     for (const source of sources.filter((s) => !hidden.has(s))) {
@@ -113,7 +114,7 @@ export function PriceChart({
     });
     return () => chart.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, bucket, hidden, theme, sources, amountsHidden, money]);
+  }, [points, bucket, hidden, theme, sources, amountsHidden, money, locale]);
 
   if (points.length === 0) return <p className="text-sm text-muted-foreground">{t('noHistory')}</p>;
   const estimatedDays = new Set(visible.filter((p) => p.estimated > 0).map((p) => p.day));

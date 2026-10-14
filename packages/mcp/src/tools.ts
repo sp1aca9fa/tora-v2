@@ -1,6 +1,6 @@
 // Read-only views of one user's data for Claude (requirements S4b). Plain functions over the
 // database, so the MCP server (server.ts) and the tests share them. Results are compact JSON:
-// yen as integers, dates as ISO strings, lists limited.
+// amounts as integers in the base currency's smallest unit, dates as ISO strings, lists limited.
 import { noAiSources, productClass } from '@tora/core';
 import {
   type Db,

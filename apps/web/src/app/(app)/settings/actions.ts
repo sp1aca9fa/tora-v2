@@ -27,12 +27,14 @@ import {
   setRateSetting,
   changeBaseCurrency,
   setMarketSettings,
+  setLanguageSettings,
   setSourceOrder,
   setSourceRoles,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { cookies } from 'next/headers';
+import { isLocale } from '@/i18n/locale';
 import { AMOUNTS_COOKIE } from '@/lib/amounts';
 import { authed } from '@/lib/auth/guard';
 import { type FormState, runDomain } from '@/lib/form';
@@ -169,6 +171,15 @@ export async function setMarketsAction(primary: string, secondary: string | null
     await refreshBucketValues(db);
     revalidatePath('/', 'layout');
   });
+  revalidatePath('/', 'layout');
+}
+
+/** The app's primary and secondary language (admins, S16), from the installed ones. */
+export async function setLanguagesAction(primary: string, secondary: string | null) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !isLocale(primary) || (secondary !== null && !isLocale(secondary)))
+    return;
+  await setLanguageSettings(db, { primary, secondary: secondary === primary ? null : secondary });
   revalidatePath('/', 'layout');
 }
 

@@ -1,6 +1,7 @@
 // The source registry (requirements S8, sources with roles): what the plug-ins describe, saved
 // by the collectors, read by the app.
 import {
+  type LanguageSettings,
   type CurrencySettings,
   ITEM_CLASSES,
   type RateSourceInfo,
@@ -63,7 +64,7 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     db
       .select()
       .from(appSettings)
-      .where(inArray(appSettings.key, ['markets', 'sourceOrder', 'currency', 'rateSources'])),
+      .where(inArray(appSettings.key, ['markets', 'sourceOrder', 'currency', 'rateSources', 'languages'])),
   ]);
   const markets = settings.find((r) => r.key === 'markets');
   const order = settings.find((r) => r.key === 'sourceOrder');
@@ -92,6 +93,7 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     ].reduce((max, r) => (r.updatedAt > max ? r.updatedAt : max), ''),
     currency: resolveCurrency(setting('currency') as Partial<CurrencySettings> | undefined),
     rateSources: (setting('rateSources') as RateSourceInfo[] | undefined) ?? [],
+    languages: (setting('languages') as Partial<LanguageSettings> | undefined) ?? null,
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;
@@ -130,6 +132,11 @@ async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
 /** The base currency and where each currency's rate comes from (S16). */
 export async function setCurrencySettings(db: Db, value: CurrencySettings): Promise<void> {
   await saveSetting(db, 'currency', value);
+}
+
+/** The app's primary and secondary language (S16, admins). */
+export async function setLanguageSettings(db: Db, value: LanguageSettings): Promise<void> {
+  await saveSetting(db, 'languages', value);
 }
 
 /** The rate plug-ins installed (collectors, at the start of a run). */

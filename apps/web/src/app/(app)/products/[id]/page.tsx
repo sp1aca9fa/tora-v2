@@ -104,6 +104,9 @@ export default async function ProductPage({ params }: Params) {
               </Link>
             </p>
             <h1 className="text-xl leading-tight font-semibold tracking-tight">{product.name}</h1>
+            {product.nameAlias && product.nameAlias !== product.name && (
+              <p className="text-sm">{product.nameAlias}</p>
+            )}
             <p className="text-sm text-muted-foreground">
               {productMeta(product, t)}
               {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}

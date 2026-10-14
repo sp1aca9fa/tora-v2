@@ -13,7 +13,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { useMoney } from '@/components/money-context';
 
 export type ProductDefaults = Partial<
-  Record<ProductField | 'name' | 'region', string | number | null>
+  Record<ProductField | 'name' | 'nameAlias' | 'region', string | number | null>
 >;
 
 /**
@@ -80,6 +80,19 @@ export function ProductFields({
           defaultValue={value('name')}
           autoComplete="off"
           onChange={onTyped && ((e) => onTyped('name', e.target.value))}
+        />
+      </Field>
+      <Field
+        label={t('fields.nameAlias')}
+        htmlFor="p-nameAlias"
+        hint={t('fields.nameAliasHint')}
+        className="sm:col-span-2"
+      >
+        <Input
+          id="p-nameAlias"
+          name="nameAlias"
+          defaultValue={value('nameAlias')}
+          autoComplete="off"
         />
       </Field>
       {showRegion && (

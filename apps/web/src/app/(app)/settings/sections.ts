@@ -1,4 +1,14 @@
-import { Bell, Eye, Fingerprint, Globe, Plug, ShieldCheck, Store, User } from 'lucide-react';
+import {
+  Bell,
+  Eye,
+  Fingerprint,
+  Globe,
+  Languages,
+  Plug,
+  ShieldCheck,
+  Store,
+  User,
+} from 'lucide-react';
 
 export interface SettingsEntry {
   key: string;
@@ -24,6 +34,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
       { key: 'markets', href: '/settings/admin/markets', icon: Globe, admin: true },
       { key: 'sources', href: '/settings/admin/sources', icon: Store, admin: true },
       { key: 'identity', href: '/settings/admin/identity', icon: Fingerprint, admin: true },
+      { key: 'languages', href: '/settings/admin/languages', icon: Languages, admin: true },
     ],
   },
 ];
