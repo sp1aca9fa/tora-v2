@@ -647,7 +647,7 @@ Markets:
 
 Languages:
 - A language is a translation file (about 950 texts today, English and Japanese). Adding one means translating that file (Claude can draft it); S12 explains how and how to check it (the message scan finds missing texts).
-- Settings > Admin preferences: the admin sets the app's primary and secondary language, picked from the installed ones (user, 2026-10-14: languages are the admin's, like markets and currency; whether each user can still switch between those two, as with today's English / Japanese toggle, is decided when part 2 starts).
+- Settings > Admin preferences: the admin sets the app's primary and secondary language, picked from the installed ones (user, 2026-10-14: languages are the admin's, like markets and currency); each user switches between those two with the toggle, as with English / Japanese today (user, 2026-10-14).
 - Item names: the two name fields follow the primary and secondary language instead of Japanese and English; collectors and search use both, as today.
 - Dates and numbers follow each language's formats.
 - Speed: each page loads one language (lighter still once S14 sends a page only its own texts).
