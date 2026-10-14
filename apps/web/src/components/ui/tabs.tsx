@@ -14,7 +14,12 @@ export function Tabs({
   const [current, setCurrent] = useState(initial ?? tabs[0]?.key);
   return (
     <div className="space-y-4">
-      <div role="tablist" className="flex gap-1 overflow-x-auto border-b">
+      {/* Scrolls sideways on narrow screens without a scrollbar; the line is a shadow under the
+          tabs, so the selected tab's underline covers it without overflowing downwards. */}
+      <div
+        role="tablist"
+        className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -23,7 +28,7 @@ export function Tabs({
             aria-selected={tab.key === current}
             onClick={() => setCurrent(tab.key)}
             className={cn(
-              '-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+              'shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
               tab.key === current
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
