@@ -172,7 +172,7 @@
       "condition": "Change condition",
       "note": "Add note",
       "delete": "Delete entry",
-      "cancel-order": "Order cancelled"
+      "cancel-order": "Mark order cancelled"
     },
     "allLots": "All lots of this product",
     "marketData": "Market prices, chart and price sources",
@@ -226,6 +226,28 @@
       "dismiss": "Keep it this way"
     },
     "openSettings": "Open price sources in Settings"
+  },
+  "lotActions": {
+    "partialHint": "You have {total}. Choosing fewer moves them into a separate entry first.",
+    "splitQuantity": "Units to move",
+    "splitHint": "Cost is divided in proportion to the units.",
+    "openSealedHint": "Once the packs are opened the box counts as consumed; its value lives on in the pulls.",
+    "feeHint": "Added to the cost basis.",
+    "extraFeeHint": "Upcharges or return shipping. Added to the cost basis.",
+    "priceHint": "Total for all units sold.",
+    "feesHint": "Platform fee and shipping you paid.",
+    "editCostHint": "Correct the total paid. Use grading or sell for later changes.",
+    "deleteConfirm": "Delete this entry and its history. Only for entries registered by mistake; this cannot be undone.",
+    "intro": {
+      "edit": "Correct what was recorded. The change is kept in the history.",
+      "split": "Move some units into their own entry, e.g. before selling or grading only some of them.",
+      "grade-submit": "The fee is added to the cost basis. The card stays raw until it comes back.",
+      "sell": "Partial sales split the lot automatically.",
+      "condition": "Only the fields you change are recorded.",
+      "editProduct": "Applies to every entry of this item.",
+      "cancel-order": "For orders you cancelled yourself: shops often send no email for that, so the import cannot tell."
+    },
+    "cancelOrderConfirm": "The order #{order} ({from}) was cancelled: remove all of its lots. Future imports will skip this order."
   },
   "pulls": {
     "mode": {

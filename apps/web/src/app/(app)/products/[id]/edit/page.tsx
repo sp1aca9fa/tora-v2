@@ -33,7 +33,7 @@ export default async function EditProductPage({
             .join(' · ')}
         </p>
         <h1 className="text-2xl font-semibold tracking-tight">{t('holding.editProduct')}</h1>
-        <p className="text-sm text-muted-foreground">{t('actions.intro.editProduct')}</p>
+        <p className="text-sm text-muted-foreground">{t('lotActions.intro.editProduct')}</p>
       </header>
       <ActionForm
         action={editProductAction.bind(null, id, back)}

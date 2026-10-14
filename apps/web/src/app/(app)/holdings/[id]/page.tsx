@@ -94,6 +94,9 @@ export default async function HoldingPage({ params }: Params) {
       format.dateTime(new Date(holding.acquiredAt), { dateStyle: 'medium' }),
     ],
     [t('fields.acquiredFrom'), holding.acquiredFrom ?? '-'],
+    ...(holding.orderId
+      ? [[t('fields.orderId'), holding.orderId] as [string, React.ReactNode]]
+      : []),
     [t('fields.acquisitionType'), t(`acquisitionType.${holding.acquisitionType}`)],
   ];
   if (fields.condition && holding.condition)
@@ -178,7 +181,9 @@ export default async function HoldingPage({ params }: Params) {
               {facts.map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
-                  <dd className="text-right tabular-nums sm:text-left">{v}</dd>
+                  <dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere] sm:text-left">
+                    {v}
+                  </dd>
                 </div>
               ))}
             </dl>

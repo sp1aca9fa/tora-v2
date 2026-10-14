@@ -81,7 +81,7 @@ export default async function HoldingActionPage({
       <Field
         label={t('fields.quantity')}
         htmlFor="quantity"
-        hint={t('actions.partialHint', { total: holding.quantity })}
+        hint={t('lotActions.partialHint', { total: holding.quantity })}
       >
         <Input
           id="quantity"
@@ -155,7 +155,7 @@ export default async function HoldingActionPage({
           <Field
             label={t('fields.costTotalJpy')}
             htmlFor="costTotalJpy"
-            hint={t('actions.editCostHint')}
+            hint={t('lotActions.editCostHint')}
           >
             <Input
               id="costTotalJpy"
@@ -183,9 +183,9 @@ export default async function HoldingActionPage({
       body = (
         <>
           <Field
-            label={t('actions.splitQuantity')}
+            label={t('lotActions.splitQuantity')}
             htmlFor="quantity"
-            hint={t('actions.splitHint')}
+            hint={t('lotActions.splitHint')}
           >
             <Input
               id="quantity"
@@ -210,7 +210,7 @@ export default async function HoldingActionPage({
           <Field
             label={t('fields.packagingState')}
             htmlFor="packagingState"
-            hint={cls === 'sealed' ? t('actions.openSealedHint') : undefined}
+            hint={cls === 'sealed' ? t('lotActions.openSealedHint') : undefined}
           >
             <NativeSelect
               id="packagingState"
@@ -243,7 +243,7 @@ export default async function HoldingActionPage({
                 ))}
               </NativeSelect>
             </Field>
-            <Field label={t('fields.feeJpy')} htmlFor="feeJpy" hint={t('actions.feeHint')}>
+            <Field label={t('fields.feeJpy')} htmlFor="feeJpy" hint={t('lotActions.feeHint')}>
               {yenInput('feeJpy')}
             </Field>
             <Field label={t('fields.service')} htmlFor="service">
@@ -276,7 +276,7 @@ export default async function HoldingActionPage({
           <Field
             label={t('fields.extraFeeJpy')}
             htmlFor="extraFeeJpy"
-            hint={t('actions.extraFeeHint')}
+            hint={t('lotActions.extraFeeHint')}
           >
             {yenInput('extraFeeJpy', false)}
           </Field>
@@ -290,10 +290,10 @@ export default async function HoldingActionPage({
         <>
           {quantityField()}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t('fields.priceJpy')} htmlFor="priceJpy" hint={t('actions.priceHint')}>
+            <Field label={t('fields.priceJpy')} htmlFor="priceJpy" hint={t('lotActions.priceHint')}>
               {yenInput('priceJpy')}
             </Field>
-            <Field label={t('fields.feesJpy')} htmlFor="feesJpy" hint={t('actions.feesHint')}>
+            <Field label={t('fields.feesJpy')} htmlFor="feesJpy" hint={t('lotActions.feesHint')}>
               {yenInput('feesJpy', false)}
             </Field>
             <Field label={t('fields.platform')} htmlFor="platform">
@@ -378,7 +378,7 @@ export default async function HoldingActionPage({
         <label className="flex items-start gap-3 rounded-md border border-destructive/40 p-3 text-sm">
           <input type="checkbox" name="confirm" required className="mt-0.5 size-4" />
           <span>
-            {t('actions.cancelOrderConfirm', {
+            {t('lotActions.cancelOrderConfirm', {
               order: holding.orderId ?? '-',
               from: holding.acquiredFrom ?? '-',
             })}
@@ -390,7 +390,7 @@ export default async function HoldingActionPage({
       body = (
         <label className="flex items-start gap-3 rounded-md border border-destructive/40 p-3 text-sm">
           <input type="checkbox" name="confirm" required className="mt-0.5 size-4" />
-          <span>{t('actions.deleteConfirm')}</span>
+          <span>{t('lotActions.deleteConfirm')}</span>
         </label>
       );
       break;
@@ -401,8 +401,8 @@ export default async function HoldingActionPage({
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">{product.name}</p>
         <h1 className="text-2xl font-semibold tracking-tight">{t(`holding.actions.${key}`)}</h1>
-        {t.has(`actions.intro.${key}`) && (
-          <p className="text-sm text-muted-foreground">{t(`actions.intro.${key}`)}</p>
+        {t.has(`lotActions.intro.${key}`) && (
+          <p className="text-sm text-muted-foreground">{t(`lotActions.intro.${key}`)}</p>
         )}
       </header>
       <ActionForm
