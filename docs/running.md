@@ -13,6 +13,7 @@ pnpm collect --source <source>       # one collector
 pnpm collect --match-only            # only look for listings of unlinked items
 pnpm collect --collect-only          # only fetch prices for linked listings
 pnpm collect --product <product-id>  # one item
+pnpm collect --refresh                # also listings already collected today
 pnpm collect --review                # then the data review (or TORA_REVIEW=1)
 pnpm valuate                         # only refresh values and the value history
 ```
@@ -20,6 +21,13 @@ pnpm valuate                         # only refresh values and the value history
 A full run: exchange rates, uploaded files waiting to be read, each collector in turn, pictures,
 values, and the day's value snapshot. It refuses to run against a database that needs a migration
 (run `pnpm db:migrate`).
+
+**Once a day, once per site.** Prices are daily, so a listing already collected today (the home
+PC's date) is left out: a run started again the same day (a retry after the PC turned off, a
+second task) does only what is left. `--refresh` or `--product` collects again anyway. A site
+another collect is already running (by hand or by the schedule) is skipped, so two runs never
+fetch from the same site at once; the skipped run does not count as the day's run, and the
+schedule tries again later.
 
 **How items get prices.** Register an item; on the next run each collector searches its site for
 it and stores the best candidates; confirm the right one under **Actions** or the item page's

@@ -39,6 +39,14 @@ export interface RunOptions {
   /** Collect only; skip searching for candidates. */
   collectOnly?: boolean;
   http?: PoliteHttpOptions;
+  /**
+   * Leave out listings already collected today (the home PC's date, i.e. the admin's time zone):
+   * a run started again the same day
+   * (a retry, a second task) only does what is left. Prices are daily.
+   */
+  skipCollectedToday?: boolean;
+  /** The caller holds the source's lock (runs still marked running were cut off). */
+  exclusive?: boolean;
   log?: (message: string) => void;
   /**
    * After each product: how far the run is (products done, or requests used when the request
@@ -56,6 +64,15 @@ export interface RunSummary {
   observationsAdded: number;
   errors: string[];
 }
+
+/** A day (YYYY-MM-DD) on the home PC's clock: the admin's own time zone. */
+export const localDate = (date: Date, timeZone?: string) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
 
 /** The closest two requests to one site may be. */
 const MIN_DELAY_MS = 2000;
@@ -114,7 +131,7 @@ export async function runCollector(
         .filter((s) => s.active)
         .map((s) => ({ source: s.source, title: s.title })),
   };
-  const runId = await startRun(db, collector.source);
+  const runId = await startRun(db, collector.source, { exclusive: options.exclusive });
   const clock = awakeClock();
   // Progress: items (products to match + listings to collect) done before the current one.
   let total = 0;
@@ -191,9 +208,15 @@ export async function runCollector(
       }
     }
     if (!options.matchOnly) {
-      const sources = await activeSources(db, collector.source, {
-        productId: options.productId,
-      });
+      const today = localDate(now);
+      const all = await activeSources(db, collector.source, { productId: options.productId });
+      const sources = options.skipCollectedToday
+        ? all.filter(
+            ({ source: l }) => !l.lastSuccessAt || localDate(new Date(l.lastSuccessAt)) !== today,
+          )
+        : all;
+      if (sources.length < all.length)
+        log(`${all.length - sources.length} listing(s) already collected today, left out`);
       total += sources.length;
       for (const { source: listing, product } of sources) {
         tick();

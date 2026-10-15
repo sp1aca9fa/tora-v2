@@ -509,7 +509,15 @@ export async function updateSourceProgress(
 /** A run still "running" after this long was interrupted (runs take about half an hour). */
 const STALE_RUN_MS = 3 * 60 * 60 * 1000;
 
-export async function startRun(db: Db, source: string): Promise<string> {
+/**
+ * Records a run's start. `exclusive`: the caller holds the source's lock, so any run still marked
+ * running was cut off and is closed out whatever its age.
+ */
+export async function startRun(
+  db: Db,
+  source: string,
+  options: { exclusive?: boolean } = {},
+): Promise<string> {
   // Close out runs of this source that never finished (crash, PC shut down mid-run).
   await db
     .update(collectorRuns)
@@ -518,7 +526,9 @@ export async function startRun(db: Db, source: string): Promise<string> {
       and(
         eq(collectorRuns.source, source),
         eq(collectorRuns.status, 'running'),
-        lt(collectorRuns.startedAt, toTokyoIso(new Date(Date.now() - STALE_RUN_MS))),
+        options.exclusive
+          ? undefined
+          : lt(collectorRuns.startedAt, toTokyoIso(new Date(Date.now() - STALE_RUN_MS))),
       ),
     );
   const [run] = await db

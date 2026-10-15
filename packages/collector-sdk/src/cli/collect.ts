@@ -1,5 +1,7 @@
-// `pnpm collect [--market us] [--source x] [--product id] [--match-only] [--collect-only] [--review]`
+// `pnpm collect [--market us] [--source x] [--product id] [--match-only] [--collect-only] [--refresh] [--review]`
 // --market / --source: one market's or one source's collectors (S16: spread across the night).
+// Listings already collected today are left out (a retry does only what is left) unless --refresh
+// or --product; a site another collect is running is skipped (never two runs for one site).
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
 import {
@@ -20,6 +22,7 @@ import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
 import { loadAndRegister } from '../registry';
+import { lockSource } from '../lock';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
@@ -33,6 +36,8 @@ const { values } = parseArgs({
     product: { type: 'string' },
     'match-only': { type: 'boolean', default: false },
     'collect-only': { type: 'boolean', default: false },
+    /** Collect listings again even if already collected today. */
+    refresh: { type: 'boolean', default: false },
     /** Then the automated data review (S4d), also when TORA_REVIEW=1. */
     review: { type: 'boolean', default: false },
   },
@@ -114,13 +119,27 @@ if (!values.product && !values.source) {
 if (selected.length === 0) console.log('No collectors registered.');
 for (const collector of selected) {
   progress.next(collector.source);
-  const s = await runCollector(db, collector, {
-    productId: values.product,
-    matchOnly: values['match-only'],
-    collectOnly: values['collect-only'],
-    log: (m) => log(`[${collector.source}] ${m}`),
-    onProgress: (p) => progress.update(collector.source, p.fraction, `${p.done}/${p.total}`),
-  });
+  const lock = lockSource(collector.source);
+  if ('heldBy' in lock) {
+    // Not a success: the schedule tries again later, when the other run is done.
+    log(`${collector.source}: skipped, another collect is running it (process ${lock.heldBy})`);
+    exitCode = 1;
+    continue;
+  }
+  let s;
+  try {
+    s = await runCollector(db, collector, {
+      productId: values.product,
+      matchOnly: values['match-only'],
+      collectOnly: values['collect-only'],
+      skipCollectedToday: !values.refresh && !values.product,
+      exclusive: true,
+      log: (m) => log(`[${collector.source}] ${m}`),
+      onProgress: (p) => progress.update(collector.source, p.fraction, `${p.done}/${p.total}`),
+    });
+  } finally {
+    lock.release();
+  }
   log(
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );

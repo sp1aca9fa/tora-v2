@@ -23,6 +23,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       { key: 'product', command: 'pnpm collect --product <product-id>' },
       { key: 'matchOnly', command: 'pnpm collect --match-only' },
       { key: 'collectOnly', command: 'pnpm collect --collect-only' },
+      { key: 'refresh', command: 'pnpm collect --refresh' },
       { key: 'valuate', command: 'pnpm valuate' },
     ],
   },

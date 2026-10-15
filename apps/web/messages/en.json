@@ -1097,12 +1097,13 @@
     "copied": "Copied",
     "collect": {
       "title": "Collecting prices",
-      "all": "Every collector: look for listings of new items, then fetch prices, then pictures, values and the day's snapshot.",
+      "all": "Every collector: look for listings of new items, then fetch prices (listings already collected today are left out), then pictures, values and the day's snapshot.",
       "market": "Only one market's collectors (e.g. us).",
       "source": "Only one collector (its key, e.g. ebay).",
       "product": "Only one item (its ID from the item page's address).",
       "matchOnly": "Only look for listings of items without one.",
       "collectOnly": "Only fetch prices for listings already confirmed.",
+      "refresh": "Also collects listings already collected today (normally left out).",
       "valuate": "Only rebuild values and the value history."
     },
     "schedule": {

@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
 import { BlockedError } from './http';
-import { pace, runCollector } from './runner';
+import { localDate, pace, runCollector } from './runner';
 import type { Collector } from './types';
 
 let db: Db;
@@ -365,4 +365,29 @@ it("uses a plug-in's own pace, never faster than 2 s", () => {
     minDelayMs: 2000,
     maxDelayMs: 2000,
   });
+});
+
+it('leaves out listings already collected today, on the home PC clock', async () => {
+  const { product } = await box();
+  let calls = 0;
+  const collector = fakeCollector({
+    collect: async () => (calls++, { state: null, complete: true }),
+  });
+  await runCollector(db, collector, quiet);
+  await confirmCandidate(db, (await listPendingCandidates(db, product.id))[0]!.id);
+  const today = { ...quiet, skipCollectedToday: true };
+  await runCollector(db, collector, today);
+  expect(calls).toBe(1);
+  // Started again the same day (a retry): nothing left to do.
+  await runCollector(db, collector, today);
+  expect(calls).toBe(1);
+  // Another day.
+  await runCollector(db, collector, { ...today, now: new Date(Date.now() + 86_400_000) });
+  expect(calls).toBe(2);
+});
+
+it('reads days on the given clock', () => {
+  const at = new Date('2026-10-15T20:00:00Z');
+  expect(localDate(at, 'Asia/Tokyo')).toBe('2026-10-16');
+  expect(localDate(at, 'Europe/Paris')).toBe('2026-10-15');
 });
