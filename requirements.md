@@ -29,7 +29,7 @@
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
 | S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: parts 1-3 (currency, languages, categories) live 2026-10-14; part 4 (markets, heavy-user rules) live 2026-10-15; part 5 (the app's time zone) built 2026-10-15, awaiting user check; left: the EUR + French end-to-end check (with S10) and measuring on S14's large data |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | built 2026-10-15 (guides in `docs/`, template plug-in, Commands page); awaiting user check |
-| S6 | Backups, download my data, spreadsheet import | in progress: design 2026-10-16 (user) |
+| S6 | Backups, download my data, spreadsheet import | built 2026-10-16; awaiting user check (optional later: load the JSON into an empty account) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
@@ -537,6 +537,11 @@ Dropped from the first plan (user, 2026-10-16): the zip of one CSV per table and
 
 Acceptance:
 - Scenario 8 (the lots spreadsheet rebuilds the collection without the app); the backup and restore test passes in `pnpm test`.
+
+Built (2026-10-16):
+- Backups: `pnpm backup` copies every table, then its indexes, into a local SQLite file (2,000 rows per request; each table's row count checked, then an integrity check), compresses it and moves it into place whole; one a day (`--force`: again), then deletes copies no longer kept. `scripts/collect-cron.sh` runs it after the collect whatever the collect did; the day counts as done only when both succeeded. `pnpm restore <file>` refuses a database with any table, then copies parents before the tables pointing at them, with references checked per page (Turso enforces them). First real run: 283,410 rows, 18.4 MB, 38 s; restored into an empty file in 28 s. Guide `docs/backups.md`; Commands page group; `BACKUP_DIR` in `.env.example`.
+- Settings > Your data: the lots spreadsheet (`/export/lots`, CSV with a byte order mark so Excel opens Japanese right; `?template`: headers only) and the account's JSON (`/export/account`: items, lots with their value now, history, manual prices, linked listings without collected sales, imports, links, cancelled orders; no sign-in secrets, no collected prices). Headers and names in the person's language, amounts in the base currency; cells that a spreadsheet would run as a formula get a leading `'`.
+- Imports > Spreadsheet: a CSV (UTF-8 or Shift_JIS) checked first, row by row (new lot, new lot of a new item, already in Tora, skipped, or the problem); headers and names read in any installed language or as keys. Already in Tora: the lot ID is in the account, the same order is (one-item shops: the order alone; others: the order and the item), or a lot of the same item with the same date, quantity and cost (each lot matches one row). Not owned (sold, opened, lost) rows are skipped; an unknown status is a problem, not a skip. New lots wait in Review (reasons: new item, no date), as one import "Spreadsheet" in the history. Up to 5,000 rows, 2 MB.
 
 ## S7: US data, 駿河屋, FX, JP vs US spread
 

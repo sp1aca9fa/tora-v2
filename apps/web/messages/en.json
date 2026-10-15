@@ -320,6 +320,10 @@
         "title": "Collectors",
         "info": "Status of the daily collect on the home PC."
       },
+      "data": {
+        "title": "Your data",
+        "info": "Download your lots as a spreadsheet, or all your data."
+      },
       "admin": {
         "title": "Admin preferences",
         "info": "Markets, price sources, identity pages, categories, languages, the time zone and the home PC's commands, for every account."
@@ -715,7 +719,7 @@
       "method": {
         "email": "Order emails",
         "links": "Purchase links",
-        "file": "Purchases file",
+        "file": "Spreadsheet",
         "claude": "Through Claude"
       },
       "count": {
@@ -764,6 +768,48 @@
         "uploadTooBig": "over {mb} MB",
         "uploadTooMany": "too many files",
         "invalid_input": "not readable"
+      }
+    },
+    "sheet": {
+      "title": "Spreadsheet",
+      "intro": "A CSV in the layout of <download>your lots download</download> (or <template>this empty one</template>), saved from Excel or any spreadsheet app. You see what each row would do before anything is added; new lots then wait in Review. Rows already in Tora are left alone. Other layouts: upload them above, Claude reads them.",
+      "file": "Spreadsheet file",
+      "check": "Check the file",
+      "checking": "Checking...",
+      "summary": "{added, plural, one {# new lot} other {# new lots}} · {existing} already in Tora · {skipped} skipped · {problems, plural, one {# problem} other {# problems}}",
+      "ignored": "Columns not used: {columns}",
+      "line": "Row {line}",
+      "row": {
+        "new": "New lot",
+        "newItem": "New lot of a new item",
+        "existing": "Already in Tora",
+        "skipped": "Skipped: not an owned lot (sold, opened or lost)"
+      },
+      "problem": {
+        "missing_item": "No item name",
+        "unknown_item": "No item with this ID, and no item name",
+        "unknown_category": "Category not known",
+        "unknown_kind": "Kind not known for this category",
+        "bad_region": "Region not known for this category",
+        "bad_status": "Status not known (Owned, Sold, Consumed or Lost)",
+        "bad_quantity": "Quantity must be a whole number, 1 or more",
+        "bad_cost": "Cost must be a whole amount, 0 or more",
+        "bad_date": "Date not readable or in the future (use 2026-10-16 or 2026/10/16)",
+        "bad_condition": "Condition not known for this kind",
+        "bad_packaging": "Packaging not known",
+        "bad_graded": "Graded: the grader then the grade, e.g. PSA 10"
+      },
+      "import": "{count, plural, one {Import # lot} other {Import # lots}}",
+      "importing": "Importing...",
+      "cancel": "Cancel",
+      "done": "{count, plural, one {# lot imported.} other {# lots imported.}}",
+      "review": "Review them",
+      "open": "Open the import",
+      "error": {
+        "sheetType": "Choose a .csv file (in Excel: Save as > CSV).",
+        "sheetTooBig": "The file is over 2 MB.",
+        "sheetNoHeader": "The first row must name the columns, with at least the item (as in the download).",
+        "sheetTooManyRows": "Over 5,000 rows: split the file."
       }
     }
   },
@@ -1160,6 +1206,51 @@
       "catalogFetch": "Refreshes the TCG set catalog files (then review and commit them).",
       "catalogSync": "Loads the TCG set catalog into the database.",
       "mcp": "Lets Claude Code read your data, read-only (sources marked no-AI are left out)."
+    }
+  },
+  "myData": {
+    "lotsTitle": "Your lots as a spreadsheet",
+    "lotsInfo": "Every lot, one per row: item, condition, quantity, cost, date, shop, order ID, status, value now and profit; sold lots with their sale. Opens in Excel, Numbers or Google Sheets.",
+    "lotsDownload": "Download the spreadsheet (CSV)",
+    "lotsImport": "The same layout can be imported: <link>Imports > Spreadsheet</link>.",
+    "allTitle": "All your data",
+    "allInfo": "One JSON file with your items, lots, their history, manual prices, linked listings and imports: for keeping a copy, or for another program.",
+    "allDownload": "Download all (JSON)",
+    "noPrices": "Prices collected from other sites are not included (their terms do not allow passing them on); each lot carries its value now instead.",
+    "adminBackups": "The whole database is backed up every day on the home PC (Admin preferences > Commands)."
+  },
+  "sheet": {
+    "column": {
+      "lot_id": "Lot ID",
+      "item_id": "Item ID",
+      "item": "Item",
+      "category": "Category",
+      "kind": "Kind",
+      "franchise": "Franchise",
+      "platform": "Platform",
+      "set": "Set",
+      "set_code": "Set code",
+      "card_number": "Card number",
+      "rarity": "Rarity",
+      "variant": "Variant",
+      "region": "Region",
+      "condition": "Condition",
+      "packaging": "Packaging",
+      "graded": "Graded",
+      "quantity": "Quantity",
+      "cost": "Cost",
+      "acquired": "Date acquired",
+      "shop": "From",
+      "order_id": "Order ID",
+      "acquisition": "How",
+      "status": "Status",
+      "value": "Value now",
+      "profit": "Profit",
+      "sold_on": "Sold on",
+      "sold_for": "Sold for",
+      "fees": "Fees",
+      "from_lot": "From lot",
+      "notes": "Notes"
     }
   }
 }

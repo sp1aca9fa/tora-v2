@@ -124,6 +124,14 @@ The same import runs from the app (**Imports > Upload**, up to 30 files of 4 MB)
 PC by the next `pnpm collect` or `pnpm import-uploads` (your Claude plan), or right away by the app
 when Vercel has an `ANTHROPIC_API_KEY` (a few cents per batch).
 
+**A spreadsheet** (no command; **Imports > Spreadsheet**, in the app). A CSV in the layout of
+**Settings > Your data**'s lots download (or its empty template): headers and names (category,
+kind, condition, status) in either of the app's languages or as keys, UTF-8 or the Japanese
+encoding Excel saves. A preview shows what each row would do: a new lot, already in Tora (its lot
+ID is in the account, the same order is, or a lot of the same item with the same date, quantity
+and cost), skipped (not an owned lot) or a problem; confirming adds the new rows as lots waiting
+in Review. Rows already in Tora are never changed: edit lots in the app. Up to 5,000 rows, 2 MB.
+
 ## The data review
 
 The checks flag sales far from an item's value and searches that keep little of what they find.

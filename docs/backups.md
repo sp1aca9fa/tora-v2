@@ -65,4 +65,4 @@ Or restore it into a local file and run the app against it (`DATABASE_URL=file:.
 
 Every account can also download its own data in the app (Settings > Your data): a spreadsheet of
 its lots and a JSON file. That is for the person, not a backup of the app; see
-[the spreadsheet import](running.md#imports) for bringing a spreadsheet back.
+the spreadsheet import in [Running collectors](running.md#imports) for bringing a spreadsheet back.

@@ -8,16 +8,18 @@ import {
   uploadBatchesOf,
 } from '@tora/db';
 import { claudeApiAvailable } from '@tora/collector-sdk/uploads';
+import { baseCurrency } from '@tora/core';
 import { ChevronRight, RotateCw, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { userActions } from '@/lib/actions';
-import { sourceLabels } from '@/lib/sources';
+import { getRegistry, sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { removeLinkAction, retryLinkAction } from './actions';
 import { LinksForm } from './links-form';
+import { SheetForm } from './sheet-form';
 import { UploadForm } from './upload-form';
 import { retryUploadsAction } from './upload-actions';
 
@@ -30,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const maxDuration = 300;
 
 export default async function ImportsPage() {
-  const sourceLabel = await sourceLabels();
+  const [sourceLabel, registry] = await Promise.all([sourceLabels(), getRegistry()]);
   const { db, user } = await authed();
   const [actions, links, runs, uploads, t, format] = await Promise.all([
     userActions(),
@@ -224,6 +226,25 @@ export default async function ImportsPage() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div id="sheet" className="scroll-mt-20 space-y-2 rounded-xl border bg-card px-4 py-3">
+            <h3 className="font-medium">{t('imports.sheet.title')}</h3>
+            <p className="text-sm text-muted-foreground">
+              {t.rich('imports.sheet.intro', {
+                template: (chunks) => (
+                  <a href="/export/lots?template" download className="underline">
+                    {chunks}
+                  </a>
+                ),
+                download: (chunks) => (
+                  <Link href="/settings/data" className="underline">
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </p>
+            <SheetForm currency={baseCurrency(registry)} />
           </div>
 
           <div className="space-y-2 rounded-xl border bg-card px-4 py-3">

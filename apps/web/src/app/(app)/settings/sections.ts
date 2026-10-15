@@ -1,6 +1,7 @@
 import {
   Bell,
   Clock,
+  Download,
   Eye,
   Fingerprint,
   Globe,
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
   { key: 'display', href: '/settings/display', icon: Eye },
   { key: 'notices', href: '/settings/notices', icon: Bell },
   { key: 'collectors', href: '/settings/collectors', icon: Plug },
+  { key: 'data', href: '/settings/data', icon: Download },
   {
     key: 'admin',
     href: '/settings/admin',

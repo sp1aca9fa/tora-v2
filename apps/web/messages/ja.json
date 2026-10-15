@@ -320,6 +320,10 @@
         "title": "コレクター",
         "info": "自宅PCの毎日の収集の状況。"
       },
+      "data": {
+        "title": "データ",
+        "info": "ロットを表計算ファイルで、またはすべてのデータをダウンロード。"
+      },
       "admin": {
         "title": "管理者設定",
         "info": "市場、価格ソース、識別ページ、カテゴリー、言語、タイムゾーン、自宅PCのコマンド（全アカウント共通）。"
@@ -715,7 +719,7 @@
       "method": {
         "email": "注文メール",
         "links": "購入リンク",
-        "file": "購入ファイル",
+        "file": "表計算ファイル",
         "claude": "Claude経由"
       },
       "count": {
@@ -764,6 +768,48 @@
         "uploadTooBig": "{mb}MBを超えています",
         "uploadTooMany": "ファイルが多すぎます",
         "invalid_input": "読み取れません"
+      }
+    },
+    "sheet": {
+      "title": "表計算ファイル",
+      "intro": "<download>ロットのダウンロード</download>と同じ形式のCSV（または<template>空のひな形</template>）。Excelなどで保存したもの。追加する前に各行がどうなるかを確認でき、新しいロットは確認待ちになります。すでにToraにある行はそのままです。ほかの形式は上からアップロードすればClaudeが読み取ります。",
+      "file": "表計算ファイル",
+      "check": "ファイルを確認",
+      "checking": "確認中...",
+      "summary": "新しいロット {added} 件 · Toraに登録済み {existing} 件 · 対象外 {skipped} 件 · 問題 {problems} 件",
+      "ignored": "使わない列：{columns}",
+      "line": "{line}行目",
+      "row": {
+        "new": "新しいロット",
+        "newItem": "新しい商品の新しいロット",
+        "existing": "Toraに登録済み",
+        "skipped": "対象外：所持中のロットではありません（売却済み・開封済み・紛失）"
+      },
+      "problem": {
+        "missing_item": "商品名がありません",
+        "unknown_item": "このIDの商品がなく、商品名もありません",
+        "unknown_category": "カテゴリーが分かりません",
+        "unknown_kind": "このカテゴリーにない種類です",
+        "bad_region": "このカテゴリーにない地域です",
+        "bad_status": "ステータスが分かりません（所有中・売却済み・開封・消費済み・紛失）",
+        "bad_quantity": "数量は1以上の整数にしてください",
+        "bad_cost": "金額は0以上の整数にしてください",
+        "bad_date": "日付が読めないか未来の日付です（2026-10-16 や 2026/10/16 の形式）",
+        "bad_condition": "この種類にない状態です",
+        "bad_packaging": "パッケージが分かりません",
+        "bad_graded": "鑑定：鑑定会社とグレード（例：PSA 10）"
+      },
+      "import": "{count} 件のロットをインポート",
+      "importing": "インポート中...",
+      "cancel": "キャンセル",
+      "done": "{count} 件のロットをインポートしました。",
+      "review": "確認する",
+      "open": "インポートを開く",
+      "error": {
+        "sheetType": ".csv ファイルを選んでください（Excel：名前を付けて保存 > CSV）。",
+        "sheetTooBig": "ファイルが2MBを超えています。",
+        "sheetNoHeader": "1行目に列名が必要です（少なくとも商品名。ダウンロードと同じ形式）。",
+        "sheetTooManyRows": "5,000行を超えています。ファイルを分けてください。"
       }
     }
   },
@@ -1160,6 +1206,51 @@
       "catalogFetch": "TCGのセットカタログのファイルを更新します（その後、確認してコミット）。",
       "catalogSync": "TCGのセットカタログをデータベースに読み込みます。",
       "mcp": "Claude Codeがデータを読めるようにします（読み取り専用、AI禁止のソースは除外）。"
+    }
+  },
+  "myData": {
+    "lotsTitle": "ロットの表計算ファイル",
+    "lotsInfo": "1行に1ロット：商品、状態、数量、金額、日付、購入先、注文番号、ステータス、現在の評価額と損益。売却済みのロットは売却内容も。Excel、Numbers、Googleスプレッドシートで開けます。",
+    "lotsDownload": "表計算ファイルをダウンロード（CSV）",
+    "lotsImport": "同じ形式でインポートもできます：<link>インポート > 表計算ファイル</link>。",
+    "allTitle": "すべてのデータ",
+    "allInfo": "商品、ロット、その履歴、手動価格、紐付けた出品、インポートを1つのJSONファイルに。控えとして、または他のプログラム用に。",
+    "allDownload": "すべてダウンロード（JSON）",
+    "noPrices": "他のサイトから収集した価格は含まれません（各サイトの規約で再配布できないため）。代わりに各ロットに現在の評価額が入ります。",
+    "adminBackups": "データベース全体は自宅PCで毎日バックアップされています（管理者設定 > コマンド）。"
+  },
+  "sheet": {
+    "column": {
+      "lot_id": "ロットID",
+      "item_id": "商品ID",
+      "item": "商品名",
+      "category": "カテゴリー",
+      "kind": "種類",
+      "franchise": "シリーズ",
+      "platform": "機種",
+      "set": "セット",
+      "set_code": "セットコード",
+      "card_number": "カード番号",
+      "rarity": "レアリティ",
+      "variant": "バリエーション",
+      "region": "地域・言語",
+      "condition": "商品の状態",
+      "packaging": "パッケージ",
+      "graded": "鑑定",
+      "quantity": "数量",
+      "cost": "合計金額",
+      "acquired": "取得日",
+      "shop": "購入先",
+      "order_id": "注文番号",
+      "acquisition": "取得方法",
+      "status": "ステータス",
+      "value": "現在の評価額",
+      "profit": "損益",
+      "sold_on": "売却日",
+      "sold_for": "売却価格",
+      "fees": "手数料",
+      "from_lot": "元のロット",
+      "notes": "メモ"
     }
   }
 }

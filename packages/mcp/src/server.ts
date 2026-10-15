@@ -175,7 +175,7 @@ server.registerTool(
   {
     title: 'Read-only SQL',
     description:
-      'One SELECT (or WITH ... SELECT) on the SQLite (libSQL) database, run read-only with a row limit, for questions the other tools do not cover. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_base, acquired_at, ...), price_observations (product_id, source, bucket, price_base, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_base, method), holding_events. Times are ISO strings in Tokyo time.',
+      'One SELECT (or WITH ... SELECT) on the SQLite (libSQL) database, run read-only with a row limit, for questions the other tools do not cover. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_base, acquired_at, ...), price_observations (product_id, source, bucket, price_base, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_base, method), holding_events. Times are ISO strings in the app time zone (with its offset).',
     inputSchema: {
       sql: z.string().max(4000),
       limit: z.number().int().min(1).max(1000).optional().describe('default 200'),
