@@ -143,6 +143,11 @@ async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
   cache = new WeakMap();
 }
 
+/** The nightly collect's time window in hours (S16; Settings > Collectors). */
+export async function setCollectWindow(db: Db, hours: number): Promise<void> {
+  await saveSetting(db, 'collectWindow', hours);
+}
+
 /** The base currency and where each currency's rate comes from (S16). */
 export async function setCurrencySettings(db: Db, value: CurrencySettings): Promise<void> {
   await saveSetting(db, 'currency', value);

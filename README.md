@@ -152,6 +152,7 @@ Vercel or CI (the CLI refuses when `VERCEL` or `CI` is set).
 
 ```bash
 pnpm collect                         # all collectors: match, then collect
+pnpm collect --market <market>       # one market's collectors (e.g. us)
 pnpm collect --source <source>       # one collector
 pnpm collect --match-only            # only look for listings of unlinked items
 pnpm collect --collect-only          # only fetch trades for linked listings
@@ -173,6 +174,21 @@ pnpm valuate                         # only refresh valuation snapshots (collect
 
 Settings shows each source's last run, items waiting for confirmation, listings not collected for
 3+ days and big median moves.
+
+### Run time and many collectors
+
+Settings > Collectors shows each collector's working time (time the PC slept is not counted),
+its usual time, and the last night's total against a night window the admin sets (6 hours by
+default); a long run and a night over the window are flagged. Up to about 3 markets and 10
+collectors, one nightly `pnpm collect` is enough. Beyond that, run one market at a time at
+different hours, one Windows task each (then remove the all-markets `tora-collect` task):
+
+```bash
+AT=01:00 scripts/install-windows-task.sh --market jp   # task tora-collect-market-jp
+AT=03:00 scripts/install-windows-task.sh --market us   # task tora-collect-market-us
+```
+
+Collectors for different sites may run side by side; never two runs for the same site.
 
 ### Markets, sources and roles
 

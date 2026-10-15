@@ -127,7 +127,13 @@ it('keeps foreign prices out of the valuation data and shows the newest per list
   const market = await loadMarketData(db, userId, [product.id], now);
   expect(market.observations.get(product.id) ?? []).toEqual([]);
   expect(await foreignPrices(db, product.id, now)).toEqual([
-    expect.objectContaining({ price: 23.5, currency: 'USD', priceBase: 3525, variant: 'Holofoil' }),
+    expect.objectContaining({
+      market: 'us',
+      price: 23.5,
+      currency: 'USD',
+      priceBase: 3525,
+      variant: 'Holofoil',
+    }),
   ]);
 });
 
@@ -202,9 +208,10 @@ it("follows the user's notice levels; quiet ones are listed but not counted", as
   expect((await getUserById(db, userId))?.noticeLevels).toBeNull();
 });
 
-it('keeps one ungraded foreign price per source, the middle one', () => {
+it('keeps one foreign price per source in the compared condition, the middle one', () => {
   const row = (source: string, priceBase: number, bucket: string | null = null): ForeignPrice => ({
     source,
+    market: 'us',
     title: null,
     url: null,
     price: priceBase / 150,
@@ -217,15 +224,19 @@ it('keeps one ungraded foreign price per source, the middle one', () => {
     bucket,
     count: null,
   });
-  const out = foreignEstimates([
+  const rows = [
     row('tcgcsv', 3000),
     row('tcgcsv', 1000),
     row('tcgcsv', 2000),
     row('ebay', 9000, 'graded:PSA:10'),
     row('ebay', 1500),
-  ]);
+  ];
+  const out = foreignEstimates(rows, { bucket: 'raw:A', plain: true });
   expect(out.map((f) => [f.source, f.priceBase, f.of])).toEqual([
     ['tcgcsv', 2000, 3],
     ['ebay', 1500, 1],
   ]);
+  // A condition plain prices do not count in: only that condition's prices.
+  const graded = foreignEstimates(rows, { bucket: 'graded:PSA:10', plain: false });
+  expect(graded.map((f) => [f.source, f.priceBase])).toEqual([['ebay', 9000]]);
 });

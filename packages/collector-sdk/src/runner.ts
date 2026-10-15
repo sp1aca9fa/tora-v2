@@ -28,6 +28,7 @@ import {
   errorText,
 } from './http';
 import { baseConverter } from './money';
+import { awakeClock } from './clock';
 import type { Collector, CollectorContext } from './types';
 
 export interface RunOptions {
@@ -98,6 +99,7 @@ export async function runCollector(
         .map((s) => ({ source: s.source, title: s.title })),
   };
   const runId = await startRun(db, collector.source);
+  const clock = awakeClock();
   // Progress: items (products to match + listings to collect) done before the current one.
   let total = 0;
   let done = 0;
@@ -267,6 +269,7 @@ export async function runCollector(
     status: summary.status,
     requests: summary.requests,
     observationsAdded: added,
+    activeMs: clock.stop(),
     error: summary.errors.join('\n') || null,
   });
   return summary;

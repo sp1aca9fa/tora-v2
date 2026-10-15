@@ -8,6 +8,7 @@ import {
   identitySources,
   toTokyoIso,
   conditionListOf,
+  IDENTITY_MIN_COST,
 } from '@tora/core';
 import {
   and,
@@ -18,6 +19,7 @@ import {
   exists,
   gte,
   inArray,
+  isNotNull,
   isNull,
   lt,
   max,
@@ -36,6 +38,7 @@ import {
   type RecentSale,
   type SourceCandidate,
   type SourceQuery,
+  appSettings,
   collectorRuns,
   holdings,
   priceObservations,
@@ -532,6 +535,8 @@ export async function finishRun(
     status: CollectorRunStatus;
     requests: number;
     observationsAdded: number;
+    /** Working time, without time the PC slept. */
+    activeMs?: number | null;
     error?: string | null;
   },
 ): Promise<void> {
@@ -539,6 +544,67 @@ export async function finishRun(
     .update(collectorRuns)
     .set({ ...result, error: result.error?.slice(0, 2000) ?? null, finishedAt: toTokyoIso() })
     .where(eq(collectorRuns.id, id));
+}
+
+// ---------------------------------------------------------------------------------------------
+// run times (S16: ground rules for heavy users)
+
+/** The night window when the admin has not set one: 6 hours. */
+export const COLLECT_WINDOW_HOURS = 6;
+
+export interface CollectorTimes {
+  /** Per source: its last finished run's working time and the median of the runs before (ms). */
+  sources: Record<string, { last: number; usual: number | null; long: boolean }>;
+  /** The last night: each source's last run started within a day of the newest one, added up. */
+  night: number;
+  windowHours: number;
+  over: boolean;
+}
+
+/** A run's working time; older runs without one: start to finish. */
+const runMs = (r: { activeMs: number | null; startedAt: string; finishedAt: string | null }) =>
+  r.activeMs ?? Math.max(0, Date.parse(r.finishedAt!) - Date.parse(r.startedAt));
+
+/**
+ * How long collectors take (Settings > Collectors): a run is long when it took over twice its
+ * usual time and at least 5 minutes more; the night is over when its total passes the window.
+ */
+export async function collectorTimes(db: Db): Promise<CollectorTimes> {
+  const [runs, [setting]] = await Promise.all([
+    db
+      .select({
+        source: collectorRuns.source,
+        startedAt: collectorRuns.startedAt,
+        finishedAt: collectorRuns.finishedAt,
+        activeMs: collectorRuns.activeMs,
+      })
+      .from(collectorRuns)
+      .where(isNotNull(collectorRuns.finishedAt))
+      .orderBy(desc(collectorRuns.startedAt))
+      .limit(500),
+    db.select().from(appSettings).where(eq(appSettings.key, 'collectWindow')),
+  ]);
+  const bySource = new Map<string, typeof runs>();
+  for (const r of runs) {
+    const list = bySource.get(r.source) ?? [];
+    if (list.length < 8) bySource.set(r.source, [...list, r]);
+  }
+  const sources: CollectorTimes['sources'] = {};
+  const newest = runs[0]?.startedAt;
+  let night = 0;
+  for (const [source, [last, ...before]] of bySource) {
+    const ms = runMs(last!);
+    const usual = median(before.map(runMs));
+    sources[source] = {
+      last: ms,
+      usual,
+      long: usual !== null && ms > 2 * usual && ms - usual >= 5 * 60_000,
+    };
+    if (newest && Date.parse(newest) - Date.parse(last!.startedAt) < 86_400_000) night += ms;
+  }
+  const saved = Number(setting?.value);
+  const windowHours = saved > 0 ? saved : COLLECT_WINDOW_HOURS;
+  return { sources, night, windowHours, over: night > windowHours * 3_600_000 };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -874,14 +940,11 @@ export async function addSourceReference(
   return true;
 }
 
-/** Other items (not cards or sealed TCG) are expected to have their main source only above this. */
-export const STORE_LINK_MIN_COST = 3000;
-
 /**
  * The identity link an item is expected to have (requirements S8): a product page of one of its
  * class's identity sources (see `identitySources`), whatever the price roles; for other items
- * only when they cost more than ¥3,000 (what the user paid for the lots they own). The preferred
- * source (to look for and suggest) and every source whose page counts, in a market (default:
+ * only when they cost more than the admin's identity amount (what the user paid for the lots
+ * they own). The preferred source (to look for and suggest) and every source whose page counts, in a market (default:
  * the primary one, S11). Null when none applies.
  */
 export function identityFor(
@@ -893,7 +956,7 @@ export function identityFor(
   const cls = productClass(product);
   // Cards and sealed TCG always; other items (the item-condition list, the admin's lists) when not cheap.
   const always = ['card_grades', 'sealed'].includes(conditionListOf(cls));
-  if (!always && costBase <= STORE_LINK_MIN_COST) return null;
+  if (!always && costBase <= (registry.markets?.identityMinCost ?? IDENTITY_MIN_COST)) return null;
   const accepted = identitySources(registry, cls, market);
   return accepted.length ? { preferred: accepted[0]!, accepted } : null;
 }

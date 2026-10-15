@@ -8,7 +8,7 @@ import {
 import { tokyoDate } from '@tora/core';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getRegistry, sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
 import { AddFlow } from './add-flow';
@@ -40,8 +40,9 @@ export default async function AddPage({
     // The shop's item ID is the last part of the link (e.g. Mercari's m123…).
     orderId: new URL(link.url).pathname.split('/').filter(Boolean).pop() ?? null,
   };
-  const [t, fromHistory, franchises, product] = await Promise.all([
+  const [t, locale, fromHistory, franchises, product] = await Promise.all([
     getTranslations('add'),
+    getLocale(),
     acquiredFromSuggestions(db, user.id),
     productValueSuggestions(db, 'franchise', 'game'),
     productId ? getProduct(db, productId) : null,
@@ -61,9 +62,9 @@ export default async function AddPage({
       <AddFlow
         today={tokyoDate()}
         fromSuggestions={[...new Set([...fromHistory, ...registryShops])].sort((a, b) =>
-          a.localeCompare(b, 'ja'),
+          a.localeCompare(b, locale),
         )}
-        franchiseSuggestions={[...franchises].sort((a, b) => a.localeCompare(b, 'ja'))}
+        franchiseSuggestions={[...franchises].sort((a, b) => a.localeCompare(b, locale))}
         fromLink={fromLink}
         initialProduct={
           product && {

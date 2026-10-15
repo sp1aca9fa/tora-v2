@@ -114,7 +114,17 @@ export interface MarketSettings {
    * not set: the first source declaring it.
    */
   identity?: Record<string, Partial<Record<ProductClass, string | null>>>;
+  /** What item pages compare (S16): the primary with the secondary (default) or every market. */
+  compare?: 'secondary' | 'all';
+  /**
+   * Items outside cards and sealed TCG are expected to have their identity link only above this
+   * cost, in the base currency's smallest unit (S16). Not set: `IDENTITY_MIN_COST`.
+   */
+  identityMinCost?: number;
 }
+
+/** The default of `MarketSettings.identityMinCost` (¥3,000 when the base is yen). */
+export const IDENTITY_MIN_COST = 3000;
 
 /** Markets the sources belong to, best first (by their best source's priority). */
 export function marketsOf(sources: SourceInfo[]): string[] {
@@ -141,7 +151,13 @@ export function resolveMarkets(
       : saved?.secondary && saved.secondary !== primary && all.includes(saved.secondary)
         ? saved.secondary
         : (all.find((m) => m !== primary) ?? null);
-  return { primary, secondary, identity: saved?.identity ?? {} };
+  return {
+    primary,
+    secondary,
+    identity: saved?.identity ?? {},
+    compare: saved?.compare === 'all' ? 'all' : 'secondary',
+    identityMinCost: saved?.identityMinCost ?? IDENTITY_MIN_COST,
+  };
 }
 
 export interface SourceRegistry {

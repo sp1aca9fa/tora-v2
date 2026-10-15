@@ -6,7 +6,7 @@ import {
   type PackagingState,
   type RawGrade,
 } from './domain';
-import { conditionListOf } from './categories';
+import { type Taxonomy, conditionList, conditionListOf } from './categories';
 import type { ProductClass } from './taxonomy';
 
 /**
@@ -89,4 +89,32 @@ export function parseGrade(text: string): CardGrade | null {
   if (!slab || !grader || grader === 'other') return null;
   const grade = slab[2]!.replace(/\.0$/, '');
   return Number(grade) >= 1 && Number(grade) <= 10 ? { grading: 'graded', grader, grade } : null;
+}
+
+/**
+ * The condition item pages compare markets in (S7, S16), from the condition most owned units are
+ * in, and whether another market's plain price (no bucket: ungraded, as sold new) counts in it.
+ * TCG: ungraded cards in their grade, graded ones at ungraded A (plain prices are for ungraded
+ * near-mint cards); sealed with shrink unless the lot has none. Other lists: the lot's own
+ * condition, plain prices only in the list's best value. Null: nothing to compare in.
+ */
+export function compareBucket(
+  itemType: ProductClass,
+  mainBucket: Bucket | null,
+  taxonomy: Taxonomy,
+): { bucket: Bucket; plain: boolean } | null {
+  const list = conditionListOf(itemType);
+  if (list === 'card_grades') {
+    return { bucket: mainBucket?.startsWith('raw:') ? mainBucket : 'raw:A', plain: true };
+  }
+  if (list === 'sealed') {
+    return {
+      bucket: mainBucket === 'sealed:no_shrink' ? mainBucket : 'sealed:shrink',
+      plain: true,
+    };
+  }
+  const first = conditionList(taxonomy, list)?.values[0]?.key;
+  const best = list === 'item_condition' ? 'cond:new' : first ? `${list}:${first}` : null;
+  const bucket = mainBucket ?? best;
+  return bucket ? { bucket, plain: bucket === best } : null;
 }

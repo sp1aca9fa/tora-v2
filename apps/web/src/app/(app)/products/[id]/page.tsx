@@ -54,7 +54,7 @@ export default async function ProductPage({ params }: Params) {
     if (b) unitsByBucket.set(b, (unitsByBucket.get(b) ?? 0) + h.quantity);
   }
   const mainBucket = [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-  const usBucket = compareBucket(product, mainBucket);
+  const compare = await compareBucket(product, mainBucket);
   const [t, format, valuations, japan, history, images, foreign, dismissed] = await Promise.all([
     getTranslations(),
     getFormatter(),
@@ -63,7 +63,7 @@ export default async function ProductPage({ params }: Params) {
       user.id,
       owned.map((holding) => ({ holding, product })),
     ),
-    usBucket ? savedBucketValues(db, [{ product, bucket: usBucket }]) : null,
+    compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
     priceHistory(db, product.id, 365),
     imageVersions(db, [product.id]),
     foreignPrices(db, product.id),
@@ -233,10 +233,10 @@ export default async function ProductPage({ params }: Params) {
             </CardContent>
           </Card>
 
-          {usBucket && (
+          {compare && (
             <MarketCompare
-              bucket={usBucket}
-              japan={japan?.get(bucketValueKey(product.id, usBucket))?.valuation ?? null}
+              compare={compare}
+              japan={japan?.get(bucketValueKey(product.id, compare.bucket))?.valuation ?? null}
               product={product}
               mainBucket={mainBucket}
               foreign={foreign}

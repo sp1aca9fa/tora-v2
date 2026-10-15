@@ -1,9 +1,11 @@
-import { identityChoices, identitySources, typesOf } from '@tora/core';
+import { IDENTITY_MIN_COST, identityChoices, identitySources, typesOf } from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { adminOnly } from '@/lib/auth/guard';
-import { getRegistry, marketLabels } from '@/lib/sources';
+import { getRegistry, marketLabels, marketsInOrder } from '@/lib/sources';
+import { getMoney } from '@/lib/money-server';
+import { IdentityAmountForm } from '../../identity-amount-form';
 import { IdentityForm } from '../../identity-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,15 +18,16 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function IdentitySettingsPage() {
   await adminOnly();
-  const [registry, marketLabel, t] = await Promise.all([
+  const [registry, marketLabel, t, money] = await Promise.all([
     getRegistry(),
     marketLabels(),
     getTranslations(),
+    getMoney(),
   ]);
   const labels = Object.fromEntries(registry.sources.map((s) => [s.key, s.label]));
-  const markets = (['primary', 'secondary'] as const)
-    .map((which) => ({ which, market: registry.markets?.[which] ?? null }))
-    .filter((m): m is { which: 'primary' | 'secondary'; market: string } => !!m.market);
+  // Other markets' items are not flagged.
+  const markets = marketsInOrder(registry);
+  const amount = registry.markets?.identityMinCost ?? IDENTITY_MIN_COST;
   return (
     <div className="space-y-4">
       <Card>
@@ -38,8 +41,17 @@ export default async function IdentitySettingsPage() {
           </CardDescription>
         </CardHeader>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('identity.amount')}</CardTitle>
+          <CardDescription>{t('identity.amountInfo', { amount: money(amount) })}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <IdentityAmountForm amount={amount} />
+        </CardContent>
+      </Card>
       {markets.map(({ which, market }) => (
-        <Card key={which}>
+        <Card key={market}>
           <CardHeader>
             <CardTitle>{`${t(`markets.${which}`)}: ${marketLabel(market)}`}</CardTitle>
             <CardDescription>

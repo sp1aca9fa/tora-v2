@@ -50,6 +50,7 @@ export async function MarketsSection() {
             markets={marketsOf(registry.sources).map((m) => ({ key: m, label: marketLabel(m) }))}
             primary={registry.markets?.primary ?? null}
             secondary={registry.markets?.secondary ?? null}
+            compare={registry.markets?.compare ?? 'secondary'}
             editable
           />
         </CardContent>

@@ -12,11 +12,12 @@ import {
   loadSourceRegistry,
   pruneSourceDetails,
   saveSourceInfos,
+  setCollectWindow,
   setMarketSettings,
   setSourceOrder,
   setSourceRoles,
 } from './registry';
-import { identityFor, insertObservations } from './sources';
+import { collectorTimes, finishRun, identityFor, insertObservations, startRun } from './sources';
 import * as schema from './schema';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -192,4 +193,49 @@ it("keeps the admin's order per class within a role, never across roles", async 
   registry = await loadSourceRegistry(db);
   expect(valuationOrder(registry, 'item')).toEqual(['surugaya', 'mercari']);
   expect(registry.order?.sealed?.[0]).toBe('surugaya');
+});
+
+it('shows a third market and keeps the compare choice and identity amount (S16)', async () => {
+  await saveSourceInfos(db, [
+    ...TEST_SOURCES,
+    {
+      key: 'cardmarket',
+      label: 'Cardmarket',
+      market: 'eu',
+      currency: 'EUR',
+      priceKinds: ['listing'],
+      roles: { card: 'reference' },
+      identity: ['card'],
+    },
+  ]);
+  let registry = await loadSourceRegistry(db);
+  expect(registry.markets).toMatchObject({ compare: 'secondary', identityMinCost: 3000 });
+  expect(valuationOrder(registry, 'card', 'eu')).toEqual(['cardmarket']);
+  await setMarketSettings(db, { ...registry.markets!, compare: 'all', identityMinCost: 10000 });
+  registry = await loadSourceRegistry(db);
+  expect(registry.markets).toMatchObject({ primary: 'jp', compare: 'all', identityMinCost: 10000 });
+  // Items outside cards and sealed TCG need an identity link only above the admin's amount.
+  const game = { category: 'game', kind: 'software', itemType: 'game' };
+  expect(identityFor(game, 9000, registry)).toBeNull();
+  expect(identityFor(game, 12000, registry)).not.toBeNull();
+});
+
+it("records each run's working time and flags a long run and a long night (S16)", async () => {
+  const run = async (source: string, activeMs: number) =>
+    finishRun(db, await startRun(db, source), {
+      status: 'ok',
+      requests: 1,
+      observationsAdded: 0,
+      activeMs,
+    });
+  for (const ms of [600_000, 660_000, 540_000]) await run('snkrdunk', ms);
+  await run('snkrdunk', 3_000_000);
+  await run('mercari', 300_000);
+  let times = await collectorTimes(db);
+  expect(times.sources.snkrdunk).toEqual({ last: 3_000_000, usual: 600_000, long: true });
+  expect(times.sources.mercari).toEqual({ last: 300_000, usual: null, long: false });
+  expect(times).toMatchObject({ night: 3_300_000, windowHours: 6, over: false });
+  await setCollectWindow(db, 0.5);
+  times = await collectorTimes(db);
+  expect(times).toMatchObject({ windowHours: 0.5, over: true });
 });

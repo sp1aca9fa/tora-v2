@@ -1,0 +1,1 @@
+ALTER TABLE `collector_runs` ADD `active_ms` integer;

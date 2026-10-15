@@ -1,5 +1,5 @@
 import 'server-only';
-import { type SourceRegistry, sourceName } from '@tora/core';
+import { type SourceRegistry, marketsOf, sourceName } from '@tora/core';
 import { getDb, loadSourceRegistry } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { cache } from 'react';
@@ -17,4 +17,18 @@ export async function sourceLabels(): Promise<(key: string) => string> {
 export async function marketLabels(): Promise<(market: string | null | undefined) => string> {
   const t = await getTranslations('sources.market');
   return (market) => (!market ? '-' : t.has(market) ? t(market) : market.toUpperCase());
+}
+
+/** Every market, the primary and secondary first, then the others (S16), with its place. */
+export function marketsInOrder(
+  registry: SourceRegistry,
+): { market: string; which: 'primary' | 'secondary' | 'other' }[] {
+  const { primary = null, secondary = null } = registry.markets ?? {};
+  const rank = (m: string) => (m === primary ? 0 : m === secondary ? 1 : 2);
+  return marketsOf(registry.sources)
+    .toSorted((a, b) => rank(a) - rank(b))
+    .map((market) => ({
+      market,
+      which: market === primary ? 'primary' : market === secondary ? 'secondary' : 'other',
+    }));
 }

@@ -209,7 +209,7 @@
       "second_source": "{count, plural, one {# suggestion} other {# suggestions}} from another price source",
       "secondary_identity": "{count, plural, one {# item} other {# items}} without an identity link in the secondary market",
       "card_grade": "{count, plural, one {# card} other {# cards}} without a grade",
-      "game_condition": "{count, plural, one {# game} other {# games}} without a condition",
+      "game_condition": "{count, plural, one {# item} other {# items}} without a condition",
       "import_review": "{count, plural, one {# imported lot} other {# imported lots}} to review",
       "failed_link": "{count, plural, one {# purchase link} other {# purchase links}} could not be imported",
       "data_review": "{count, plural, one {# data review suggestion} other {# data review suggestions}} to decide",
@@ -341,7 +341,17 @@
         "info": "Kinds of items, their fields and condition lists."
       }
     },
-    "adminInfo": "Only admins see these settings. They apply to every account on this app."
+    "adminInfo": "Only admins see these settings. They apply to every account on this app.",
+    "collectWindow": "Night window",
+    "hours": "{count, plural, one {# hour} other {# hours}}",
+    "underMinute": "<1 min",
+    "minutes": "{m} min",
+    "hoursMinutes": "{h} h {m} min",
+    "nightTotal": "Last night: {total} of collecting, window {window}.",
+    "nightOver": "Longer than the window. Run one market or one collector at a time (pnpm collect --market us, --source x), spread across the night by the scheduler; the setup guide has an example.",
+    "runTime": "Last run: {time}",
+    "runTimeUsual": "Last run: {time} (usual {usual})",
+    "runTimeLong": "Last run: {time}, much longer than usual ({usual})"
   },
   "fields": {
     "type": "Type",
@@ -812,7 +822,9 @@
     "spread": "{pct}% vs {primary}",
     "converted": "{price} at {rate} per {currency} ({date})",
     "asks": "median ask of {count, plural, one {# listing} other {# listings}}",
-    "middleOf": "middle of {count} prices (printings or listings)"
+    "middleOf": "middle of {count} prices (printings or listings)",
+    "titleAll": "{primary} vs other markets",
+    "infoAll": "Same condition in every market ({bucket}). Other markets' prices are shown for comparison only and never count in the value."
   },
   "coverage": {
     "dismiss": "Don't warn",
@@ -835,7 +847,7 @@
       "second_source": "Suggestions from another price source",
       "secondary_identity": "Item without an identity link in the secondary market",
       "card_grade": "Card without a grade",
-      "game_condition": "Game without a condition",
+      "game_condition": "Item without a condition",
       "import_review": "Imported lots to review",
       "failed_link": "Purchase links that failed",
       "data_review": "Data review suggestions",
@@ -948,7 +960,12 @@
     "secondary": "Secondary market",
     "primaryInfo": "Where values come from.",
     "secondaryInfo": "Shown beside the value, never in it.",
-    "none": "None"
+    "none": "None",
+    "other": "Other market",
+    "compare": "Item pages compare",
+    "compareSecondary": "Primary and secondary market",
+    "compareAll": "Every market",
+    "compareInfo": "Other markets' prices are converted to the base currency and never count in the value."
   },
   "identity": {
     "whatTitle": "Why identity pages matter",
@@ -957,7 +974,12 @@
     "how": "Pick one source per kind of item and market. Items without an identity page are listed under Actions. A product page from another source of the same market that has them counts too. It does not have to be the price reference.",
     "primaryNotice": "Items without an identity page in {market} show under Actions as \"without an identity link\".",
     "secondaryNotice": "Items without an identity page in {market} show under Actions with their own notice type (blue by default).",
-    "notListed": "Only sources with one product page per item can be identity pages. Search-based sources (Mercari, Yahoo Auctions, eBay) cannot, but they can still be any market's price reference: set that under Price sources."
+    "notListed": "Only sources with one product page per item can be identity pages. Search-based sources (Mercari, Yahoo Auctions, eBay) cannot, but they can still be any market's price reference: set that under Price sources.",
+    "otherNotice": "Items without an identity page in {market} are not flagged.",
+    "amount": "Identity links for other items",
+    "amountInfo": "Cards and sealed TCG always need an identity link. Other items only when they cost more than this ({amount} now).",
+    "amountSave": "Save",
+    "amountSaved": "Saved"
   },
   "currency": {
     "title": "Currencies",

@@ -3,6 +3,9 @@
 # per day: it exits early when today's run already succeeded, so it is safe to trigger often.
 # Logs to ~/.local/state/tora/collect.log.
 #
+# Arguments go to `pnpm collect` (e.g. `collect-cron.sh --market us`), to spread markets or
+# collectors across the night (requirements S16); each set of arguments runs once per day.
+#
 #   MAX_JITTER_SECONDS=300  random wait before starting (default 300 s; 0 to disable)
 #   FORCE=1                 run even if today's run already succeeded
 set -euo pipefail
@@ -10,8 +13,10 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tora"
 LOG="$STATE_DIR/collect.log"
-STAMP="$STATE_DIR/last-success-date"
-LOCK="$STATE_DIR/collect.lock"
+# One stamp and lock per set of arguments ("--market us" -> "market-us").
+SUFFIX="$(printf '%s' "$*" | tr -c 'A-Za-z0-9_' '-' | sed 's/^-*//')"
+STAMP="$STATE_DIR/last-success-date${SUFFIX:+-$SUFFIX}"
+LOCK="$STATE_DIR/collect${SUFFIX:+-$SUFFIX}.lock"
 MAX_JITTER_SECONDS="${MAX_JITTER_SECONDS:-300}"
 mkdir -p "$STATE_DIR"
 
@@ -34,8 +39,8 @@ if [ "$MAX_JITTER_SECONDS" -gt 0 ]; then
 fi
 
 cd "$REPO_DIR"
-echo "=== $(date -Iseconds) ===" >>"$LOG"
-if pnpm --silent collect >>"$LOG" 2>&1; then
+echo "=== $(date -Iseconds) $* ===" >>"$LOG"
+if pnpm --silent collect "$@" >>"$LOG" 2>&1; then
   echo "$today" >"$STAMP"
 else
   echo "collect failed (exit $?); will retry on the next trigger" >>"$LOG"

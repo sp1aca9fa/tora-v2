@@ -641,6 +641,8 @@ export const collectorRuns = sqliteTable(
     status: text('status', { enum: COLLECTOR_RUN_STATUSES }).notNull(),
     requests: integer('requests').notNull().default(0),
     observationsAdded: integer('observations_added').notNull().default(0),
+    /** Working time in ms, without time the PC slept (S16); null for older runs. */
+    activeMs: integer('active_ms'),
     error: text('error'),
     ...timestamps,
   },

@@ -1,12 +1,12 @@
 import {
+  type Bucket,
   type RateSetting,
   baseCurrency,
   fromMinor,
-  marketCurrency,
   ratePair,
   tokyoDate,
 } from '@tora/core';
-import { and, asc, desc, eq, gt, gte, lte, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lte } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadSourceRegistry, setCurrencySettings } from './registry';
 import { type Product, fxRates, priceObservations, tcgSets } from './schema';
@@ -120,6 +120,8 @@ export async function productSetInfo(
 
 export interface ForeignPrice {
   source: string;
+  /** The source's market (S11). */
+  market: string;
   title: string | null;
   url: string | null;
   /** In the source's currency (e.g. dollars), and converted to the base with the rate of `fxDate`. */
@@ -138,8 +140,8 @@ export interface ForeignPrice {
 }
 
 /**
- * Newest price per listing of a product in another market's currency than the primary one (e.g.
- * TCGplayer), from the last `days`.
+ * Newest price per listing and condition of a product from the other markets' sources than the primary one
+ * (e.g. TCGplayer), from the last `days`.
  */
 export async function foreignPrices(
   db: Db,
@@ -148,7 +150,14 @@ export async function foreignPrices(
   days = 14,
 ): Promise<ForeignPrice[]> {
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
-  const primary = marketCurrency(await loadSourceRegistry(db));
+  const registry = await loadSourceRegistry(db);
+  const primary = registry.markets?.primary;
+  const marketOf = new Map(
+    registry.sources
+      .filter((s) => s.market && s.market !== primary && !s.shopOnly)
+      .map((s) => [s.key, s.market!]),
+  );
+  if (!primary || marketOf.size === 0) return [];
   const rows = await db
     .select()
     .from(priceObservations)
@@ -156,7 +165,7 @@ export async function foreignPrices(
       and(
         eq(priceObservations.productId, productId),
         eq(priceObservations.excluded, false),
-        ne(priceObservations.currency, primary),
+        inArray(priceObservations.source, [...marketOf.keys()]),
         gte(priceObservations.fetchedAt, since),
       ),
     )
@@ -165,14 +174,17 @@ export async function foreignPrices(
   const out: ForeignPrice[] = [];
   for (const o of rows) {
     const raw = (o.raw ?? {}) as { subType?: string; fxDate?: string; count?: number };
-    const key = `${o.source}|${o.url}|${raw.subType ?? ''}`;
-    if (seen.has(key) || o.priceOriginal === null || !o.currency) continue;
+    // Per listing and condition (a listing may price several, e.g. used and new).
+    const key = `${o.source}|${o.url}|${raw.subType ?? ''}|${o.bucket ?? ''}`;
+    if (seen.has(key) || !o.currency) continue;
     seen.add(key);
     out.push({
       source: o.source,
+      market: marketOf.get(o.source)!,
       title: o.title,
       url: o.url,
-      price: fromMinor(o.priceOriginal, o.currency),
+      // A market in the base currency: nothing was converted.
+      price: fromMinor(o.priceOriginal ?? o.priceBase, o.currency),
       currency: o.currency,
       priceBase: o.priceBase,
       fxRate: o.fxRate,
@@ -187,14 +199,18 @@ export async function foreignPrices(
 }
 
 /**
- * One estimated price per foreign source, for comparing with Japan in the same condition:
- * its ungraded (or sealed as sold new) prices only, and when there are several (TCGplayer
- * printings, several linked listings) the middle one. `of`: how many prices it was chosen from.
+ * One estimated price per foreign source, for comparing with the primary market in the same
+ * condition (see `compareBucket`): its prices in that bucket, and its plain ones (ungraded, as sold
+ * new) when they count in it; when there are several (TCGplayer printings, several linked
+ * listings) the middle one. `of`: how many prices it was chosen from.
  */
-export function foreignEstimates(prices: ForeignPrice[]): (ForeignPrice & { of: number })[] {
+export function foreignEstimates(
+  prices: ForeignPrice[],
+  compare: { bucket: Bucket; plain: boolean },
+): (ForeignPrice & { of: number })[] {
   const bySource = new Map<string, ForeignPrice[]>();
   for (const p of prices) {
-    if (p.bucket !== null) continue;
+    if (p.bucket === null ? !compare.plain : p.bucket !== compare.bucket) continue;
     bySource.set(p.source, [...(bySource.get(p.source) ?? []), p]);
   }
   return [...bySource.values()].map((list) => {

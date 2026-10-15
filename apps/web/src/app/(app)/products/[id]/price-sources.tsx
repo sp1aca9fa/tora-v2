@@ -75,7 +75,7 @@ export async function PriceSources({
   // (e.g. a no-shrink variant of a linked SNKRDUNK listing) wait under "Add another listing".
   const linked = new Set(active.map((s) => s.source));
   // No identity link yet (a stable product page: SNKRDUNK for cards, 駿河屋 for other items over
-  // ¥3,000): say so and keep the paste box open, whatever else is linked.
+  // the admin's identity amount): say so and keep the paste box open, whatever else is linked.
   const registry = await getRegistry();
   const identity = identityFor(product, ownedCostBase, registry);
   // Sources whose product links can be pasted here.

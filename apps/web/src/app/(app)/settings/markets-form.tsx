@@ -4,18 +4,20 @@ import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
-import { setMarketsAction } from './actions';
+import { setMarketOptionsAction, setMarketsAction } from './actions';
 
-/** The primary and secondary markets (S11; admins). */
+/** The primary and secondary markets (S11; admins) and what item pages compare (S16). */
 export function MarketsForm({
   markets,
   primary,
   secondary,
+  compare,
   editable,
 }: {
   markets: { key: string; label: string }[];
   primary: string | null;
   secondary: string | null;
+  compare: 'secondary' | 'all';
   editable: boolean;
 }) {
   const t = useTranslations('markets');
@@ -58,6 +60,30 @@ export function MarketsForm({
           </div>
         );
       })}
+      {markets.length > 2 && (
+        <div className="space-y-1.5 text-sm sm:col-span-2">
+          <p className="font-medium">{t('compare')}</p>
+          {editable ? (
+            <NativeSelect
+              value={compare}
+              disabled={pending}
+              aria-label={t('compare')}
+              onChange={(e) =>
+                startTransition(() =>
+                  setMarketOptionsAction({ compare: e.target.value as 'secondary' | 'all' }),
+                )
+              }
+              className="h-9 w-full sm:w-1/2"
+            >
+              <option value="secondary">{t('compareSecondary')}</option>
+              <option value="all">{t('compareAll')}</option>
+            </NativeSelect>
+          ) : (
+            <p>{t(compare === 'all' ? 'compareAll' : 'compareSecondary')}</p>
+          )}
+          <p className="text-xs text-muted-foreground">{t('compareInfo')}</p>
+        </div>
+      )}
     </div>
   );
 }

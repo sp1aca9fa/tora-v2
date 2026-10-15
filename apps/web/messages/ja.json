@@ -209,7 +209,7 @@
       "second_source": "他の価格ソースの候補 {count}件",
       "secondary_identity": "セカンダリ市場の識別リンクがないアイテム {count}件",
       "card_grade": "グレードのないカード {count}件",
-      "game_condition": "状態のないゲーム {count}件",
+      "game_condition": "状態のないアイテム {count}件",
       "import_review": "確認待ちのインポート {count}件",
       "failed_link": "インポートできなかった購入リンク {count}件",
       "data_review": "判断待ちのデータレビュー提案 {count}件",
@@ -341,7 +341,17 @@
         "info": "商品の種類、項目、状態リスト。"
       }
     },
-    "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。"
+    "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。",
+    "collectWindow": "夜間の実行時間枠",
+    "hours": "{count}時間",
+    "underMinute": "1分未満",
+    "minutes": "{m}分",
+    "hoursMinutes": "{h}時間{m}分",
+    "nightTotal": "昨夜の収集: 合計{total}（時間枠{window}）。",
+    "nightOver": "時間枠を超えています。市場ごと、またはコレクターごとに分けて実行し（pnpm collect --market us、--source x）、スケジューラーで夜間に分散してください。例はセットアップガイドにあります。",
+    "runTime": "前回の実行: {time}",
+    "runTimeUsual": "前回の実行: {time}（通常{usual}）",
+    "runTimeLong": "前回の実行: {time}、通常（{usual}）よりかなり長い"
   },
   "fields": {
     "type": "種類",
@@ -812,7 +822,9 @@
     "spread": "{primary}比 {pct}%",
     "converted": "{price}（1 {currency} = {rate}、{date}）",
     "asks": "出品{count}件の中央値",
-    "middleOf": "{count}件の価格の中央値"
+    "middleOf": "{count}件の価格の中央値",
+    "titleAll": "{primary}と他の市場の比較",
+    "infoAll": "すべての市場で同じ状態（{bucket}）で比較しています。他の市場の価格は比較用で、評価額には含まれません。"
   },
   "coverage": {
     "dismiss": "警告しない",
@@ -835,7 +847,7 @@
       "second_source": "他の価格ソースの候補",
       "secondary_identity": "セカンダリ市場の識別リンクがないアイテム",
       "card_grade": "グレードのないカード",
-      "game_condition": "状態のないゲーム",
+      "game_condition": "状態のないアイテム",
       "import_review": "確認待ちのインポート",
       "failed_link": "失敗した購入リンク",
       "data_review": "データレビューの提案",
@@ -948,7 +960,12 @@
     "secondary": "セカンダリ市場",
     "primaryInfo": "評価額の元になる市場。",
     "secondaryInfo": "評価額の横に表示（評価額には含めません）。",
-    "none": "なし"
+    "none": "なし",
+    "other": "その他の市場",
+    "compare": "商品ページで比較する市場",
+    "compareSecondary": "プライマリ市場とセカンダリ市場",
+    "compareAll": "すべての市場",
+    "compareInfo": "他の市場の価格は基準通貨に換算して表示し、評価額には含めません。"
   },
   "identity": {
     "whatTitle": "識別ページが大切な理由",
@@ -957,7 +974,12 @@
     "how": "市場とアイテムの種類ごとにソースを1つ選びます。識別ページのないアイテムはアクションに表示されます。同じ市場の商品ページを持つ他のソースのリンクも有効です。価格の基準ソースと同じである必要はありません。",
     "primaryNotice": "{market}の識別ページがないアイテムは、アクションに「識別リンクなし」として表示されます。",
     "secondaryNotice": "{market}の識別ページがないアイテムは、アクションに専用の通知として表示されます（初期設定は青）。",
-    "notListed": "識別ページにできるのは、アイテムごとに商品ページがあるソースだけです。検索型のソース（メルカリ、ヤフオク、eBay）は識別ページにできませんが、価格ソースで基準ソースに設定できます。"
+    "notListed": "識別ページにできるのは、アイテムごとに商品ページがあるソースだけです。検索型のソース（メルカリ、ヤフオク、eBay）は識別ページにできませんが、価格ソースで基準ソースに設定できます。",
+    "otherNotice": "{market}の識別ページがないアイテムは通知されません。",
+    "amount": "その他のアイテムの識別リンク",
+    "amountInfo": "カードとトレカの未開封品は常に識別リンクが必要です。その他のアイテムは、この金額を超える場合のみ必要です（現在{amount}）。",
+    "amountSave": "保存",
+    "amountSaved": "保存しました"
   },
   "currency": {
     "title": "通貨",

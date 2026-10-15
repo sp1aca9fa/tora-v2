@@ -1,4 +1,5 @@
-// `pnpm collect [--source x] [--product id] [--match-only] [--collect-only] [--review]`
+// `pnpm collect [--market us] [--source x] [--product id] [--match-only] [--collect-only] [--review]`
+// --market / --source: one market's or one source's collectors (S16: spread across the night).
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
 import {
@@ -27,6 +28,7 @@ import { reviewUsers } from './review-run';
 
 const { values } = parseArgs({
   options: {
+    market: { type: 'string' },
     source: { type: 'string' },
     product: { type: 'string' },
     'match-only': { type: 'boolean', default: false },
@@ -47,11 +49,22 @@ console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 await exitIfUnmigrated(db);
 // The plug-ins' source descriptions are saved first: the app reads them.
-const { collectors, importers, rates, missing } = await loadAndRegister(db);
+const { collectors, importers, rates, sources, missing } = await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
-const selected = collectors.filter((c) => !values.source || c.source === values.source);
+const marketOf = new Map(sources.map((s) => [s.key, s.market]));
+const selected = collectors.filter(
+  (c) =>
+    (!values.source || c.source === values.source) &&
+    (!values.market || marketOf.get(c.source) === values.market),
+);
+if (values.market && selected.length === 0) {
+  const known = [...new Set(sources.map((s) => s.market).filter(Boolean))].join(', ');
+  console.error(`No collectors for market "${values.market}" (markets: ${known || 'none'}).`);
+  process.exit(1);
+}
 let exitCode = 0;
 const withLinks = !values.product && importers.some((i) => i.readLink);
+// A run per market keeps the rates, purchase links and uploads (each does only what is waiting).
 const withRates = !values.product && !values.source && rates.length > 0;
 // Steps: exchange rates, purchase links, each collector, then pictures + lot sizes + snapshots.
 const progress = new Progress((withRates ? 1 : 0) + (withLinks ? 1 : 0) + selected.length + 1);

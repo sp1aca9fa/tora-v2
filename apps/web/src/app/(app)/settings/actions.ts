@@ -15,6 +15,7 @@ import {
   ROTATE_SECONDS,
   inClassOrder,
   identityChoices,
+  type MarketSettings,
   marketsOf,
   SOURCE_ROLES,
   type SourceRole,
@@ -30,6 +31,7 @@ import {
   setPreferences,
   setRateSetting,
   changeBaseCurrency,
+  setCollectWindow,
   setMarketSettings,
   setLanguageSettings,
   categoryUsage,
@@ -170,9 +172,9 @@ export async function setMarketsAction(primary: string, secondary: string | null
   const all = marketsOf(registry.sources);
   if (!all.includes(primary) || (secondary !== null && !all.includes(secondary))) return;
   await setMarketSettings(db, {
+    ...registry.markets,
     primary,
     secondary: secondary === primary ? null : secondary,
-    identity: registry.markets?.identity ?? {},
   });
   await clearAllBucketValues(db);
   after(async () => {
@@ -252,6 +254,41 @@ export async function setIdentitySourceAction(
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');
+}
+
+/**
+ * Market settings that leave values as they are (admins, S16): what item pages compare, and the
+ * cost above which other items are expected to have their identity link (base currency).
+ */
+export async function setMarketOptionsAction(
+  options: Partial<Pick<MarketSettings, 'compare' | 'identityMinCost'>>,
+) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const markets = (await loadSourceRegistry(db)).markets;
+  if (!markets) return;
+  const { compare, identityMinCost: min } = options;
+  if (compare !== undefined && compare !== 'secondary' && compare !== 'all') return;
+  if (min !== undefined && !(Number.isSafeInteger(min) && min >= 0)) return;
+  await setMarketSettings(db, {
+    ...markets,
+    ...(compare !== undefined && { compare }),
+    ...(min !== undefined && { identityMinCost: min }),
+  });
+  // Saved values carry the settings' date: saved again so pages keep using them.
+  after(async () => {
+    await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+}
+
+/** The nightly collect's time window in hours (admins, S16), for the run time warning. */
+export async function setCollectWindowAction(hours: number) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !Number.isInteger(hours) || hours < 1 || hours > 24) return;
+  await setCollectWindow(db, hours);
+  revalidatePath('/settings/collectors');
 }
 
 /** Where a currency's exchange rate comes from (admins, S16): a rate plug-in or a typed rate. */

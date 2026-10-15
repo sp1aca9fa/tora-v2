@@ -18,7 +18,6 @@ import {
   reviewNotes,
   oddSales,
   pendingImportReview,
-  STORE_LINK_MIN_COST,
   missingPriceSources,
   pendingMatchesForUser,
   portfolioSeries,
@@ -561,7 +560,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     finding(
       'missing_price_sources',
       'warn',
-      `Owned items without their main price source (the reference source of their class in the source registry; other items only when they cost more than ¥${STORE_LINK_MIN_COST}).`,
+      `Owned items without their main price source (the reference source of their class in the source registry; other items only when they cost more than the identity amount set in Settings > Identity, base currency's smallest unit).`,
       (await missingPriceSources(db, userId)).map((m) => ({
         productId: m.product.id,
         name: m.product.name,

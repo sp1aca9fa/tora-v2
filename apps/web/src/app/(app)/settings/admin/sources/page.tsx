@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs } from '@/components/ui/tabs';
 import { adminOnly } from '@/lib/auth/guard';
-import { getRegistry, marketLabels } from '@/lib/sources';
+import { getRegistry, marketLabels, marketsInOrder } from '@/lib/sources';
 import { SourcesForm } from '../../sources-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -29,16 +29,12 @@ export default async function SourceSettingsPage() {
       inClassOrder(registry, c, registry.sources).map((s) => s.key),
     ]),
   );
-  const { primary = null, secondary = null } = registry.markets ?? {};
-  const tabs = [
-    ...(primary ? [{ key: 'primary', market: primary }] : []),
-    ...(secondary ? [{ key: 'secondary', market: secondary }] : []),
-  ].map(({ key, market }) => ({
-    key,
+  const tabs = marketsInOrder(registry).map(({ market, which }) => ({
+    key: which === 'other' ? market : which,
     // Phones: the market's name only.
     label: (
       <>
-        <span className="hidden sm:inline">{t(`markets.${key}`)}: </span>
+        <span className="hidden sm:inline">{t(`markets.${which}`)}: </span>
         {marketLabel(market)}
       </>
     ),

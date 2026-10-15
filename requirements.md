@@ -27,7 +27,7 @@
 | S7 | US data (TCGCSV, eBay), 駿河屋, FX, JP vs US spread | built; eBay asks collector ready, waiting on the user's eBay developer account review |
 | S8 | Visual redesign + wide-screen layout, portfolio revamp (tracking groups, speed), Actions page, sources with roles | in progress |
 | S11 | Primary and secondary markets: roles and identity sources per market, one secondary price per item | built 2026-10-14; awaiting user check |
-| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: part 1 (currency) live 2026-10-14; parts 2 (languages) and 3 (categories) built 2026-10-14, migration 0024 to apply with the push; next part 4 (markets) |
+| S16 | Make Tora work anywhere: admin-defined categories (kinds, fields, price condition), markets, languages and base currency; ground rules for running many collectors | in progress: parts 1-3 (currency, languages, categories) live 2026-10-14; part 4 (markets, heavy-user rules) built 2026-10-15, migration 0025 to apply with the push; left: the EUR + French end-to-end check (with S10) and measuring on S14's large data |
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | todo (after S16; user, 2026-10-13) |
 | S6 | Export / import (JSON, CSV) + backups; imports started from the app | todo (moved after S8 at the user's request) |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
@@ -130,6 +130,7 @@
 - 2026-10-13: Summary insights (user): movers and trade panels switch between 7 days, 30 days, 90 days and a year; two market-wide panels (market movers by %, most traded in the market) cover every item any user holds (product names and prices only, no one's lots), tagged "All tracked items".
 - 2026-10-13: eBay keys working (production keyset, Marketplace Account Deletion exemption: no eBay user data stored). eBay's API terms (2025): no eBay data into generative AI tools, copies only while needed. So the eBay source is `noAi` (left out of the data review and the MCP tools; query_sql reads sales without it; Claude does not read eBay results, the user checks them in the app) and stores daily aggregates plus listing IDs for 14 days, no titles or links. First collect: 51 searches, 289 daily aggregates.
 
+- 2026-10-15: S16 part 4 (user's choices): other categories compare markets in the lot's own condition (TCG keeps its rule); the night window for collectors is the admin's (6 hours by default), a run over twice its usual time is flagged; taking turns waits for S14's large data; the identity-link amount (¥3,000) is the admin's, in the base currency, on the Identity page.
 ---
 
 # CORE
@@ -691,6 +692,17 @@ Part 3 design (2026-10-14, user's choices):
 
 Part 3 built (2026-10-14): Settings > Admin preferences > Categories (categories, kinds with their condition list, standard and custom fields per kind, the admin's condition lists with pool groups; names in the app's two languages; keys made from the English name on save; a change touching items lists them and asks; categories and kinds with items can only be hidden). Items store their item type (`item_type`) and custom field values (`fields`); lots store the admin's condition value (`condition_value`); buckets `{list}:{value}`. Add, edit, lot actions, item and lot pages, the items list, Price sources and Identity pages follow the categories; the admin's names join each page's texts. Games have their own item type (`game`); today's `item` roles, order, quality and identity choices are copied by migration 0024, and the plug-ins declare `game` too. Checked on the demo data: watches made from scratch (list with a pool group, a required text field, a choice field), a watch added and valued in its own condition, condition changed, Japanese names, a used value removed after the confirmation; TCG and games add as before. Tests: a watch valued with pooling, saving that touches items, the migration, a collector run for watches. Not covered yet: screenshot and email imports read only the built-in kinds; the identity-link threshold (¥3,000) is in yen; the market comparison is TCG only (part 4).
 
+Part 4 design (2026-10-15, user's choices):
+- What item pages compare: Settings > Markets, primary against secondary (default) or every market; each other market shows its reference source's price (else a supporting one's), converted to the base, next to the primary market's value. Markets are told apart by their sources' market, not by currency (two markets may share one).
+- The compared condition (user): TCG keeps today's rule (ungraded cards in their grade, graded ones at ungraded A; sealed with shrink unless the lot has none). Other categories compare in the lot's own condition (the one most units are in): another market's price counts when it prices that condition, or when it is the plain "as sold new" price and the lot is in the list's best value.
+- Run time (user): each collector run records its working time (time the PC slept is not counted). Settings > Collectors shows each collector's last run time and its usual time, and the last night's total against a night window the admin sets (default 6 hours); a total over the window and a run much longer than usual (over twice the median of its last runs) are flagged.
+- `pnpm collect --market us` runs one market's collectors (`--source x` exists already).
+- Taking turns (refreshing each item every few days when one night is too short) waits for S14's large data (user).
+- The amount above which items outside cards and sealed TCG are expected to have a store link (¥3,000 today) is the admin's, in the base currency, on the Identity page (user).
+- Screenshot and email imports read the admin's categories and kinds.
+
+Part 4 built (2026-10-15): Settings > Markets chooses what item pages compare (primary and secondary, or every market; shown with three or more markets); item pages compare any category, in the lot's own condition (TCG as before), each other market's price converted with its rate and source. Markets are told apart by their sources' market. Price sources and Identity pages show every market (other markets after the primary and secondary; their items are not flagged). The identity-link amount is set on the Identity page (base currency, ¥3,000 by default). Collector runs record their working time (migration 0025, `active_ms`; a sleeping PC is not counted); Settings > Collectors shows each run's time, its usual time, the last night's total and the admin's night window, flagging a long run and a night over the window. `pnpm collect --market`, and `collect-cron.sh` / `install-windows-task.sh` take arguments (one task per market and hour). Screenshot and email imports offer the admin's categories and kinds. "Item without a condition" notices name items, not games; sorts follow the page language. Checked on local test data with a third market (EU, euros): Markets, Price sources, Identity, the card (Japan, US, EU), a game in its own condition, a watch, the identity amount, the night window, a long run. Tests: the compared condition, foreign prices per condition, a third market with the compare choice and amount, run times and the night, the import schema. Left for S14: taking turns when one night is too short, and measuring the rules on large data.
+
 Acceptance:
 - An admin creates a new category from scratch (e.g. watches) with its own fields and price condition, registers items, and a test plug-in prices them; TCG and games work as before.
 - A third market added by a test plug-in shows in Markets, Price sources and Identity pages.
@@ -709,6 +721,15 @@ Added at the user's request (2026-10-13); replaces "documentation first" under O
 - Currency at setup (user, 2026-10-14): pick the base currency first, before adding anything (Settings > Markets > Currencies). A secondary market in another currency needs a rate plug-in; rules for building one, with `collectors-public/src/fx.ts` (ECB via Frankfurter) as the template: daily rates (working days are enough), expressed as units of the base per unit of the other currency, a year of history on the first run, a free source whose terms allow it, the currencies it covers declared. One currency only: nothing to set up. Changing the base later is rare and converts every stored amount.
 - Tora does not judge a site (user, 2026-10-14): it follows what each plug-in declares. A per-item link pattern (`links`) makes a source an identity choice; its price kinds decide the asking-price warnings; the only automatic check is the quality gate (a supporting source against its market's reference). The docs spell out the requirements for each role and what goes wrong when a plug-in declares them wrongly (for example a search page given as an item link).
 - Adding a language (S16): translate `apps/web/messages/en.json` into `{code}.json` (Claude can draft it), add the code to `LANGUAGES` in `apps/web/src/i18n/locale.ts`, run the tests (missing or extra texts fail), then pick it in Settings > Admin preferences > Languages.
+- Running many collectors (S16 ground rules), with Settings > Collectors to measure first:
+
+  | Setup | How to run |
+  | --- | --- |
+  | Up to about 3 markets and 10 collectors, a few hundred items | One nightly `pnpm collect` (2026-10-15: 6 collectors, about 100 items, about an hour) |
+  | More markets or collectors | One run per market at its own hour: `AT=01:00 scripts/install-windows-task.sh --market jp`, then `--market us` at 03:00 (`--source x` for one collector); remove the all-markets task |
+  | Too many items for one night | Taking turns, held items first (S14) |
+
+  Different sites may run side by side, never two runs for the same site; each site's pace and request cap are set in its plug-in.
 - Terms and responsibility: each site's terms are the builder's responsibility; sources whose terms forbid AI use are marked noAi.
 - Checked in S10 by the France + China setup.
 

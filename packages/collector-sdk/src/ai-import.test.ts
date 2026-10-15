@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BUILT_IN_CATEGORIES, EMPTY_REGISTRY, resolveTaxonomy } from '@tora/core';
 import { beforeEach, expect, it } from 'vitest';
 import {
   type AskClaude,
@@ -24,8 +25,10 @@ import {
   type ReadCache,
   checkContext,
   checkRow,
+  extractPrompt,
   mergeRows,
   readPurchases,
+  rowsSchema,
 } from './ai-import';
 import { applyAiImport, planAiImport } from './ai-import-plan';
 
@@ -434,4 +437,27 @@ it('joins look-alikes of different batches when the model, asked separately, is 
   const different = mergeRows([listing, deal], () => ({ same: false, confidence: 0.9 }));
   expect(different.rows).toHaveLength(2);
   expect(different.pairs).toEqual([]);
+});
+
+it("offers the admin's categories and kinds to the reader (S16)", () => {
+  const taxonomy = resolveTaxonomy({
+    categories: [
+      ...BUILT_IN_CATEGORIES,
+      {
+        key: 'watch',
+        names: { en: 'Watches' },
+        kinds: [{ key: 'wrist', names: { en: 'Wristwatch' }, conditions: 'item_condition' }],
+        fields: [],
+      },
+    ],
+  });
+  const registry = { ...EMPTY_REGISTRY, taxonomy };
+  const product = rowsSchema(registry).properties.rows.items.properties.product.properties;
+  expect(product.category.enum).toEqual(['tcg', 'game', 'watch']);
+  expect(product.kind.enum).toContain('wrist');
+  expect(product.kind.enum).toContain('single');
+  expect(extractPrompt(['a.png'], [], undefined, registry)).toContain(
+    'watch (Watches): kinds wrist (Wristwatch)',
+  );
+  expect(extractPrompt(['a.png'], [])).not.toContain('Other categories');
 });

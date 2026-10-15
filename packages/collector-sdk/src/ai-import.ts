@@ -11,7 +11,8 @@ import {
   EMPTY_REGISTRY,
   type Grader,
   GRADERS,
-  PRODUCT_KINDS,
+  BUILT_IN_CATEGORIES,
+  pickName,
   type ProductKind,
   REGIONS,
   type Region,
@@ -80,7 +81,60 @@ interface NewProduct {
 }
 
 const str = { type: ['string', 'null'] };
-export const ROWS_SCHEMA = {
+
+/** The categories a new product may be in: the admin's (S16), else the built-in TCG and games. */
+const categoriesOf = (registry: SourceRegistry) =>
+  (registry.taxonomy?.categories ?? BUILT_IN_CATEGORIES).filter((c) => !c.hidden);
+
+/** The rows' JSON schema, with the admin's categories and kinds. */
+export const rowsSchema = (registry: SourceRegistry = EMPTY_REGISTRY) => {
+  const categories = categoriesOf(registry);
+  const kinds = [
+    ...new Set(categories.flatMap((c) => c.kinds.filter((k) => !k.hidden).map((k) => k.key))),
+  ];
+  return {
+    ...ROWS_SCHEMA,
+    properties: {
+      rows: {
+        ...ROWS_SCHEMA.properties.rows,
+        items: {
+          ...ROWS_SCHEMA.properties.rows.items,
+          properties: {
+            ...ROWS_SCHEMA.properties.rows.items.properties,
+            product: {
+              ...ROWS_SCHEMA.properties.rows.items.properties.product,
+              properties: {
+                ...ROWS_SCHEMA.properties.rows.items.properties.product.properties,
+                category: { type: 'string', enum: categories.map((c) => c.key) },
+                kind: { type: 'string', enum: kinds },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+};
+
+/** "watch (Watches): kinds wrist (Wristwatch)": the admin's own categories, for the prompt. */
+function ownCategories(registry: SourceRegistry): string {
+  const name = (names: Record<string, string> | undefined, key: string) => {
+    const n = pickName(names, 'en', key);
+    return n === key ? key : `${key} (${n})`;
+  };
+  return categoriesOf(registry)
+    .filter((c) => !BUILT_IN_CATEGORIES.some((b) => b.key === c.key))
+    .map(
+      (c) =>
+        `${name(c.names, c.key)}: kinds ${c.kinds
+          .filter((k) => !k.hidden)
+          .map((k) => name(k.names, k.key))
+          .join(', ')}`,
+    )
+    .join('; ');
+}
+
+const ROWS_SCHEMA = {
   type: 'object',
   properties: {
     rows: {
@@ -104,8 +158,9 @@ export const ROWS_SCHEMA = {
           product: {
             type: ['object', 'null'],
             properties: {
-              category: { type: 'string', enum: ['tcg', 'game'] },
-              kind: { type: 'string', enum: [...PRODUCT_KINDS] },
+              // The admin's categories and kinds: see `rowsSchema`.
+              category: { type: 'string' },
+              kind: { type: 'string' },
               name: { type: 'string' },
               franchise: str,
               setName: str,
@@ -191,6 +246,7 @@ export function extractPrompt(
   hints?: { rows: ExtractedRow[]; flags: Record<string, string[]> },
   registry: SourceRegistry = EMPTY_REGISTRY,
 ): string {
+  const own = ownCategories(registry);
   return `Open each of these files with the Read tool (they are in the current folder) and list every item bought in them:
 ${files.map((f) => `- ${f}`).join('\n')}
 
@@ -209,9 +265,9 @@ One row per distinct item in an order. Several of the same item are one row with
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
 - date: the order / purchase date as YYYY-MM-DD (購入日時, 注文日). An order date missing its year: your best guess with dateApprox true. A listing page's age or update time (半年以上前, 3日前, 更新) is not the purchase date: null. Not shown at all: null.
 - status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
-- collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures; false for anything else.
+- collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures${own ? ', and items of the other categories below' : ''}; false for anything else.
 - productId: when the item is clearly one of the user's products listed below (same card name and number, same box or set, same game and platform), its id; else null.
-- product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind ("supply" for sleeves (スリーブ, デッキシールド), deck cases, playmats and loaders; "deck" only for a playable deck of cards); name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region: one of jp, en, zh_cn, zh_tw, kr, other ("jp" unless the item itself is an English or other-language version, 英語版 / 海外版; where it was sold does not matter). Null for non-collectibles.
+- product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind ("supply" for sleeves (スリーブ, デッキシールド), deck cases, playmats and loaders; "deck" only for a playable deck of cards); name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region: one of jp, en, zh_cn, zh_tw, kr, other ("jp" unless the item itself is an English or other-language version, 英語版 / 海外版; where it was sold does not matter). Null for non-collectibles.${own ? `\n  Other categories (category: its kinds): ${own}. Their items have only category, kind and name; the other fields are null.` : ''}
 - gradedAs: "PSA 10" (grader and grade) when the item is a graded slab; else null.
 - sealedState: for sealed boxes and packs, "shrink" or "no_shrink" when the title says (シュリンク付き / シュリンクなし); else null.
 - unsure: null, or a short reason when you guessed a field from what is shown. A field that is simply not shown is null and is not a reason to be unsure.
@@ -676,7 +732,7 @@ export async function readPurchases(
       model,
       system: EXTRACT_SYSTEM,
       prompt: extractPrompt(batch, products, hints, ctx.registry),
-      schema: ROWS_SCHEMA,
+      schema: rowsSchema(ctx.registry),
       readDir: dir,
       files: batch,
     });

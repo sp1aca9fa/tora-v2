@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveBucket, gradedBucket, parseGrade } from './bucket';
+import { compareBucket, deriveBucket, gradedBucket, parseGrade } from './bucket';
+import { resolveTaxonomy } from './categories';
 
 describe('deriveBucket', () => {
   it('raw cards use the raw grade', () => {
@@ -70,5 +71,38 @@ describe('parseGrade', () => {
   it('refuses unclear input', () => {
     for (const t of ['', 'E', 'PSA', 'PSA11', 'XYZ10', 'other 10'])
       expect(parseGrade(t)).toBeNull();
+  });
+});
+
+describe('compareBucket', () => {
+  const taxonomy = resolveTaxonomy({
+    lists: [
+      {
+        key: 'watch_condition',
+        values: [
+          { key: 'unworn', names: { en: 'Unworn' } },
+          { key: 'good', names: { en: 'Good' } },
+        ],
+      },
+    ],
+  });
+  it('keeps the TCG rule: ungraded cards in their grade, graded at A, sealed with shrink', () => {
+    expect(compareBucket('card', 'raw:B', taxonomy)).toEqual({ bucket: 'raw:B', plain: true });
+    expect(compareBucket('card', 'graded:PSA:10', taxonomy)).toEqual({
+      bucket: 'raw:A',
+      plain: true,
+    });
+    expect(compareBucket('sealed', 'sealed:opened', taxonomy)?.bucket).toBe('sealed:shrink');
+    expect(compareBucket('sealed', 'sealed:no_shrink', taxonomy)?.bucket).toBe('sealed:no_shrink');
+  });
+  it('compares other lists in the lot condition, plain prices only in the best value', () => {
+    expect(compareBucket('game', 'cond:good', taxonomy)).toEqual({
+      bucket: 'cond:good',
+      plain: false,
+    });
+    expect(compareBucket('game', null, taxonomy)).toEqual({ bucket: 'cond:new', plain: true });
+    const watch = 'watch/watch_condition';
+    expect(compareBucket(watch, 'watch_condition:unworn', taxonomy)?.plain).toBe(true);
+    expect(compareBucket(watch, 'watch_condition:good', taxonomy)?.plain).toBe(false);
   });
 });
