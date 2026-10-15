@@ -10,7 +10,8 @@
     "./migrate": "./src/migrate.ts",
     "./seed": "./src/seed.ts",
     "./catalog": "./src/catalog.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./backup": "./src/backup.ts"
   },
   "scripts": {
     "build": "tsc -p .",
@@ -21,7 +22,9 @@
     "studio": "drizzle-kit studio",
     "user": "tsx src/scripts/user.ts",
     "catalog:sync": "tsx src/scripts/catalog-sync.ts",
-    "valuate": "tsx src/scripts/valuate.ts"
+    "valuate": "tsx src/scripts/valuate.ts",
+    "backup": "tsx src/scripts/backup.ts",
+    "restore": "tsx src/scripts/restore.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

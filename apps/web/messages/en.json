@@ -1148,6 +1148,12 @@
       "enable": "Lets a disabled account sign in again.",
       "demo": "Fills the demo account with sample lots (only accounts named demo*)."
     },
+    "backups": {
+      "title": "Backups",
+      "backup": "Saves today's copy of the whole database (the schedule does it after each collect), and deletes copies no longer kept: the last 30 days and the first of each month for a year are.",
+      "list": "Lists the copies (or the folder in BACKUP_DIR).",
+      "restore": "Loads a copy into the new, empty database in DATABASE_URL; it refuses a database with data."
+    },
     "database": {
       "title": "Database and Claude",
       "migrate": "Applies new database migrations. Run it right after pushing a change that adds one.",

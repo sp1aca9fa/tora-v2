@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Daily collector run for Windows Task Scheduler (at logon + daily) or cron. Runs at most once
-# per day: it exits early when today's run already succeeded, so it is safe to trigger often.
+# Daily collector run for Windows Task Scheduler (at logon + daily) or cron, then the day's
+# database backup (`pnpm backup`). Runs at most once per day: it exits early when today's run
+# already succeeded, so it is safe to trigger often.
 # Logs to ~/.local/state/tora/collect.log.
 #
 # Arguments go to `pnpm collect` (e.g. `collect-cron.sh --market us`), to spread markets or
@@ -43,9 +44,19 @@ fi
 
 cd "$REPO_DIR"
 echo "=== $(date -Iseconds) $* ===" >>"$LOG"
-if pnpm --silent collect "$@" >>"$LOG" 2>&1; then
-  echo "$today" >"$STAMP"
-else
-  echo "collect failed (exit $?); will retry on the next trigger" >>"$LOG"
-  exit 1
+ok=1
+rc=0
+pnpm --silent collect "$@" >>"$LOG" 2>&1 || rc=$?
+if [ "$rc" != 0 ]; then
+  echo "collect failed (exit $rc); will retry on the next trigger" >>"$LOG"
+  ok=0
 fi
+# The day's backup of the whole database (requirements S6), whatever the collect did; one a day.
+rc=0
+pnpm --silent backup >>"$LOG" 2>&1 || rc=$?
+if [ "$rc" != 0 ]; then
+  echo "backup failed (exit $rc); will retry on the next trigger" >>"$LOG"
+  ok=0
+fi
+[ "$ok" = 1 ] || exit 1
+echo "$today" >"$STAMP"

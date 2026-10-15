@@ -12,6 +12,7 @@ this order the first time.
 | [Building a collector](collectors.md) | The plug-in contract, the template plug-in, testing, rate plug-ins, importers        |
 | [Running collectors](running.md)      | `pnpm collect`, the daily schedule, many collectors, logs, imports, the data review  |
 | [Languages](languages.md)             | The app's two languages and adding a new one                                         |
+| [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

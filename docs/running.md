@@ -37,8 +37,8 @@ a box with and without shrink wrap), each feeding its own condition.
 
 ## The daily schedule
 
-`scripts/collect-cron.sh` runs `pnpm collect` **at most once a day**: it exits at once when today's
-run already succeeded (a day in the app's time zone, written down by each collect), waits a
+`scripts/collect-cron.sh` runs `pnpm collect`, then the day's database backup (`pnpm backup`, see
+[backups](backups.md)), **at most once a day**: it exits at once when today's run already succeeded (a day in the app's time zone, written down by each collect), waits a
 random 0-5 min, loads nvm, and logs to
 `~/.local/state/tora/collect.log`. Because it is safe to start often, it is started by events
 rather than one fixed time. Arguments are passed on (`--market jp`), each set with its own daily

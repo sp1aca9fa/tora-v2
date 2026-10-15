@@ -28,6 +28,8 @@
     "catalog:fetch": "pnpm --filter @tora/catalog run fetch",
     "catalog:sync": "pnpm --filter @tora/db catalog:sync",
     "valuate": "pnpm --filter @tora/db valuate",
+    "backup": "pnpm --silent --filter @tora/db backup",
+    "restore": "pnpm --silent --filter @tora/db restore",
     "demo": "pnpm --silent --filter @tora/collector-sdk demo",
     "mcp": "pnpm --silent --filter @tora/mcp start"
   },

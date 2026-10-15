@@ -41,13 +41,14 @@ After editing `packages/db/src/schema.ts`: `pnpm db:generate`, then `pnpm db:mig
 
 ### Environment variables
 
-| Variable                                                           | Where                      | What                                                                                       |
-| ------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`, `DATABASE_AUTH_TOKEN`                              | `.env` and Vercel          | `file:./data/local.db` locally; the Turso URL and token in production                      |
-| `AUTH_SECRET`                                                      | `.env` and Vercel          | The **same** random value in both (see below)                                              |
-| `ENABLE_EXPERIMENTAL_COREPACK=1`                                   | Vercel                     | Uses the pnpm version pinned in `package.json`                                             |
-| `ANTHROPIC_API_KEY`                                                | Vercel, optional           | Uploaded screenshots are read right away by the Claude API ([imports](running.md#imports)) |
-| Keys a plug-in needs (e.g. `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`) | `.env` on the home PC only | Never on Vercel: collectors run only at home                                               |
+| Variable                                                           | Where                           | What                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`, `DATABASE_AUTH_TOKEN`                              | `.env` and Vercel               | `file:./data/local.db` locally; the Turso URL and token in production                      |
+| `AUTH_SECRET`                                                      | `.env` and Vercel               | The **same** random value in both (see below)                                              |
+| `ENABLE_EXPERIMENTAL_COREPACK=1`                                   | Vercel                          | Uses the pnpm version pinned in `package.json`                                             |
+| `ANTHROPIC_API_KEY`                                                | Vercel, optional                | Uploaded screenshots are read right away by the Claude API ([imports](running.md#imports)) |
+| Keys a plug-in needs (e.g. `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`) | `.env` on the home PC only      | Never on Vercel: collectors run only at home                                               |
+| `BACKUP_DIR`                                                       | `.env` on the home PC, optional | Where the daily database copies go ([backups](backups.md))                                 |
 
 `AUTH_SECRET` signs sessions and encrypts the authenticator secrets that `pnpm user` writes, which
 is why the home PC and Vercel must share it. Changing it signs everyone out and needs
@@ -143,7 +144,9 @@ These are choices made once, at setup, for the whole app (Settings > Admin prefe
    with), and each other currency's rate source. See [Markets and currency](markets.md).
 7. **Price sources** and **Identity**: each source's role per item type and each market's identity
    page per item type. See [Sources and roles](sources.md).
-8. **The daily collect**: install the scheduled task. See [Running collectors](running.md).
+8. **The daily collect**: install the scheduled task. See [Running collectors](running.md). It
+   also backs up the database every day; set `BACKUP_DIR` to keep the copies off the PC too. See
+   [Backups](backups.md).
 
 Then add your items in the app (Add, or Imports), confirm the listings the collectors find for
 them under **Actions**, and the next collects fill in their history and values.

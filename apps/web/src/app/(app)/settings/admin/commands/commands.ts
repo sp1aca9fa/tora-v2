@@ -63,6 +63,15 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     ],
   },
   {
+    key: 'backups',
+    guide: 'backups.md',
+    commands: [
+      { key: 'backup', command: 'pnpm backup' },
+      { key: 'list', command: 'ls -lh ~/.local/share/tora/backups' },
+      { key: 'restore', command: 'pnpm restore <file>' },
+    ],
+  },
+  {
     key: 'database',
     guide: 'setup.md#2-database-turso',
     commands: [
