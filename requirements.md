@@ -36,6 +36,7 @@
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check | todo (user, 2026-10-14) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
+| S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
 ### Decision log
 
@@ -137,6 +138,7 @@
 - 2026-10-15: The app's time zone (S16 part 5, user): set by the admin in Settings > Admin preferences > Time zone, one for the whole app (not per user), picked at setup next to the base currency; existing data stays Asia/Tokyo until changed. Stored times keep their text form (ISO with the zone's offset at that instant, so a day is still the first 10 characters and nothing else changes); changing the zone later rewrites every stored time as the same instant in the new zone (every `*_at` column and times inside JSON), then values and daily snapshots are rebuilt; dates without a time (snapshots, exchange rates, release dates) stay. The collect's "today" and the schedule's daily stamp follow the app's zone (replacing the home PC's date above). Reason: one definition of a day everywhere; storing UTC instead would have changed every day calculation in the app.
 - 2026-10-16: S6 rethought (user): automatic backups of the whole database on the home PC (a synced folder can take them off the PC; 30 daily + 12 monthly kept; restore only into an empty database), a per-account download (lots spreadsheet, JSON of the account's own data, no collected prices) and a spreadsheet import in the download's layout that skips rows already in Tora. Dropped: per-table CSV zip, whole-database JSON, the purchases file upload. Gmail auto-import moved to Open issues. Loading the JSON into an empty account is optional, later. Reason: accounts, Claude-read uploads and admin settings came after the first plan; what cannot be collected again is what needs protecting.
 - 2026-10-16: Import log and alerts (user): every import keeps each row's outcome (a row left out must never be only a number); a spreadsheet row matching a lot only loosely can be added anyway from the preview. Alerts outside the app and an activity log become their own phase, S17, after S6 and before S9 (S9's price alerts use its channels). Plan order: S6 > S17 > S9 > S13 > S10 > S14 > S15.
+- 2026-10-16: A documentation pass is the last phase, S18 (user): it builds nothing, so it comes after S15. Plan order: S17 > S9 > S13 > S10 > S14 > S15 > S18.
 ---
 
 # CORE
@@ -879,6 +881,10 @@ Acceptance:
 - `pnpm check:all` passes; no severity 1 or 2 bug left open; the bug log and what is left for Open issues reviewed with the user.
 
 ---
+
+## S18: Documentation pass
+
+The last phase (user, 2026-10-16): nothing to build, so it comes after everything else. Each phase keeps its guide current as it goes; this pass reads `docs/` and the README from start to finish against the app as it is then (S17, S9, S13, S10's France + China setup, S14, S15 all change what a newcomer sees), fixes what drifted, fills gaps, and checks every command and link. To consider then: the Japanese documentation for the portfolio (Open issues).
 
 ## Open issues (to plan later)
 
