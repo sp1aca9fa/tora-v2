@@ -395,7 +395,8 @@ rather than a fixed time.
 ```
 
 This registers the `tora-collect` task: 5 minutes after you log on to Windows, plus daily at
-12:00 and "as soon as possible" if the PC was off then. It starts WSL by itself.
+12:00 and "as soon as possible" if the PC was off then, then every hour until midnight (a run cut
+short by turning the PC off is retried; a finished day is skipped). It starts WSL by itself.
 Remove it with `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"`.
 
 **cron (only if WSL stays running):**
