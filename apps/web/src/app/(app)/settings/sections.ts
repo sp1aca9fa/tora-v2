@@ -8,6 +8,7 @@ import {
   Plug,
   ShieldCheck,
   Store,
+  Terminal,
   User,
 } from 'lucide-react';
 
@@ -37,6 +38,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
       { key: 'identity', href: '/settings/admin/identity', icon: Fingerprint, admin: true },
       { key: 'categories', href: '/settings/admin/categories', icon: Shapes, admin: true },
       { key: 'languages', href: '/settings/admin/languages', icon: Languages, admin: true },
+      { key: 'commands', href: '/settings/admin/commands', icon: Terminal, admin: true },
     ],
   },
 ];

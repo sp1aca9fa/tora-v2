@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "c-1001",
+      "title": "ピカチュウ 025/100 プロモ",
+      "url": "https://example-market.test/items/c-1001",
+      "image": "https://example-market.test/img/c-1001.jpg",
+      "price": 4800,
+      "currency": "JPY"
+    },
+    {
+      "id": "c-1002",
+      "title": "ピカチュウ 026/100",
+      "url": "https://example-market.test/items/c-1002",
+      "image": null,
+      "price": 300,
+      "currency": "JPY"
+    },
+    {
+      "id": "s-77",
+      "title": "スリーブ 64枚入り",
+      "url": "https://example-market.test/items/s-77",
+      "image": null,
+      "price": 900,
+      "currency": "JPY"
+    }
+  ]
+}

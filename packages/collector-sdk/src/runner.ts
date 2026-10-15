@@ -57,8 +57,24 @@ export interface RunSummary {
   errors: string[];
 }
 
+/** The closest two requests to one site may be. */
+const MIN_DELAY_MS = 2000;
+
 /** Products searched per source per run (the rest wait for the next run). */
 const MATCH_PER_RUN = 50;
+
+/** The polite client's options for a collector: its own pace, never under 2-5 s (S16). */
+export function pace(collector: Collector, options?: PoliteHttpOptions): PoliteHttpOptions {
+  const own = collector.http ?? {};
+  const minDelayMs = Math.max(MIN_DELAY_MS, own.minDelayMs ?? MIN_DELAY_MS);
+  const maxDelayMs = Math.max(minDelayMs, own.maxDelayMs ?? Math.max(5000, minDelayMs));
+  return {
+    minDelayMs,
+    maxDelayMs,
+    ...(own.maxRequests !== undefined && { maxRequests: own.maxRequests }),
+    ...options,
+  };
+}
 
 /** One run of one collector: match unlinked products, then collect linked listings. */
 export async function runCollector(
@@ -67,7 +83,7 @@ export async function runCollector(
   options: RunOptions = {},
 ): Promise<RunSummary> {
   const log = options.log ?? ((m: string) => console.log(`[${collector.source}] ${m}`));
-  const http = new PoliteHttp(options.http);
+  const http = new PoliteHttp(pace(collector, options.http));
   let added = 0;
   const now = options.now ?? new Date();
   // Plug-ins report amounts in their own currency; they are stored in the base (S16).

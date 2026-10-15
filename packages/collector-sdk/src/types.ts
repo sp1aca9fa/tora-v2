@@ -9,7 +9,7 @@ import type {
   RecentSale,
   SourceQuery,
 } from '@tora/db';
-import type { PoliteHttp } from './http';
+import type { PoliteHttp, PoliteHttpOptions } from './http';
 import type { Email } from './mbox';
 
 export interface CollectorContext {
@@ -70,6 +70,11 @@ export interface Collector {
   /** Matches `product_sources.source` and `price_observations.source`. */
   source: string;
   label: string;
+  /**
+   * This site's pace and request cap per run (default 2-5 s between requests, 500 requests). A
+   * plug-in can only slow down: requests are never closer than 2 s.
+   */
+  http?: Pick<PoliteHttpOptions, 'minDelayMs' | 'maxDelayMs' | 'maxRequests'>;
   /** Whether this source can price the product (e.g. SNKRDUNK: TCG only). */
   supports(product: Product): boolean;
   /** Searches the site for listings that may be this product, best first, with a 0-1 score. */

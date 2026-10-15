@@ -1,0 +1,29 @@
+{
+  "title": "ピカチュウ 025/100 プロモ",
+  "url": "https://example-market.test/items/c-1001",
+  "image": "https://example-market.test/img/c-1001.jpg",
+  "hasMore": true,
+  "sales": [
+    {
+      "id": "t-905",
+      "price": 5200,
+      "currency": "JPY",
+      "condition": "A",
+      "soldAt": "2026-10-14T21:10:00+09:00"
+    },
+    {
+      "id": "t-904",
+      "price": 31000,
+      "currency": "JPY",
+      "condition": "PSA 10",
+      "soldAt": "2026-10-13T18:02:00+09:00"
+    },
+    {
+      "id": "t-903",
+      "price": 4900,
+      "currency": "JPY",
+      "condition": "A",
+      "soldAt": "2026-10-12T09:45:00+09:00"
+    }
+  ]
+}

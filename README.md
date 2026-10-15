@@ -14,26 +14,25 @@ their own collection, while the product catalog and market data are shared.
 ### Bring your own sources
 
 Prices and purchase imports come from **source plug-ins** that you choose and write for the shops
-and marketplaces you use. A plug-in implements the `Collector` interface (find listings for a
-product, fetch its sold prices) and/or the `PurchaseImporter` interface (read order emails, or links
-you paste in the app, into purchases), see `packages/collector-sdk/src/types.ts`. Plug-in packages are loaded by path from
-`collectors-public/` (publishable ones) and `collectors/` (an optional private package, e.g. a git
-submodule), so the app, build and tests work without any of them. The framework enforces a polite
-pace (2-5 s between requests, a request cap per run, stop on 403/429/captcha) and refuses to run on
-Vercel/CI, but whether a site may be collected from is up to you: check its terms of use first.
+and marketplaces you use, starting from a runnable template. The framework enforces a polite pace
+and refuses to run on Vercel or CI, but whether a site may be collected from is up to you: check
+its terms of use first. Categories, markets, the base currency and the app's languages are set by
+an admin, so Tora works for any collectibles in any country.
 
 ```
 apps/web                 Next.js app (UI, server actions, auth)
-packages/core            Domain logic: taxonomy, lot splits, valuation buckets
+packages/core            Domain logic: categories, sources and markets, valuation, buckets
 packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
-packages/collector-sdk   Collector interface, registry, `pnpm collect`
-collectors-public/       Publishable plug-ins (public APIs: TCGCSV and eBay prices, ECB exchange rates; shops)
+packages/collector-sdk   Plug-in contract, polite HTTP, `pnpm collect` and the imports
+packages/mcp             Read-only MCP server (Claude reads your data on the home PC)
+collectors-public/       Publishable plug-ins (TCGCSV and eBay prices, ECB exchange rates) and the template
 collectors/              Optional private plug-ins (git submodule; not in this repo)
+docs/                    The guides
 ```
 
-## Local setup (WSL2)
+## Quick start (local)
 
 Requires Node 22+ (24 LTS recommended) and pnpm via corepack.
 
@@ -42,403 +41,27 @@ corepack enable
 pnpm install
 cp .env.example .env
 openssl rand -base64 32       # put it in .env as AUTH_SECRET
-
 pnpm db:migrate               # creates ./data/local.db
 pnpm db:seed                  # catalog + demo account with sample data (local DB only)
 pnpm dev                      # http://localhost:3000
 ```
 
 The seed prints the demo login: `demo` / `local-dev-password`, authenticator key
-`JBSWY3DPEHPK3PXP` (add it to an authenticator app, demo use only) and backup codes.
-
-Other commands: `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm typecheck`,
-`pnpm db:generate` (after editing `packages/db/src/schema.ts`), `pnpm collect`.
-
-All tools read the single `.env` at the repo root. A relative `file:` `DATABASE_URL` resolves
-from the repo root.
-
-## Deploying
-
-### 1. Turso (database)
-
-```bash
-curl -sSfL https://get.tur.so/install.sh | bash
-turso auth login
-turso db create tora --location aws-ap-northeast-1     # Tokyo
-turso db show tora --url                               # libsql://...
-turso db tokens create tora                            # auth token
-```
-
-Migrations run from your PC, not from Vercel builds. Point `.env` at Turso and migrate:
-
-```bash
-DATABASE_URL=libsql://tora-<org>.turso.io
-DATABASE_AUTH_TOKEN=<token>
-```
-
-```bash
-pnpm db:migrate
-```
-
-Your home PC's `.env` keeps these values so `pnpm collect` writes to Turso. For local UI work
-against a throwaway DB, switch `DATABASE_URL` back to `file:./data/local.db`.
-
-### 2. Vercel (web app)
-
-1. Push this repo to GitHub and import it in Vercel.
-2. **Root Directory**: `apps/web`. Framework: Next.js (auto-detected).
-3. Environment variables (Production):
-   - `DATABASE_URL`, `DATABASE_AUTH_TOKEN` (from Turso)
-   - `AUTH_SECRET` (the same value as in your local `.env`, see below)
-   - `ENABLE_EXPERIMENTAL_COREPACK=1` (so Vercel uses the pnpm version pinned in `package.json`)
-4. Deploy. Functions run in Tokyo (`hnd1`, see `apps/web/vercel.json`) next to the Turso DB.
-5. On the phone: open the URL, sign in, then "Add to Home Screen".
-
-### 3. Accounts
-
-There is no sign-up page. Accounts are managed from the home PC (with `.env` pointing at Turso):
-
-```bash
-pnpm user create <username>        # password, then scan the QR code with an authenticator app,
-                                   # confirm one code, write down the 8 backup codes
-pnpm user list
-pnpm user devices <username>
-pnpm user revoke <username> <device-id|all>
-pnpm user reset-password <username>
-pnpm user reset-2fa <username>     # lost phone: new authenticator + backup codes
-pnpm user disable|enable <username>
-```
-
-The first account is an admin. If the database has data from before accounts existed, the first
-account you create takes it over.
-
-A demo account shows the app without anyone's real collection: `pnpm user create demo`, then
-`pnpm demo demo` fills it with sample lots of every kind and every kind of notice, finds their
-price sources with the collectors' matching and settles each item to show a state (complete, to
-confirm, missing). Run it again to reset it; only accounts named `demo*` are touched. Then
-`pnpm collect` gives the items real prices.
-
-### Auth notes
-
-- Login: username + password, then a 6-digit authenticator code (or a one-time backup code).
-- **Max 2 devices per account.** Each login registers the device; a third is refused until one is
-  revoked (Settings on another device, or `pnpm user revoke`). Signing out frees the slot.
-  On iPhone, Safari and the home-screen app count as two devices: sign in from the home-screen app.
-- Sessions do not expire while used (the cookie is renewed automatically). Revoking the device,
-  changing the password or resetting 2FA ends them.
-- Password: scrypt hash. Authenticator secret: AES-GCM encrypted with a key derived from
-  `AUTH_SECRET`, which is why the local `.env` and Vercel must share the same `AUTH_SECRET`.
-- Lockout: 5 failures per IP per 15 min, 10 per username per hour, 50 overall per hour. IPs and
-  usernames in the log are keyed hashes.
-- The app fails closed: without `AUTH_SECRET`, only the login page is served.
-
-## TCG catalog
-
-`packages/catalog/data/*.json` holds Japanese sets with release dates (Magic sets apply to every
-region). Sealed products (box, pack, deck) are created from a set the first time someone registers
-one. Sources: the official Pokemon card product list (codes cross-checked with TCGdex), the One Piece Card Game official product list, Yugipedia
-(Yu-Gi-Oh! OCG) and Scryfall (Magic). Only set names, codes, types and dates are taken.
-
-```bash
-pnpm catalog:fetch [pokemon|one_piece|yugioh|mtg]   # refresh the JSON (a few minutes), review, commit
-pnpm catalog:sync                                   # load into the database; removes sets that left the catalog
-```
-
-## Collectors
-
-Collectors only fetch for products with active sources, at a polite pace (2-5 s between requests,
-a request cap per run, stop on 403/429/captcha), and only from the home PC. Never run them on
-Vercel or CI (the CLI refuses when `VERCEL` or `CI` is set).
-
-```bash
-pnpm collect                         # all collectors: match, then collect
-pnpm collect --market <market>       # one market's collectors (e.g. us)
-pnpm collect --source <source>       # one collector
-pnpm collect --match-only            # only look for listings of unlinked items
-pnpm collect --collect-only          # only fetch trades for linked listings
-pnpm collect --product <product-id>  # one product
-pnpm collect --review                # then the data review below (or TORA_REVIEW=1)
-pnpm valuate                         # only refresh valuation snapshots (collect does this too)
-```
-
-### How items get prices
-
-1. Register an item in the app as usual.
-2. On the next run, each collector searches its site for owned (or opened) items without a
-   listing and stores the best candidates.
-3. In the app, **Actions** and the item page's **Price sources** show them:
-   confirm the right one, or paste the listing's link instead. A product can have several listings
-   (e.g. a box with and without shrink wrap); each feeds its own price bucket.
-4. The next runs backfill the listing's sales history (a page budget per run, resuming where they
-   stopped), then add new sales.
-
-Settings shows each source's last run, items waiting for confirmation, listings not collected for
-3+ days and big median moves.
-
-### Run time and many collectors
-
-Settings > Collectors shows each collector's working time (time the PC slept is not counted),
-its usual time, and the last night's total against a night window the admin sets (6 hours by
-default); a long run and a night over the window are flagged. Up to about 3 markets and 10
-collectors, one nightly `pnpm collect` is enough. Beyond that, run one market at a time at
-different hours, one Windows task each (then remove the all-markets `tora-collect` task):
-
-```bash
-AT=01:00 scripts/install-windows-task.sh --market jp   # task tora-collect-market-jp
-AT=03:00 scripts/install-windows-task.sh --market us   # task tora-collect-market-us
-```
-
-Collectors for different sites may run side by side; never two runs for the same site.
-
-### Markets, sources and roles
-
-Every source belongs to a **market** (Japan, US, ...). An admin picks two in **Settings > Markets
-and price sources** (they apply to every account): the **primary market** makes the value; the
-**secondary market** gives one price per item to compare with, shown on the item page (e.g.
-**Japan vs US**), never counted in the value. Sources of other markets are not used.
-
-Within each market, every source has a **role** per kind of item (cards, sealed TCG, games and
-other items):
-
-- **Reference**: the trusted source for that kind of item. Valued first (in the secondary market:
-  its price is the one compared).
-- **Supporting**: used when the reference has too few sales (fewer than 3 in the windows the
-  valuation tries).
-- **Comparison**: shown on the item page's price sources, never counted.
-- **Off**: not used for that kind of item.
-
-Each market also has an **identity page** per kind of item: the source whose product page says
-exactly what the item is (name, set, number, picture), used to find the same item elsewhere. Items
-without one show under **Actions** (other items only when they cost more than ¥3,000); a product
-page from another source of that market that has them counts too. It need not be the reference.
-
-A value is the median of the reference's sales (30 days, widened to 90 / 180 / 365 when there are
-fewer than 3), else a supporting source's, else a shop's asking price in the same condition (at
-most 30 days old), else the retail price. Only the primary market's prices count.
-
-Each plug-in suggests its sources' roles; an admin can change them in **Settings > Price
-sources** (they apply to every account). The suggestions of the author's plug-ins make the
-**Japan collectibles** setup this app is built and tested with (primary market Japan, secondary
-US):
-
-| Source             | Market | Cards      | Sealed TCG | Games & other | Identity page | What it gives                                               |
-| ------------------ | ------ | ---------- | ---------- | ------------- | ------------- | ----------------------------------------------------------- |
-| SNKRDUNK           | Japan  | reference  | reference  | -             | cards, sealed | verified trades, raw grades and slabs apart                 |
-| Mercari            | Japan  | supporting | supporting | supporting    | -             | sold listings (searched; bundles, parts and fakes filtered) |
-| 駿河屋             | Japan  | -          | supporting | reference     | sealed, games | store and buy-back prices (no sales)                        |
-| TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices, converted to the base currency            |
-| eBay               | US     | supporting | supporting | -             | -             | US asking prices (official API)                             |
-
-**Trust is earned, not declared.** After each collect, each supporting source's sales are compared
-with its market's reference's on the same items and conditions (the last 90 days, 3+ sales on each side). On
-10+ items, a median gap over 15% means it disagrees: it is valued as comparison only until it agrees
-again, admins get a notice, and Settings shows the gap. With fewer items in common it is
-"unverified" and keeps its role. (For example, Mercari card sales run about 15% below SNKRDUNK's,
-so Mercari is comparison only for cards; for sealed product it agrees.)
-
-Notes on the author's sources:
-
-- **US prices**: TCGplayer market prices through TCGCSV (public files, updated daily), for
-  Japanese and English Pokemon cards and sealed product, converted to the base currency with that
-  day's rate (ECB rates via Frankfurter, fetched at the start of each collect) and shown on the item page as **Japan vs
-  US**. TCGplayer only prices ungraded cards.
-- **eBay asks**: eBay's official Browse API (active listings only; eBay closed its sold data to new
-  developers and blocks scraping). Each collect stores, per condition (ungraded, PSA 10, ...), the
-  median asking price, the lowest and how many are listed, and the listing IDs seen (kept 14
-  days; no titles or links). eBay's terms forbid giving its data to AI models, so the source is
-  marked `noAi`: the data review, the MCP tools and Claude never see it. Needs a
-  production keyset from developer.ebay.com in the root `.env` (`EBAY_CLIENT_ID` = App ID,
-  `EBAY_CLIENT_SECRET` = Cert ID); without it the collector is skipped.
-
-### Writing a source plug-in
-
-A plug-in package exports `collectors` (find listings for a product, collect their prices),
-optionally `importers` (read order emails or pasted links into purchases) and `sources`: one
-description per price source or shop (`SourceInfo` in `packages/core/src/sources.ts`):
-
-- `key`, `label`, `badge`: how it is stored and shown;
-- `market`, `currency`, `priceKinds`: where its prices are from and what they are (sales, asking
-  prices, buy-back prices);
-- `categories`: the categories it collects, by key (none: the built-in `tcg` and `game`);
-- `roles` (per item type) and `priority`: its suggested role in its market, and its default order
-  among sources of the same role (an admin can reorder them per item type in Settings > Admin
-  preferences > Price sources);
-- `identity`: the item types it has one stable product page per item for (it can be an item's
-  identity page);
-- `links`: the shape of its product links (pasting one on an item links that listing);
-- `aliases`, `singleItemOrders`, `orderIds`: how purchases from it are recognised in imports (its
-  names, whether an order ID is one item, the shape of its IDs);
-- `shopOnly`: a shop purchases come from that is not a price source;
-- `noAi`, `detailsDays`: when its terms forbid giving its data to AI models (left out of the data
-  review and the MCP tools), or allow keeping listing details only for some days.
-
-The collectors save these descriptions to the database on each run; the app reads them there (it
-cannot load private plug-ins). Nothing in the app names a store.
-
-**Categories.** The admin defines the categories in Settings > Admin preferences > Categories:
-kinds, fields and a condition list per kind; TCG and games are built-in templates. An item type is
-a category's kinds sharing a condition list: `card` (TCG singles), `sealed`, `item` (other TCG
-items) and `game` for the templates, `{category}/{list}` for the admin's (e.g. `watch/watch_condition`).
-Roles and identity pages are declared per item type. A collector's `supports(product)` picks the
-items it handles (`product.category`, `product.kind`, `product.itemType`, and custom fields in
-`product.fields`). Prices go in buckets: the ready-made lists' (`raw:A`, `graded:PSA:10`,
-`sealed:shrink`, `cond:new`) or `{list}:{value}` for the admin's lists (e.g.
-`watch_condition:unworn`); the keys show in the Categories settings.
-
-**Currencies.** A plug-in reports every amount in its own currency, in the currency's smallest unit
-(yen, cents): prices as `price` with `currency`, candidates' and recent sales' `price`, receipts'
-`total`. It never converts. The collect converts each amount to the base currency with the
-exchange rate of its day and keeps the rate used. A package may also export `rates`: exchange-rate
-plug-ins (`key`, `label`, the `currencies` they cover, a `rates` function for a pair and a date
-range); `collectors-public` has one for the European Central Bank's rates. The admin sets the base
-currency and where each other currency's rate comes from (a rate plug-in or a typed rate) in
-Settings > Admin preferences > Markets > Currencies. Prices in a currency without a
-rate are not saved until it has one.
-
-**Your sources, your responsibility.** The app checks what it can (sales against the reference,
-outliers, the data review, the import review), but which sites you collect from, whether their
-terms allow it, and how good their data is are up to you. The author takes no responsibility for
-other setups, sources or imports. A new source is best started as **comparison** and given a
-role once its numbers look right.
-
-### Purchase import
-
-Importer plug-ins turn a shop's order emails into purchases. Export the emails with Google Takeout
-(Gmail filter + label, then Mail limited to that label) and run, on the home PC:
-
-```bash
-pnpm purchases <export.mbox> --user <username> [--source <source>]
-```
-
-The app never gets access to Gmail. Purchases are matched by transaction ID: ones already
-registered with the same data are skipped, different data or likely duplicates are asked about,
-cancelled orders are left out, and nothing is written before you confirm. Imported items then
-appear under **Review import** in the app to set each one's grade, cert number or packaging.
-
-Shops that send no receipt email (e.g. Mercari, where buyers are only notified in the app) use
-links instead: paste the links of things you bought under **Imports > Purchase links** (from the
-phone is fine). The next `pnpm collect` on the home PC reads each link once with
-the importer whose `matchesLink` accepts it (`readLink`), imports it the same way and shows what
-happened next to each link (imported, matched an entry you added by hand, already registered,
-skipped with the reason, failed).
-
-### Import through Claude (any shop)
-
-For shops without an importer: put what you have (screenshots of the order list or order pages,
-PDFs, CSV, copied text) in one folder and run, on the home PC:
-
-```bash
-pnpm import-ai <folder> --user <username> [--dry-run] [--yes]   # Windows paths work too
-```
-
-Haiku reads the files (`claude -p` with only the Read tool, confined to that folder) and lists
-every purchase, matched to your items or as a new one. The code checks each row (missing price or
-date, a match the title does not support, a price far from the item's value, the model unsure),
-and Sonnet reads again the files with flagged rows plus a 10 % sample (`--sample`). The plan is
-the same as for order emails: already registered purchases are recognised (by order ID, or by
-item, price and date when there is none), non-collectibles and cancelled orders are left out, and
-nothing is written before you confirm. New lots wait in **Imports > Review**; failed purchase
-links whose item it imported are marked as resolved. Readings are cached in the folder
-(`.tora-import.json`), so running again only reads new files.
-
-**From the app** (Imports > Upload screenshots or files): the same import, without a terminal.
-Files are uploaded one by one (up to 30, 4 MB each) and read in one of two ways:
-
-- **On the home PC** (default, no extra cost with a Claude plan): `pnpm collect` reads waiting
-  uploads with the home PC's Claude login, and so does `pnpm import-uploads`, which is quick when
-  nothing waits and can be scheduled every few minutes (see Daily schedule).
-- **Right away by the app**: with an `ANTHROPIC_API_KEY` in Vercel's environment, the app reads
-  each upload as soon as it is sent (Claude API: Haiku 5.5, Sonnet 5.5 for flagged files; a few
-  cents per batch of screenshots, billed to that key).
-
-Either way the purchases wait in **Imports > Review**, and an upload that failed can be tried again.
-
-### Data review
-
-The checks flag sales far from an item's value and searches that keep little of what they find.
-`pnpm review` (or `pnpm collect --review`) hands only those to Claude Code on the home PC
-(`claude -p`, with your Claude login; no tools, no MCP): Haiku judges each case, the ones it is
-unsure about go to Sonnet, and the findings appear under **Imports > Suggestions** (exclude a
-sale, make a search skip a word, fill in product details). Nothing changes until you accept one;
-dismissed suggestions and cases judged fine are not looked at again. `--dry-run` prints the
-verdicts without filing anything. A run with ~20 cases costs a few cents.
-
-### Private plug-ins (submodule)
-
-The author's own plug-ins live in a private repo mounted at `collectors/` (git submodule). Use the
-same layout for yours: `collectors/src/index.ts` exporting `collectors`, `importers` and `sources`
-(see "Writing a source plug-in").
-
-```bash
-git clone --recurse-submodules git@github.com:sp1aca9fa/tora-v2.git
-# or, in an existing checkout:
-git submodule update --init
-pnpm install
-```
-
-Without it, `pnpm collect` reports the package as missing and does nothing; the app, build and
-tests work as usual. Vercel builds skip it (private submodules are not fetched), which is intended.
-Commit collector changes inside `collectors/` first, push them, then commit the updated submodule
-pointer in the main repo.
-
-### Daily schedule
-
-`scripts/collect-cron.sh` runs `pnpm collect` **at most once per day**: it exits right away when
-today's run already succeeded, waits a random 0-5 min first (jitter), loads nvm, and logs to
-`~/.local/state/tora/collect.log`. Because it is safe to trigger often, it is started by events
-rather than a fixed time.
-
-**Windows Task Scheduler (recommended, PC not always on):**
-
-```bash
-./scripts/install-windows-task.sh     # from WSL; no admin needed
-```
-
-This registers the `tora-collect` task: 5 minutes after you log on to Windows, plus daily at
-12:00 and "as soon as possible" if the PC was off then, then every hour until midnight (a run cut
-short by turning the PC off is retried; a finished day is skipped). It starts WSL by itself.
-Remove it with `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"`.
-
-**cron (only if WSL stays running):**
-
-```bash
-crontab -e
-0 * * * * /home/<user>/code/<path>/tora-v2/scripts/collect-cron.sh   # hourly; runs once a day
-*/5 * * * * cd /home/<user>/code/<path>/tora-v2 && pnpm import-uploads   # optional: files uploaded in the app
-```
-
-Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`
-to go through the scheduled path.
-
-## Claude access (MCP)
-
-`packages/mcp` is a local [MCP](https://modelcontextprotocol.io) server that lets Claude read one
-user's data, to sanity-check it, explain it and find what to improve. It is read-only, runs on the
-home PC over stdio with the root `.env`, and is never deployed.
-
-```bash
-# Claude Code (from anywhere):
-claude mcp add tora -- pnpm --silent --dir /path/to/tora-v2 mcp --user <username>
-```
-
-For Claude Desktop, add the same command to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "tora": {
-      "command": "pnpm",
-      "args": ["--silent", "--dir", "/path/to/tora-v2", "mcp", "--user", "<username>"]
-    }
-  }
-}
-```
-
-(On Windows with the repo in WSL, use `"command": "wsl"` and put `pnpm ...` in `args`.)
-
-Tools: `portfolio_summary`, `list_products`, `product_detail`, `price_history`, `sales`,
-`collector_status`, `review_queue`, `data_checks` (start here for "does anything look off?") and
-`query_sql` (one read-only SELECT).
+`JBSWY3DPEHPK3PXP` (demo use only).
+
+## Documentation
+
+| Guide                                      | What it covers                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------- |
+| [Setup](docs/setup.md)                     | Accounts and tools, the database, deploying, the first user, first settings   |
+| [Markets and currency](docs/markets.md)    | Primary and secondary markets, the base currency, exchange rates              |
+| [Categories](docs/categories.md)           | Kinds of items, fields, condition lists, item types and price buckets         |
+| [Sources and roles](docs/sources.md)       | Reference, supporting, comparison; identity pages; the quality gate           |
+| [Building a collector](docs/collectors.md) | The plug-in contract, the template, testing, rate plug-ins, importers         |
+| [Running collectors](docs/running.md)      | `pnpm collect`, the daily schedule, many collectors, imports, the data review |
+| [Languages](docs/languages.md)             | The app's two languages and adding one                                        |
+
+In the app, Settings > Admin preferences > Commands lists the home-PC commands.
 
 ## License
 

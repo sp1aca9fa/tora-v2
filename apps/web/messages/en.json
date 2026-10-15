@@ -322,7 +322,7 @@
       },
       "admin": {
         "title": "Admin preferences",
-        "info": "Markets, price sources, identity pages, categories and languages, for every account."
+        "info": "Markets, price sources, identity pages, categories, languages and the home PC's commands, for every account."
       },
       "markets": {
         "title": "Markets",
@@ -339,6 +339,10 @@
       "categories": {
         "title": "Categories",
         "info": "Kinds of items, their fields and condition lists."
+      },
+      "commands": {
+        "title": "Commands",
+        "info": "The home PC's commands and what each does."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -1084,6 +1088,55 @@
       "kind_list": "A kind uses a removed condition list.",
       "field_key": "Two fields have the same name.",
       "choice_empty": "A choice field needs at least one choice."
+    }
+  },
+  "commands": {
+    "info": "Commands to run on the home PC, in a terminal in the Tora folder (WSL or Linux). Nothing runs from this page: copy a command, then fill in the parts in <angle brackets>.",
+    "guide": "Guide",
+    "copy": "Copy",
+    "copied": "Copied",
+    "collect": {
+      "title": "Collecting prices",
+      "all": "Every collector: look for listings of new items, then fetch prices, then pictures, values and the day's snapshot.",
+      "market": "Only one market's collectors (e.g. us).",
+      "source": "Only one collector (its key, e.g. ebay).",
+      "product": "Only one item (its ID from the item page's address).",
+      "matchOnly": "Only look for listings of items without one.",
+      "collectOnly": "Only fetch prices for listings already confirmed.",
+      "valuate": "Only rebuild values and the value history."
+    },
+    "schedule": {
+      "title": "Daily schedule",
+      "install": "Installs the Windows task: after logging on and at 12:00, retried hourly until a run finishes that day.",
+      "perMarket": "One task per market at its own hour, when one night is not enough for every collector.",
+      "force": "Runs the scheduled collect now, even if today's already finished.",
+      "log": "Follows the collect log."
+    },
+    "imports": {
+      "title": "Imports and review",
+      "uploads": "Reads files uploaded in the app (Imports > Upload) with the home PC's Claude login.",
+      "ai": "Imports purchases from screenshots, PDFs or text in a folder, through Claude.",
+      "mail": "Imports purchases from order emails exported with Google Takeout.",
+      "review": "Asks Claude about flagged sales and searches; findings go to Imports > Suggestions."
+    },
+    "accounts": {
+      "title": "Accounts",
+      "create": "Creates an account: password, authenticator QR code, backup codes. The first one is an admin.",
+      "list": "Lists the accounts.",
+      "devices": "Lists an account's signed-in devices (at most 2).",
+      "revoke": "Signs a device out, or all of them.",
+      "password": "Sets a new password.",
+      "twoFactor": "A lost phone: new authenticator key and backup codes.",
+      "disable": "Stops an account from signing in.",
+      "enable": "Lets a disabled account sign in again.",
+      "demo": "Fills the demo account with sample lots (only accounts named demo*)."
+    },
+    "database": {
+      "title": "Database and Claude",
+      "migrate": "Applies new database migrations. Run it right after pushing a change that adds one.",
+      "catalogFetch": "Refreshes the TCG set catalog files (then review and commit them).",
+      "catalogSync": "Loads the TCG set catalog into the database.",
+      "mcp": "Lets Claude Code read your data, read-only (sources marked no-AI are left out)."
     }
   }
 }

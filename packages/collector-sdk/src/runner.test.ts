@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
 import { BlockedError } from './http';
-import { runCollector } from './runner';
+import { pace, runCollector } from './runner';
 import type { Collector } from './types';
 
 let db: Db;
@@ -351,4 +351,18 @@ it('collects for a category the admin made, in its own condition values (S16)', 
   expect(seen).toEqual(['watch/wrist/watch/watch_condition/Seiko']);
   const stats = await bucketStats(db, product.id, 30, new Date('2026-10-09T00:00:00Z'));
   expect(stats).toEqual([expect.objectContaining({ bucket: 'watch_condition:unworn', count: 1 })]);
+});
+
+it("uses a plug-in's own pace, never faster than 2 s", () => {
+  const plugin = (http?: Collector['http']) => ({ source: 'x', http }) as Collector;
+  expect(pace(plugin())).toEqual({ minDelayMs: 2000, maxDelayMs: 5000 });
+  expect(pace(plugin({ minDelayMs: 8000, maxRequests: 50 }))).toEqual({
+    minDelayMs: 8000,
+    maxDelayMs: 8000,
+    maxRequests: 50,
+  });
+  expect(pace(plugin({ minDelayMs: 100, maxDelayMs: 500 }))).toMatchObject({
+    minDelayMs: 2000,
+    maxDelayMs: 2000,
+  });
 });
