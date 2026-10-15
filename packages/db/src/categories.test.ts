@@ -1,4 +1,4 @@
-import { type Taxonomy, resolveTaxonomy, toTokyoIso } from '@tora/core';
+import { type Taxonomy, resolveTaxonomy, toLocalIso } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -96,13 +96,13 @@ it('registers, values and edits items of a category the admin made', async () =>
         fields: { brand: 'Seiko', movement: 'auto', unknown: 'dropped' },
       },
     },
-    { quantity: 1, costTotalBase: 100000, acquiredAt: toTokyoIso(), conditionValue: 'excellent' },
+    { quantity: 1, costTotalBase: 100000, acquiredAt: toLocalIso(), conditionValue: 'excellent' },
   );
   expect(product.itemType).toBe('watch/watch_condition');
   expect(product.fields).toEqual({ brand: 'Seiko', movement: 'auto' });
 
   // Too few "excellent" sales: the "worn" group (excellent + good) is pooled; unworn is not.
-  const day = (n: number) => toTokyoIso(new Date(Date.now() - n * 86_400_000));
+  const day = (n: number) => toLocalIso(new Date(Date.now() - n * 86_400_000));
   await insertObservations(
     db,
     [
@@ -157,7 +157,7 @@ it('keeps the built-in item types and roles for TCG and games', async () => {
     db,
     userId,
     { product: { category: 'game', kind: 'software', name: 'Zelda' } },
-    { quantity: 1, costTotalBase: 5000, acquiredAt: toTokyoIso(), condition: 'new_unused' },
+    { quantity: 1, costTotalBase: 5000, acquiredAt: toLocalIso(), condition: 'new_unused' },
   );
   expect(product.itemType).toBe('game');
   expect(registry.roles.surugaya?.game).toBe('reference');

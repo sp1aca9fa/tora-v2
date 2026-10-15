@@ -1,5 +1,6 @@
 import {
   Bell,
+  Clock,
   Eye,
   Fingerprint,
   Globe,
@@ -38,6 +39,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
       { key: 'identity', href: '/settings/admin/identity', icon: Fingerprint, admin: true },
       { key: 'categories', href: '/settings/admin/categories', icon: Shapes, admin: true },
       { key: 'languages', href: '/settings/admin/languages', icon: Languages, admin: true },
+      { key: 'timeZone', href: '/settings/admin/time-zone', icon: Clock, admin: true },
       { key: 'commands', href: '/settings/admin/commands', icon: Terminal, admin: true },
     ],
   },

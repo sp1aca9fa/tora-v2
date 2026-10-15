@@ -2,8 +2,14 @@
 // Imports marketplace purchases from a Google Takeout mail export (requirements S5b). Runs on
 // the home PC; the app never gets Gmail access. Nothing is written before the summary is
 // confirmed, and existing entries are never removed.
-import { tokyoDate } from '@tora/core';
-import { createDb, finishImportRun, getUserByUsername, startImportRun } from '@tora/db';
+import { localDate } from '@tora/core';
+import {
+  createDb,
+  finishImportRun,
+  getUserByUsername,
+  startImportRun,
+  loadTimeZone,
+} from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { resolve } from 'node:path';
@@ -35,6 +41,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const user = await getUserByUsername(db, values.user.trim().toLowerCase());
 if (!user) {
   console.error(`No user "${values.user}".`);
@@ -60,7 +68,7 @@ console.log(`User: ${user.username}\n`);
 const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
 const answers = rl[Symbol.asyncIterator]();
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
-const day = (iso: string) => tokyoDate(new Date(iso));
+const day = (iso: string) => localDate(new Date(iso));
 const line = (r: PurchaseReceipt) =>
   `  ${day(r.orderedAt)}  #${r.orderId}  ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`;
 async function choose<T>(question: string, options: Record<string, T>): Promise<T> {

@@ -1,4 +1,4 @@
-import { baseCurrency, convertMinor, ratePair, tokyoDate } from '@tora/core';
+import { baseCurrency, convertMinor, ratePair, localDate } from '@tora/core';
 import { type Db, fxRateOn, loadSourceRegistry } from '@tora/db';
 
 /** A currency has no stored rate to the base yet (Settings > Markets sets where it comes from). */
@@ -30,7 +30,7 @@ export async function baseConverter(db: Db) {
     at: string | Date,
   ): Promise<Converted> => {
     if (!currency || currency === base) return { amount: minor, rate: null, rateDate: null };
-    const day = tokyoDate(typeof at === 'string' ? new Date(at) : at);
+    const day = localDate(typeof at === 'string' ? new Date(at) : at);
     const key = `${currency}|${day}`;
     if (!rates.has(key)) rates.set(key, fxRateOn(db, ratePair(currency, base), day));
     const rate = await rates.get(key)!;

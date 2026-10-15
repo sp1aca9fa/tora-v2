@@ -1,5 +1,5 @@
 // Purchase files uploaded in the app for the import through Claude (requirements S8 step 5).
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { importUploads } from './schema';
@@ -29,7 +29,7 @@ export async function addUpload(
 export async function finishUploadBatch(db: Db, userId: string, batchId: string): Promise<number> {
   const rows = await db
     .update(importUploads)
-    .set({ status: 'waiting', updatedAt: toTokyoIso() })
+    .set({ status: 'waiting', updatedAt: toLocalIso() })
     .where(
       and(
         eq(importUploads.userId, userId),
@@ -48,7 +48,7 @@ export async function finishUploadBatch(db: Db, userId: string, batchId: string)
 export async function claimUploadBatch(db: Db, batchId: string) {
   const claimed = await db
     .update(importUploads)
-    .set({ status: 'reading', updatedAt: toTokyoIso() })
+    .set({ status: 'reading', updatedAt: toLocalIso() })
     .where(and(eq(importUploads.batchId, batchId), eq(importUploads.status, 'waiting')))
     .returning();
   return claimed.length ? claimed : null;
@@ -84,7 +84,7 @@ export async function finishUploadRead(
       message: result.message,
       importRunId: result.importRunId ?? null,
       data: result.status === 'done' ? '' : undefined,
-      updatedAt: toTokyoIso(),
+      updatedAt: toLocalIso(),
     })
     .where(eq(importUploads.batchId, batchId));
 }
@@ -93,7 +93,7 @@ export async function finishUploadRead(
 export async function retryUploadBatch(db: Db, userId: string, batchId: string): Promise<void> {
   await db
     .update(importUploads)
-    .set({ status: 'waiting', message: null, updatedAt: toTokyoIso() })
+    .set({ status: 'waiting', message: null, updatedAt: toLocalIso() })
     .where(
       and(
         eq(importUploads.userId, userId),

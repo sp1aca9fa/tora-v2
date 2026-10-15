@@ -17,7 +17,7 @@ import {
   USER_ROLES,
   VALUATION_CONFIDENCES,
   newId,
-  toTokyoIso,
+  toLocalIso,
   type NoticeLevels,
   type ProductClass,
   type SourceInfo,
@@ -42,11 +42,11 @@ const id = () => text('id').primaryKey().$defaultFn(newId);
 const timestamps = {
   createdAt: text('created_at')
     .notNull()
-    .$defaultFn(() => toTokyoIso()),
+    .$defaultFn(() => toLocalIso()),
   updatedAt: text('updated_at')
     .notNull()
-    .$defaultFn(() => toTokyoIso())
-    .$onUpdateFn(() => toTokyoIso()),
+    .$defaultFn(() => toLocalIso())
+    .$onUpdateFn(() => toLocalIso()),
 };
 
 /** `column IN ('a', 'b', ...)`; values are compile-time constants, so inlining is safe. */

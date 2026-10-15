@@ -4,12 +4,14 @@ import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { inferLotSizes } from '../lot-sizes';
 import { exitIfUnmigrated } from '../migrate';
-import { checkSourceQuality } from '../registry';
+import { checkSourceQuality, loadTimeZone } from '../registry';
 import { clearAllBucketValues, refreshBucketValues, runSnapshots } from '../valuation';
 
 loadRootEnv();
 const db = createDb(dbConfigFromEnv());
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const lots = await inferLotSizes(db);
 console.log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
 const quality = await checkSourceQuality(db);

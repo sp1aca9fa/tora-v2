@@ -5,7 +5,7 @@ import {
   getPurchaseLink,
   productValueSuggestions,
 } from '@tora/db';
-import { tokyoDate } from '@tora/core';
+import { localDate } from '@tora/core';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -60,7 +60,7 @@ export default async function AddPage({
         </Link>
       </header>
       <AddFlow
-        today={tokyoDate()}
+        today={localDate()}
         fromSuggestions={[...new Set([...fromHistory, ...registryShops])].sort((a, b) =>
           a.localeCompare(b, locale),
         )}

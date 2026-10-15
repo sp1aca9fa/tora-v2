@@ -10,7 +10,7 @@ import {
   holdingFieldsFor,
   openedStatesFor,
   pendingGrading,
-  tokyoDate,
+  localDate,
 } from '@tora/core';
 import { getHoldingDetail } from '@tora/db';
 import { notFound } from 'next/navigation';
@@ -74,7 +74,7 @@ export default async function HoldingActionPage({
     t('holding.cardShop'),
     ...(await getRegistry()).sources.filter((s) => s.aliases?.length).map((s) => s.label),
   ].sort((a, b) => a.localeCompare(b, locale));
-  const today = tokyoDate();
+  const today = localDate();
   const cls = productClass(product);
   const fields = holdingFieldsFor(cls);
   // The admin's own condition list for this kind (S16), if it has one.

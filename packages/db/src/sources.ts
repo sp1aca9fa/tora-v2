@@ -6,7 +6,7 @@ import {
   median,
   productClass,
   identitySources,
-  toTokyoIso,
+  toLocalIso,
   conditionListOf,
   IDENTITY_MIN_COST,
 } from '@tora/core';
@@ -265,7 +265,7 @@ export async function bucketStats(
   days = 30,
   now = new Date(),
 ): Promise<BucketStat[]> {
-  const since = toTokyoIso(new Date(now.getTime() - days * 86_400_000));
+  const since = toLocalIso(new Date(now.getTime() - days * 86_400_000));
   const rows = await db
     .select({
       source: priceObservations.source,
@@ -473,7 +473,7 @@ export async function syncProductDetails(
     }
     await tx
       .update(productSources)
-      .set({ detailsSyncedAt: toTokyoIso() })
+      .set({ detailsSyncedAt: toLocalIso() })
       .where(eq(productSources.id, link.id));
     return changed;
   });
@@ -495,7 +495,7 @@ export async function updateSourceProgress(
     .update(productSources)
     .set({
       ...(patch.state !== undefined ? { state: patch.state } : {}),
-      ...(patch.success ? { lastSuccessAt: toTokyoIso() } : {}),
+      ...(patch.success ? { lastSuccessAt: toLocalIso() } : {}),
       ...(patch.title ? { title: patch.title } : {}),
       ...(patch.url ? { url: patch.url } : {}),
       ...(patch.recentSales ? { recentSales: patch.recentSales } : {}),
@@ -521,19 +521,19 @@ export async function startRun(
   // Close out runs of this source that never finished (crash, PC shut down mid-run).
   await db
     .update(collectorRuns)
-    .set({ status: 'failed', finishedAt: toTokyoIso(), error: 'interrupted (never finished)' })
+    .set({ status: 'failed', finishedAt: toLocalIso(), error: 'interrupted (never finished)' })
     .where(
       and(
         eq(collectorRuns.source, source),
         eq(collectorRuns.status, 'running'),
         options.exclusive
           ? undefined
-          : lt(collectorRuns.startedAt, toTokyoIso(new Date(Date.now() - STALE_RUN_MS))),
+          : lt(collectorRuns.startedAt, toLocalIso(new Date(Date.now() - STALE_RUN_MS))),
       ),
     );
   const [run] = await db
     .insert(collectorRuns)
-    .values({ source, startedAt: toTokyoIso(), status: 'running' })
+    .values({ source, startedAt: toLocalIso(), status: 'running' })
     .returning({ id: collectorRuns.id });
   return run!.id;
 }
@@ -552,7 +552,7 @@ export async function finishRun(
 ): Promise<void> {
   await db
     .update(collectorRuns)
-    .set({ ...result, error: result.error?.slice(0, 2000) ?? null, finishedAt: toTokyoIso() })
+    .set({ ...result, error: result.error?.slice(0, 2000) ?? null, finishedAt: toLocalIso() })
     .where(eq(collectorRuns.id, id));
 }
 
@@ -635,7 +635,7 @@ export interface SourceHealth {
  */
 export async function collectorHealth(db: Db, now = new Date()): Promise<SourceHealth[]> {
   const day = 86_400_000;
-  const iso = (ms: number) => toTokyoIso(new Date(now.getTime() - ms));
+  const iso = (ms: number) => toLocalIso(new Date(now.getTime() - ms));
   const sources = await db
     .selectDistinct({ source: productSources.source })
     .from(productSources)
@@ -811,7 +811,7 @@ export async function createQuerySource(
 export async function setSourceQuery(db: Db, sourceId: string, query: SourceQuery): Promise<void> {
   await db
     .update(productSources)
-    .set({ query, updatedAt: toTokyoIso() })
+    .set({ query, updatedAt: toLocalIso() })
     .where(eq(productSources.id, sourceId));
 }
 
@@ -903,7 +903,7 @@ export async function keptObservations(db: Db, productId: string, source: string
         eq(priceObservations.source, source),
         eq(priceObservations.observationType, 'sold'),
         eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, toTokyoIso(new Date(Date.now() - days * 86_400_000))),
+        gte(priceObservations.observedAt, toLocalIso(new Date(Date.now() - days * 86_400_000))),
       ),
     );
 }

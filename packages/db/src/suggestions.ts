@@ -1,7 +1,7 @@
 // Suggestions from the automated data review (requirements S4d). `pnpm review` on the home PC
 // files them; the user accepts or dismisses each in the app, and accepting runs the same action
 // as doing it by hand (exclude a sale, add an excluded word to a search, fill product details).
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError, canEditProduct } from './mutations';
@@ -55,7 +55,7 @@ export async function fileSuggestion(db: Db, input: SuggestionInput): Promise<bo
     .values({ ...input, payload: input.payload ?? {}, status: verdict ? 'closed' : 'open' })
     .onConflictDoUpdate({
       target: [suggestions.userId, suggestions.kind, suggestions.targetKey],
-      set: { updatedAt: toTokyoIso(), reason: input.reason },
+      set: { updatedAt: toLocalIso(), reason: input.reason },
       setWhere: eq(suggestions.status, 'closed'),
     })
     .returning({ id: suggestions.id });
@@ -143,7 +143,7 @@ async function applySuggestion(
     if (Object.keys(set).length === 0) return;
     await db
       .update(products)
-      .set({ ...set, updatedAt: toTokyoIso() })
+      .set({ ...set, updatedAt: toLocalIso() })
       .where(eq(products.id, product.id));
     await clearBucketValues(db, [product.id]);
     // Searches judge their sales by these details: fetch them again on the next collect.
@@ -174,7 +174,7 @@ export async function decideSuggestion(
     .where(and(eq(suggestions.id, id), eq(suggestions.userId, user.id)));
   if (!s || s.status !== 'open') return null;
   if (accept) await applySuggestion(db, user, s);
-  const now = toTokyoIso();
+  const now = toLocalIso();
   await db
     .update(suggestions)
     .set({
@@ -267,6 +267,6 @@ export async function reviewNotes(db: Db, userId: string, limit = 50) {
 export async function clearReviewNote(db: Db, userId: string, id: string): Promise<void> {
   await db
     .update(suggestions)
-    .set({ userNote: null, updatedAt: toTokyoIso() })
+    .set({ userNote: null, updatedAt: toLocalIso() })
     .where(and(eq(suggestions.id, id), eq(suggestions.userId, userId)));
 }

@@ -1,4 +1,4 @@
-import { type CollectorRunStatus, sourceInfo } from '@tora/core';
+import { type CollectorRunStatus, inAppZone, localDate, sourceInfo } from '@tora/core';
 import {
   type Db,
   activeSources,
@@ -65,15 +65,6 @@ export interface RunSummary {
   errors: string[];
 }
 
-/** A day (YYYY-MM-DD) on the home PC's clock: the admin's own time zone. */
-export const localDate = (date: Date, timeZone?: string) =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-
 /** The closest two requests to one site may be. */
 const MIN_DELAY_MS = 2000;
 
@@ -116,6 +107,9 @@ export async function runCollector(
         const c = await toBase(price, row.currency, row.observedAt);
         converted.push({
           ...row,
+          // Plug-ins may give times with any offset (a site's own): stored in the app's zone.
+          observedAt: inAppZone(row.observedAt),
+          fetchedAt: inAppZone(row.fetchedAt),
           priceBase: c.amount,
           fxRate: c.rate,
           raw: c.rateDate ? { ...(row.raw as object), fxDate: c.rateDate } : row.raw,
@@ -263,6 +257,7 @@ export async function runCollector(
               (await Promise.all(
                 result.recentSales.map(async ({ price, ...r }) => ({
                   ...r,
+                  observedAt: inAppZone(r.observedAt),
                   priceBase: (await toBase(price, own, r.observedAt)).amount,
                 })),
               )),

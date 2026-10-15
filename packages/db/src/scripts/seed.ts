@@ -1,6 +1,7 @@
 import { count } from 'drizzle-orm';
 import { loadCatalogFiles, syncCatalog } from '../catalog';
 import { createDb } from '../client';
+import { loadTimeZone } from '../registry';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '../env';
 import { users } from '../schema';
 import {
@@ -25,6 +26,8 @@ if (!authSecret) {
 }
 
 const db = createDb(config);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const [existing] = await db.select({ n: count() }).from(users);
 if (existing && existing.n > 0) {
   console.error('Database already has accounts; seed only runs on an empty DB.');

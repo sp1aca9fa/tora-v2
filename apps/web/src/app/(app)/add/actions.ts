@@ -12,7 +12,7 @@ import {
   itemTypeOf,
   kindsForSetType,
   productClass,
-  tokyoDateToIso,
+  localDateToIso,
 } from '@tora/core';
 import {
   type ProductRef,
@@ -206,7 +206,7 @@ export async function createHoldingAction(
       costTotalBase,
       acquisitionType: d.acquisitionType,
       ...input,
-      acquiredAt: tokyoDateToIso(d.acquiredAt),
+      acquiredAt: localDateToIso(d.acquiredAt),
       acquiredFrom: d.acquiredFrom ?? null,
       notes: d.notes ?? null,
       orderId: d.orderId ?? null,

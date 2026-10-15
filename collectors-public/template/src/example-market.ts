@@ -1,6 +1,6 @@
 import type { Collector, PriceInput } from '@tora/collector-sdk';
 import { termCoverage } from '@tora/collector-sdk';
-import { gradedBucket, parseGrade, productClass, toTokyoIso } from '@tora/core';
+import { gradedBucket, parseGrade, productClass, toLocalIso } from '@tora/core';
 import type { Product } from '@tora/db';
 
 /**
@@ -125,8 +125,8 @@ export const exampleMarket: Collector = {
             price: s.price,
             priceOriginal: s.price,
             currency: s.currency,
-            observedAt: toTokyoIso(new Date(s.soldAt)),
-            fetchedAt: toTokyoIso(ctx.now),
+            observedAt: toLocalIso(new Date(s.soldAt)),
+            fetchedAt: toLocalIso(ctx.now),
             // Unique per source: saving the same sale twice is a no-op.
             externalRef: s.id,
             title: last!.title,

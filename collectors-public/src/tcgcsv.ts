@@ -1,5 +1,5 @@
 import type { Collector, CollectorContext, PoliteHttp } from '@tora/collector-sdk';
-import { tokyoDate, toTokyoIso } from '@tora/core';
+import { localDate, toLocalIso } from '@tora/core';
 import type { Product } from '@tora/db';
 
 /**
@@ -171,7 +171,7 @@ export const tcgcsv: Collector = {
     const item = items.find((p) => p.productId === id);
     // When TCGCSV last refreshed its prices (e.g. "2026-10-10T20:06:02+0000").
     const at = updated && !Number.isNaN(Date.parse(updated)) ? new Date(updated) : ctx.now;
-    const day = tokyoDate(at);
+    const day = localDate(at);
     const rows = prices
       .filter((p) => p.productId === id)
       .flatMap((p) => {
@@ -187,8 +187,8 @@ export const tcgcsv: Collector = {
             price: Math.round(usd * 100),
             priceOriginal: Math.round(usd * 100),
             currency: 'USD',
-            observedAt: toTokyoIso(at),
-            fetchedAt: toTokyoIso(ctx.now),
+            observedAt: toLocalIso(at),
+            fetchedAt: toLocalIso(ctx.now),
             externalRef: `${id}|${p.subTypeName}|${day}`,
             title: item?.name ?? null,
             url: item?.url ?? link.url,

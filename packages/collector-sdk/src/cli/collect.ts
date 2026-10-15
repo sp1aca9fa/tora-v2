@@ -13,16 +13,19 @@ import {
   listUsers,
   refreshBucketValues,
   runSnapshots,
+  loadTimeZone,
 } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
 import { loadAndRegister } from '../registry';
-import { lockSource } from '../lock';
+import { defaultLockDir, lockSource } from '../lock';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
@@ -53,6 +56,16 @@ const config = dbConfigFromEnv();
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+const timeZone = await loadTimeZone(db);
+// The schedule's daily stamp counts days in the app's zone too (scripts/collect-cron.sh).
+try {
+  const state = dirname(defaultLockDir());
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, 'time-zone'), `${timeZone}\n`);
+} catch {
+  // Without it the schedule counts days on the PC's clock.
+}
 // The plug-ins' source descriptions are saved first: the app reads them.
 const { collectors, importers, rates, sources, missing } = await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);

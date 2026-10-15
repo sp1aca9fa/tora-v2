@@ -1,4 +1,4 @@
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import type { Db } from '@tora/db';
 import { schema } from '@tora/db';
 import { and, count, eq, gte, lt } from 'drizzle-orm';
@@ -15,7 +15,7 @@ export const MAX_FAILURES_GLOBAL = 50;
 export const HOUR_MS = 60 * 60 * 1000;
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
-const since = (now: Date, ms: number) => toTokyoIso(new Date(now.getTime() - ms));
+const since = (now: Date, ms: number) => toLocalIso(new Date(now.getTime() - ms));
 
 async function failures(db: Db, now: Date, windowMs: number, where?: ReturnType<typeof eq>) {
   const [row] = await db
@@ -63,7 +63,7 @@ export async function recordAttempt(
     ipHash: key.ipHash,
     usernameHash: key.usernameHash ?? null,
     success,
-    attemptedAt: toTokyoIso(now),
+    attemptedAt: toLocalIso(now),
   });
   await db.delete(loginAttempts).where(lt(loginAttempts.attemptedAt, since(now, RETENTION_MS)));
 }

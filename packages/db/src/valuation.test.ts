@@ -1,4 +1,4 @@
-import { tokyoDate } from '@tora/core';
+import { localDate } from '@tora/core';
 import { saveSourceInfos } from './registry';
 import { TEST_SOURCES } from './testing';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -182,7 +182,7 @@ describe('portfolio (scenario 7)', () => {
     expect(run.days).toBe(61);
     const series = await portfolioSeries(db, uid, 365, now);
     const on = (daysAgo: number) =>
-      series.find((s) => s.date === tokyoDate(new Date(now.getTime() - daysAgo * 86_400_000)));
+      series.find((s) => s.date === localDate(new Date(now.getTime() - daysAgo * 86_400_000)));
     expect(series[0]?.date).toBe(ago(60).slice(0, 10));
     expect(on(0)).toMatchObject({
       valueBase: 3_100 + 925 * 2 + 9_900 + 700,

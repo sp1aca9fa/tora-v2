@@ -1,5 +1,5 @@
 import type { Collector, CollectorContext, PriceInput } from '@tora/collector-sdk';
-import { GRADERS, gradedBucket, median, tokyoDate, toTokyoIso, withoutOutliers } from '@tora/core';
+import { GRADERS, gradedBucket, median, localDate, toLocalIso, withoutOutliers } from '@tora/core';
 import type { Product } from '@tora/db';
 
 /**
@@ -152,7 +152,7 @@ export const ebay: Collector = {
       (i) =>
         !(query.excludeKeywords ?? []).some((w) => i.title.toLowerCase().includes(w.toLowerCase())),
     );
-    const day = tokyoDate(ctx.now);
+    const day = localDate(ctx.now);
     const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(keywords)}&LH_BIN=1`;
     const rows: PriceInput[] = [];
     for (const [bucket, list] of groupListings(product, items)) {
@@ -169,8 +169,8 @@ export const ebay: Collector = {
         price: Math.round(usd * 100),
         priceOriginal: Math.round(usd * 100),
         currency: 'USD',
-        observedAt: toTokyoIso(ctx.now),
-        fetchedAt: toTokyoIso(ctx.now),
+        observedAt: toLocalIso(ctx.now),
+        fetchedAt: toLocalIso(ctx.now),
         externalRef: `${product.id}|${bucket ?? 'ungraded'}|${day}`,
         title: `${list.length} listing(s)`,
         url: searchUrl,

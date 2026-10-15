@@ -5,7 +5,7 @@ import {
   type NoticeLevels,
   noticeLevelsFor,
   type UserPreferences,
-  toTokyoIso,
+  toLocalIso,
 } from '@tora/core';
 import { and, asc, count, eq, isNull, lt, ne, or } from 'drizzle-orm';
 import type { Db } from './client';
@@ -87,7 +87,7 @@ export async function updateCredentials(
       .where(eq(users.id, userId));
     await tx
       .update(userDevices)
-      .set({ revokedAt: toTokyoIso() })
+      .set({ revokedAt: toLocalIso() })
       .where(and(eq(userDevices.userId, userId), isNull(userDevices.revokedAt)));
   });
 }
@@ -95,7 +95,7 @@ export async function updateCredentials(
 export async function setUserDisabled(db: Db, userId: string, disabled: boolean): Promise<void> {
   await db
     .update(users)
-    .set({ disabledAt: disabled ? toTokyoIso() : null })
+    .set({ disabledAt: disabled ? toLocalIso() : null })
     .where(eq(users.id, userId));
   if (disabled) await revokeAllDevices(db, userId);
 }
@@ -148,7 +148,7 @@ export async function registerDevice(
     if ((active?.n ?? 0) >= MAX_ACTIVE_DEVICES) return null;
     const [device] = await tx
       .insert(userDevices)
-      .values({ userId, label, lastSeenAt: toTokyoIso() })
+      .values({ userId, label, lastSeenAt: toLocalIso() })
       .returning();
     return device!;
   });
@@ -175,7 +175,7 @@ export async function getActiveDevice(
 export async function touchDevice(db: Db, deviceId: string): Promise<void> {
   await db
     .update(userDevices)
-    .set({ lastSeenAt: toTokyoIso() })
+    .set({ lastSeenAt: toLocalIso() })
     .where(eq(userDevices.id, deviceId));
 }
 
@@ -183,7 +183,7 @@ export async function touchDevice(db: Db, deviceId: string): Promise<void> {
 export async function revokeDevice(db: Db, userId: string, deviceId: string): Promise<boolean> {
   const rows = await db
     .update(userDevices)
-    .set({ revokedAt: toTokyoIso() })
+    .set({ revokedAt: toLocalIso() })
     .where(
       and(
         eq(userDevices.id, deviceId),
@@ -198,7 +198,7 @@ export async function revokeDevice(db: Db, userId: string, deviceId: string): Pr
 export async function revokeAllDevices(db: Db, userId: string): Promise<number> {
   const rows = await db
     .update(userDevices)
-    .set({ revokedAt: toTokyoIso() })
+    .set({ revokedAt: toLocalIso() })
     .where(and(eq(userDevices.userId, userId), isNull(userDevices.revokedAt)))
     .returning({ id: userDevices.id });
   return rows.length;
@@ -212,7 +212,7 @@ export async function setNoticeLevels(db: Db, userId: string, chosen: NoticeLeve
   ) as NoticeLevels;
   await db
     .update(users)
-    .set({ noticeLevels: Object.keys(changed).length ? changed : null, updatedAt: toTokyoIso() })
+    .set({ noticeLevels: Object.keys(changed).length ? changed : null, updatedAt: toLocalIso() })
     .where(eq(users.id, userId));
 }
 
@@ -224,6 +224,6 @@ export async function setPreferences(db: Db, userId: string, patch: UserPreferen
     .where(eq(users.id, userId));
   await db
     .update(users)
-    .set({ preferences: { ...user?.preferences, ...patch }, updatedAt: toTokyoIso() })
+    .set({ preferences: { ...user?.preferences, ...patch }, updatedAt: toLocalIso() })
     .where(eq(users.id, userId));
 }

@@ -6,7 +6,7 @@ import {
   GRADERS,
   PACKAGING_STATES,
   RAW_GRADES,
-  tokyoDateToIso,
+  localDateToIso,
 } from '@tora/core';
 import {
   type Db,
@@ -46,7 +46,7 @@ import { getTaxonomy } from '@/lib/taxonomy';
 import { productInputFrom, productSchema } from '@/lib/schemas';
 
 const holdingPath = (id: string) => `/holdings/${id}`;
-const at = (date: string) => tokyoDateToIso(date);
+const at = (date: string) => localDateToIso(date);
 
 /** Parse, run the mutation as the signed-in user, then go back to the holding page (or `to`). */
 async function handle<S extends z.ZodType, T>(

@@ -1,4 +1,4 @@
-import { baseCurrency, ratePair, rateSettingFor, ratedCurrencies, tokyoDate } from '@tora/core';
+import { baseCurrency, ratePair, rateSettingFor, ratedCurrencies, localDate } from '@tora/core';
 import { type Db, latestFxDate, loadSourceRegistry, saveFxRates } from '@tora/db';
 import type { PoliteHttp } from './http';
 import type { RateSource } from './types';
@@ -23,7 +23,7 @@ export async function updateRates(
   const registry = await loadSourceRegistry(db);
   const base = baseCurrency(registry);
   const settings = registry.currency ?? { base };
-  const today = tokyoDate(now);
+  const today = localDate(now);
   const out = [];
   for (const code of ratedCurrencies(settings, registry.sources)) {
     const pair = ratePair(code, base);

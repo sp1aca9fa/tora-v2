@@ -5,7 +5,7 @@ import {
   baseCurrency,
   currencyDigits,
   ratePair,
-  tokyoDate,
+  localDate,
 } from '@tora/core';
 import { type SQL, eq, like, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -79,13 +79,13 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   }
   // Units of the old base per unit of the new one.
   const pair = ratePair(to, from);
-  if (!(await fxRateOn(db, pair, tokyoDate(now)))) throw new DomainError('no_rate');
+  if (!(await fxRateOn(db, pair, localDate(now)))) throw new DomainError('no_rate');
   const scale = 10 ** (currencyDigits(to) - currencyDigits(from));
   const rateOn = (date: SQL | string) => sql`coalesce(
     (SELECT r.rate FROM fx_rates r WHERE r.pair = ${pair} AND r.date <= ${date}
       ORDER BY r.date DESC LIMIT 1),
     (SELECT r.rate FROM fx_rates r WHERE r.pair = ${pair} ORDER BY r.date ASC LIMIT 1))`;
-  const today = tokyoDate(now);
+  const today = localDate(now);
   const convert = (column: string, date: string | null) =>
     sql`${sql.raw(column)} = CASE WHEN ${sql.raw(column)} IS NULL THEN NULL ELSE
       CAST(round(${sql.raw(column)} * ${scale} / ${rateOn(date ? sql.raw(date) : today)}) AS INTEGER)

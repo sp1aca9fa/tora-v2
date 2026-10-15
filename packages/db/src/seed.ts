@@ -1,5 +1,6 @@
 // Sample data covering requirement scenarios 1-5 for a demo account. Local DB only.
 import { encryptSecret, generateBackupCodes, hashPassword } from '@tora/auth';
+import { localTime, toLocalIso } from '@tora/core';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from './client';
 import { addPull, createHolding, markOpened } from './mutations';
@@ -12,7 +13,7 @@ export const DEMO_PASSWORD = 'local-dev-password';
 export const DEMO_TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 
 const SAMPLE_NOTE = 'Sample seed data. Edit or delete.';
-const at = (date: string) => `${date}T12:00:00.000+09:00`;
+const at = (date: string) => toLocalIso(localTime(date, '12:00:00.000'));
 
 export async function seedDemoUser(db: Db, authSecret: string) {
   const backup = generateBackupCodes();
@@ -146,6 +147,6 @@ export async function seedCollection(db: Db, userId: string) {
   await markOpened(db, userId, box.id, {
     quantity: 1,
     packagingState: 'opened',
-    occurredAt: '2026-09-28T20:00:00.000+09:00',
+    occurredAt: toLocalIso(localTime('2026-09-28', '20:00:00.000')),
   });
 }

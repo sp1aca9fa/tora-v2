@@ -1,4 +1,4 @@
-import { newId, toTokyoIso } from './time';
+import { newId, toLocalIso } from './time';
 
 export interface Lot {
   id: string;
@@ -68,7 +68,7 @@ export function splitHolding<H extends Lot>(
   options: { occurredAt?: string; newHoldingId?: string } = {},
 ): SplitResult<H> {
   const costMovedBase = allocateSplitCost(holding.costTotalBase, holding.quantity, splitQuantity);
-  const occurredAt = options.occurredAt ?? toTokyoIso();
+  const occurredAt = options.occurredAt ?? toLocalIso();
   const splitId = options.newHoldingId ?? newId();
 
   const original: H = {

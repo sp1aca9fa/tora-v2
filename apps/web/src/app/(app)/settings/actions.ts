@@ -31,6 +31,7 @@ import {
   setPreferences,
   setRateSetting,
   changeBaseCurrency,
+  changeTimeZone,
   setCollectWindow,
   setMarketSettings,
   setLanguageSettings,
@@ -314,6 +315,25 @@ export async function changeBaseAction(code: string): Promise<FormState> {
   await clearAllBucketValues(db);
   after(async () => {
     await refreshBucketValues(db);
+    revalidatePath('/', 'layout');
+  });
+  revalidatePath('/', 'layout');
+  return {};
+}
+
+/**
+ * Makes another zone the app's time zone (admins, S16 part 5): every stored time is rewritten in
+ * it, then the saved values and the daily snapshots are rebuilt after answering.
+ */
+export async function changeTimeZoneAction(name: string): Promise<FormState> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || typeof name !== 'string') return {};
+  const result = await runDomain(() => changeTimeZone(db, name));
+  if (!result.ok) return result.state;
+  await clearAllBucketValues(db);
+  after(async () => {
+    await refreshBucketValues(db);
+    await runSnapshots(db);
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');

@@ -1,5 +1,5 @@
 // Product thumbnails (requirements S5c): downloaded by the home PC, served by the web app.
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { productImages, productSources, products } from './schema';
@@ -61,7 +61,7 @@ export async function saveProductImage(
     .values(image)
     .onConflictDoUpdate({
       target: productImages.productId,
-      set: { ...rest, updatedAt: toTokyoIso() },
+      set: { ...rest, updatedAt: toLocalIso() },
     });
 }
 

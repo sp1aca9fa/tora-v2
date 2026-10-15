@@ -24,7 +24,9 @@ import {
   productClass,
   resolveCurrency,
   resolveMarkets,
-  toTokyoIso,
+  appTimeZone,
+  setAppTimeZone,
+  toLocalIso,
 } from '@tora/core';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -32,7 +34,7 @@ import { appSettings, priceObservations, products, sources } from './schema';
 
 /** Saves the plug-ins' descriptions (collectors, at the start of a run); roles chosen stay. */
 export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void> {
-  const at = toTokyoIso();
+  const at = toLocalIso();
   const known = new Map(
     (await db.select({ key: sources.key, info: sources.info }).from(sources)).map((r) => [
       r.key,
@@ -75,12 +77,15 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
           'rateSources',
           'languages',
           'categories',
+          'timeZone',
         ]),
       ),
   ]);
   const markets = settings.find((r) => r.key === 'markets');
   const order = settings.find((r) => r.key === 'sourceOrder');
   const setting = (key: string) => settings.find((r) => r.key === key)?.value;
+  // Every time the app stores or shows follows the admin's time zone (S16 part 5).
+  setAppTimeZone(setting('timeZone') as string | undefined);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
   const infos = rows.map((r) => r.info);
   const quality = Object.fromEntries(
@@ -108,6 +113,7 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     rateSources: (setting('rateSources') as RateSourceInfo[] | undefined) ?? [],
     languages: (setting('languages') as Partial<LanguageSettings> | undefined) ?? null,
     taxonomy: resolveTaxonomy(setting('categories') as Partial<Taxonomy> | undefined),
+    timeZone: appTimeZone(),
   };
   cache.set(db, { at: Date.now(), registry });
   return registry;
@@ -119,13 +125,13 @@ export async function setSourceRoles(
   key: string,
   roles: Partial<Record<ProductClass, SourceRole>> | null,
 ): Promise<void> {
-  await db.update(sources).set({ roles, updatedAt: toTokyoIso() }).where(eq(sources.key, key));
+  await db.update(sources).set({ roles, updatedAt: toLocalIso() }).where(eq(sources.key, key));
   cache = new WeakMap();
 }
 
 /** The admin's markets and identity sources (requirements S11); values follow. */
 export async function setMarketSettings(db: Db, value: MarketSettings): Promise<void> {
-  const at = toTokyoIso();
+  const at = toLocalIso();
   await db
     .insert(appSettings)
     .values({ key: 'markets', value })
@@ -135,7 +141,7 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
 
 /** Saves a setting (app_settings) and clears the registry cache. */
 async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
-  const at = toTokyoIso();
+  const at = toLocalIso();
   await db
     .insert(appSettings)
     .values({ key, value })
@@ -166,6 +172,17 @@ export async function setLanguageSettings(db: Db, value: LanguageSettings): Prom
   await saveSetting(db, 'languages', value);
 }
 
+/** The app's time zone (S16 part 5); `changeTimeZone` converts the stored times first. */
+export async function setTimeZoneSetting(db: Db, name: string): Promise<void> {
+  await saveSetting(db, 'timeZone', name);
+  setAppTimeZone(name);
+}
+
+/** Loads the app's time zone (scripts and requests that read no other setting first). */
+export async function loadTimeZone(db: Pick<Db, 'select'>): Promise<string> {
+  return (await loadSourceRegistry(db)).timeZone ?? appTimeZone();
+}
+
 /** The rate plug-ins installed (collectors, at the start of a run). */
 export async function saveRateSources(db: Db, infos: RateSourceInfo[]): Promise<void> {
   const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'rateSources'));
@@ -175,7 +192,7 @@ export async function saveRateSources(db: Db, infos: RateSourceInfo[]): Promise<
 
 /** The admin's order of the sources for a class (Settings > Price sources); values follow. */
 export async function setSourceOrder(db: Db, cls: ProductClass, keys: string[]): Promise<void> {
-  const at = toTokyoIso();
+  const at = toLocalIso();
   const value: SourceOrder = { ...(await loadSourceRegistry(db)).order, [cls]: keys };
   await db
     .insert(appSettings)
@@ -195,7 +212,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
   const registry = await loadSourceRegistry(db);
   const rows = await db.select().from(sources);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
-  const since = toTokyoIso(new Date(now.getTime() - 90 * 86_400_000));
+  const since = toLocalIso(new Date(now.getTime() - 90 * 86_400_000));
   const sales = await db
     .select({
       productId: priceObservations.productId,
@@ -224,7 +241,7 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
     e.by.set(s.source, [...(e.by.get(s.source) ?? []), s.priceBase]);
     byKey.set(key, e);
   }
-  const at = toTokyoIso(now);
+  const at = toLocalIso(now);
   const changed: string[] = [];
   for (const row of rows) {
     const next: Partial<Record<ProductClass, SourceQuality>> = {};
@@ -275,7 +292,7 @@ export async function dismissSourceQuality(db: Db, key: string, cls: ProductClas
   const [row] = await db.select().from(sources).where(eq(sources.key, key));
   const quality = (row?.quality ?? {}) as Partial<Record<ProductClass, SourceQuality>>;
   if (!quality[cls]) return;
-  quality[cls] = { ...quality[cls]!, dismissedAt: toTokyoIso() };
+  quality[cls] = { ...quality[cls]!, dismissedAt: toLocalIso() };
   await db.update(sources).set({ quality }).where(eq(sources.key, key));
   cache = new WeakMap();
 }
@@ -288,7 +305,7 @@ export async function pruneSourceDetails(db: Db, now = new Date()): Promise<numb
   let pruned = 0;
   for (const s of (await loadSourceRegistry(db)).sources) {
     if (!s.detailsDays) continue;
-    const before = toTokyoIso(new Date(now.getTime() - s.detailsDays * 86_400_000));
+    const before = toLocalIso(new Date(now.getTime() - s.detailsDays * 86_400_000));
     const rows = await db
       .update(priceObservations)
       .set({ raw: sql`json_remove(${priceObservations.raw}, '$.ids', '$.listings')` })

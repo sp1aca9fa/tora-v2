@@ -1,5 +1,5 @@
 // Imports hub (requirements S5d): import runs and what needs the user after an import.
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { DomainError, deleteHolding, deleteUnusedProduct, editHolding } from './mutations';
 import type { Db } from './client';
@@ -13,7 +13,7 @@ export async function startImportRun(
 ): Promise<string> {
   const [run] = await db
     .insert(importRuns)
-    .values({ ...input, startedAt: toTokyoIso() })
+    .values({ ...input, startedAt: toLocalIso() })
     .returning({ id: importRuns.id });
   return run!.id;
 }
@@ -24,7 +24,7 @@ export async function finishImportRun(
   counts: Record<string, number>,
   extra: { note?: string | null; source?: string | null } = {},
 ): Promise<void> {
-  const now = toTokyoIso();
+  const now = toLocalIso();
   await db
     .update(importRuns)
     .set({
@@ -102,7 +102,7 @@ export async function mergeImportedLots(
   const dateTaken = reasons(keep).includes('date_approx') && !reasons(drop).includes('date_approx');
   await db
     .update(purchaseLinks)
-    .set({ holdingId: keepId, updatedAt: toTokyoIso() })
+    .set({ holdingId: keepId, updatedAt: toLocalIso() })
     .where(eq(purchaseLinks.holdingId, dropId));
   await deleteHolding(db, userId, dropId);
   // An item the import made for the other lot (e.g. from a cut-off title) goes too.
@@ -119,7 +119,7 @@ export async function mergeImportedLots(
   );
   await db
     .update(holdings)
-    .set({ reviewReason: left.join(',') || null, updatedAt: toTokyoIso() })
+    .set({ reviewReason: left.join(',') || null, updatedAt: toLocalIso() })
     .where(eq(holdings.id, keepId));
   return { dateTaken };
 }

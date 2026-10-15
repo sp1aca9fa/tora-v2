@@ -12,7 +12,7 @@
 // The mix shows the whole app: graded and raw cards, sealed boxes (one opened, with pulls), decks,
 // games, a console, sold lots, and every kind of notice (no grade, no condition, main source
 // missing or to confirm, import review, a failed link, a data review suggestion, a "don't warn").
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import {
   type HoldingInput,
   type ProductInput,
@@ -35,6 +35,7 @@ import {
   setManualPrice,
   setSourceWarningDismissed,
   stableSourceFor,
+  loadTimeZone,
 } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
@@ -59,6 +60,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const username = process.argv[2]?.trim().toLowerCase();
 if (!username?.startsWith('demo')) {
   console.error('Usage: pnpm demo <username> (only accounts whose name starts with "demo")');
@@ -96,7 +99,7 @@ console.log(`reset: ${lotIds.length} lot(s) removed`);
 
 // --- items ------------------------------------------------------------------------------------
 const DAY = 86_400_000;
-const ago = (days: number) => toTokyoIso(new Date(Date.now() - days * DAY));
+const ago = (days: number) => toLocalIso(new Date(Date.now() - days * DAY));
 const jp = { franchise: 'pokemon', region: 'jp' } as const;
 const card = (
   name: string,

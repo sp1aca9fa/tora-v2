@@ -1,5 +1,5 @@
 // Purchase links pasted in the app (shops without receipt emails); read by the home PC.
-import { toTokyoIso } from '@tora/core';
+import { toLocalIso } from '@tora/core';
 import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { type PurchaseLink, purchaseLinks } from './schema';
@@ -72,7 +72,7 @@ export async function setPurchaseLinkResult(
     importRunId?: string | null;
   },
 ): Promise<void> {
-  const now = toTokyoIso();
+  const now = toLocalIso();
   await db
     .update(purchaseLinks)
     .set({
@@ -99,7 +99,7 @@ export async function retryPurchaseLinks(db: Db, userId: string, ids: string[]):
   if (ids.length === 0) return;
   await db
     .update(purchaseLinks)
-    .set({ status: 'pending', message: null, updatedAt: toTokyoIso() })
+    .set({ status: 'pending', message: null, updatedAt: toLocalIso() })
     .where(and(eq(purchaseLinks.userId, userId), inArray(purchaseLinks.id, ids)));
 }
 
@@ -120,7 +120,7 @@ export async function resolvePurchaseLink(
   holdingId: string,
   message = 'Added by hand.',
 ): Promise<void> {
-  const now = toTokyoIso();
+  const now = toLocalIso();
   await db
     .update(purchaseLinks)
     .set({ status: 'matched', message, holdingId, updatedAt: now })

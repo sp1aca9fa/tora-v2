@@ -13,8 +13,9 @@ import {
   median,
   type ProductClass,
   productClass,
-  tokyoDate,
-  toTokyoIso,
+  localDate,
+  toLocalIso,
+  localTime,
   lastSale,
   sourceSummaries,
   trend,
@@ -119,7 +120,7 @@ export async function loadMarketData(
   productIds: string[],
   now = new Date(),
   /** Oldest observation to load (ISO); defaults to what valuing `now` needs. */
-  since: string = toTokyoIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY)),
+  since: string = toLocalIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY)),
 ): Promise<MarketData> {
   const observations = new Map<string, ValuationObservation[]>();
   const recent = new Map<string, RecentSaleInput[]>();
@@ -212,8 +213,8 @@ export async function loadHoldingsMarketData(
   const currency = await valuedCurrency(db);
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
   // window are never used, so extra is safe).
-  const exact = (days: number) => toTokyoIso(new Date(now.getTime() - days * DAY));
-  const ago = (days: number) => toTokyoIso(new Date(now.getTime() - (days + 1) * DAY));
+  const exact = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
+  const ago = (days: number) => toLocalIso(new Date(now.getTime() - (days + 1) * DAY));
   const since = ago(LOOKBACK_DAYS);
   const [c30, c180, c365] = [ago(30), ago(180), ago(LONG_WINDOW)];
   const add = (rows: (ValuationObservation & { productId: string })[]) => {
@@ -411,7 +412,7 @@ async function saveBucketValues(
   rows: { productId: string; bucket: string | null; value: BucketValue }[],
   now: Date,
 ) {
-  const at = toTokyoIso(now);
+  const at = toLocalIso(now);
   for (let i = 0; i < rows.length; i += 100) {
     await retried(() =>
       db
@@ -513,9 +514,9 @@ export async function savedBucketValues(
   const productIds = [...new Set(wanted.map((w) => w.product.id))];
   // Values saved before the sources' roles last changed were valued with other roles.
   const changedAt = (await loadSourceRegistry(db)).changedAt ?? '';
-  const ageLimit = toTokyoIso(new Date(now.getTime() - BUCKET_VALUE_MAX_AGE_DAYS * DAY));
+  const ageLimit = toLocalIso(new Date(now.getTime() - BUCKET_VALUE_MAX_AGE_DAYS * DAY));
   const oldest = changedAt > ageLimit ? changedAt : ageLimit;
-  const at = toTokyoIso(now);
+  const at = toLocalIso(now);
   for (let i = 0; i < productIds.length; i += 200) {
     const rows = await db
       .select()
@@ -872,7 +873,7 @@ export async function setManualPrice(
   if (!Number.isSafeInteger(priceBase) || priceBase < 0) throw new RangeError('invalid price');
   await db
     .insert(manualPrices)
-    .values({ userId, productId, bucket, priceBase, setAt: toTokyoIso(), note: note ?? null });
+    .values({ userId, productId, bucket, priceBase, setAt: toLocalIso(), note: note ?? null });
 }
 
 export async function clearManualPrice(db: Db, userId: string, productId: string, bucket: string) {
@@ -890,8 +891,8 @@ export async function clearManualPrice(db: Db, userId: string, productId: string
 // ---------------------------------------------------------------------------------------------
 // snapshots
 
-/** End of a Tokyo calendar day. */
-const endOfDay = (day: string) => new Date(`${day}T23:59:59.999+09:00`);
+/** End of a calendar day in the app's time zone. */
+const endOfDay = (day: string) => localTime(day, '23:59:59.999');
 
 /** Whether a holding was held on `day`: acquired by then, not yet sold or used up. */
 /** Day the holding was opened and used up (its value moved to the pulls), if it was. */
@@ -928,22 +929,22 @@ const MAX_HISTORY_DAYS = 3 * 366;
  * whose numbers changed are written, and rows of days a holding was not held are removed.
  */
 export async function runSnapshots(db: Db, now = new Date()) {
-  const today = tokyoDate(now);
+  const today = localDate(now);
   const rows = (
     await db
       .select({ holding: holdings, product: products })
       .from(holdings)
       .innerJoin(products, eq(products.id, holdings.productId))
   ).filter((r) => r.holding.status !== 'lost');
-  const oldest = tokyoDate(new Date(now.getTime() - MAX_HISTORY_DAYS * DAY));
+  const oldest = localDate(new Date(now.getTime() - MAX_HISTORY_DAYS * DAY));
   const first = rows.reduce(
     (min, r) => (r.holding.acquiredAt.slice(0, 10) < min ? r.holding.acquiredAt.slice(0, 10) : min),
     today,
   );
   const start = first < oldest ? oldest : first;
   const days: string[] = [];
-  for (let t = Date.parse(`${start}T12:00:00+09:00`); ; t += DAY) {
-    const day = tokyoDate(new Date(t));
+  for (let t = localTime(start, '12:00:00.000').getTime(); ; t += DAY) {
+    const day = localDate(new Date(t));
     if (day > today) break;
     days.push(day);
   }
@@ -954,7 +955,7 @@ export async function runSnapshots(db: Db, now = new Date()) {
     if (list) list.push(e);
     else eventsBy.set(e.holdingId, [e]);
   }
-  const since = toTokyoIso(new Date(Date.parse(`${start}T00:00:00+09:00`) - WINDOW_DAYS * DAY));
+  const since = toLocalIso(new Date(localTime(start).getTime() - WINDOW_DAYS * DAY));
   const markets = new Map<string, MarketData>();
   for (const userId of new Set(rows.map((r) => r.holding.userId))) {
     const ids = [
@@ -1112,7 +1113,7 @@ export async function portfolioSeries(
   days = MAX_HISTORY_DAYS,
   now = new Date(),
 ) {
-  const since = tokyoDate(new Date(now.getTime() - days * DAY));
+  const since = localDate(new Date(now.getTime() - days * DAY));
   return db
     .select({
       date: valuationSnapshots.date,
@@ -1147,7 +1148,7 @@ export async function priceHistory(
   days = 365,
   now = new Date(),
 ): Promise<PricePoint[]> {
-  const since = toTokyoIso(new Date(now.getTime() - days * DAY));
+  const since = toLocalIso(new Date(now.getTime() - days * DAY));
   const rows = await db
     .select({
       observedAt: priceObservations.observedAt,
@@ -1315,8 +1316,8 @@ export async function moversByPeriod(
     .select({ date: sql<string | null>`max(${valuationSnapshots.date})` })
     .from(valuationSnapshots);
   if (!latest?.date) return { mine, market };
-  const thenOf = (days: number) =>
-    tokyoDate(new Date(Date.parse(`${latest.date}T12:00:00+09:00`) - days * DAY));
+  const noon = localTime(latest.date, '12:00:00.000').getTime();
+  const thenOf = (days: number) => localDate(new Date(noon - days * DAY));
   const rows = await db
     .select({
       product: products,
@@ -1399,7 +1400,7 @@ export async function moversByPeriod(
  */
 export async function tradeCounts(db: Db, userId: string, periods: readonly number[]) {
   const longest = Math.max(...periods);
-  const since = (days: number) => toTokyoIso(new Date(Date.now() - days * DAY));
+  const since = (days: number) => toLocalIso(new Date(Date.now() - days * DAY));
   const counts = Object.fromEntries(
     periods.map((days) => [
       `d${days}`,

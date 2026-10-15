@@ -2,7 +2,7 @@
 // removed or silently changed: a transaction ID already registered is skipped when the data
 // agrees and asked about when it does not; an entry without ID that looks like the same purchase
 // is asked about too.
-import { orderSourceOf, sourceInfo, tokyoDate } from '@tora/core';
+import { orderSourceOf, sourceInfo, localDate } from '@tora/core';
 import {
   type Db,
   type Holding,
@@ -154,7 +154,7 @@ export type PlanEntry = (
   flags?: string[];
 };
 
-const dayNumber = (iso: string) => Date.parse(`${tokyoDate(new Date(iso))}T00:00:00Z`) / 86_400_000;
+const dayNumber = (iso: string) => Date.parse(`${localDate(new Date(iso))}T00:00:00Z`) / 86_400_000;
 const daysApart = (a: string, b: string) => Math.abs(dayNumber(a) - dayNumber(b));
 const paidAmounts = (r: PurchaseReceipt) =>
   [r.total, r.itemPrice].filter((n): n is number => n != null);
@@ -173,8 +173,8 @@ function compare(receipt: PurchaseReceipt, existing: Holding[]): Diff[] {
   if (daysApart(first.acquiredAt, receipt.orderedAt) > DATE_TOLERANCE_DAYS) {
     diffs.push({
       field: 'date',
-      existing: tokyoDate(new Date(first.acquiredAt)),
-      imported: tokyoDate(new Date(receipt.orderedAt)),
+      existing: localDate(new Date(first.acquiredAt)),
+      imported: localDate(new Date(receipt.orderedAt)),
     });
   }
   return diffs;

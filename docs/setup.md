@@ -129,18 +129,21 @@ These are choices made once, at setup, for the whole app (Settings > Admin prefe
    anything: while nothing is stored, any currency can be chosen. Later it can only change to a
    currency with exchange rates, and every stored amount is converted. See [Markets and
    currency](markets.md).
-2. **Languages**: the primary language (shown first, and on the sign-in page) and an optional
+2. **Time zone**: what a day is (daily value snapshots, charts, the collect's once a day); every
+   time is stored and shown in it. Usually yours; the page offers the device's. Changing it later
+   rewrites every stored time.
+3. **Languages**: the primary language (shown first, and on the sign-in page) and an optional
    secondary one for the toggle. See [Languages](languages.md).
-3. **Categories**: TCG and games are ready-made; add your own (watches, figures, ...) with their
+4. **Categories**: TCG and games are ready-made; add your own (watches, figures, ...) with their
    kinds, fields and condition list. See [Categories](categories.md).
-4. **Plug-ins**: put yours in `collectors/` (see [Building a collector](collectors.md)) and run
+5. **Plug-ins**: put yours in `collectors/` (see [Building a collector](collectors.md)) and run
    `pnpm collect` once: the plug-ins register their sources, markets and rate sources, which the
    next settings list.
-5. **Markets**: the primary market (makes the value) and the secondary market (one price to compare
+6. **Markets**: the primary market (makes the value) and the secondary market (one price to compare
    with), and each other currency's rate source. See [Markets and currency](markets.md).
-6. **Price sources** and **Identity**: each source's role per item type and each market's identity
+7. **Price sources** and **Identity**: each source's role per item type and each market's identity
    page per item type. See [Sources and roles](sources.md).
-7. **The daily collect**: install the scheduled task. See [Running collectors](running.md).
+8. **The daily collect**: install the scheduled task. See [Running collectors](running.md).
 
 Then add your items in the app (Add, or Imports), confirm the listings the collectors find for
 them under **Actions**, and the next collects fill in their history and values.

@@ -24,7 +24,7 @@ import {
   pendingGrading,
   productClass,
   splitHolding,
-  toTokyoIso,
+  toLocalIso,
 } from '@tora/core';
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
@@ -65,7 +65,8 @@ export type DomainErrorCode =
   | 'no_change'
   | 'has_dependents'
   | 'duplicate_order'
-  | 'no_rate';
+  | 'no_rate'
+  | 'invalid_time_zone';
 
 /** Expected business-rule failure; actions map the code to a user-facing message. */
 export class DomainError extends Error {
@@ -483,7 +484,7 @@ export async function editHolding(
   userId: string,
   id: string,
   edit: HoldingEdit,
-  occurredAt: string = toTokyoIso(),
+  occurredAt: string = toLocalIso(),
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
@@ -539,7 +540,7 @@ export async function setCardGrade(
   userId: string,
   ids: string[],
   grade: CardGrade,
-  occurredAt: string = toTokyoIso(),
+  occurredAt: string = toLocalIso(),
 ): Promise<number> {
   const next =
     grade.grading === 'raw'
@@ -575,7 +576,7 @@ export interface ImportReview {
   grade?: CardGrade | null;
   certNumber?: string | null;
   packagingState?: PackagingState | null;
-  /** Corrected purchase time (Tokyo ISO), e.g. when the import only knew it roughly. */
+  /** Corrected purchase time (ISO), e.g. when the import only knew it roughly. */
   acquiredAt?: string | null;
   /** Corrected number of units (e.g. a listing that sold several cards together); cost stays. */
   quantity?: number | null;
@@ -590,7 +591,7 @@ export async function confirmImportReview(
   db: Db,
   userId: string,
   rows: ImportReview[],
-  occurredAt: string = toTokyoIso(),
+  occurredAt: string = toLocalIso(),
 ): Promise<number> {
   return db.transaction(async (tx) => {
     let confirmed = 0;
@@ -661,7 +662,7 @@ export async function splitOff(
   userId: string,
   id: string,
   quantity: number,
-  occurredAt: string = toTokyoIso(),
+  occurredAt: string = toLocalIso(),
 ): Promise<Holding> {
   return db.transaction(async (tx) => {
     const { holding } = await loadHolding(tx, userId, id);
@@ -1111,7 +1112,7 @@ export async function setLotTracking(
     const { holding } = await loadHolding(tx, userId, holdingId);
     const changed = await tx
       .update(holdings)
-      .set({ ...tracking, updatedAt: toTokyoIso() })
+      .set({ ...tracking, updatedAt: toLocalIso() })
       .where(
         allOfItem
           ? and(eq(holdings.userId, userId), eq(holdings.productId, holding.productId))

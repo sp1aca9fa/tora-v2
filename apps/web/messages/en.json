@@ -322,7 +322,7 @@
       },
       "admin": {
         "title": "Admin preferences",
-        "info": "Markets, price sources, identity pages, categories, languages and the home PC's commands, for every account."
+        "info": "Markets, price sources, identity pages, categories, languages, the time zone and the home PC's commands, for every account."
       },
       "markets": {
         "title": "Markets",
@@ -335,6 +335,10 @@
       "languages": {
         "title": "Languages",
         "info": "The app's two languages, which people switch between."
+      },
+      "timeZone": {
+        "title": "Time zone",
+        "info": "What a day is for snapshots, charts and the daily collect."
       },
       "categories": {
         "title": "Categories",
@@ -422,7 +426,8 @@
     "noneGraded": "Pick a grade for at least one card",
     "noLinks": "No links found.",
     "tooManyLinks": "Up to 200 links at a time.",
-    "nonePicked": "Pick at least one panel."
+    "nonePicked": "Pick at least one panel.",
+    "invalid_time_zone": "That time zone is not known."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -1011,6 +1016,17 @@
     "none": "None (no toggle)",
     "primaryInfo": "Shown first, and to people signing in.",
     "secondaryInfo": "The other side of the toggle."
+  },
+  "timeZone": {
+    "title": "Time zone",
+    "info": "The app's time zone: it decides when a day starts for the daily value snapshots, charts, value windows and the collect's once a day, and every time is shown in it. One zone for every account, usually the admin's own. Pick it at setup, next to the base currency.",
+    "zone": "Time zone",
+    "now": "Now there: {time}",
+    "device": "This device is set to {zone}.",
+    "useDevice": "Use it",
+    "confirm": "Change the time zone from {from} to {to}? Every stored time is rewritten as the same moment in the new zone, then values and the daily history are rebuilt (a minute or two). Do it while no collect is running.",
+    "changeInfo": "Changing it later is rare (e.g. after moving abroad): stored times keep their moment, and days near midnight may move to the day before or after.",
+    "setupInfo": "Nothing is stored yet: changing it now rewrites nothing."
   },
   "conditionLists": {
     "card_grades": "Card grades (raw S-D, slabs)",

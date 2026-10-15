@@ -188,6 +188,8 @@ export interface SourceRegistry {
   languages?: Partial<LanguageSettings> | null;
   /** The admin's categories and condition lists (S16; default: the built-in TCG and games). */
   taxonomy?: Taxonomy;
+  /** The app's time zone (S16 part 5; default Asia/Tokyo). */
+  timeZone?: string;
 }
 
 /**

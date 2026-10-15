@@ -3,7 +3,7 @@
 // weak searches), Sonnet the cases Haiku is unsure about, and the findings are filed as
 // suggestions in the app (Imports). Nothing else changes. Runs on the home PC, with the Claude
 // Code login; also run by `pnpm collect --review`.
-import { createDb, getUserByUsername, listUsers } from '@tora/db';
+import { createDb, getUserByUsername, listUsers, loadTimeZone } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -17,6 +17,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 let users = await listUsers(db);
 if (values.user) {

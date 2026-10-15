@@ -22,12 +22,12 @@ A full run: exchange rates, uploaded files waiting to be read, each collector in
 values, and the day's value snapshot. It refuses to run against a database that needs a migration
 (run `pnpm db:migrate`).
 
-**Once a day, once per site.** Prices are daily, so a listing already collected today (the home
-PC's date) is left out: a run started again the same day (a retry after the PC turned off, a
-second task) does only what is left. `--refresh` or `--product` collects again anyway. A site
-another collect is already running (by hand or by the schedule) is skipped, so two runs never
-fetch from the same site at once; the skipped run does not count as the day's run, and the
-schedule tries again later.
+**Once a day, once per site.** Prices are daily, so a listing already collected today (a day in the
+app's time zone, Settings > Admin preferences > Time zone) is left out: a run started again the same
+day (a retry after the PC turned off, a second task) does only what is left. `--refresh` or
+`--product` collects again anyway. A site another collect is already running (by hand or by the
+schedule) is skipped, so two runs never fetch from the same site at once; the skipped run does not
+count as the day's run, and the schedule tries again later.
 
 **How items get prices.** Register an item; on the next run each collector searches its site for
 it and stores the best candidates; confirm the right one under **Actions** or the item page's
@@ -38,7 +38,8 @@ a box with and without shrink wrap), each feeding its own condition.
 ## The daily schedule
 
 `scripts/collect-cron.sh` runs `pnpm collect` **at most once a day**: it exits at once when today's
-run already succeeded, waits a random 0-5 min, loads nvm, and logs to
+run already succeeded (a day in the app's time zone, written down by each collect), waits a
+random 0-5 min, loads nvm, and logs to
 `~/.local/state/tora/collect.log`. Because it is safe to start often, it is started by events
 rather than one fixed time. Arguments are passed on (`--market jp`), each set with its own daily
 stamp and lock.

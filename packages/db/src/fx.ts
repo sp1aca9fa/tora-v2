@@ -4,7 +4,7 @@ import {
   baseCurrency,
   fromMinor,
   ratePair,
-  tokyoDate,
+  localDate,
 } from '@tora/core';
 import { and, asc, desc, eq, gt, gte, inArray, lte } from 'drizzle-orm';
 import type { Db } from './client';
@@ -77,7 +77,7 @@ export async function setRateSetting(
   else delete rates[code];
   await setCurrencySettings(db, { ...registry.currency, base, rates });
   if (setting && 'manual' in setting) {
-    await saveFxRates(db, ratePair(code, base), [{ date: tokyoDate(now), rate: setting.manual }]);
+    await saveFxRates(db, ratePair(code, base), [{ date: localDate(now), rate: setting.manual }]);
   }
 }
 

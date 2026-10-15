@@ -1,6 +1,6 @@
 'use server';
 
-import { type CardGrade, GRADERS, RAW_GRADES, parseGrade, tokyoDateToIso } from '@tora/core';
+import { type CardGrade, GRADERS, RAW_GRADES, parseGrade, localDateToIso } from '@tora/core';
 import {
   DomainError,
   type ImportReview,
@@ -99,7 +99,7 @@ export async function confirmReviewAction(
       grade: row.cls === 'card' ? grade : null,
       certNumber: grade?.grading === 'graded' ? row.certNumber : null,
       packagingState: row.cls === 'sealed' ? (row.packagingState ?? null) : null,
-      acquiredAt: row.acquiredAt ? tokyoDateToIso(row.acquiredAt) : null,
+      acquiredAt: row.acquiredAt ? localDateToIso(row.acquiredAt) : null,
       quantity: row.quantity ?? null,
     });
   }

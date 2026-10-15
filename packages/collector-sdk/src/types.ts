@@ -116,7 +116,7 @@ export type ProductDetails = Partial<
 export interface PurchaseReceipt {
   /** Transaction / order ID at the marketplace (e.g. a SNKRDUNK 取引ID). */
   orderId: string;
-  /** Tokyo ISO timestamp of the order. */
+  /** ISO timestamp of the order (any offset; stored in the app's time zone). */
   orderedAt: string;
   /** Item title as shown on the receipt (usually the listing title). */
   title: string;

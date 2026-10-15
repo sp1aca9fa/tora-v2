@@ -1,4 +1,4 @@
-import { productClass, tokyoDate } from '@tora/core';
+import { productClass, localDate } from '@tora/core';
 import { getHoldingDetail } from '@tora/db';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -23,7 +23,7 @@ export default async function PullsPage({ params }: { params: Promise<{ id: stri
         <h1 className="text-2xl font-semibold tracking-tight">{t('holding.logPulls')}</h1>
       </header>
 
-      <PullLogger action={addPullAction.bind(null, id)} today={tokyoDate()} />
+      <PullLogger action={addPullAction.bind(null, id)} today={localDate()} />
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">{t('holding.pulls', { count: pulls.length })}</h2>

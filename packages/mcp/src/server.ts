@@ -7,7 +7,7 @@
 // stdout carries the protocol: log to stderr only.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDb, getUserByUsername, listUsers } from '@tora/db';
+import { createDb, getUserByUsername, listUsers, loadTimeZone } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -29,6 +29,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const username = (values.user as string | undefined) ?? process.env.TORA_USER;
 const users = await listUsers(db);
 const user = username

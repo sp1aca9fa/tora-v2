@@ -5,7 +5,7 @@ import {
   type CardGrade,
   type Condition,
   type ProductClass,
-  toTokyoIso,
+  toLocalIso,
 } from '@tora/core';
 import {
   changeCondition,
@@ -34,7 +34,7 @@ export async function setLotConditionAction(holdingId: string, condition: Condit
   await changeCondition(db, user.id, holdingId, {
     quantity: detail.holding.quantity,
     condition,
-    occurredAt: toTokyoIso(),
+    occurredAt: toLocalIso(),
   });
   revalidatePath('/', 'layout');
 }

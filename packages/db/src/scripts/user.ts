@@ -21,6 +21,7 @@ import {
 import { createInterface } from 'node:readline/promises';
 import QRCode from 'qrcode';
 import { createDb } from '../client';
+import { loadTimeZone } from '../registry';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '../env';
 import {
   createUser,
@@ -39,6 +40,8 @@ loadRootEnv();
 const authSecret = process.env.AUTH_SECRET?.trim() ?? '';
 const config = dbConfigFromEnv();
 const db = createDb(config);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 const [command, ...args] = process.argv.slice(2);
 
 function fail(message: string): never {

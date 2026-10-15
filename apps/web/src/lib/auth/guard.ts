@@ -6,6 +6,7 @@ import {
   getActiveDevice,
   getDb,
   getUserById,
+  loadTimeZone,
   touchDevice,
 } from '@tora/db';
 import { cookies } from 'next/headers';
@@ -37,6 +38,8 @@ export const currentSession = cache(async (): Promise<Session | null> => {
   );
   if (!claims) return null;
   const db = getDb();
+  // Times written by this request carry the admin's time zone (S16 part 5).
+  await loadTimeZone(db);
   const user = await getUserById(db, claims.userId);
   if (!user || user.disabledAt || !user.passwordHash) return null;
   if (credentialFingerprint(user) !== claims.fingerprint) return null;

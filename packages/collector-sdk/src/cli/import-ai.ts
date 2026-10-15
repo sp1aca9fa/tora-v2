@@ -3,8 +3,8 @@
 // PDFs, CSV or text in one folder. Haiku reads them, the code checks every row, Sonnet reads
 // again the files with flagged rows; then the usual import plan, shown before anything is
 // written. Runs on the home PC with the Claude Code login. Imported lots wait in Review import.
-import { tokyoDate, toTokyoIso } from '@tora/core';
-import { createDb, getUserByUsername } from '@tora/db';
+import { localDate, toLocalIso } from '@tora/core';
+import { createDb, getUserByUsername, loadTimeZone } from '@tora/db';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -61,6 +61,8 @@ loadRootEnv();
 const config = dbConfigFromEnv();
 const db = createDb(config);
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 // The plug-ins' shops (names, aliases, ID shapes) for reading purchases.
 await loadAndRegister(db);
 const user = await getUserByUsername(db, values.user.trim().toLowerCase());
@@ -92,7 +94,7 @@ const read = await readPurchases(ctx, dir, files, askClaude, {
 // No date at all: the file's date, checked in review.
 const mtimes = new Map(
   await Promise.all(
-    names.map(async (n) => [n, toTokyoIso((await stat(join(dir, n))).mtime)] as const),
+    names.map(async (n) => [n, toLocalIso((await stat(join(dir, n))).mtime)] as const),
   ),
 );
 const plan = await planAiImport(
@@ -100,7 +102,7 @@ const plan = await planAiImport(
   user.id,
   read,
   ctx.products,
-  (f) => mtimes.get(f.split(' + ')[0]!) ?? toTokyoIso(),
+  (f) => mtimes.get(f.split(' + ')[0]!) ?? toLocalIso(),
 );
 
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
@@ -116,7 +118,7 @@ for (const s of plan.shops) {
           ? `new lot of "${entry.ref.existing.name}"`
           : `new lot, new item "${entry.ref.create.name}"`
         : entry.type === 'likely'
-          ? `already registered (${tokyoDate(new Date(entry.existing.acquiredAt))}, ${yen(entry.existing.costTotalBase)})${r.noOrderId ? '' : ': its order ID is added'}`
+          ? `already registered (${localDate(new Date(entry.existing.acquiredAt))}, ${yen(entry.existing.costTotalBase)})${r.noOrderId ? '' : ': its order ID is added'}`
           : entry.type === 'duplicate'
             ? 'already registered'
             : entry.type === 'conflict'
@@ -125,7 +127,7 @@ for (const s of plan.shops) {
                 ? 'could not tell what item this is: not imported'
                 : 'cancelled';
     console.log(
-      `  ${tokyoDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
+      `  ${localDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
     );
     console.log(
       `      -> ${what}${entry.flags?.length ? `  [check: ${entry.flags.join(', ')}]` : ''}${row?.reviewedBy ? `  (Sonnet: ${row.reviewedBy})` : ''}`,

@@ -17,6 +17,7 @@ import {
   getUserById,
   getUserByUsername,
   listDevices,
+  loadTimeZone,
   markTotpStepUsed,
   registerDevice,
 } from '@tora/db';
@@ -55,6 +56,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const config = authConfigFromEnv();
   if (!config) return { error: 'notConfigured' };
   const db = getDb();
+  await loadTimeZone(db);
   const username = normalizeUsername(String(formData.get('username') ?? '')) ?? '';
   const key = {
     ipHash: keyedHash(await clientIp(), config.secret),
@@ -87,6 +89,7 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
   const config = authConfigFromEnv();
   if (!config) return { error: 'notConfigured' };
   const db = getDb();
+  await loadTimeZone(db);
   const jar = await cookies();
   const userId = await verifyMfaToken(jar.get(MFA_COOKIE)?.value, config);
   const user = userId ? await getUserById(db, userId) : null;

@@ -2,7 +2,7 @@
 // Claude login of the home PC (`claude -p`), the same way as `pnpm import-ai`; new lots wait in
 // Imports > Review. Quick when nothing waits: fine to schedule every few minutes. `pnpm collect`
 // does this too.
-import { createDb } from '@tora/db';
+import { createDb, loadTimeZone } from '@tora/db';
 import { dbConfigFromEnv, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { readWaitingUploads } from '../ai-import-run';
@@ -16,6 +16,8 @@ if (process.env.VERCEL || process.env.CI) {
 loadRootEnv();
 const db = createDb(dbConfigFromEnv());
 await exitIfUnmigrated(db);
+// Times written follow the admin's time zone (S16 part 5).
+await loadTimeZone(db);
 await loadAndRegister(db);
 const read = await readWaitingUploads(db, askClaude, { log: (m) => console.log(m) });
 if (read) console.log(`${read} upload batch(es) read: check Imports > Review.`);

@@ -1,4 +1,4 @@
-import { USER_TIME_ZONE, pickLocale } from '@tora/core';
+import { appTimeZone, pickLocale } from '@tora/core';
 import { getRequestConfig } from 'next-intl/server';
 import { cookies } from 'next/headers';
 import { getLanguages } from '@/lib/languages';
@@ -14,7 +14,8 @@ export default getRequestConfig(async () => {
   const messages = (await import(`../../messages/${locale}.json`)).default;
   return {
     locale,
-    timeZone: USER_TIME_ZONE,
+    // The admin's time zone (S16 part 5).
+    timeZone: registry.timeZone ?? appTimeZone(),
     // The admin's category names (S16) join the language's texts.
     messages: registry.taxonomy ? withTaxonomy(messages, registry.taxonomy, locale) : messages,
   };

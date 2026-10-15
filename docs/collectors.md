@@ -172,8 +172,8 @@ Fetch the listing's prices and save them with `ctx.save(rows)`. Each row (`Price
 | `price`           | Per unit, in the currency's **smallest unit** (yen; cents for dollars); never converted                                                        |
 | `priceOriginal`   | Usually the same as `price` (the amount as the site showed it)                                                                                 |
 | `currency`        | ISO 4217 code of `price`                                                                                                                       |
-| `observedAt`      | When it sold (or was seen), `toTokyoIso(date)` from `@tora/core`                                                                               |
-| `fetchedAt`       | `toTokyoIso(ctx.now)`                                                                                                                          |
+| `observedAt`      | When it sold (or was seen): an ISO time with any offset (a site's own is fine); stored in the app's time zone                                  |
+| `fetchedAt`       | `toLocalIso(ctx.now)` from `@tora/core` (or any ISO time)                                                                                      |
 | `externalRef`     | **Unique per source** for this price (a sale ID, or `id                                                                                        | condition | day`): saving it again is a no-op |
 | `title`, `url`    | The listing's title and link                                                                                                                   |
 | `raw`             | Anything useful to keep (JSON); no personal data                                                                                               |

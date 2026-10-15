@@ -21,6 +21,8 @@ import {
   shopOf,
   sourceName,
   toMinor,
+  localTime,
+  toLocalIso,
 } from '@tora/core';
 import {
   type Db,
@@ -452,8 +454,8 @@ export function toReceipts(
     const receipt: PurchaseReceipt = {
       orderId: key,
       noOrderId: !orderId,
-      // Noon in Tokyo: a date alone, never shifted to the day before.
-      orderedAt: date ? `${date}T12:00:00.000+09:00` : fallbackDate(row.file),
+      // Noon in the app's time zone: a date alone, never shifted to the day before.
+      orderedAt: date ? toLocalIso(localTime(date, '12:00:00.000')) : fallbackDate(row.file),
       title: row.title,
       quantity: row.quantity >= 1 && row.quantity <= 100 ? row.quantity : 1,
       total: toMinor(row.price ?? 0, row.currency || currencyOf(row.shop)),

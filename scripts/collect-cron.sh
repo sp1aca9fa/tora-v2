@@ -20,7 +20,10 @@ LOCK="$STATE_DIR/collect${SUFFIX:+-$SUFFIX}.lock"
 MAX_JITTER_SECONDS="${MAX_JITTER_SECONDS:-300}"
 mkdir -p "$STATE_DIR"
 
-today="$(TZ=Asia/Tokyo date +%F)"
+# The day in the app's time zone (Settings > Admin preferences > Time zone), which each collect
+# writes down; before the first one, the PC's own.
+APP_TZ="$(cat "$STATE_DIR/time-zone" 2>/dev/null || true)"
+today="$(${APP_TZ:+env TZ="$APP_TZ"} date +%F)"
 if [ "${FORCE:-0}" != "1" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$today" ]; then
   exit 0
 fi
