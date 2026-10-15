@@ -365,6 +365,52 @@ export const importRuns = sqliteTable('import_runs', {
   ...timestamps,
 });
 
+/** Import log outcomes (S6): what happened to each row of an import. */
+export const IMPORT_ROW_OUTCOMES = [
+  'imported',
+  'existing',
+  'matched',
+  'updated',
+  'skipped',
+  'problem',
+] as const;
+export type ImportRowOutcome = (typeof IMPORT_ROW_OUTCOMES)[number];
+
+/**
+ * The import log (requirements S6): each row an import read (a spreadsheet row, a purchase read
+ * by Claude, an order email) and what happened to it, so nothing left out is only a number.
+ */
+export const importRows = sqliteTable(
+  'import_rows',
+  {
+    id: id(),
+    importRunId: text('import_run_id')
+      .notNull()
+      .references(() => importRuns.id, { onDelete: 'cascade' }),
+    /** Order in the import (a spreadsheet's line, a receipt's place). */
+    position: integer('position').notNull(),
+    /** What the row says it is (item title or name). */
+    title: text('title').notNull(),
+    /** Where it came from: an order ID, a file name, a spreadsheet line. */
+    detail: text('detail'),
+    /** imported | existing (already in Tora) | matched (to an entry added by hand) | updated | skipped | problem */
+    outcome: text('outcome', { enum: IMPORT_ROW_OUTCOMES }).notNull(),
+    /** Why (a code the app names, e.g. `same_order`, `not_owned`, `bad_date`), or an error. */
+    reason: text('reason'),
+    /** The lot it created or matched. */
+    holdingId: text('holding_id').references(() => holdings.id, { onDelete: 'set null' }),
+    quantity: integer('quantity'),
+    costBase: integer('cost_base'),
+    /** The purchase day, as the row gives it. */
+    day: text('day'),
+    ...timestamps,
+  },
+  (t) => [
+    check('import_rows_outcome_check', oneOf(t.outcome, IMPORT_ROW_OUTCOMES)),
+    index('import_rows_run_idx').on(t.importRunId, t.position),
+  ],
+);
+
 /**
  * Links to purchases the user pasted in the app (shops that send no receipt email, e.g.
  * Mercari). The home PC reads each on the next collect and imports it into the review queue.
@@ -672,6 +718,8 @@ export const loginAttempts = sqliteTable(
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
+export type ImportRow = typeof importRows.$inferSelect;
+export type NewImportRow = typeof importRows.$inferInsert;
 export type Suggestion = typeof suggestions.$inferSelect;
 export type UserDevice = typeof userDevices.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;

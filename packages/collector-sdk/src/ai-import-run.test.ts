@@ -14,6 +14,7 @@ import { migrateDb } from '@tora/db/migrate';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import type { AskClaude, ExtractedRow } from './ai-import';
 import { readUploadBatch, readWaitingUploads } from './ai-import-run';
@@ -67,7 +68,13 @@ it('reads an uploaded batch once into the review, by whoever claims it first', a
   const ask: AskClaude = async <T>(o: { files?: string[] }) => {
     seen.push(o.files ?? []);
     return {
-      output: { rows: (o.files ?? []).map(row) } as T,
+      output: {
+        rows: [
+          ...(o.files ?? []).map(row),
+          // Not a collectible: left out, but in the import's log.
+          { ...row(o.files?.[0] ?? ''), orderId: null, title: '充電ケーブル', collectible: false },
+        ],
+      } as T,
       costUsd: 0.001,
       tokens: 100,
       modelName: 'claude-haiku-5-5',
@@ -86,6 +93,16 @@ it('reads an uploaded batch once into the review, by whoever claims it first', a
   const [batch] = await uploadBatchesOf(db, userId);
   expect(batch).toMatchObject({ status: 'done', files: ['IMG 1.png'] });
   expect(batch!.importRunId).toBeTruthy();
+  const log = await db
+    .select()
+    .from(schema.importRows)
+    .where(eq(schema.importRows.importRunId, batch!.importRunId!))
+    .orderBy(schema.importRows.position);
+  expect(log.map((r) => [r.title, r.outcome, r.reason, r.detail])).toEqual([
+    ['リザードンex SAR 201/165', 'imported', null, 'm12345678901'],
+    ['充電ケーブル', 'skipped', 'not_collectible', '01-IMG_1.png'],
+  ]);
+  expect(log[0]!.holdingId).toBe(review[0]!.holding.id);
   // The file's data is dropped once read; a second read finds nothing waiting.
   const [stored] = await db.select().from(schema.importUploads);
   expect(stored!.data).toBe('');

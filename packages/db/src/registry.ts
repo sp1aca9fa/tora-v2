@@ -178,6 +178,23 @@ export async function setTimeZoneSetting(db: Db, name: string): Promise<void> {
   setAppTimeZone(name);
 }
 
+/** The last backup the home PC made (S6), shown to admins in Settings > Collectors. */
+export interface BackupRecord {
+  at: string;
+  file: string;
+  bytes: number;
+  rows: number;
+}
+
+export async function setLastBackup(db: Db, value: BackupRecord): Promise<void> {
+  await saveSetting(db, 'lastBackup', value);
+}
+
+export async function lastBackup(db: Pick<Db, 'select'>): Promise<BackupRecord | null> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'lastBackup'));
+  return (row?.value as BackupRecord | undefined) ?? null;
+}
+
 /** Loads the app's time zone (scripts and requests that read no other setting first). */
 export async function loadTimeZone(db: Pick<Db, 'select'>): Promise<string> {
   return (await loadSourceRegistry(db)).timeZone ?? appTimeZone();

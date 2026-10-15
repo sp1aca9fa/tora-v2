@@ -130,7 +130,12 @@ kind, condition, status) in either of the app's languages or as keys, UTF-8 or t
 encoding Excel saves. A preview shows what each row would do: a new lot, already in Tora (its lot
 ID is in the account, the same order is, or a lot of the same item with the same date, quantity
 and cost), skipped (not an owned lot) or a problem; confirming adds the new rows as lots waiting
-in Review. Rows already in Tora are never changed: edit lots in the app. Up to 5,000 rows, 2 MB.
+in Review. A row matching only by item, date, quantity and cost shows that lot and can be ticked
+"Add anyway" (a real second purchase). Rows already in Tora are never changed: edit lots in the
+app. Up to 5,000 rows, 2 MB.
+
+Every import keeps a log: its page (Imports > History) lists the rows not imported and why, and
+the rows already in Tora with the lot each matched, so nothing is left out silently.
 
 ## The data review
 

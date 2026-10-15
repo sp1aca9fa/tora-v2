@@ -6,6 +6,7 @@ import { localDate } from '@tora/core';
 import {
   createDb,
   finishImportRun,
+  saveImportRows,
   getUserByUsername,
   startImportRun,
   loadTimeZone,
@@ -210,6 +211,12 @@ for (const importer of selected) {
     source: importer.source,
   });
   const outcome = await applyImport(db, user.id, importer, plan, decisions, { importRunId: run });
+  // Emails that could not be read go in the import's log too.
+  await saveImportRows(
+    db,
+    run,
+    gathered.unreadable.map((u) => ({ title: u.subject, outcome: 'problem', reason: u.reason })),
+  );
   await finishImportRun(db, run, {
     imported: outcome.created,
     corrected: outcome.updated,

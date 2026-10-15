@@ -363,7 +363,9 @@
     "nightOver": "Longer than the window. Run one market or one collector at a time (pnpm collect --market us, --source x), spread across the night by the scheduler; the setup guide has an example.",
     "runTime": "Last run: {time}",
     "runTimeUsual": "Last run: {time} (usual {usual})",
-    "runTimeLong": "Last run: {time}, much longer than usual ({usual})"
+    "runTimeLong": "Last run: {time}, much longer than usual ({usual})",
+    "lastBackup": "Last backup of the database: {date} ({mb} MB, {rows} rows).",
+    "noBackup": "No database backup recorded yet: the daily schedule makes one after each collect (or run pnpm backup on the home PC)."
   },
   "fields": {
     "type": "Type",
@@ -776,7 +778,7 @@
       "file": "Spreadsheet file",
       "check": "Check the file",
       "checking": "Checking...",
-      "summary": "{added, plural, one {# new lot} other {# new lots}} · {existing} already in Tora · {skipped} skipped · {problems, plural, one {# problem} other {# problems}}",
+      "summary": "{added, plural, one {# new lot} other {# new lots}} · {existing} already in Tora{likely, plural, =0 {} other { · # maybe already in Tora (check them below)}} · {skipped} skipped · {problems, plural, one {# problem} other {# problems}}",
       "ignored": "Columns not used: {columns}",
       "line": "Row {line}",
       "row": {
@@ -810,7 +812,47 @@
         "sheetTooBig": "The file is over 2 MB.",
         "sheetNoHeader": "The first row must name the columns, with at least the item (as in the download).",
         "sheetTooManyRows": "Over 5,000 rows: split the file."
+      },
+      "likely": "Maybe already in Tora",
+      "addAnyway": "Add anyway",
+      "matchedLot": "the lot",
+      "matchedBy": {
+        "lot_id": "Already in Tora (same lot ID)",
+        "same_order": "Already in Tora (same order)",
+        "same_lot": "Maybe already in Tora: a lot of the same item, day, quantity and cost"
       }
+    },
+    "log": {
+      "outcome": {
+        "imported": "Imported",
+        "existing": "Already in Tora",
+        "matched": "Matched to an entry you added",
+        "updated": "Corrected",
+        "skipped": "Skipped",
+        "problem": "Not imported"
+      },
+      "reason": {
+        "lot_id": "same lot ID",
+        "same_order": "same order",
+        "same_lot": "a lot of the same item, day, quantity and cost (a second purchase? import the file again and tick Add anyway)",
+        "added_anyway": "added anyway, though it looked like a lot already in Tora",
+        "not_owned": "not an owned lot (sold, consumed or lost)",
+        "entry_by_hand": "an entry you added by hand; it now has this order",
+        "not_entry_by_hand": "you said it is not the entry you added",
+        "like_entry_by_hand": "looks like an entry you added; you chose to skip it",
+        "differs_kept": "registered with different details; kept as registered",
+        "unclassified": "could not tell which item it is: add it by hand",
+        "cancelled": "cancelled",
+        "cancelled_in_app": "marked as cancelled in the app",
+        "cancelled_registered": "cancelled per the emails, but registered: check it",
+        "not_purchase": "not a purchase",
+        "not_collectible": "not a collectible",
+        "corrected": "corrected: {fields}"
+      },
+      "notImported": "{count, plural, one {# row not imported} other {# rows not imported}}",
+      "found": "{count, plural, one {# row already in Tora} other {# rows already in Tora}}",
+      "foundInfo": "Rows Tora already had, each with the lot it matched: open it to check it is the same purchase.",
+      "openLot": "Open the lot"
     }
   },
   "product": {

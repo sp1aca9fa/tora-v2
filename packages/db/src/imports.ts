@@ -1,9 +1,17 @@
 // Imports hub (requirements S5d): import runs and what needs the user after an import.
 import { toLocalIso } from '@tora/core';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { DomainError, deleteHolding, deleteUnusedProduct, editHolding } from './mutations';
 import type { Db } from './client';
-import { type ImportRun, holdings, importRuns, products, purchaseLinks } from './schema';
+import {
+  type ImportRun,
+  type NewImportRow,
+  holdings,
+  importRows,
+  importRuns,
+  products,
+  purchaseLinks,
+} from './schema';
 
 export type ImportMethod = 'email' | 'links' | 'file' | 'claude';
 
@@ -37,6 +45,35 @@ export async function finishImportRun(
     .where(eq(importRuns.id, id));
 }
 
+/** A row of the import log, before it is saved (its run and place are added). */
+export type ImportRowLog = Omit<
+  NewImportRow,
+  'id' | 'importRunId' | 'position' | 'createdAt' | 'updatedAt'
+>;
+
+/** Saves an import's log (S6): every row it read and what happened to it, in order. */
+export async function saveImportRows(db: Db, runId: string, rows: ImportRowLog[]): Promise<void> {
+  const [last] = await db
+    .select({ position: importRows.position })
+    .from(importRows)
+    .where(eq(importRows.importRunId, runId))
+    .orderBy(desc(importRows.position))
+    .limit(1);
+  const start = (last?.position ?? 0) + 1;
+  for (let i = 0; i < rows.length; i += 200) {
+    await db.insert(importRows).values(
+      rows.slice(i, i + 200).map((r, j) => ({
+        ...r,
+        title: r.title.slice(0, 300) || '-',
+        detail: r.detail?.slice(0, 300) ?? null,
+        reason: r.reason?.slice(0, 500) ?? null,
+        importRunId: runId,
+        position: start + i + j,
+      })),
+    );
+  }
+}
+
 /** The user's import runs, newest first. */
 export async function importRunsOf(db: Db, userId: string, limit = 30): Promise<ImportRun[]> {
   return db
@@ -47,14 +84,14 @@ export async function importRunsOf(db: Db, userId: string, limit = 30): Promise<
     .limit(limit);
 }
 
-/** One run with the lots it created and the links it read. */
+/** One run with the lots it created, the links it read and its log. */
 export async function importRunDetail(db: Db, userId: string, id: string) {
   const [run] = await db
     .select()
     .from(importRuns)
     .where(and(eq(importRuns.id, id), eq(importRuns.userId, userId)));
   if (!run) return null;
-  const [lots, links] = await Promise.all([
+  const [lots, links, rows] = await Promise.all([
     db
       .select({ holding: holdings, product: products })
       .from(holdings)
@@ -65,8 +102,15 @@ export async function importRunDetail(db: Db, userId: string, id: string) {
       .select()
       .from(purchaseLinks)
       .where(and(eq(purchaseLinks.userId, userId), eq(purchaseLinks.importRunId, id))),
+    db
+      .select({ row: importRows, product: products })
+      .from(importRows)
+      .leftJoin(holdings, eq(holdings.id, importRows.holdingId))
+      .leftJoin(products, eq(products.id, holdings.productId))
+      .where(eq(importRows.importRunId, id))
+      .orderBy(asc(importRows.position)),
   ]);
-  return { run, lots, links };
+  return { run, lots, links, rows };
 }
 
 export async function getImportRun(db: Db, userId: string, id: string): Promise<ImportRun | null> {

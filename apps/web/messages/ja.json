@@ -363,7 +363,9 @@
     "nightOver": "時間枠を超えています。市場ごと、またはコレクターごとに分けて実行し（pnpm collect --market us、--source x）、スケジューラーで夜間に分散してください。例はセットアップガイドにあります。",
     "runTime": "前回の実行: {time}",
     "runTimeUsual": "前回の実行: {time}（通常{usual}）",
-    "runTimeLong": "前回の実行: {time}、通常（{usual}）よりかなり長い"
+    "runTimeLong": "前回の実行: {time}、通常（{usual}）よりかなり長い",
+    "lastBackup": "データベースの最新バックアップ：{date}（{mb} MB、{rows} 行）。",
+    "noBackup": "データベースのバックアップの記録がまだありません。毎日のスケジュールが収集の後に作成します（自宅PCで pnpm backup も可）。"
   },
   "fields": {
     "type": "種類",
@@ -776,7 +778,7 @@
       "file": "表計算ファイル",
       "check": "ファイルを確認",
       "checking": "確認中...",
-      "summary": "新しいロット {added} 件 · Toraに登録済み {existing} 件 · 対象外 {skipped} 件 · 問題 {problems} 件",
+      "summary": "新しいロット {added} 件 · Toraに登録済み {existing} 件{likely, plural, =0 {} other { · 登録済みかもしれない行 # 件（下で確認）}} · 対象外 {skipped} 件 · 問題 {problems} 件",
       "ignored": "使わない列：{columns}",
       "line": "{line}行目",
       "row": {
@@ -810,7 +812,47 @@
         "sheetTooBig": "ファイルが2MBを超えています。",
         "sheetNoHeader": "1行目に列名が必要です（少なくとも商品名。ダウンロードと同じ形式）。",
         "sheetTooManyRows": "5,000行を超えています。ファイルを分けてください。"
+      },
+      "likely": "登録済みかもしれません",
+      "addAnyway": "それでも追加",
+      "matchedLot": "そのロット",
+      "matchedBy": {
+        "lot_id": "Toraに登録済み（同じロットID）",
+        "same_order": "Toraに登録済み（同じ注文）",
+        "same_lot": "登録済みかもしれません：同じ商品・日付・数量・金額のロット"
       }
+    },
+    "log": {
+      "outcome": {
+        "imported": "インポート済み",
+        "existing": "Toraに登録済み",
+        "matched": "手入力の登録と一致",
+        "updated": "修正",
+        "skipped": "対象外",
+        "problem": "インポートできませんでした"
+      },
+      "reason": {
+        "lot_id": "同じロットID",
+        "same_order": "同じ注文",
+        "same_lot": "同じ商品・日付・数量・金額のロット（別の購入なら、もう一度インポートして「それでも追加」にチェック）",
+        "added_anyway": "登録済みのロットに似ていましたが追加しました",
+        "not_owned": "所有中のロットではありません（売却済み・開封・消費済み・紛失）",
+        "entry_by_hand": "手入力した登録。この注文番号を付けました",
+        "not_entry_by_hand": "手入力の登録とは別の購入として追加",
+        "like_entry_by_hand": "手入力の登録に似ているため対象外にしました",
+        "differs_kept": "内容の違う登録があります。登録内容のままです",
+        "unclassified": "どの商品か分かりません。手入力で登録してください",
+        "cancelled": "キャンセル",
+        "cancelled_in_app": "アプリでキャンセル済みにした注文",
+        "cancelled_registered": "メールではキャンセルですが登録されています。確認してください",
+        "not_purchase": "購入ではありません",
+        "not_collectible": "コレクション品ではありません",
+        "corrected": "修正：{fields}"
+      },
+      "notImported": "インポートしなかった行 {count} 件",
+      "found": "Toraに登録済みの行 {count} 件",
+      "foundInfo": "Toraにすでにあった行と、一致したロット。同じ購入か開いて確認できます。",
+      "openLot": "ロットを開く"
     }
   },
   "product": {

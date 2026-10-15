@@ -20,7 +20,7 @@ import {
 } from '@tora/core';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
-import { finishImportRun, startImportRun } from './imports';
+import { type ImportRowLog, finishImportRun, saveImportRows, startImportRun } from './imports';
 import { type HoldingInput, type ProductRef, DomainError, createHolding } from './mutations';
 import { findSameProduct } from './purchases';
 import { loadSourceRegistry } from './registry';
@@ -173,17 +173,29 @@ export type SheetError =
   | 'bad_packaging'
   | 'bad_graded';
 
+/** A lot the row would add. */
+export interface NewLot {
+  quantity: number;
+  costBase: number;
+  acquired: string;
+  newItem: boolean;
+  ref: ProductRef;
+  input: HoldingInput;
+}
+
+/** How a row was found in Tora: its lot ID, the same order, or (loosely) the same lot details. */
+export type SheetMatch = 'lot_id' | 'same_order' | 'same_lot';
+
 export type SheetEntry = { line: number; item: string } & (
+  | ({ type: 'new' } & NewLot)
   | {
-      type: 'new';
-      quantity: number;
-      costBase: number;
-      acquired: string;
-      newItem: boolean;
-      ref: ProductRef;
-      input: HoldingInput;
+      type: 'existing';
+      /** The lot it matched (none: an earlier row of the file with the same order). */
+      lotId: string | null;
+      match: SheetMatch;
+      /** A loose match can still be added ("add anyway"): the lot it would be. */
+      asNew?: NewLot;
     }
-  | { type: 'existing'; lotId: string }
   | { type: 'skipped'; why: 'not_owned' }
   | { type: 'error'; error: SheetError }
 );
@@ -329,7 +341,7 @@ export async function planSheet(
     const item = cells.item ?? known.get(cells.item_id ?? '')?.name ?? cells.item_id ?? '';
     const fail = (error: SheetError) => entries.push({ line, item, type: 'error', error });
     if (cells.lot_id && lotIds.has(cells.lot_id)) {
-      entries.push({ line, item, type: 'existing', lotId: cells.lot_id });
+      entries.push({ line, item, type: 'existing', lotId: cells.lot_id, match: 'lot_id' });
       continue;
     }
     if (cells.status) {
@@ -425,43 +437,22 @@ export async function planSheet(
           (single || h.productId === product?.id),
       );
       if (same) {
-        entries.push({ line, item, type: 'existing', lotId: same.id });
+        entries.push({ line, item, type: 'existing', lotId: same.id, match: 'same_order' });
         continue;
       }
       const key = `${orderSource}\n${orderId}\n${single ? '' : (product?.id ?? cells.item)}`;
       if (planned.has(key)) {
-        entries.push({ line, item, type: 'existing', lotId: '' });
+        entries.push({ line, item, type: 'existing', lotId: null, match: 'same_order' });
         continue;
       }
       planned.add(key);
-    }
-
-    // Already in Tora without IDs (a hand-made sheet imported again): a lot of the same item
-    // acquired the same day, in the same quantity, for the same cost.
-    if (product && cells.acquired) {
-      const same = mine.find(
-        (h) =>
-          !matched.has(h.id) &&
-          h.productId === product.id &&
-          h.acquiredAt.slice(0, 10) === acquired &&
-          h.quantity === quantity &&
-          h.costTotalBase === (cost ?? 0),
-      );
-      if (same) {
-        matched.add(same.id);
-        entries.push({ line, item, type: 'existing', lotId: same.id });
-        continue;
-      }
     }
 
     const reasons = [
       ...(product ? [] : ['new_product']),
       ...(cells.acquired ? [] : ['date_approx']),
     ];
-    entries.push({
-      line,
-      item,
-      type: 'new',
+    const lot: NewLot = {
       quantity,
       costBase: cost ?? 0,
       acquired,
@@ -479,40 +470,107 @@ export async function planSheet(
         reviewPending: true,
         reviewReason: reasons.length ? reasons.join(',') : null,
       },
-    });
+    };
+
+    // Maybe already in Tora (a hand-made sheet imported again): a lot of the same item acquired
+    // the same day, in the same quantity, for the same cost. The person decides ("add anyway").
+    if (product && cells.acquired) {
+      const same = mine.find(
+        (h) =>
+          !matched.has(h.id) &&
+          h.productId === product.id &&
+          h.acquiredAt.slice(0, 10) === acquired &&
+          h.quantity === quantity &&
+          h.costTotalBase === (cost ?? 0),
+      );
+      if (same) {
+        matched.add(same.id);
+        entries.push({
+          line,
+          item,
+          type: 'existing',
+          lotId: same.id,
+          match: 'same_lot',
+          asNew: lot,
+        });
+        continue;
+      }
+    }
+    entries.push({ line, item, type: 'new', ...lot });
   }
   return entries;
 }
 
-/** Adds the plan's new lots as one import (Imports history), each waiting in Review. */
+/**
+ * Adds the plan's new lots (and the loose matches the person chose to add anyway, by line) as one
+ * import (Imports history), each waiting in Review; every row goes in the import's log.
+ */
 export async function applySheet(
   db: Db,
   userId: string,
   entries: SheetEntry[],
   fileName: string,
+  addAnyway: readonly number[] = [],
 ): Promise<{ runId: string; counts: Record<string, number> }> {
   const runId = await startImportRun(db, { userId, method: 'file' });
   const counts: Record<string, number> = {};
   const add = (k: string) => (counts[k] = (counts[k] ?? 0) + 1);
+  const log: ImportRowLog[] = [];
   for (const e of entries) {
-    if (e.type !== 'new') {
-      add(e.type === 'existing' ? 'duplicate' : e.type === 'skipped' ? 'skipped' : 'failed');
+    const row = { title: e.item, detail: `line:${e.line}` };
+    const lot =
+      e.type === 'new'
+        ? e
+        : e.type === 'existing' && e.asNew && addAnyway.includes(e.line)
+          ? e.asNew
+          : null;
+    if (!lot) {
+      if (e.type === 'existing') {
+        add('duplicate');
+        log.push({ ...row, outcome: 'existing', reason: e.match, holdingId: e.lotId });
+      } else if (e.type === 'skipped') {
+        add('skipped');
+        log.push({ ...row, outcome: 'skipped', reason: e.why });
+      } else if (e.type === 'error') {
+        add('failed');
+        log.push({ ...row, outcome: 'problem', reason: e.error });
+      }
       continue;
     }
+    const details = { quantity: lot.quantity, costBase: lot.costBase, day: lot.acquired };
     // A new item made by an earlier row is used again.
-    let ref = e.ref;
+    let ref = lot.ref;
     if ('product' in ref) {
       const same = await findSameProduct(db, ref.product);
       if (same) ref = { productId: same.id };
     }
     try {
-      await createHolding(db, userId, ref, { ...e.input, importRunId: runId });
+      const { holding } = await createHolding(db, userId, ref, {
+        ...lot.input,
+        importRunId: runId,
+      });
       add('imported');
+      log.push({
+        ...row,
+        ...details,
+        outcome: 'imported',
+        reason: e.type === 'existing' ? 'added_anyway' : null,
+        holdingId: holding.id,
+      });
     } catch (error) {
       if (!(error instanceof DomainError)) throw error;
-      add(error.code === 'duplicate_order' ? 'duplicate' : 'failed');
+      const duplicate = error.code === 'duplicate_order';
+      add(duplicate ? 'duplicate' : 'failed');
+      log.push({
+        ...row,
+        ...details,
+        outcome: duplicate ? 'existing' : 'problem',
+        reason: duplicate ? 'same_order' : error.code,
+        holdingId: duplicate ? (error.message === error.code ? null : error.message) : null,
+      });
     }
   }
+  await saveImportRows(db, runId, log);
   await finishImportRun(db, runId, counts, { note: fileName.slice(0, 200) });
   return { runId, counts };
 }

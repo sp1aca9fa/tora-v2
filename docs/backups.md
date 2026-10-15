@@ -16,6 +16,8 @@ It runs even when the collect failed, and only once a day (the day in the app's 
 - **Size and time**: a database with 280,000 collected prices gives an 18 MB file in about 40 s.
   Each backup reads every row once, well within Turso's free monthly reads.
 
+Settings > Collectors shows admins when the last copy was made (in red after two days without one).
+
 By hand: `pnpm backup` (skips when today's copy exists; `pnpm backup --force` makes it again).
 
 ### Copies off the PC

@@ -7,6 +7,7 @@ import {
   type Db,
   type PurchaseLink,
   finishImportRun,
+  saveImportRows,
   holdingsWithProducts,
   loadSourceRegistry,
   purchaseLinksOf,
@@ -140,6 +141,19 @@ export async function applyAiImport(
     add('failed', outcome.failed.length);
     failed.push(...outcome.failed);
   }
+  // Rows not imported on purpose go in the import's log after the purchases.
+  await saveImportRows(
+    db,
+    runId,
+    plan.skipped.map(({ row, why }) => ({
+      title: row.title,
+      detail: [row.file, row.orderId].filter(Boolean).join(' · ') || null,
+      outcome: 'skipped' as const,
+      reason: why,
+      quantity: row.quantity,
+      day: row.date,
+    })),
+  );
   add('cancelled', plan.skipped.filter((s) => s.why === 'cancelled').length);
   add('skipped', plan.skipped.filter((s) => s.why === 'not_collectible').length);
 

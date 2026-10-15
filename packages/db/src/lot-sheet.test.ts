@@ -19,7 +19,8 @@ import {
 import { migrateDb } from './migrate';
 import { createHolding, sellHolding } from './mutations';
 import { saveSourceInfos } from './registry';
-import { holdings, importRuns } from './schema';
+import { holdings, importRows, importRuns } from './schema';
+import { importRunDetail } from './imports';
 import { seedCollection } from './seed';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -277,13 +278,45 @@ it('reads a hand-made sheet in Japanese and reports each problem', async () => {
 
   // The same file again: the lots it added are found (the one without a date cannot be).
   const again = await planSheet(db, a, read, keyOf, new Date('2026-10-16T12:00:00+09:00'));
-  expect(again.slice(0, 5).map((e) => e.type)).toEqual([
-    'existing',
+  expect(again.slice(0, 5).map((e) => (e.type === 'existing' ? e.match : e.type))).toEqual([
+    'same_lot',
     'new',
-    'existing',
-    'existing',
-    'existing',
+    'same_order',
+    'same_order',
+    'same_order',
   ]);
+
+  // A loose match can still be added; every row is in the import's log.
+  const { runId } = await applySheet(db, a, again, 'mine.csv', [2]);
+  const log = await db
+    .select()
+    .from(importRows)
+    .where(eq(importRows.importRunId, runId))
+    .orderBy(importRows.position);
+  expect(log.map((r) => [r.detail, r.outcome, r.reason])).toEqual([
+    ['line:2', 'imported', 'added_anyway'],
+    ['line:3', 'imported', null],
+    ['line:4', 'existing', 'same_order'],
+    ['line:5', 'existing', 'same_order'],
+    ['line:6', 'existing', 'same_order'],
+    ['line:7', 'problem', 'bad_graded'],
+    ['line:8', 'skipped', 'not_owned'],
+    ['line:9', 'problem', 'unknown_category'],
+    ['line:10', 'problem', 'bad_quantity'],
+    ['line:11', 'problem', 'bad_cost'],
+    ['line:12', 'problem', 'bad_date'],
+    ['line:13', 'problem', 'missing_item'],
+    ['line:14', 'problem', 'bad_status'],
+  ]);
+  expect(log[0]).toMatchObject({
+    title: 'ポケモンBOX',
+    quantity: 2,
+    costBase: 12_000,
+    day: '2026-09-05',
+  });
+  expect(log[2]!.holdingId).toBeTruthy();
+  const detail = await importRunDetail(db, a, runId);
+  expect(detail!.rows[0]!.product?.name).toBe('ポケモンBOX');
 });
 
 it('downloads the account data without collected prices or secrets', async () => {

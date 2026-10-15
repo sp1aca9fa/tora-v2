@@ -1,4 +1,4 @@
-import { collectorHealth, collectorTimes, listRecentCollectorRuns } from '@tora/db';
+import { collectorHealth, collectorTimes, lastBackup, listRecentCollectorRuns } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
@@ -12,14 +12,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.collectors.title') };
 }
 
+/** The daily backup has not run for two days. */
+const backupStale = (at: string) => Date.now() - Date.parse(at) > 2 * 86_400_000;
+
 export default async function CollectorSettingsPage() {
   const money = await getMoney();
   const { db, user } = await authed();
-  const [sourceLabel, runs, health, times, t, format] = await Promise.all([
+  const [sourceLabel, runs, health, times, backup, t, format] = await Promise.all([
     sourceLabels(),
     listRecentCollectorRuns(db, 10),
     collectorHealth(db),
     collectorTimes(db),
+    user.role === 'admin' ? lastBackup(db) : null,
     getTranslations(),
     getFormatter(),
   ]);
@@ -53,6 +57,24 @@ export default async function CollectorSettingsPage() {
               )}
               {user.role === 'admin' && <CollectWindowForm hours={times.windowHours} />}
             </div>
+          )}
+          {user.role === 'admin' && (
+            // The home PC's daily database copy (S6): stale after two days.
+            <p
+              className={
+                !backup || backupStale(backup.at)
+                  ? 'rounded-md bg-muted px-3 py-2.5 text-sm font-medium text-destructive'
+                  : 'rounded-md bg-muted px-3 py-2.5 text-sm'
+              }
+            >
+              {backup
+                ? t('settings.lastBackup', {
+                    date: dateTime(backup.at),
+                    mb: (backup.bytes / 1024 / 1024).toFixed(1),
+                    rows: backup.rows,
+                  })
+                : t('settings.noBackup')}
+            </p>
           )}
           {health.map((h) => {
             const time = times.sources[h.source];

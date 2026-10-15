@@ -1,7 +1,7 @@
 'use server';
 
 import { decodeText, parseCsv } from '@tora/core';
-import { type SheetEntry, applySheet, planSheet, readSheet } from '@tora/db';
+import { type SheetEntry, type SheetMatch, applySheet, planSheet, readSheet } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
 import { sheetReader } from '@/lib/lot-sheet';
@@ -21,6 +21,11 @@ export interface SheetPreviewRow {
   costBase?: number;
   acquired?: string;
   newItem?: boolean;
+  /** Already in Tora: how it was found and the lot it matched. */
+  match?: SheetMatch;
+  lotId?: string | null;
+  /** A loose match the person may add anyway. */
+  canAdd?: boolean;
 }
 
 type Plan =
@@ -66,6 +71,7 @@ export async function previewSheetAction(
       item: e.item,
       type: e.type,
       ...(e.type === 'error' && { error: e.error }),
+      ...(e.type === 'existing' && { match: e.match, lotId: e.lotId, canAdd: !!e.asNew }),
       ...(e.type === 'new' && {
         quantity: e.quantity,
         costBase: e.costBase,
@@ -76,13 +82,23 @@ export async function previewSheetAction(
   };
 }
 
-/** Adds the file's new rows as lots waiting in Review (the file is read again). */
+/**
+ * Adds the file's new rows as lots waiting in Review (the file is read again), and the loose
+ * matches ticked "add anyway" (their lines, in `addAnyway`).
+ */
 export async function importSheetAction(
   formData: FormData,
 ): Promise<{ error: SheetError } | { runId: string; imported: number }> {
   const p = await plan(formData);
   if ('error' in p) return { error: p.error };
-  const { runId, counts } = await applySheet(p.db, p.userId, p.entries, p.name);
+  let addAnyway: number[] = [];
+  try {
+    const lines: unknown = JSON.parse(String(formData.get('addAnyway') ?? '[]'));
+    if (Array.isArray(lines)) addAnyway = lines.filter((n) => Number.isSafeInteger(n));
+  } catch {
+    // None ticked.
+  }
+  const { runId, counts } = await applySheet(p.db, p.userId, p.entries, p.name, addAnyway);
   revalidatePath('/', 'layout');
   return { runId, imported: counts.imported ?? 0 };
 }

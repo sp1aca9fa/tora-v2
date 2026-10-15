@@ -8,6 +8,8 @@ import {
   type Holding,
   type Product,
   type ProductInput,
+  type ImportRowLog,
+  saveImportRows,
   createHolding,
   editHolding,
   cancelledOrderIds,
@@ -344,10 +346,10 @@ export async function applyImport(
     ref: ProductRef,
     linked: boolean,
     flags: string[] = [],
-  ) => {
+  ): Promise<string> => {
     const existing = 'existing' in ref ? ref.existing : createdProducts.get(productKey(ref.create));
     const shape = existing ?? ('create' in ref ? ref.create : ref.existing);
-    const { product } = await createHolding(
+    const { product, holding } = await createHolding(
       db,
       userId,
       existing ? { productId: existing.id } : { product: (ref as { create: ProductInput }).create },
@@ -378,14 +380,39 @@ export async function applyImport(
       });
     }
     outcome.created++;
+    return holding.id;
   };
+
+  // The import's log (S6): each receipt and what happened to it.
+  const log: ImportRowLog[] = [];
+  const logRow = (
+    receipt: PurchaseReceipt,
+    outcome: ImportRowLog['outcome'],
+    reason: string | null,
+    holdingId: string | null = null,
+  ) =>
+    log.push({
+      title: receipt.title,
+      detail: receipt.noOrderId ? null : receipt.orderId,
+      outcome,
+      reason,
+      holdingId,
+      quantity: receipt.quantity,
+      costBase: receipt.total,
+      day: localDate(new Date(receipt.orderedAt)),
+    });
 
   for (const entry of plan) {
     const { receipt } = entry;
     const decision = decisions.get(receipt.orderId);
     try {
       if (entry.type === 'new') {
-        await create(receipt, entry.ref, entry.linked, entry.flags);
+        logRow(
+          receipt,
+          'imported',
+          null,
+          await create(receipt, entry.ref, entry.linked, entry.flags),
+        );
       } else if (
         entry.type === 'conflict' &&
         decision === 'imported' &&
@@ -399,8 +426,15 @@ export async function applyImport(
         }
         await editHolding(db, userId, entry.existing[0]!.id, edit);
         outcome.updated++;
+        logRow(
+          receipt,
+          'updated',
+          entry.diffs.map((d) => d.field).join(','),
+          entry.existing[0]!.id,
+        );
       } else if (entry.type === 'likely' && decision === 'same' && receipt.noOrderId) {
         // Nothing to attach: the entry already stands for this purchase.
+        logRow(receipt, 'matched', 'entry_by_hand', entry.existing.id);
       } else if (entry.type === 'likely' && decision === 'same') {
         const from = entry.existing.acquiredFrom;
         await editHolding(db, userId, entry.existing.id, {
@@ -410,8 +444,28 @@ export async function applyImport(
             : { acquiredFrom: importer.label }),
         });
         outcome.attached++;
+        logRow(receipt, 'matched', 'entry_by_hand', entry.existing.id);
       } else if (entry.type === 'likely' && decision === 'different' && entry.ref) {
-        await create(receipt, entry.ref, entry.linked, entry.flags);
+        logRow(
+          receipt,
+          'imported',
+          'not_entry_by_hand',
+          await create(receipt, entry.ref, entry.linked, entry.flags),
+        );
+      } else if (entry.type === 'likely') {
+        logRow(receipt, 'skipped', 'like_entry_by_hand', entry.existing.id);
+      } else if (entry.type === 'duplicate') {
+        logRow(receipt, 'existing', 'same_order', entry.existing[0]?.id ?? null);
+      } else if (entry.type === 'conflict') {
+        logRow(receipt, 'existing', 'differs_kept', entry.existing[0]?.id ?? null);
+      } else if (entry.type === 'unclassified') {
+        logRow(receipt, 'problem', 'unclassified');
+      } else if (entry.type === 'cancelled') {
+        logRow(receipt, 'skipped', 'cancelled');
+      } else if (entry.type === 'cancelledInApp') {
+        logRow(receipt, 'skipped', 'cancelled_in_app');
+      } else if (entry.type === 'cancelledRegistered') {
+        logRow(receipt, 'existing', 'cancelled_registered', entry.existing[0]?.id ?? null);
       }
       // Lots already in the app (or just matched to one) get the same review flags.
       const existing =
@@ -429,7 +483,9 @@ export async function applyImport(
       }
     } catch (error) {
       outcome.failed.push({ orderId: receipt.orderId, error: String(error) });
+      logRow(receipt, 'problem', String(error));
     }
   }
+  if (options.importRunId) await saveImportRows(db, options.importRunId, log);
   return outcome;
 }
