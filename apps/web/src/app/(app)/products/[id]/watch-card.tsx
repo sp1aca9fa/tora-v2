@@ -107,7 +107,7 @@ export function WatchCard({
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{w.label ?? t('watchlist.anyCondition')}</p>
-                    <p className="text-xs break-words text-muted-foreground">
+                    <p className="text-xs break-words text-muted-foreground tabular-nums">
                       {[
                         w.target
                           ? t('watchlist.targetShort', { target: money(w.target) })

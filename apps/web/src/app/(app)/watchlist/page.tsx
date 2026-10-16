@@ -3,6 +3,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
+import { AmountsToggle } from '@/components/amounts-toggle';
 import { ProductImage } from '@/components/product-image';
 import { Button } from '@/components/ui/button';
 import { authed } from '@/lib/auth/guard';
@@ -54,7 +55,10 @@ export default async function WatchlistPage() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{t('nav.watchlist')}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight">{t('nav.watchlist')}</h1>
+            <AmountsToggle />
+          </div>
           <p className="text-sm text-muted-foreground">{t('watchlist.intro')}</p>
         </div>
         <Button asChild>
@@ -94,14 +98,18 @@ export default async function WatchlistPage() {
                       <p className="truncate text-xs text-muted-foreground">{watch.note}</p>
                     )}
                   </div>
-                  <div className="shrink-0 space-y-0.5 text-right text-sm tabular-nums">
-                    <p className={now !== null ? 'font-medium' : 'text-muted-foreground'}>
+                  <div className="shrink-0 space-y-0.5 text-right text-sm">
+                    <p
+                      className={
+                        now !== null ? 'font-medium tabular-nums' : 'text-muted-foreground'
+                      }
+                    >
                       {now !== null ? money(now) : t('watchlist.noPrice')}
                     </p>
                     {target ? (
                       <p
                         className={cn(
-                          'text-xs',
+                          'text-xs tabular-nums',
                           gap !== null && gap <= 0
                             ? 'font-medium text-emerald-700 dark:text-emerald-400'
                             : 'text-muted-foreground',
@@ -118,7 +126,7 @@ export default async function WatchlistPage() {
                       </p>
                     ) : (
                       last && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground tabular-nums">
                           {t('watchlist.lastSale', { amount: money(last.priceBase) })}
                         </p>
                       )
