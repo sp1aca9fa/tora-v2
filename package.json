@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @tora/web dev",
+    "app": "pnpm build && pnpm --filter @tora/web start -H 0.0.0.0",
     "build": "pnpm -r --workspace-concurrency=1 build",
     "test": "vitest run",
     "test:watch": "vitest",

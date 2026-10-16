@@ -111,7 +111,9 @@ export async function verifyMfaToken(
 export function sessionCookieOptions(maxAge = SESSION_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // TORA_LOCAL_HTTP=1: the app run on the home PC and opened over plain http from the home
+    // network (a phone cannot keep a secure cookie there).
+    secure: process.env.NODE_ENV === 'production' && process.env.TORA_LOCAL_HTTP !== '1',
     sameSite: 'lax' as const,
     path: '/',
     maxAge,
