@@ -165,8 +165,8 @@ claude mcp add tora -- pnpm --silent --dir /path/to/tora-v2 mcp --user <username
 For Claude Desktop, put the same command in `claude_desktop_config.json` (`"command": "pnpm"`,
 `"args": ["--silent", "--dir", "/path/to/tora-v2", "mcp", "--user", "<username>"]`; with the repo
 in WSL, `"command": "wsl"` and `pnpm ...` in `args`). Tools: `portfolio_summary`, `list_products`,
-`product_detail`, `price_history`, `sales`, `collector_status`, `review_queue`, `data_checks` (start
-here for "does anything look off?") and `query_sql` (one read-only SELECT).
+`product_detail`, `price_history`, `sales`, `watchlist`, `collector_status`, `review_queue`,
+`data_checks` (start here for "does anything look off?") and `query_sql` (one read-only SELECT).
 
 ## TCG catalog
 

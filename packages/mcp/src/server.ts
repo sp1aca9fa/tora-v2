@@ -22,6 +22,7 @@ import {
   querySql,
   reviewQueue,
   sales,
+  watchlist,
 } from './tools';
 
 const { values } = parseArgs({ options: { user: { type: 'string' } }, strict: false });
@@ -119,6 +120,17 @@ server.registerTool(
     },
   },
   async ({ productId, ...filter }) => json(await priceHistoryOf(db, productId, filter)),
+);
+
+server.registerTool(
+  'watchlist',
+  {
+    title: 'Watchlist',
+    description:
+      'Items the user watches to buy (not owned yet, or more of): the condition bucket, the target price per unit (base currency, null when none), the note, and the market value now in that condition (method, source, number of sales, window, confidence).',
+    inputSchema: {},
+  },
+  async () => json(await watchlist(db, user.id)),
 );
 
 server.registerTool(

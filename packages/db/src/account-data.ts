@@ -15,6 +15,7 @@ import {
   products,
   purchaseLinks,
   users,
+  watches,
 } from './schema';
 import { portfolioValuation } from './valuation';
 
@@ -40,8 +41,13 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
     .orderBy(asc(holdings.acquiredAt), asc(holdings.createdAt));
   const lotIds = lots.map((l) => l.id);
   const manual = await db.select().from(manualPrices).where(eq(manualPrices.userId, userId));
+  const watched = await db.select().from(watches).where(eq(watches.userId, userId));
   const productIds = [
-    ...new Set([...lots.map((l) => l.productId), ...manual.map((m) => m.productId)]),
+    ...new Set([
+      ...lots.map((l) => l.productId),
+      ...manual.map((m) => m.productId),
+      ...watched.map((w) => w.productId),
+    ]),
   ];
   const items = productIds.length
     ? await db
@@ -92,6 +98,7 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
     }),
     history,
     manualPrices: manual,
+    watches: watched,
     listings,
     importRuns: await db.select().from(importRuns).where(eq(importRuns.userId, userId)),
     purchaseLinks: await db.select().from(purchaseLinks).where(eq(purchaseLinks.userId, userId)),

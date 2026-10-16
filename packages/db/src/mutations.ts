@@ -49,6 +49,7 @@ import {
   sourceWarningDismissals,
   tcgSets,
   valuationSnapshots,
+  watches,
 } from './schema';
 
 export type DomainErrorCode =
@@ -66,7 +67,8 @@ export type DomainErrorCode =
   | 'has_dependents'
   | 'duplicate_order'
   | 'no_rate'
-  | 'invalid_time_zone';
+  | 'invalid_time_zone'
+  | 'duplicate_watch';
 
 /** Expected business-rule failure; actions map the code to a user-facing message. */
 export class DomainError extends Error {
@@ -253,6 +255,11 @@ async function resolveCatalogProduct(tx: Tx, ref: CatalogRef): Promise<Product> 
     })
     .returning();
   return product!;
+}
+
+/** The product a reference names, created first when new (e.g. an item added to the watchlist). */
+export async function resolveProductRef(db: Db, userId: string, ref: ProductRef): Promise<Product> {
+  return db.transaction((tx) => resolveProduct(tx, userId, ref));
 }
 
 async function resolveProduct(tx: Tx, userId: string, ref: ProductRef): Promise<Product> {
@@ -1016,7 +1023,7 @@ export async function flagForReview(
 
 /**
  * Merges a duplicate product into another (same category and kind): its lots, sales data, manual
- * prices and listings move over, then the duplicate is deleted. Listings the target already has,
+ * prices, watches and listings move over, then the duplicate is deleted. Listings the target already has,
  * the duplicate's pending suggestions and its picture are dropped. Products are shared, so other
  * users' lots of the duplicate move too (they are the same item).
  */
@@ -1044,6 +1051,19 @@ export async function mergeProducts(
       .update(manualPrices)
       .set({ productId: intoId })
       .where(eq(manualPrices.productId, fromId));
+    // A watch the target already has (same person and condition) is dropped.
+    const intoWatches = await tx
+      .select({ userId: watches.userId, bucket: watches.bucket })
+      .from(watches)
+      .where(eq(watches.productId, intoId));
+    const watched = new Set(intoWatches.map((w) => `${w.userId}|${w.bucket}`));
+    for (const w of await tx.select().from(watches).where(eq(watches.productId, fromId))) {
+      if (watched.has(`${w.userId}|${w.bucket}`)) {
+        await tx.delete(watches).where(eq(watches.id, w.id));
+      } else {
+        await tx.update(watches).set({ productId: intoId }).where(eq(watches.id, w.id));
+      }
+    }
     const intoListings = await tx
       .select({ source: productSources.source, externalId: productSources.externalId })
       .from(productSources)
@@ -1072,7 +1092,7 @@ export async function mergeProducts(
 }
 
 /**
- * Deletes a product nobody holds (e.g. one an import made from a cut-off title, whose lot was
+ * Deletes a product nobody holds or watches (e.g. one an import made from a cut-off title, whose lot was
  * merged into another): its listings, sales data, suggestions and picture go with it. Returns
  * false, changing nothing, when any lot still refers to it.
  */
@@ -1083,6 +1103,11 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
       .from(holdings)
       .where(eq(holdings.productId, productId));
     if ((used?.n ?? 0) > 0) return false;
+    const [watched] = await tx
+      .select({ n: count() })
+      .from(watches)
+      .where(eq(watches.productId, productId));
+    if ((watched?.n ?? 0) > 0) return false;
     await tx.delete(priceObservations).where(eq(priceObservations.productId, productId));
     await tx.delete(manualPrices).where(eq(manualPrices.productId, productId));
     await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, productId));

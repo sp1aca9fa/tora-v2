@@ -24,3 +24,4 @@ export * from './time-zone';
 export * from './categories';
 export * from './lot-sheet';
 export * from './account-data';
+export * from './watches';

@@ -30,9 +30,12 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { type ProductSummary, type SetSummary, createHoldingAction } from './actions';
+import { createWatchAction } from '../watchlist/actions';
 import { useMoney } from '@/components/money-context';
 
-const STEPS = ['what', 'how', 'details'] as const;
+const LOT_STEPS = ['what', 'how', 'details'] as const;
+/** Watching an item (S9): what, then the condition and target. */
+const WATCH_STEPS = ['what', 'watch'] as const;
 const MTG_VARIANTS = ['Play', 'Collector', 'Draft', 'Set', 'Jumpstart'];
 
 function Chips<T extends string>({
@@ -89,6 +92,7 @@ export function AddFlow({
   franchiseSuggestions,
   initialProduct,
   fromLink,
+  watch = false,
 }: {
   today: string;
   fromSuggestions: string[];
@@ -101,10 +105,16 @@ export function AddFlow({
     acquiredFrom: string | null;
     orderId: string | null;
   } | null;
+  /** Watch the item instead of registering a lot (S9). */
+  watch?: boolean;
 }) {
   const money = useMoney();
   const t = useTranslations();
-  const [state, formAction, pending] = useActionState(createHoldingAction, {});
+  const STEPS: readonly string[] = watch ? WATCH_STEPS : LOT_STEPS;
+  const [state, formAction, pending] = useActionState(
+    watch ? createWatchAction : createHoldingAction,
+    {},
+  );
   const [step, setStep] = useState(initialProduct ? 1 : 0);
   const [mode, setMode] = useState<'existing' | 'new'>(initialProduct ? 'existing' : 'new');
   const [selected, setSelected] = useState<ProductSummary | null>(initialProduct);
@@ -243,7 +253,7 @@ export function AddFlow({
             )}
           >
             {i < step ? <Check className="size-3.5" /> : <span>{i + 1}</span>}
-            {t(`add.steps.${s}`)}
+            {t(watch && s === 'watch' ? 'watchlist.step' : `add.steps.${s}`)}
           </li>
         ))}
       </ol>
@@ -470,155 +480,178 @@ export function AddFlow({
         )}
       </section>
 
+      {watch && (
+        <section
+          ref={(el) => {
+            sectionRefs.current[1] = el;
+          }}
+          hidden={step !== 1}
+          className="space-y-4"
+        >
+          {summary && <p className="text-sm font-medium">{summary}</p>}
+          <p className="text-sm text-muted-foreground">{t('watchlist.conditionHint')}</p>
+          {cls && <ConditionFields key={cls} cls={cls} />}
+          <WatchTargetFields retail={retail} />
+        </section>
+      )}
+
       {/* Step 2: how I got it */}
-      <section
-        ref={(el) => {
-          sectionRefs.current[1] = el;
-        }}
-        hidden={step !== 1}
-        className="space-y-4"
-      >
-        {summary && <p className="text-sm font-medium">{summary}</p>}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t('fields.acquiredAt')} htmlFor="acquiredAt">
-            <Input
-              id="acquiredAt"
-              name="acquiredAt"
-              type="date"
-              required
-              value={acquiredAt}
-              onChange={(e) => {
-                setAcquiredAt(e.target.value);
-                setOnRelease(false);
-              }}
-              max={today}
-            />
-            <label
-              className={cn(
-                'mt-1.5 flex items-center gap-2 text-xs',
-                releaseDate ? 'text-muted-foreground' : 'text-muted-foreground/50',
-              )}
-            >
-              <input
-                type="checkbox"
-                className="size-3.5"
-                disabled={!releaseDate}
-                checked={onRelease && !!releaseDate}
+      {!watch && (
+        <section
+          ref={(el) => {
+            sectionRefs.current[1] = el;
+          }}
+          hidden={step !== 1}
+          className="space-y-4"
+        >
+          {summary && <p className="text-sm font-medium">{summary}</p>}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label={t('fields.acquiredAt')} htmlFor="acquiredAt">
+              <Input
+                id="acquiredAt"
+                name="acquiredAt"
+                type="date"
+                required
+                value={acquiredAt}
                 onChange={(e) => {
-                  setOnRelease(e.target.checked);
-                  setAcquiredAt(e.target.checked && releaseDate ? releaseDate : today);
+                  setAcquiredAt(e.target.value);
+                  setOnRelease(false);
                 }}
+                max={today}
               />
-              {releaseDate ? t('add.onRelease', { date: releaseDate }) : t('add.onReleaseUnknown')}
-            </label>
-          </Field>
-          <Field label={t('fields.acquiredFrom')} htmlFor="acquiredFrom">
-            <Input
-              id="acquiredFrom"
-              name="acquiredFrom"
-              list="from-suggestions"
-              autoComplete="off"
-              defaultValue={fromLink?.acquiredFrom ?? undefined}
-            />
-            <datalist id="from-suggestions">
-              <option value={t('add.unknownFrom')} />
-              {fromSuggestions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </Field>
-          <Field label={t('fields.acquisitionType')} htmlFor="acquisitionType">
-            <NativeSelect id="acquisitionType" name="acquisitionType" defaultValue="purchase">
-              {(['purchase', 'gift', 'trade'] as const).map((a) => (
-                <option key={a} value={a}>
-                  {t(`acquisitionType.${a}`)}
-                </option>
-              ))}
-            </NativeSelect>
-          </Field>
-          <Field label={t('fields.quantity')} htmlFor="quantity">
-            <Input
-              id="quantity"
-              name="quantity"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              required
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-          </Field>
-          <Field
-            label={t('fields.costTotalBase')}
-            htmlFor="costTotalBase"
-            hint={
-              !cost.trim() && retail
-                ? t('add.costFromRetail', {
-                    amount: money(retail * (Number(quantity) || 1)),
-                  })
-                : perUnit !== null
-                  ? t('common.perUnit', { amount: money(perUnit) })
-                  : t('add.costHint')
-            }
-            className="sm:col-span-2"
-          >
-            <Input
-              id="costTotalBase"
-              name="costTotalBase"
-              inputMode="decimal"
-              required={!retail}
-              placeholder={money.symbol}
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-            />
-          </Field>
-          <Field
-            label={t('fields.orderId')}
-            htmlFor="orderId"
-            hint={t('add.orderIdHint')}
-            className="sm:col-span-2"
-          >
-            <Input
-              id="orderId"
-              name="orderId"
-              autoComplete="off"
-              inputMode="text"
-              defaultValue={fromLink?.orderId ?? undefined}
-            />
-            {fromLink && <input type="hidden" name="purchaseLinkId" value={fromLink.id} />}
-          </Field>
-        </div>
-      </section>
+              <label
+                className={cn(
+                  'mt-1.5 flex items-center gap-2 text-xs',
+                  releaseDate ? 'text-muted-foreground' : 'text-muted-foreground/50',
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="size-3.5"
+                  disabled={!releaseDate}
+                  checked={onRelease && !!releaseDate}
+                  onChange={(e) => {
+                    setOnRelease(e.target.checked);
+                    setAcquiredAt(e.target.checked && releaseDate ? releaseDate : today);
+                  }}
+                />
+                {releaseDate
+                  ? t('add.onRelease', { date: releaseDate })
+                  : t('add.onReleaseUnknown')}
+              </label>
+            </Field>
+            <Field label={t('fields.acquiredFrom')} htmlFor="acquiredFrom">
+              <Input
+                id="acquiredFrom"
+                name="acquiredFrom"
+                list="from-suggestions"
+                autoComplete="off"
+                defaultValue={fromLink?.acquiredFrom ?? undefined}
+              />
+              <datalist id="from-suggestions">
+                <option value={t('add.unknownFrom')} />
+                {fromSuggestions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </Field>
+            <Field label={t('fields.acquisitionType')} htmlFor="acquisitionType">
+              <NativeSelect id="acquisitionType" name="acquisitionType" defaultValue="purchase">
+                {(['purchase', 'gift', 'trade'] as const).map((a) => (
+                  <option key={a} value={a}>
+                    {t(`acquisitionType.${a}`)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+            <Field label={t('fields.quantity')} htmlFor="quantity">
+              <Input
+                id="quantity"
+                name="quantity"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={1}
+                required
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+              />
+            </Field>
+            <Field
+              label={t('fields.costTotalBase')}
+              htmlFor="costTotalBase"
+              hint={
+                !cost.trim() && retail
+                  ? t('add.costFromRetail', {
+                      amount: money(retail * (Number(quantity) || 1)),
+                    })
+                  : perUnit !== null
+                    ? t('common.perUnit', { amount: money(perUnit) })
+                    : t('add.costHint')
+              }
+              className="sm:col-span-2"
+            >
+              <Input
+                id="costTotalBase"
+                name="costTotalBase"
+                inputMode="decimal"
+                required={!retail}
+                placeholder={money.symbol}
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+              />
+            </Field>
+            <Field
+              label={t('fields.orderId')}
+              htmlFor="orderId"
+              hint={t('add.orderIdHint')}
+              className="sm:col-span-2"
+            >
+              <Input
+                id="orderId"
+                name="orderId"
+                autoComplete="off"
+                inputMode="text"
+                defaultValue={fromLink?.orderId ?? undefined}
+              />
+              {fromLink && <input type="hidden" name="purchaseLinkId" value={fromLink.id} />}
+            </Field>
+          </div>
+        </section>
+      )}
 
       {/* Step 3: condition details */}
-      <section
-        ref={(el) => {
-          sectionRefs.current[2] = el;
-        }}
-        hidden={step !== 2}
-        className="space-y-4"
-      >
-        {cls && <ConditionFields key={cls} cls={cls} />}
-        <Field label={t('fields.notes')} htmlFor="notes">
-          <Textarea id="notes" name="notes" rows={2} />
-        </Field>
-        <details className="text-sm">
-          <summary className="cursor-pointer text-muted-foreground">{t('tracking.title')}</summary>
-          <div className="mt-2 space-y-2">
-            <input type="hidden" name="tracking" value="shown" />
-            <p className="text-xs text-muted-foreground">{t('tracking.info')}</p>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="countInCost" defaultChecked className="size-4" />
-              {t('tracking.inCost')}
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="countInValue" defaultChecked className="size-4" />
-              {t('tracking.inValue')}
-            </label>
-          </div>
-        </details>
-      </section>
+      {!watch && (
+        <section
+          ref={(el) => {
+            sectionRefs.current[2] = el;
+          }}
+          hidden={step !== 2}
+          className="space-y-4"
+        >
+          {cls && <ConditionFields key={cls} cls={cls} />}
+          <Field label={t('fields.notes')} htmlFor="notes">
+            <Textarea id="notes" name="notes" rows={2} />
+          </Field>
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground">
+              {t('tracking.title')}
+            </summary>
+            <div className="mt-2 space-y-2">
+              <input type="hidden" name="tracking" value="shown" />
+              <p className="text-xs text-muted-foreground">{t('tracking.info')}</p>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="countInCost" defaultChecked className="size-4" />
+                {t('tracking.inCost')}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="countInValue" defaultChecked className="size-4" />
+                {t('tracking.inValue')}
+              </label>
+            </div>
+          </details>
+        </section>
+      )}
 
       {stepError && (
         <p role="alert" className="text-sm text-destructive">
@@ -645,10 +678,46 @@ export function AddFlow({
           </Button>
         ) : (
           <Button key="submit" type="submit" disabled={pending} className="flex-1 sm:flex-none">
-            {t('add.submit')}
+            {t(watch ? 'watchlist.submit' : 'add.submit')}
           </Button>
         )}
       </div>
     </form>
+  );
+}
+
+/** A watch's target price and note (S9), shared by the watch steps and the item page's card. */
+export function WatchTargetFields({
+  retail,
+  defaults = {},
+}: {
+  retail?: number | null;
+  defaults?: { target?: number | null; note?: string | null };
+}) {
+  const t = useTranslations();
+  const money = useMoney();
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <Field
+        label={t('watchlist.target')}
+        htmlFor="w-target"
+        hint={
+          retail
+            ? t('watchlist.targetHintRetail', { amount: money(retail) })
+            : t('watchlist.targetHint')
+        }
+      >
+        <Input
+          id="w-target"
+          name="targetPriceBase"
+          inputMode="decimal"
+          placeholder={money.symbol}
+          defaultValue={defaults.target != null ? money.input(defaults.target) : undefined}
+        />
+      </Field>
+      <Field label={t('fields.notes')} htmlFor="w-note">
+        <Textarea id="w-note" name="note" rows={2} defaultValue={defaults.note ?? undefined} />
+      </Field>
+    </div>
   );
 }

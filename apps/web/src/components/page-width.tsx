@@ -14,7 +14,7 @@ const WIDE = [
 ];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */
-const MEDIUM = [/^\/settings(\/.*)?$/];
+const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist$/];
 
 /** The page area: full width for wide pages, a centred reading column for the rest (S8). */
 export function PageWidth({ children }: { children: React.ReactNode }) {

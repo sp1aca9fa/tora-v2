@@ -8,7 +8,8 @@
     "actions": "Actions",
     "add": "Add",
     "settings": "Settings",
-    "imports": "Imports"
+    "imports": "Imports",
+    "watchlist": "Watchlist"
   },
   "common": {
     "save": "Save",
@@ -441,7 +442,8 @@
     "noLinks": "No links found.",
     "tooManyLinks": "Up to 200 links at a time.",
     "nonePicked": "Pick at least one panel.",
-    "invalid_time_zone": "That time zone is not known."
+    "invalid_time_zone": "That time zone is not known.",
+    "duplicate_watch": "You already watch this item in that condition."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -1269,7 +1271,7 @@
     "lotsDownload": "Download the spreadsheet (CSV)",
     "lotsImport": "The same layout can be imported: <link>Imports > Spreadsheet</link>.",
     "allTitle": "All your data",
-    "allInfo": "One JSON file with your items, lots, their history, manual prices, linked listings and imports: for keeping a copy, or for another program.",
+    "allInfo": "One JSON file with your items, lots, their history, manual prices, watchlist, linked listings and imports: for keeping a copy, or for another program.",
     "allDownload": "Download all (JSON)",
     "noPrices": "Prices collected from other sites are not included (their terms do not allow passing them on); each lot carries its value now instead.",
     "adminBackups": "The whole database is backed up every day on the home PC (Admin preferences > Commands)."
@@ -1443,5 +1445,33 @@
       "admin": "admin",
       "member": "member"
     }
+  },
+  "watchlist": {
+    "intro": "Items you want to buy, in the condition you want, with today's market price. Items at or under your target come first.",
+    "add": "Watch an item",
+    "addIntro": "Pick an item already in Tora or add a new one, then the condition you want and, if you like, a target price. It is collected like the items you own.",
+    "empty": "Nothing watched yet. Watch an item to follow its price before buying.",
+    "step": "Condition and target",
+    "conditionHint": "The condition you want to buy it in: prices are followed in this condition.",
+    "submit": "Watch",
+    "target": "Target price (per unit)",
+    "targetHint": "Optional. You get an alert when the price reaches it.",
+    "targetHintRetail": "Optional. You get an alert when the price reaches it. Retail price: {amount}.",
+    "noPrice": "No price yet",
+    "underTarget": "At or under your target ({target})",
+    "overTarget": "{amount} above your target ({target})",
+    "targetShort": "Target {target}",
+    "noTarget": "No target",
+    "lastSale": "Last sale {amount}",
+    "card": "Watching",
+    "cardInfo": "Watch this item to follow its price in a condition and set a target price.",
+    "cardWatched": "You watch this item in these conditions.",
+    "anyCondition": "Any condition",
+    "watch": "Watch",
+    "watchAnother": "Watch in another condition",
+    "edit": "Edit",
+    "remove": "Stop watching",
+    "removeConfirm": "Stop watching this item in this condition?",
+    "bought": "Bought it? Register the lot"
   }
 }

@@ -42,6 +42,7 @@ import {
   productSources,
   products,
   valuationSnapshots,
+  watches,
 } from './schema';
 
 const DAY = 86_400_000;
@@ -447,8 +448,8 @@ export async function clearBucketValues(db: Pick<Db, 'delete'>, productIds: stri
 }
 
 /**
- * Values every product + bucket held by anyone and saves them (end of a collect); values no
- * longer held are removed.
+ * Values every product + bucket held or watched by anyone and saves them (end of a collect);
+ * values no longer held or watched are removed.
  */
 export async function refreshBucketValues(db: Db, now = new Date()) {
   const rows = await db
@@ -460,6 +461,13 @@ export async function refreshBucketValues(db: Db, now = new Date()) {
   for (const { holding, product } of rows) {
     const bucket = holdingBucket(holding, product);
     wanted.set(`${product.id}|${bucket ?? ''}`, { product, bucket });
+  }
+  // Watched items too (S9): the Watchlist reads their saved values.
+  for (const { watch, product } of await db
+    .select({ watch: watches, product: products })
+    .from(watches)
+    .innerJoin(products, eq(products.id, watches.productId))) {
+    wanted.set(`${product.id}|${watch.bucket}`, { product, bucket: watch.bucket || null });
   }
   const market = await loadHoldingsMarketData(
     db,
@@ -606,14 +614,24 @@ export async function valueHoldings(
   return out;
 }
 
-/** Valuation buckets of a product's owned holdings, across users (what collectors should cover). */
+/**
+ * Valuation buckets of a product's owned holdings and watches (S9), across users (what collectors
+ * should cover).
+ */
 export async function heldBuckets(db: Db, productId: string): Promise<string[]> {
   const rows = await db
     .select({ holding: holdings, product: products })
     .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
     .where(and(eq(holdings.productId, productId), eq(holdings.status, 'owned')));
-  const buckets = rows.map((r) => holdingBucket(r.holding, r.product));
+  const watched = await db
+    .selectDistinct({ bucket: watches.bucket })
+    .from(watches)
+    .where(eq(watches.productId, productId));
+  const buckets = [
+    ...rows.map((r) => holdingBucket(r.holding, r.product)),
+    ...watched.map((w) => w.bucket || null),
+  ];
   return [...new Set(buckets.filter((b): b is string => b !== null))];
 }
 

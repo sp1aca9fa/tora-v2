@@ -29,6 +29,9 @@ import {
   summarizeByProduct,
   valueHolding,
   loadSourceRegistry,
+  listWatches,
+  savedBucketValues,
+  bucketValueKey,
 } from '@tora/db';
 import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
 
@@ -675,4 +678,42 @@ export async function querySql(db: Db, sql: string, limit = 200) {
   } finally {
     await tx.rollback().catch(() => {});
   }
+}
+
+/**
+ * The user's watchlist (S9): each watched item and condition, the target price, and today's
+ * market value in that condition (sources Claude may not read are left out).
+ */
+export async function watchlist(db: Db, userId: string) {
+  const rows = await listWatches(db, userId);
+  const noAi = noAiSources(await loadSourceRegistry(db));
+  const values = await savedBucketValues(
+    db,
+    rows.map((r) => ({ product: r.product, bucket: r.watch.bucket || null })),
+  );
+  return rows.map(({ watch, product }) => {
+    const v = values.get(bucketValueKey(product.id, watch.bucket || null))?.valuation;
+    const hidden = !!v?.source && noAi.includes(v.source);
+    return {
+      watchId: watch.id,
+      productId: product.id,
+      name: product.name,
+      kind: product.kind,
+      bucket: watch.bucket || null,
+      targetPriceBase: watch.targetPriceBase,
+      note: watch.note,
+      watchedSince: day(watch.createdAt),
+      market:
+        v && !hidden
+          ? {
+              unitBase: v.unitBase,
+              method: v.method,
+              source: v.source,
+              sales: v.sampleSize,
+              windowDays: v.windowDays,
+              confidence: v.confidence,
+            }
+          : null,
+    };
+  });
 }

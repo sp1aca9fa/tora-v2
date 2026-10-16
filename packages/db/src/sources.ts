@@ -46,6 +46,7 @@ import {
   products,
   sourceCandidates,
   sourceWarningDismissals,
+  watches,
 } from './schema';
 
 // ---------------------------------------------------------------------------------------------
@@ -306,7 +307,30 @@ export async function bucketStats(
 // ---------------------------------------------------------------------------------------------
 // collector side (home PC)
 
-/** Owned (or opened) products without an active listing or pending candidates for this source. */
+/**
+ * Products someone owns, has opened (the box view values them "as received") or watches (S9):
+ * the ones collectors match and collect.
+ */
+function trackedProduct(db: Db) {
+  return or(
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(holdings)
+        .where(
+          and(eq(holdings.productId, products.id), inArray(holdings.status, ['owned', 'consumed'])),
+        ),
+    ),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(watches)
+        .where(eq(watches.productId, products.id)),
+    ),
+  );
+}
+
+/** Tracked products (owned, opened or watched) without an active listing or pending candidates for this source. */
 export async function productsToMatch(
   db: Db,
   source: string,
@@ -318,18 +342,7 @@ export async function productsToMatch(
     .where(
       and(
         filter.productId ? eq(products.id, filter.productId) : undefined,
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(holdings)
-            .where(
-              and(
-                eq(holdings.productId, products.id),
-                // Opened boxes still need prices: the box view values them "as received".
-                inArray(holdings.status, ['owned', 'consumed']),
-              ),
-            ),
-        ),
+        trackedProduct(db),
         not(
           exists(
             db
@@ -751,7 +764,7 @@ export async function linkedProductIds(db: Db, productIds: string[]): Promise<Se
 /** Listing id used for a product's search-based source (one query per product and source). */
 export const QUERY_SOURCE_ID = 'search';
 
-/** Owned (or opened) products with no source row at all for `source` (an unlinked one counts). */
+/** Tracked products (owned, opened or watched) with no source row at all for `source` (an unlinked one counts). */
 export async function productsWithoutSource(
   db: Db,
   source: string,
@@ -763,17 +776,7 @@ export async function productsWithoutSource(
     .where(
       and(
         filter.productId ? eq(products.id, filter.productId) : undefined,
-        exists(
-          db
-            .select({ one: sql`1` })
-            .from(holdings)
-            .where(
-              and(
-                eq(holdings.productId, products.id),
-                inArray(holdings.status, ['owned', 'consumed']),
-              ),
-            ),
-        ),
+        trackedProduct(db),
         not(
           exists(
             db

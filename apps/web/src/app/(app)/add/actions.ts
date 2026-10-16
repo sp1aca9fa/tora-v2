@@ -2,23 +2,16 @@
 
 import {
   type Category,
-  type ProductClass,
-  SEALED_KINDS,
   type ProductKind,
   REGIONS,
   type Region,
   type SetType,
   TCG_FRANCHISES,
-  itemTypeOf,
   kindsForSetType,
-  productClass,
   localDateToIso,
 } from '@tora/core';
 import {
-  type ProductRef,
   createHolding,
-  getProduct,
-  getSet,
   linkedProductIds,
   searchProducts,
   searchSets,
@@ -27,12 +20,10 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
 import {
   type FormState,
   dateText,
-  optEnum,
   optText,
   optAmount,
   parseForm,
@@ -40,13 +31,8 @@ import {
   reqEnum,
   runDomain,
 } from '@/lib/form';
-import { getTaxonomy } from '@/lib/taxonomy';
-import {
-  conditionInputFrom,
-  conditionSchema,
-  productInputFrom,
-  productSchema,
-} from '@/lib/schemas';
+import { productRefFrom, productRefSchema } from '@/lib/product-ref';
+import { conditionInputFrom, conditionSchema } from '@/lib/schemas';
 
 export interface ProductSummary {
   id: string;
@@ -134,13 +120,7 @@ export async function searchSetsAction(
     }));
 }
 
-const holdingSchema = z.object({
-  mode: reqEnum(['existing', 'new', 'catalog'] as const),
-  productId: optText,
-  catalogSetId: optText,
-  catalogKind: optEnum(SEALED_KINDS),
-  catalogVariant: optText,
-  region: optEnum(REGIONS),
+const holdingSchema = productRefSchema.extend({
   acquiredAt: dateText,
   acquiredFrom: optText,
   acquisitionType: reqEnum(['purchase', 'gift', 'trade'] as const),
@@ -160,37 +140,9 @@ export async function createHoldingAction(
   if ('state' in base) return base.state;
   const d = base.data;
 
-  let ref: ProductRef;
-  let cls: ProductClass;
-  let retailPriceBase: number | null = null;
-  if (d.mode === 'existing') {
-    const product = d.productId ? await getProduct(db, d.productId) : null;
-    if (!product) return { error: 'not_found' };
-    ref = { productId: product.id };
-    cls = productClass(product);
-    retailPriceBase = product.retailPriceBase;
-  } else if (d.mode === 'catalog') {
-    const set = d.catalogSetId ? await getSet(db, d.catalogSetId) : null;
-    if (!set || !d.catalogKind) return { error: 'check', fields: ['setName'] };
-    ref = {
-      catalog: {
-        setId: set.id,
-        kind: d.catalogKind,
-        variant: d.catalogVariant,
-        region: d.region,
-      },
-    };
-    cls = 'sealed';
-  } else {
-    const parsed = await parseForm(productSchema, formData);
-    if ('state' in parsed) return parsed.state;
-    const taxonomy = await getTaxonomy();
-    const product = productInputFrom(parsed.data, taxonomy, formData);
-    if (!product) return { error: 'check', fields: ['name'] };
-    ref = { product };
-    cls = itemTypeOf(taxonomy, product.category, product.kind) ?? productClass(product);
-    retailPriceBase = product.retailPriceBase ?? null;
-  }
+  const resolved = await productRefFrom(db, d, formData);
+  if ('state' in resolved) return resolved.state;
+  const { ref, cls, retailPriceBase } = resolved;
   const costTotalBase =
     d.costTotalBase ?? (retailPriceBase !== null ? retailPriceBase * d.quantity : undefined);
   if (costTotalBase === undefined) return { error: 'check', fields: ['costTotalBase'] };

@@ -754,6 +754,47 @@ export const activity = sqliteTable(
   ],
 );
 
+/**
+ * Items a person watches to buy (requirements S9): one row per item and condition, with an
+ * optional target price. Watched items are matched and collected like owned ones. The condition
+ * is kept in a lot's fields (so forms and labels are shared) and as its valuation bucket.
+ */
+export const watches = sqliteTable(
+  'watches',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    condition: text('condition', { enum: CONDITIONS }),
+    packagingState: text('packaging_state', { enum: PACKAGING_STATES }),
+    grading: text('grading', { enum: GRADINGS }),
+    rawGrade: text('raw_grade', { enum: RAW_GRADES }),
+    grader: text('grader', { enum: GRADERS }),
+    grade: text('grade'),
+    conditionValue: text('condition_value'),
+    /** The valuation bucket of the condition above ('' when the item has no condition). */
+    bucket: text('bucket').notNull(),
+    /** Buy at or under this, per unit, in the base currency. */
+    targetPriceBase: integer('target_price_base'),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [
+    check('watches_condition_check', oneOf(t.condition, CONDITIONS)),
+    check('watches_packaging_state_check', oneOf(t.packagingState, PACKAGING_STATES)),
+    check('watches_grading_check', oneOf(t.grading, GRADINGS)),
+    check('watches_raw_grade_check', oneOf(t.rawGrade, RAW_GRADES)),
+    check('watches_grader_check', oneOf(t.grader, GRADERS)),
+    check('watches_target_check', sql`${t.targetPriceBase} IS NULL OR ${t.targetPriceBase} > 0`),
+    uniqueIndex('watches_user_product_bucket_uq').on(t.userId, t.productId, t.bucket),
+    index('watches_product_idx').on(t.productId),
+  ],
+);
+
 export const ALERT_CHANNEL_KINDS = ['telegram', 'discord'] as const;
 export type AlertChannelKind = (typeof ALERT_CHANNEL_KINDS)[number];
 
@@ -804,3 +845,4 @@ export type PriceObservation = typeof priceObservations.$inferSelect;
 export type CollectorRun = typeof collectorRuns.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type AlertChannel = typeof alertChannels.$inferSelect;
+export type Watch = typeof watches.$inferSelect;

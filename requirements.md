@@ -31,7 +31,7 @@
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | built 2026-10-15 (guides in `docs/`, template plug-in, Commands page); awaiting user check |
 | S6 | Backups, download my data, spreadsheet import, import log | built 2026-10-16 (migration 0026); awaiting user check (optional later: load the JSON into an empty account) |
 | S17 | Notifications and activity log: alerts outside the app (Telegram, Discord), what triggers them, a log of what happened | built 2026-10-16 (migration 0027); awaiting user setup (CRON_SECRET, Telegram bot) and check |
-| S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | idea; design session first (user, 2026-10-12) |
+| S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | designed 2026-10-16; part 1 (watchlist) built 2026-10-16 (migration 0028); next: part 2 (for sale now) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check | todo (user, 2026-10-14) |
@@ -140,6 +140,7 @@
 - 2026-10-16: Import log and alerts (user): every import keeps each row's outcome (a row left out must never be only a number); a spreadsheet row matching a lot only loosely can be added anyway from the preview. Alerts outside the app and an activity log become their own phase, S17, after S6 and before S9 (S9's price alerts use its channels). Plan order: S6 > S17 > S9 > S13 > S10 > S14 > S15.
 - 2026-10-16: S17 design (user): Telegram and Discord first (email and phone push to Open issues); failures at once from the home PC, a daily check in the app for runs that did not happen, everything else in one daily summary; one Activity page that also serves as the admin audit log.
 - 2026-10-16: A documentation pass is the last phase, S18 (user): it builds nothing, so it comes after S15. Plan order: S17 > S9 > S13 > S10 > S14 > S15 > S18.
+- 2026-10-16: S9 design (user): watch items (not sets), with a condition and an optional target; the lowest ask and listing count once a day in the nightly collect; rules first, Claude later; signals saved daily; the buy zone from the item's own history plus the new-set pattern pooled from every user's items of the same kind, franchise and language (release dates from the set catalog, else the item's own, else its first sale); zone and target alerts at once; signals on owned items' pages too; rule tests shown as a short results card.
 ---
 
 # CORE
@@ -828,6 +829,29 @@ Automatic, Claude, or both (to decide; first thought: both, layered):
 Open questions: how much to trust thin data (a card with 3 sales a month); one strategy for all or per kind (sealed vs singles vs games); whether to store signals daily (for backtests) or compute on view; notifications (push, email) and how often; how to avoid looking like financial advice (show reasons and uncertainty, never a sure thing).
 
 Acceptance (draft): add an item not owned to the watchlist; after the next collects it shows its price history, where today's price sits, a buy zone with the reasons, and the user can set a target price that triggers an alert.
+
+Design (user, 2026-10-16):
+- Watch items only (not whole sets, which overlaps S13): a Watch button on any item page, or a new item added without a lot. Each watch has a condition (e.g. raw A, PSA 10, sealed) and an optional target price; watched items are matched and collected like owned ones.
+- What is for sale now: once a day, in the nightly collect, the lowest ask and the number of listings for owned and watched items. No checks during the day.
+- Rules now, Claude later: fixed rules and statistics, every number explained in the app; a weekly Claude summary comes in S13 or after.
+- Signals saved daily (one row per item and condition), for rule tests, alerts and S13.
+- Buy zone from the item's own history plus the new-set pattern, the latter from data already collected for every user's items (no extra collecting; user: "we dont need to limit ourselves to just one product if several users register different products in the same career"). Similar items: same kind, franchise and language (games: kind and platform); each card says how many items it is based on and hides under a minimum. Release dates: items are linked to the set catalog from the set code or name they have (confirmed on Actions where unsure) and take the set's date; without a set, the item's own date, else its earliest collected sale.
+- Alerts through S17's channels, at once after the nightly collect: a watched item entered its buy zone, or its lowest ask went under the target. Sharp drops go in the daily summary.
+- Owned items show the signals too, on the item page; the Watchlist page lists watched items.
+- Rule tests visible: a short results card per group of similar items ("past buy signals: price 90 days later higher 7 times out of 10"), never a sure thing.
+
+Parts:
+1. Watchlist: a `watches` table (person, item, condition, target, note); Watch on item pages, a watch-only new item, the Watchlist page; the collectors match and collect watched items and their conditions; an MCP tool.
+2. For sale now: plug-ins report the lowest ask and listing count per condition with each collect; a daily table; shown on item pages and the Watchlist.
+3. Release dates and similar items: catalog links from set code or name (unsure ones on Actions), the release date rule above, the group of similar items.
+4. Signals: computed daily after the collect for owned and watched items and saved: fair value and band, where today sits (90 / 180 / 365 days), trend (2 / 4 / 12 weeks) with the falling guard, how many sales (confidence), lowest ask against fair value, the new-set pattern (day N after release against similar items at day N); buy zone. A Buy timing card on item pages with the reasons, the Watchlist columns.
+5. Alerts and rule tests: zone and target alerts at once, sharp drops in the summary; rule tests per group from the price history, a results card.
+
+Built, part 1 (2026-10-16, migration 0028):
+- Table `watches` (person, item, the condition in a lot's fields and as its bucket, target per unit in the base currency, note; one per person, item and condition).
+- Watchlist page (menu, between Portfolio and Actions): each watched item and condition with today's market value in that condition, how far it is from the target (at or under it in green, first), or the last sale. "Watch an item" uses the Add steps (existing, new, or a catalog set's sealed product), then the condition and target instead of the purchase.
+- Item pages open for watched items too (not only owned ones); a Watching card (owned or not) lists the person's watches of the item to change or remove and watches it in another condition; a watched item not owned links to registering the lot.
+- Collectors match and collect watched items (with owned and opened ones) and cover watched conditions; their values are saved after each collect like owned ones. A merge moves watches; a watched item is never deleted as unused. Watches are in the account download (JSON). MCP tool `watchlist`.
 
 ## S13: Buy suggestions
 
