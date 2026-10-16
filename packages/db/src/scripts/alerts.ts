@@ -1,0 +1,85 @@
+// `pnpm alerts <command>`: alerts outside the app from the home PC (requirements S17).
+//   after-run --since <time> [--collect-exit N] [--backup-exit N]
+//       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
+//       stopped before it could record itself and sends failures to admins at once.
+//   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
+//       each person at most once in 20 hours).
+import { localDate, toLocalIso } from '@tora/core';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { parseArgs } from 'node:util';
+import { lastActivity, recordActivity } from '../activity';
+import {
+  type AlertContext,
+  type AlertTexts,
+  alertFailures,
+  checkMissedRuns,
+  sendSummaries,
+} from '../alerts';
+import { createDb } from '../client';
+import { dbConfigFromEnv, findRepoRoot, loadRootEnv } from '../env';
+import { loadTimeZone } from '../registry';
+
+loadRootEnv();
+const secret = process.env.AUTH_SECRET?.trim();
+if (!secret) {
+  console.error("alerts: AUTH_SECRET is not set in .env (the same as the app's).");
+  process.exit(1);
+}
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    since: { type: 'string' },
+    'collect-exit': { type: 'string' },
+    'backup-exit': { type: 'string' },
+  },
+});
+const db = createDb(dbConfigFromEnv());
+await loadTimeZone(db);
+
+/** The app's texts (apps/web/messages), so the PC and the app send the same words. */
+const texts = (locale: string): AlertTexts => {
+  try {
+    const file = join(findRepoRoot(), 'apps', 'web', 'messages', `${locale}.json`);
+    return (JSON.parse(readFileSync(file, 'utf8')) as { alertText?: AlertTexts }).alertText ?? {};
+  } catch {
+    return {};
+  }
+};
+const ctx: AlertContext = { secret, texts, log: console.log };
+
+const command = positionals[0];
+if (command === 'after-run') {
+  const parsed = values.since ? new Date(values.since) : new Date(Date.now() - 6 * 3_600_000);
+  if (Number.isNaN(parsed.getTime())) {
+    console.error(`alerts: --since is not a time: ${values.since}`);
+    process.exit(1);
+  }
+  const since = toLocalIso(parsed);
+  // A step that crashed recorded nothing: say so from its exit code.
+  for (const kind of ['collect', 'backup'] as const) {
+    const code = Number(values[`${kind}-exit`] ?? 0);
+    if (!code) continue;
+    const last = await lastActivity(db, kind);
+    if (last && last.occurredAt >= since) continue;
+    await recordActivity(db, {
+      kind,
+      level: 'failed',
+      detail: { exitCode: code, error: `exit code ${code}` },
+      href: kind === 'collect' ? '/settings/collectors' : '/settings/activity',
+    });
+  }
+  const failures = await alertFailures(db, ctx, since);
+  console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
+} else if (command === 'check') {
+  const missed = await checkMissedRuns(db, ctx);
+  const summaries = await sendSummaries(db, ctx);
+  console.log(
+    `alerts: missed ${missed.join(', ') || 'nothing'}; ${summaries} summary message(s) sent`,
+  );
+} else {
+  console.error(
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] | check',
+  );
+  process.exit(1);
+}

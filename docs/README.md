@@ -13,6 +13,7 @@ this order the first time.
 | [Running collectors](running.md)      | `pnpm collect`, the daily schedule, many collectors, logs, imports, the data review  |
 | [Languages](languages.md)             | The app's two languages and adding a new one                                         |
 | [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
+| [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Daily collector run for Windows Task Scheduler (at logon + daily) or cron, then the day's
-# database backup (`pnpm backup`). Runs at most once per day: it exits early when today's run
+# database backup (`pnpm backup`), then alerts (`pnpm alerts after-run`: failures to admins at
+# once, the daily summaries; requirements S17). Runs at most once per day: it exits early when today's run
 # already succeeded, so it is safe to trigger often.
 # Logs to ~/.local/state/tora/collect.log.
 #
@@ -43,20 +44,24 @@ if [ "$MAX_JITTER_SECONDS" -gt 0 ]; then
 fi
 
 cd "$REPO_DIR"
-echo "=== $(date -Iseconds) $* ===" >>"$LOG"
+started="$(date -Iseconds)"
+echo "=== $started $* ===" >>"$LOG"
 ok=1
-rc=0
-pnpm --silent collect "$@" >>"$LOG" 2>&1 || rc=$?
-if [ "$rc" != 0 ]; then
-  echo "collect failed (exit $rc); will retry on the next trigger" >>"$LOG"
+collect_rc=0
+pnpm --silent collect "$@" >>"$LOG" 2>&1 || collect_rc=$?
+if [ "$collect_rc" != 0 ]; then
+  echo "collect failed (exit $collect_rc); will retry on the next trigger" >>"$LOG"
   ok=0
 fi
 # The day's backup of the whole database (requirements S6), whatever the collect did; one a day.
-rc=0
-pnpm --silent backup >>"$LOG" 2>&1 || rc=$?
-if [ "$rc" != 0 ]; then
-  echo "backup failed (exit $rc); will retry on the next trigger" >>"$LOG"
+backup_rc=0
+pnpm --silent backup >>"$LOG" 2>&1 || backup_rc=$?
+if [ "$backup_rc" != 0 ]; then
+  echo "backup failed (exit $backup_rc); will retry on the next trigger" >>"$LOG"
   ok=0
 fi
+# Alerts (S17); their own failure never fails the run.
+pnpm --silent alerts after-run --since "$started" --collect-exit "$collect_rc" \
+  --backup-exit "$backup_rc" >>"$LOG" 2>&1 || echo "alerts failed; see above" >>"$LOG"
 [ "$ok" = 1 ] || exit 1
 echo "$today" >"$STAMP"

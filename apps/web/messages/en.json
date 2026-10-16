@@ -351,6 +351,14 @@
       "commands": {
         "title": "Commands",
         "info": "The home PC's commands and what each does."
+      },
+      "alerts": {
+        "title": "Alerts",
+        "info": "Messages on Telegram or Discord when something needs you."
+      },
+      "activity": {
+        "title": "Activity",
+        "info": "Collects, backups, imports and admin changes, newest first."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -1242,6 +1250,11 @@
       "list": "Lists the copies (or the folder in BACKUP_DIR).",
       "restore": "Loads a copy into the new, empty database in DATABASE_URL; it refuses a database with data."
     },
+    "alerts": {
+      "title": "Alerts",
+      "afterRun": "Records a collect or backup that stopped before it could, and sends failures to admins at once. The schedule runs it after each collect and backup.",
+      "check": "The app's morning check, run from the PC: \"nothing ran\" alerts and the daily summaries (each person at most once in 20 hours)."
+    },
     "database": {
       "title": "Database and Claude",
       "migrate": "Applies new database migrations. Run it right after pushing a change that adds one.",
@@ -1293,6 +1306,142 @@
       "fees": "Fees",
       "from_lot": "From lot",
       "notes": "Notes"
+    }
+  },
+  "alertText": {
+    "test": "Tora: test message. Alerts will arrive here.",
+    "connected": "Tora: alerts will arrive in this chat.",
+    "collectFailed": "Tora: the collect failed.",
+    "collectStopped": "Tora: the collect stopped (exit code {code}). See collect.log on the home PC.",
+    "sourceLine": "{source}: {status}",
+    "status_failed": "failed",
+    "status_blocked": "blocked by the site",
+    "status_partial": "partly done",
+    "status_locked": "skipped, another collect was running it",
+    "backupFailed": "Tora: the backup failed: {error}",
+    "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
+    "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
+    "summaryTitle": "Tora: daily summary",
+    "summaryImport": "{method}: {imported} added, {existing} already in Tora, {skipped} left out, {problem} with a problem",
+    "summaryActions": "Waiting on Actions: {count}",
+    "method_email": "Order emails",
+    "method_links": "Purchase links",
+    "method_file": "Spreadsheet",
+    "method_claude": "Through Claude"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "info": "Tora sends a message when something needs you: to admins at once when the collect or the backup fails or does not run, and to everyone a morning summary of imports that did not add every row and of what waits on Actions.",
+    "channels": "Where alerts go",
+    "none": "No channel yet. Add Telegram or Discord below.",
+    "telegram": "Telegram",
+    "discord": "Discord",
+    "lastSent": "Last sent {date}",
+    "neverSent": "Nothing sent yet",
+    "lastError": "Last try failed: {error}",
+    "test": "Send a test",
+    "testSent": "Sent. Check the chat.",
+    "testFailed": "Not sent. See the error above.",
+    "remove": "Remove",
+    "removeConfirm": "Stop sending alerts to {name}?",
+    "addTelegram": "Connect Telegram",
+    "telegramSteps": "1. Open the link below on a device with Telegram and press Start. 2. Come back and press Check.",
+    "telegramOpen": "Open @{bot} in Telegram",
+    "telegramCheck": "Check",
+    "telegramNoBot": "Telegram is not set up yet: an admin adds the app's bot below.",
+    "addDiscord": "Add a Discord webhook",
+    "discordHelp": "In Discord: a channel's settings > Integrations > Webhooks > New webhook > Copy webhook URL.",
+    "discordUrl": "Webhook URL",
+    "add": "Add",
+    "what": "What to send",
+    "failures": "The collect or the backup failed or did not run (at once)",
+    "imports": "Imports that did not add every row (morning summary)",
+    "actions": "What waits on Actions (morning summary)",
+    "language": "Language of the messages",
+    "save": "Save",
+    "saved": "Saved.",
+    "bot": "Telegram bot (admin)",
+    "botInfo": "One bot for the whole app. In Telegram, talk to @BotFather, send /newbot, choose a name, and paste the token it gives here. Stored encrypted.",
+    "botSet": "The app's bot is @{bot}.",
+    "botToken": "Bot token",
+    "botSave": "Save the bot",
+    "botRemove": "Remove the bot",
+    "botRemoveConfirm": "Remove the bot? Everyone's Telegram channels stop.",
+    "schedule": "The morning check runs once a day at about {time} (Vercel cron, set in apps/web/vercel.json).",
+    "error": {
+      "invalid": "That does not look right. Check it and try again.",
+      "unreachable": "Could not reach the service. Try again in a moment.",
+      "not_found": "Tora did not find your Start message yet. Press Start in Telegram, then Check again.",
+      "no_bot": "No Telegram bot is set up yet.",
+      "no_secret": "AUTH_SECRET is not set on the server."
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "info": "What happened, newest first. Admins see the whole app; everyone sees their own imports.",
+    "infoMember": "Your imports, newest first.",
+    "empty": "Nothing yet.",
+    "older": "Older",
+    "newest": "Newest",
+    "filter": {
+      "all": "All",
+      "collect": "Collects",
+      "backup": "Backups",
+      "import": "Imports",
+      "admin": "Admin changes",
+      "check": "Checks"
+    },
+    "level": {
+      "ok": "OK",
+      "problem": "Problem",
+      "failed": "Failed"
+    },
+    "by": "by {name}",
+    "byPc": "home PC",
+    "byTerminal": "terminal",
+    "byApp": "the app's check",
+    "alerted": "alert sent {date}",
+    "open": "Open",
+    "kind": {
+      "collect": "Collect",
+      "backup": "Backup",
+      "import": "Import: {method}",
+      "check": "Daily check"
+    },
+    "collect": "{observations} new prices",
+    "collectScope": "only {scope}",
+    "collectSource": "{source}: {status}",
+    "collectStopped": "Stopped with exit code {code}",
+    "backup": "{mb} MB, {rows} rows, {seconds} s",
+    "backupFailed": "Failed: {error}",
+    "import": "{imported} added, {existing} already in Tora, {skipped} left out, {problem} with a problem",
+    "noCollect": "No collect for {hours} hours (last {last})",
+    "noBackup": "No backup for {hours} hours (last {last})",
+    "fromTo": "{from} to {to}",
+    "none": "none",
+    "admin": {
+      "sourceRole": "Price source role",
+      "sourceOrder": "Price source order",
+      "markets": "Markets",
+      "marketOptions": "Market options",
+      "categories": "Categories",
+      "languages": "Languages",
+      "identity": "Identity page",
+      "collectWindow": "Night window",
+      "rate": "Exchange rate",
+      "currency": "Base currency",
+      "timeZone": "Time zone",
+      "telegramBot": "Telegram bot",
+      "userCreated": "Account created",
+      "userPassword": "Password reset",
+      "user2fa": "Authenticator reset",
+      "userDevices": "Devices signed out",
+      "userDisabled": "Account disabled",
+      "userEnabled": "Account enabled"
+    },
+    "role": {
+      "admin": "admin",
+      "member": "member"
     }
   }
 }

@@ -715,6 +715,73 @@ export const loginAttempts = sqliteTable(
   ],
 );
 
+/** Activity log kinds and levels (requirements S17). */
+export const ACTIVITY_KINDS = ['collect', 'backup', 'import', 'admin', 'check'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+export const ACTIVITY_LEVELS = ['ok', 'problem', 'failed'] as const;
+export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
+
+/**
+ * The activity log (requirements S17): collects, backups, imports, admin changes and the app's
+ * daily check, newest first on Settings > Activity. Also the admin audit log.
+ */
+export const activity = sqliteTable(
+  'activity',
+  {
+    id: id(),
+    /** Whose entry it is (an import's owner); null for the whole app (admins see it). */
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    /** Who did it; null for the home PC's runs and the terminal. */
+    actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    kind: text('kind', { enum: ACTIVITY_KINDS }).notNull(),
+    /** What exactly, per kind: an import's method, an admin setting's key, a check's subject. */
+    action: text('action'),
+    level: text('level', { enum: ACTIVITY_LEVELS }).notNull(),
+    /** What the app shows, per kind (counts, sources, from and to). */
+    detail: text('detail', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+    /** The page it is about. */
+    href: text('href'),
+    occurredAt: text('occurred_at').notNull(),
+    /** When an alert about it went out (at once, or in a daily summary). */
+    alertedAt: text('alerted_at'),
+    ...timestamps,
+  },
+  (t) => [
+    check('activity_kind_check', oneOf(t.kind, ACTIVITY_KINDS)),
+    check('activity_level_check', oneOf(t.level, ACTIVITY_LEVELS)),
+    index('activity_time_idx').on(t.occurredAt),
+    index('activity_user_idx').on(t.userId, t.occurredAt),
+  ],
+);
+
+export const ALERT_CHANNEL_KINDS = ['telegram', 'discord'] as const;
+export type AlertChannelKind = (typeof ALERT_CHANNEL_KINDS)[number];
+
+/**
+ * Where a person's alerts go (requirements S17): a Telegram chat with the app's bot, or a Discord
+ * webhook. The target (chat ID or webhook link) is encrypted with `AUTH_SECRET`.
+ */
+export const alertChannels = sqliteTable(
+  'alert_channels',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ALERT_CHANNEL_KINDS }).notNull(),
+    targetEnc: text('target_enc').notNull(),
+    /** What the person sees (a Telegram name, or the webhook's channel). */
+    label: text('label'),
+    lastSentAt: text('last_sent_at'),
+    lastError: text('last_error'),
+    ...timestamps,
+  },
+  (t) => [
+    check('alert_channels_kind_check', oneOf(t.kind, ALERT_CHANNEL_KINDS)),
+    index('alert_channels_user_idx').on(t.userId),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -735,3 +802,5 @@ export type HoldingEvent = typeof holdingEvents.$inferSelect;
 export type NewHoldingEvent = typeof holdingEvents.$inferInsert;
 export type PriceObservation = typeof priceObservations.$inferSelect;
 export type CollectorRun = typeof collectorRuns.$inferSelect;
+export type Activity = typeof activity.$inferSelect;
+export type AlertChannel = typeof alertChannels.$inferSelect;

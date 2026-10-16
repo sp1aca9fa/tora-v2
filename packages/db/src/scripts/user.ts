@@ -20,6 +20,7 @@ import {
 } from '@tora/auth';
 import { createInterface } from 'node:readline/promises';
 import QRCode from 'qrcode';
+import { recordAdminChange } from '../activity';
 import { createDb } from '../client';
 import { loadTimeZone } from '../registry';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '../env';
@@ -124,6 +125,10 @@ async function requireUser(name: string | undefined) {
 
 console.log(`Database: ${isRemoteUrl(config.url) ? config.url : 'local file'}`);
 
+/** The activity log (S17): account changes made here, done from the terminal. */
+const audit = (action: string, username: string, detail: Record<string, unknown> = {}) =>
+  recordAdminChange(db, null, action, { user: username, ...detail }, null);
+
 switch (command) {
   case 'list': {
     for (const u of await listUsers(db)) {
@@ -148,6 +153,7 @@ switch (command) {
       args.includes('--admin') ? 'admin' : 'member',
     );
     printBackupCodes(backup.codes);
+    await audit('userCreated', user.username, { role: user.role });
     console.log(`Created "${user.username}" (${user.role}).`);
     if (claimedHoldings)
       console.log(`Claimed ${claimedHoldings} existing entries from before accounts existed.`);
@@ -156,6 +162,7 @@ switch (command) {
   case 'reset-password': {
     const user = await requireUser(args[0]);
     await updateCredentials(db, user.id, { passwordHash: await askPassword() });
+    await audit('userPassword', user.username);
     console.log('Password changed. All devices were signed out.');
     break;
   }
@@ -163,6 +170,7 @@ switch (command) {
     const user = await requireUser(args[0]);
     const { totpSecretEnc, backup } = await enrollAuthenticator(user.username);
     await updateCredentials(db, user.id, { totpSecretEnc, backupCodeHashes: backup.hashes });
+    await audit('user2fa', user.username);
     printBackupCodes(backup.codes);
     console.log('Authenticator replaced. All devices were signed out.');
     break;
@@ -179,18 +187,22 @@ switch (command) {
   }
   case 'revoke': {
     const user = await requireUser(args[0]);
-    if (args[1] === 'all') console.log(`Revoked ${await revokeAllDevices(db, user.id)} device(s).`);
-    else if (args[1])
-      console.log(
-        (await revokeDevice(db, user.id, args[1])) ? 'Revoked.' : 'No such active device.',
-      );
-    else fail('Usage: pnpm user revoke <username> <device-id|all>');
+    if (args[1] === 'all') {
+      const n = await revokeAllDevices(db, user.id);
+      if (n) await audit('userDevices', user.username, { count: n });
+      console.log(`Revoked ${n} device(s).`);
+    } else if (args[1]) {
+      const done = await revokeDevice(db, user.id, args[1]);
+      if (done) await audit('userDevices', user.username, { count: 1 });
+      console.log(done ? 'Revoked.' : 'No such active device.');
+    } else fail('Usage: pnpm user revoke <username> <device-id|all>');
     break;
   }
   case 'disable':
   case 'enable': {
     const user = await requireUser(args[0]);
     await setUserDisabled(db, user.id, command === 'disable');
+    await audit(command === 'disable' ? 'userDisabled' : 'userEnabled', user.username);
     console.log(command === 'disable' ? 'Disabled and signed out.' : 'Enabled.');
     break;
   }

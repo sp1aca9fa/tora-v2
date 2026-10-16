@@ -1,5 +1,7 @@
 import {
   Bell,
+  BellRing,
+  History,
   Clock,
   Download,
   Eye,
@@ -28,6 +30,8 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
   { key: 'account', href: '/settings/account', icon: User },
   { key: 'display', href: '/settings/display', icon: Eye },
   { key: 'notices', href: '/settings/notices', icon: Bell },
+  { key: 'alerts', href: '/settings/alerts', icon: BellRing },
+  { key: 'activity', href: '/settings/activity', icon: History },
   { key: 'collectors', href: '/settings/collectors', icon: Plug },
   { key: 'data', href: '/settings/data', icon: Download },
   {

@@ -7,6 +7,7 @@ import { createClient } from '@libsql/client';
 import { localDate, toLocalIso } from '@tora/core';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { recordActivity } from '../activity';
 import { backupDatabase, backupDir, backupName, ensureDir, pruneBackups } from '../backup';
 import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
@@ -26,14 +27,33 @@ if (existsSync(file) && !process.argv.includes('--force')) {
 } else {
   const started = Date.now();
   const source = createClient({ ...config, intMode: 'bigint' });
-  const r = await backupDatabase(source, file);
-  source.close();
-  // The app shows when the last one ran (Settings > Collectors).
-  await setLastBackup(db, { at: toLocalIso(), file: r.file, bytes: r.bytes, rows: r.rows });
-  console.log(
-    `backup: ${r.file} (${(r.bytes / 1024 / 1024).toFixed(1)} MB, ${r.tables} tables, ` +
-      `${r.rows} rows, ${Math.round((Date.now() - started) / 1000)} s)`,
-  );
+  try {
+    const r = await backupDatabase(source, file);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    // The app shows when the last one ran (Settings > Collectors) and the activity log (S17).
+    await setLastBackup(db, { at: toLocalIso(), file: r.file, bytes: r.bytes, rows: r.rows });
+    await recordActivity(db, {
+      kind: 'backup',
+      detail: { file: r.file, bytes: r.bytes, tables: r.tables, rows: r.rows, seconds },
+      href: '/settings/collectors',
+    });
+    console.log(
+      `backup: ${r.file} (${(r.bytes / 1024 / 1024).toFixed(1)} MB, ${r.tables} tables, ` +
+        `${r.rows} rows, ${seconds} s)`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    // Sent to admins by `pnpm alerts after-run` (scripts/collect-cron.sh).
+    await recordActivity(db, {
+      kind: 'backup',
+      level: 'failed',
+      detail: { error: message.slice(0, 500) },
+      href: '/settings/activity',
+    }).catch(() => undefined);
+    throw error;
+  } finally {
+    source.close();
+  }
 }
 const removed = await pruneBackups(dir, today);
 if (removed) console.log(`backup: ${removed} old copy(ies) deleted`);

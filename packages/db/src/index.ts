@@ -9,6 +9,8 @@ export * from './lot-sizes';
 export * from './images';
 export * from './similar';
 export * from './purchase-links';
+export * from './activity';
+export * from './alerts';
 export * from './imports';
 export * from './suggestions';
 export * from './fx';

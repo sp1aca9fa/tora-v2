@@ -29,6 +29,30 @@ export interface UserPreferences {
     /** The panels shown, in order; all by default. */
     panels?: SummaryPanel[];
   };
+  /** Alerts outside the app (S17). */
+  alerts?: AlertPrefs;
+}
+
+/** What a person is sent (S17); each kind on unless switched off. */
+export interface AlertPrefs {
+  /** Admins: the collect or the backup failed or did not run (at once). */
+  failures?: boolean;
+  /** Daily summary: imports with rows not added. */
+  imports?: boolean;
+  /** Daily summary: what waits on the Actions page. */
+  actions?: boolean;
+  /** The messages' language (one of the admin's two); the app's primary when unset. */
+  language?: string;
+}
+
+export function alertPrefs(prefs: UserPreferences | null | undefined) {
+  const a = prefs?.alerts ?? {};
+  return {
+    failures: a.failures ?? true,
+    imports: a.imports ?? true,
+    actions: a.actions ?? true,
+    language: a.language ?? null,
+  };
 }
 
 /** The Summary card's settings with the defaults filled in. */

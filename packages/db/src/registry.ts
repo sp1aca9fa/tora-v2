@@ -140,13 +140,19 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
 }
 
 /** Saves a setting (app_settings) and clears the registry cache. */
-async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
+export async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
   const at = toLocalIso();
   await db
     .insert(appSettings)
     .values({ key, value })
     .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: at } });
   cache = new WeakMap();
+}
+
+/** One app setting's value, read fresh (no cache). */
+export async function readSetting<T>(db: Pick<Db, 'select'>, key: string): Promise<T | null> {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key));
+  return (row?.value as T | undefined) ?? null;
 }
 
 /** The nightly collect's time window in hours (S16; Settings > Collectors). */

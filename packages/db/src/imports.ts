@@ -1,6 +1,7 @@
 // Imports hub (requirements S5d): import runs and what needs the user after an import.
 import { toLocalIso } from '@tora/core';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { recordImport } from './activity';
 import { DomainError, deleteHolding, deleteUnusedProduct, editHolding } from './mutations';
 import type { Db } from './client';
 import {
@@ -43,6 +44,10 @@ export async function finishImportRun(
       ...extra,
     })
     .where(eq(importRuns.id, id));
+  // The activity log and the daily summary (S17); never fails the import.
+  await recordImport(db, id).catch((error) =>
+    console.error('activity: import not recorded', error),
+  );
 }
 
 /** A row of the import log, before it is saved (its run and place are added). */

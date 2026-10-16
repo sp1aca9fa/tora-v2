@@ -11,6 +11,7 @@ import {
   createDb,
   inferLotSizes,
   listUsers,
+  recordActivity,
   refreshBucketValues,
   runSnapshots,
   loadTimeZone,
@@ -81,6 +82,8 @@ if (values.market && selected.length === 0) {
   process.exit(1);
 }
 let exitCode = 0;
+// Each collector's result, for the activity log (S17).
+const results: { source: string; status: string; requests: number; observations: number }[] = [];
 const withLinks = !values.product && importers.some((i) => i.readLink);
 // A run per market keeps the rates, purchase links and uploads (each does only what is waiting).
 const withRates = !values.product && !values.source && rates.length > 0;
@@ -136,6 +139,7 @@ for (const collector of selected) {
   if ('heldBy' in lock) {
     // Not a success: the schedule tries again later, when the other run is done.
     log(`${collector.source}: skipped, another collect is running it (process ${lock.heldBy})`);
+    results.push({ source: collector.source, status: 'locked', requests: 0, observations: 0 });
     exitCode = 1;
     continue;
   }
@@ -157,6 +161,12 @@ for (const collector of selected) {
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
+  results.push({
+    source: s.source,
+    status: s.status,
+    requests: s.requests,
+    observations: s.observationsAdded,
+  });
 }
 // Product pictures not stored yet (separate polite client: the collectors' cap is spent).
 progress.next('pictures, lot sizes, chart');
@@ -191,4 +201,19 @@ console.log(`values: ${saved.values} saved, ${saved.removed} removed`);
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }
+// The activity log (S17); a failed run is sent to admins by `pnpm alerts after-run`.
+const failed = results.some((r) => r.status === 'failed' || r.status === 'blocked');
+await recordActivity(db, {
+  kind: 'collect',
+  level: failed ? 'failed' : exitCode ? 'problem' : 'ok',
+  detail: {
+    market: values.market ?? null,
+    source: values.source ?? null,
+    product: values.product ?? null,
+    sources: results,
+    observations: results.reduce((n, r) => n + r.observations, 0),
+    values: saved.values,
+  },
+  href: '/settings/collectors',
+});
 process.exit(exitCode);

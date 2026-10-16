@@ -351,6 +351,14 @@
       "commands": {
         "title": "コマンド",
         "info": "自宅PCのコマンドとその説明。"
+      },
+      "alerts": {
+        "title": "アラート",
+        "info": "対応が必要なときに Telegram や Discord に届くメッセージ。"
+      },
+      "activity": {
+        "title": "アクティビティ",
+        "info": "収集、バックアップ、インポート、管理者の変更を新しい順に。"
       }
     },
     "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。",
@@ -1242,6 +1250,11 @@
       "list": "コピーの一覧（BACKUP_DIR を設定した場合はそのフォルダ）。",
       "restore": "DATABASE_URL の新しい空のデータベースにコピーを読み込みます。データのあるデータベースには読み込みません。"
     },
+    "alerts": {
+      "title": "アラート",
+      "afterRun": "記録の前に止まった収集やバックアップを記録し、失敗をすぐに管理者へ送ります。スケジュールが収集とバックアップのあとに実行します。",
+      "check": "アプリの朝のチェックを PC から実行します:「実行なし」のアラートと毎日のまとめ（1人につき20時間に1回まで）。"
+    },
     "database": {
       "title": "データベースとClaude",
       "migrate": "新しいデータベースのマイグレーションを適用します。マイグレーションを含む変更をプッシュした直後に実行してください。",
@@ -1293,6 +1306,142 @@
       "fees": "手数料",
       "from_lot": "元のロット",
       "notes": "メモ"
+    }
+  },
+  "alertText": {
+    "test": "Tora: テストメッセージです。アラートはここに届きます。",
+    "connected": "Tora: アラートはこのチャットに届きます。",
+    "collectFailed": "Tora: 収集に失敗しました。",
+    "collectStopped": "Tora: 収集が止まりました（終了コード {code}）。自宅PCの collect.log を確認してください。",
+    "sourceLine": "{source}: {status}",
+    "status_failed": "失敗",
+    "status_blocked": "サイトにブロックされました",
+    "status_partial": "一部のみ完了",
+    "status_locked": "別の収集が実行中のためスキップ",
+    "backupFailed": "Tora: バックアップに失敗しました: {error}",
+    "noCollect": "Tora: {hours} 時間、収集が実行されていません（最後: {last}）。自宅PCは起動していますか？",
+    "noBackup": "Tora: {hours} 時間、バックアップがありません（最後: {last}）。自宅PCは起動していますか？",
+    "summaryTitle": "Tora: 今日のまとめ",
+    "summaryImport": "{method}: {imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
+    "summaryActions": "アクションで対応待ち: {count} 件",
+    "method_email": "注文メール",
+    "method_links": "購入リンク",
+    "method_file": "表計算ファイル",
+    "method_claude": "Claude経由"
+  },
+  "alerts": {
+    "title": "アラート",
+    "info": "対応が必要なときに Tora がメッセージを送ります。収集やバックアップが失敗した、または実行されなかったときは管理者にすぐに、すべての行が追加されなかったインポートとアクションの対応待ちは毎朝のまとめで全員に送ります。",
+    "channels": "送信先",
+    "none": "送信先はまだありません。下から Telegram か Discord を追加してください。",
+    "telegram": "Telegram",
+    "discord": "Discord",
+    "lastSent": "最終送信 {date}",
+    "neverSent": "まだ送信なし",
+    "lastError": "前回の送信に失敗: {error}",
+    "test": "テスト送信",
+    "testSent": "送信しました。チャットを確認してください。",
+    "testFailed": "送信できませんでした。上のエラーを確認してください。",
+    "remove": "削除",
+    "removeConfirm": "{name} へのアラート送信を止めますか？",
+    "addTelegram": "Telegram に接続",
+    "telegramSteps": "1. Telegram が使える端末で下のリンクを開き、「開始」を押します。2. ここに戻って「確認」を押します。",
+    "telegramOpen": "Telegram で @{bot} を開く",
+    "telegramCheck": "確認",
+    "telegramNoBot": "Telegram はまだ設定されていません。管理者が下でアプリのボットを追加します。",
+    "addDiscord": "Discord の Webhook を追加",
+    "discordHelp": "Discord で: チャンネルの設定 > 連携サービス > ウェブフック > 新しいウェブフック > ウェブフックURLをコピー。",
+    "discordUrl": "Webhook URL",
+    "add": "追加",
+    "what": "送る内容",
+    "failures": "収集やバックアップが失敗した、または実行されなかった（すぐに）",
+    "imports": "すべての行が追加されなかったインポート（毎朝のまとめ）",
+    "actions": "アクションで対応待ちのもの（毎朝のまとめ）",
+    "language": "メッセージの言語",
+    "save": "保存",
+    "saved": "保存しました。",
+    "bot": "Telegram ボット（管理者）",
+    "botInfo": "アプリ全体でひとつのボットを使います。Telegram で @BotFather に /newbot を送り、名前を決めて、表示されたトークンをここに貼り付けます。暗号化して保存します。",
+    "botSet": "アプリのボットは @{bot} です。",
+    "botToken": "ボットのトークン",
+    "botSave": "ボットを保存",
+    "botRemove": "ボットを削除",
+    "botRemoveConfirm": "ボットを削除しますか？全員の Telegram 送信先が止まります。",
+    "schedule": "朝のチェックは毎日 {time} ごろに一度実行されます（Vercel の cron、apps/web/vercel.json で設定）。",
+    "error": {
+      "invalid": "正しくないようです。確認してもう一度お試しください。",
+      "unreachable": "サービスに接続できませんでした。しばらくしてからもう一度お試しください。",
+      "not_found": "「開始」のメッセージがまだ見つかりません。Telegram で「開始」を押してから、もう一度「確認」を押してください。",
+      "no_bot": "Telegram ボットがまだ設定されていません。",
+      "no_secret": "サーバーに AUTH_SECRET が設定されていません。"
+    }
+  },
+  "activity": {
+    "title": "アクティビティ",
+    "info": "起きたことを新しい順に表示します。管理者はアプリ全体、ほかの人は自分のインポートを見られます。",
+    "infoMember": "自分のインポートを新しい順に。",
+    "empty": "まだありません。",
+    "older": "さらに古いもの",
+    "newest": "最新",
+    "filter": {
+      "all": "すべて",
+      "collect": "収集",
+      "backup": "バックアップ",
+      "import": "インポート",
+      "admin": "管理者の変更",
+      "check": "チェック"
+    },
+    "level": {
+      "ok": "OK",
+      "problem": "問題あり",
+      "failed": "失敗"
+    },
+    "by": "{name}",
+    "byPc": "自宅PC",
+    "byTerminal": "ターミナル",
+    "byApp": "アプリのチェック",
+    "alerted": "アラート送信 {date}",
+    "open": "開く",
+    "kind": {
+      "collect": "収集",
+      "backup": "バックアップ",
+      "import": "インポート: {method}",
+      "check": "毎日のチェック"
+    },
+    "collect": "新しい価格 {observations} 件",
+    "collectScope": "{scope} のみ",
+    "collectSource": "{source}: {status}",
+    "collectStopped": "終了コード {code} で停止",
+    "backup": "{mb} MB、{rows} 行、{seconds} 秒",
+    "backupFailed": "失敗: {error}",
+    "import": "{imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
+    "noCollect": "{hours} 時間、収集なし（最後 {last}）",
+    "noBackup": "{hours} 時間、バックアップなし（最後 {last}）",
+    "fromTo": "{from} から {to} へ",
+    "none": "なし",
+    "admin": {
+      "sourceRole": "価格ソースの役割",
+      "sourceOrder": "価格ソースの順番",
+      "markets": "市場",
+      "marketOptions": "市場のオプション",
+      "categories": "カテゴリー",
+      "languages": "言語",
+      "identity": "識別ページ",
+      "collectWindow": "夜間の実行時間枠",
+      "rate": "為替レート",
+      "currency": "基準通貨",
+      "timeZone": "タイムゾーン",
+      "telegramBot": "Telegram ボット",
+      "userCreated": "アカウント作成",
+      "userPassword": "パスワード再設定",
+      "user2fa": "認証アプリ再設定",
+      "userDevices": "端末をサインアウト",
+      "userDisabled": "アカウント無効化",
+      "userEnabled": "アカウント有効化"
+    },
+    "role": {
+      "admin": "管理者",
+      "member": "メンバー"
     }
   }
 }

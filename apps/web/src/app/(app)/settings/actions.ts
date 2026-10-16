@@ -21,6 +21,7 @@ import {
   type SourceRole,
   SUMMARY_PANELS,
   type SummaryPanel,
+  baseCurrency,
 } from '@tora/core';
 import {
   clearAllBucketValues,
@@ -40,6 +41,7 @@ import {
   taxonomyChange,
   setSourceOrder,
   setSourceRoles,
+  recordAdminChange,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
@@ -115,7 +117,15 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   if (user.role !== 'admin' || !(SOURCE_ROLES as readonly string[]).includes(role)) return;
   const registry = await loadSourceRegistry(db);
   if (!registry.sources.some((s) => s.key === key) || !typesOf(registry).includes(cls)) return;
+  const before = (registry.declared ?? registry.roles)[key]?.[cls] ?? 'off';
   await setSourceRoles(db, key, { ...(registry.declared ?? registry.roles)[key], [cls]: role });
+  await recordAdminChange(
+    db,
+    user.id,
+    'sourceRole',
+    { source: key, cls, from: before, to: role },
+    '/settings/admin/sources',
+  );
   await clearAllBucketValues(db);
   // The value-over-time history follows too (about 10 s), right after answering.
   after(async () => {
@@ -153,6 +163,13 @@ export async function moveSourceAction(key: string, cls: ProductClass, step: -1 
   const [a, b] = [keys.indexOf(key), keys.indexOf(other.key)];
   [keys[a], keys[b]] = [keys[b]!, keys[a]!];
   await setSourceOrder(db, cls, keys);
+  await recordAdminChange(
+    db,
+    user.id,
+    'sourceOrder',
+    { source: key, cls, step, other: other.key },
+    '/settings/admin/sources',
+  );
   await clearAllBucketValues(db);
   after(async () => {
     await runSnapshots(db);
@@ -177,6 +194,16 @@ export async function setMarketsAction(primary: string, secondary: string | null
     primary,
     secondary: secondary === primary ? null : secondary,
   });
+  await recordAdminChange(
+    db,
+    user.id,
+    'markets',
+    {
+      from: [registry.markets?.primary ?? null, registry.markets?.secondary ?? null],
+      to: [primary, secondary === primary ? null : secondary],
+    },
+    '/settings/admin/markets',
+  );
   await clearAllBucketValues(db);
   after(async () => {
     await runSnapshots(db);
@@ -215,6 +242,13 @@ export async function saveCategoriesAction(
   if (check.blocked.length) return { blocked: check.blocked };
   const change = await saveTaxonomy(db, full, confirmed);
   if (change.touched.length && !confirmed) return { touched: change.touched };
+  await recordAdminChange(
+    db,
+    user.id,
+    'categories',
+    { categories: full.categories.length, touched: change.touched.length },
+    '/settings/admin/categories',
+  );
   await clearAllBucketValues(db);
   after(async () => {
     await runSnapshots(db);
@@ -230,7 +264,18 @@ export async function setLanguagesAction(primary: string, secondary: string | nu
   const { db, user } = await authed();
   if (user.role !== 'admin' || !isLocale(primary) || (secondary !== null && !isLocale(secondary)))
     return;
+  const before = (await loadSourceRegistry(db)).languages;
   await setLanguageSettings(db, { primary, secondary: secondary === primary ? null : secondary });
+  await recordAdminChange(
+    db,
+    user.id,
+    'languages',
+    {
+      from: [before?.primary ?? null, before?.secondary ?? null],
+      to: [primary, secondary === primary ? null : secondary],
+    },
+    '/settings/admin/languages',
+  );
   revalidatePath('/', 'layout');
 }
 
@@ -249,6 +294,13 @@ export async function setIdentitySourceAction(
     ...markets,
     identity: { ...markets.identity, [market]: { ...markets.identity?.[market], [cls]: key } },
   });
+  await recordAdminChange(
+    db,
+    user.id,
+    'identity',
+    { market, cls, from: markets.identity?.[market]?.[cls] ?? null, to: key },
+    '/settings/admin/identity',
+  );
   // Saved values carry the settings' date: saved again so pages keep using them.
   after(async () => {
     await refreshBucketValues(db);
@@ -276,6 +328,7 @@ export async function setMarketOptionsAction(
     ...(compare !== undefined && { compare }),
     ...(min !== undefined && { identityMinCost: min }),
   });
+  await recordAdminChange(db, user.id, 'marketOptions', options, '/settings/admin/markets');
   // Saved values carry the settings' date: saved again so pages keep using them.
   after(async () => {
     await refreshBucketValues(db);
@@ -289,6 +342,7 @@ export async function setCollectWindowAction(hours: number) {
   const { db, user } = await authed();
   if (user.role !== 'admin' || !Number.isInteger(hours) || hours < 1 || hours > 24) return;
   await setCollectWindow(db, hours);
+  await recordAdminChange(db, user.id, 'collectWindow', { to: hours }, '/settings/collectors');
   revalidatePath('/settings/collectors');
 }
 
@@ -300,6 +354,13 @@ export async function setRateAction(code: string, setting: RateSetting | null) {
     return;
   }
   await setRateSetting(db, code, setting);
+  await recordAdminChange(
+    db,
+    user.id,
+    'rate',
+    { currency: code, to: setting ? ('manual' in setting ? setting.manual : 'plugin') : null },
+    '/settings/admin/markets',
+  );
   revalidatePath('/', 'layout');
 }
 
@@ -310,8 +371,10 @@ export async function setRateAction(code: string, setting: RateSetting | null) {
 export async function changeBaseAction(code: string): Promise<FormState> {
   const { db, user } = await authed();
   if (user.role !== 'admin' || !/^[A-Z]{3}$/.test(code)) return {};
+  const from = baseCurrency(await loadSourceRegistry(db));
   const result = await runDomain(() => changeBaseCurrency(db, code));
   if (!result.ok) return result.state;
+  await recordAdminChange(db, user.id, 'currency', { from, to: code }, '/settings/admin/markets');
   await clearAllBucketValues(db);
   after(async () => {
     await refreshBucketValues(db);
@@ -328,8 +391,10 @@ export async function changeBaseAction(code: string): Promise<FormState> {
 export async function changeTimeZoneAction(name: string): Promise<FormState> {
   const { db, user } = await authed();
   if (user.role !== 'admin' || typeof name !== 'string') return {};
+  const from = (await loadSourceRegistry(db)).timeZone;
   const result = await runDomain(() => changeTimeZone(db, name));
   if (!result.ok) return result.state;
+  await recordAdminChange(db, user.id, 'timeZone', { from, to: name }, '/settings/admin/time-zone');
   await clearAllBucketValues(db);
   after(async () => {
     await refreshBucketValues(db);

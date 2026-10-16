@@ -49,9 +49,10 @@ After editing `packages/db/src/schema.ts`: `pnpm db:generate`, then `pnpm db:mig
 | `ANTHROPIC_API_KEY`                                                | Vercel, optional                | Uploaded screenshots are read right away by the Claude API ([imports](running.md#imports)) |
 | Keys a plug-in needs (e.g. `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`) | `.env` on the home PC only      | Never on Vercel: collectors run only at home                                               |
 | `BACKUP_DIR`                                                       | `.env` on the home PC, optional | Where the daily database copies go ([backups](backups.md))                                 |
+| `CRON_SECRET`                                                      | Vercel                          | Lets Vercel run the morning check of [alerts](alerts.md)                                   |
 
-`AUTH_SECRET` signs sessions and encrypts the authenticator secrets that `pnpm user` writes, which
-is why the home PC and Vercel must share it. Changing it signs everyone out and needs
+`AUTH_SECRET` signs sessions and encrypts the authenticator secrets that `pnpm user` writes (and
+the alert channels), which is why the home PC and Vercel must share it. Changing it signs everyone out and needs
 `pnpm user reset-2fa` for every account.
 
 ## 2. Database (Turso)

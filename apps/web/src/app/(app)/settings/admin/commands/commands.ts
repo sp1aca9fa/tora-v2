@@ -72,6 +72,17 @@ export const COMMAND_GROUPS: CommandGroup[] = [
     ],
   },
   {
+    key: 'alerts',
+    guide: 'alerts.md',
+    commands: [
+      {
+        key: 'afterRun',
+        command: 'pnpm alerts after-run --since <time> --collect-exit <n> --backup-exit <n>',
+      },
+      { key: 'check', command: 'pnpm alerts check' },
+    ],
+  },
+  {
     key: 'database',
     guide: 'setup.md#2-database-turso',
     commands: [
