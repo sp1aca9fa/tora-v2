@@ -1,11 +1,18 @@
 'use server';
 
-import { productClass } from '@tora/core';
+import {
+  DEFAULT_MARGIN,
+  STRATEGIES,
+  type StrategyChoice,
+  productClass,
+  toLocalIso,
+} from '@tora/core';
 import {
   addWatch,
   getProduct,
   linkSets,
   removeWatch,
+  setPreferences,
   suggestFromKnownProducts,
   updateWatch,
 } from '@tora/db';
@@ -79,5 +86,26 @@ export async function saveWatchAction(
 export async function removeWatchAction(watchId: string): Promise<void> {
   const { db, user } = await authed();
   await removeWatch(db, user.id, String(watchId).slice(0, 40));
+  revalidatePath('/', 'layout');
+}
+
+/** The person's buy strategy for item types (S9 part 4), from the strategy page. */
+export async function saveStrategyAction(choices: Record<string, StrategyChoice>) {
+  const { db, user } = await authed();
+  const clean: Record<string, StrategyChoice> = {};
+  for (const [type, c] of Object.entries(choices)) {
+    if (!STRATEGIES.includes(c.strategy) || type.length > 60) continue;
+    const margin = Math.round(Number(c.margin));
+    clean[type] =
+      c.strategy === 'margin'
+        ? { strategy: 'margin', margin: margin >= 1 && margin <= 50 ? margin : DEFAULT_MARGIN }
+        : { strategy: c.strategy };
+  }
+  await setPreferences(db, user.id, {
+    buyStrategy: {
+      byType: { ...user.preferences?.buyStrategy?.byType, ...clean },
+      chosenAt: toLocalIso(),
+    },
+  });
   revalidatePath('/', 'layout');
 }

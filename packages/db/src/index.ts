@@ -27,3 +27,4 @@ export * from './account-data';
 export * from './watches';
 export * from './supply';
 export * from './release';
+export * from './signals';

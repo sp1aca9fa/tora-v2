@@ -1478,7 +1478,13 @@
     "removeConfirm": "この状態でのウォッチをやめますか？",
     "bought": "購入しましたか？ロットを登録",
     "lowestAsk": "最安出品 <n>{amount}</n>（{source}）",
-    "askShort": "最安出品 <n>{amount}</n>"
+    "askShort": "最安出品 <n>{amount}</n>",
+    "strategyLine": "購入戦略: {list}。",
+    "setupTitle": "Toraの価格判断の基準を選んでください",
+    "setupText": "Toraが買い時を伝える前に、ウォッチしている種類ごとに購入戦略を選んでください。まず例で試せます。Toraのおすすめもあります。",
+    "setupButton": "戦略を選ぶ",
+    "zoneShort": "<n>{amount}</n>以下で買い時",
+    "limited": "データ不足"
   },
   "forSale": {
     "title": "現在の出品",
@@ -1498,5 +1504,78 @@
     "set": "{date}発売",
     "item": "{date}発売",
     "first_sale": "初めての取引 {date}"
+  },
+  "strategy": {
+    "title": "購入戦略",
+    "intro": "Toraが「買い時の価格」と判断する基準です。ウォッチまたは所有している種類ごとに1つ選べます。まず例で試してください。ウォッチの目標価格も常に有効です。",
+    "suggestAll": "{count}種類はまだToraの提案を使っています。",
+    "useSuggestions": "Toraの提案を使う",
+    "noTypes": "まず商品をウォッチしてください。戦略は商品の種類ごとに選びます。",
+    "notAdvice": "過去の価格だけから計算しています。確実な戦略はありません。",
+    "example": "試した商品:",
+    "chartLegend": "直近12か月の日ごとの価格。点はこの戦略が「買い時」と判断した日です。",
+    "noSample": "この種類の例はまだありません。取引のある日が十分ある商品が必要です。",
+    "suggested": "おすすめ",
+    "inUse": "使用中",
+    "calls": "直近1年で買い時{count}日",
+    "paidUnder": "年平均より{pct}%安い",
+    "paidOver": "年平均より{pct}%高い",
+    "after90": "90日後に値上がり {checked}回中{higher}回",
+    "marginLabel": "通常価格からの値引き",
+    "use": "{type}に「{name}」を使う",
+    "name": {
+      "steady": "安定",
+      "bargain": "掘り出し物",
+      "margin": "マージン",
+      "dip": "下落狙い",
+      "target": "目標価格のみ"
+    },
+    "about": {
+      "steady": "直近180日の安い方から4分の1の価格で買い時。履歴が少ない場合は通常価格の10%下。急落中は待ちます。",
+      "bargain": "直近1年の安い方から10分の1の価格のみ。判断は少なく、値引きは大きめ。急落中は待ちます。",
+      "margin": "通常価格（直近180日の中央値）の{margin}%下。急落中は待ちます。",
+      "dip": "「安定」と同じですが、急落中でも警告付きで買い時と判断します。早く買えますが、底値前に買うことも。",
+      "target": "ゾーンなし。ウォッチに設定した目標価格のみ。"
+    }
+  },
+  "buy": {
+    "title": "買い時",
+    "notYet": "次の収集後に計算されます。",
+    "strategy": "{type}の戦略: {name}。",
+    "change": "変更",
+    "verdict": {
+      "good": "買い時",
+      "wait": "下落中: 待つ",
+      "fair": "適正価格",
+      "high": "高値",
+      "none": "価格なし"
+    },
+    "zone": "<n>{amount}</n>以下なら買い時",
+    "basis": {
+      "quarter180": "直近180日の安い方から4分の1",
+      "tenth365": "直近1年の安い方から10分の1",
+      "margin": "通常価格 {usual} の{pct}%下",
+      "thin_margin": "通常価格の10%下（範囲を出すには履歴不足）"
+    },
+    "loweredByPattern": "新セットのパターンで引き下げ（{pct}）。",
+    "falling": "急落中（2週間で{pct}）。落ち着くまで待ちましょう。",
+    "fallingDip": "まだ急落中（2週間で{pct}）。さらに下がる可能性があります。",
+    "askInZone": "今、ゾーン内の出品があります。",
+    "limited": "データ不足: {reasons}。",
+    "limitedWhy": {
+      "few_sales": "30日間の取引が3件未満",
+      "short_range": "180日間で取引のある日が10日未満"
+    },
+    "reason": {
+      "fair": "相場 <n>{amount}</n>（30日間で{count}件）",
+      "position": "直近180日の日ごとの価格の{pct}%以下",
+      "trend": "推移: {list}",
+      "weeks": "{weeks}週間で{pct}",
+      "ask": "最安出品 <n>{amount}</n>（相場比 {pct}）",
+      "pattern": "似た商品（{items}件）は発売{days}日目からの90日で{pct}",
+      "noPattern": "新セットのパターン: この時期の価格がある似た商品がまだ足りません",
+      "noRelease": "新セットのパターン: 発売日が不明（最初に収集した取引のみ）",
+      "sep": "、"
+    }
   }
 }

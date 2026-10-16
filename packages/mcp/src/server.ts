@@ -127,7 +127,7 @@ server.registerTool(
   {
     title: 'Watchlist',
     description:
-      'Items the user watches to buy (not owned yet, or more of): the condition bucket, the target price per unit (base currency, null when none), the note, and the market value now in that condition (method, source, number of sales, window, confidence), and the lowest asking price now in that condition with its source, day and listing count (asks, not sales; from the nightly collect).',
+      'Items the user watches to buy (not owned yet, or more of): the condition bucket, the target price per unit (base currency, null when none), the note, and the market value now in that condition (method, source, number of sales, window, confidence), and the lowest asking price now in that condition with its source, day and listing count (asks, not sales; from the nightly collect). Also the buy timing: the buy strategy chosen for the type of item, its verdict (good / wait / fair / high / none), the buy zone and the numbers behind it (fair value, 180 / 365-day ranges, 2 / 4 / 12-week trends, days since release, the new-set pattern of similar items). From past prices only, never a sure thing.',
     inputSchema: {},
   },
   async () => json(await watchlist(db, user.id)),

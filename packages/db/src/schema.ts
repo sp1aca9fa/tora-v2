@@ -20,6 +20,7 @@ import {
   toLocalIso,
   type NoticeLevels,
   type ProductClass,
+  type SignalStats,
   type SourceInfo,
   type SourceRole,
   type UserPreferences,
@@ -834,6 +835,33 @@ export const supply = sqliteTable(
   ],
 );
 
+/**
+ * Buy timing numbers (requirements S9 part 4), saved daily per item and condition held or
+ * watched, after the collect: fair value, ranges, trends, the lowest ask, the new-set pattern.
+ * Each person's strategy turns them into a zone and a verdict when a page opens.
+ */
+export const signals = sqliteTable(
+  'signals',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    /** Valuation bucket ('' none). */
+    bucket: text('bucket').notNull(),
+    /** The app's local date. */
+    day: text('day').notNull(),
+    /** The source the daily prices came from (the valuation's). */
+    source: text('source'),
+    stats: text('stats', { mode: 'json' }).notNull().$type<SignalStats>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('signals_product_bucket_day_uq').on(t.productId, t.bucket, t.day),
+    index('signals_day_idx').on(t.day),
+  ],
+);
+
 export const ALERT_CHANNEL_KINDS = ['telegram', 'discord'] as const;
 export type AlertChannelKind = (typeof ALERT_CHANNEL_KINDS)[number];
 
@@ -885,4 +913,5 @@ export type CollectorRun = typeof collectorRuns.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type AlertChannel = typeof alertChannels.$inferSelect;
 export type Watch = typeof watches.$inferSelect;
+export type Signal = typeof signals.$inferSelect;
 export type Supply = typeof supply.$inferSelect;

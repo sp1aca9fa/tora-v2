@@ -2,6 +2,7 @@ import {
   canEditProduct,
   currentSupply,
   releaseDates,
+  latestSignals,
   listingsIn,
   lowestAsk,
   dismissedSourceWarnings,
@@ -16,7 +17,7 @@ import {
   valueHoldings,
   watchesOf,
 } from '@tora/db';
-import { productClass, trackingMode } from '@tora/core';
+import { productClass, strategyOf, trackingMode } from '@tora/core';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -33,6 +34,7 @@ import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
 import { ForSale } from './for-sale';
+import { BuyTiming } from './buy-timing';
 import { WatchCard } from './watch-card';
 import { getMoney } from '@/lib/money-server';
 import { getTaxonomy } from '@/lib/taxonomy';
@@ -71,23 +73,35 @@ export default async function ProductPage({ params }: Params) {
   const mainBucket =
     [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (watches[0]?.bucket || null);
   const compare = await compareBucket(product, mainBucket);
-  const [t, format, valuations, japan, history, images, foreign, dismissed, supply, released] =
-    await Promise.all([
-      getTranslations(),
-      getFormatter(),
-      valueHoldings(
-        db,
-        user.id,
-        owned.map((holding) => ({ holding, product })),
-      ),
-      compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
-      priceHistory(db, product.id, 365),
-      imageVersions(db, [product.id]),
-      foreignPrices(db, product.id),
-      dismissedSourceWarnings(db, user.id),
-      currentSupply(db, [product.id]),
-      releaseDates(db, [product]),
-    ]);
+  const [
+    t,
+    format,
+    valuations,
+    japan,
+    history,
+    images,
+    foreign,
+    dismissed,
+    supply,
+    released,
+    timing,
+  ] = await Promise.all([
+    getTranslations(),
+    getFormatter(),
+    valueHoldings(
+      db,
+      user.id,
+      owned.map((holding) => ({ holding, product })),
+    ),
+    compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
+    priceHistory(db, product.id, 365),
+    imageVersions(db, [product.id]),
+    foreignPrices(db, product.id),
+    dismissedSourceWarnings(db, user.id),
+    currentSupply(db, [product.id]),
+    releaseDates(db, [product]),
+    latestSignals(db, [{ productId: product.id, bucket: mainBucket }]),
+  ]);
   const release = released.get(product.id);
   const forSale = supply.get(product.id) ?? [];
   const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueBase ?? null]));
@@ -306,6 +320,16 @@ export default async function ProductPage({ params }: Params) {
               foreign={foreign}
             />
           )}
+          <BuyTiming
+            stats={timing.get(`${product.id}|${mainBucket ?? ''}`)?.stats ?? null}
+            choice={strategyOf(user.preferences, productClass(product))}
+            typeLabel={
+              t.has(`sourceRoles.class.${productClass(product)}`)
+                ? t(`sourceRoles.class.${productClass(product)}`)
+                : productClass(product)
+            }
+            condition={mainBucket}
+          />
           <ForSale rows={forSale} mainBucket={mainBucket} />
         </>
       }

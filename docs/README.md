@@ -14,6 +14,7 @@ this order the first time.
 | [Languages](languages.md)             | The app's two languages and adding a new one                                         |
 | [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
 | [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
+| [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

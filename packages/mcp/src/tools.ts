@@ -1,7 +1,7 @@
 // Read-only views of one user's data for Claude (requirements S4b). Plain functions over the
 // database, so the MCP server (server.ts) and the tests share them. Results are compact JSON:
 // amounts as integers in the base currency's smallest unit, dates as ISO strings, lists limited.
-import { noAiSources, productClass } from '@tora/core';
+import { judge, noAiSources, productClass, strategyOf } from '@tora/core';
 import {
   type Db,
   type Holding,
@@ -26,6 +26,8 @@ import {
   sameNameKey,
   productLots,
   releaseDates,
+  latestSignals,
+  getUserById,
   similarKey,
   similarProducts,
   schema,
@@ -706,7 +708,21 @@ export async function watchlist(db: Db, userId: string) {
     db,
     rows.map((r) => r.product.id),
   );
+  const [timing, user] = await Promise.all([
+    latestSignals(
+      db,
+      rows.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket || null })),
+    ),
+    getUserById(db, userId),
+  ]);
   return rows.map(({ watch, product }) => {
+    const signal = timing.get(`${product.id}|${watch.bucket}`);
+    const choice = strategyOf(user?.preferences, productClass(product));
+    // Numbers from a source Claude may not read are left out, as is the ask (given above).
+    const stats =
+      signal && !(signal.source && noAi.includes(signal.source))
+        ? { ...signal.stats, ask: null }
+        : null;
     const v = values.get(bucketValueKey(product.id, watch.bucket || null))?.valuation;
     const hidden = !!v?.source && noAi.includes(v.source);
     const asks = (supply.get(product.id) ?? []).filter((s) => !noAi.includes(s.source));
@@ -739,6 +755,24 @@ export async function watchlist(db: Db, userId: string) {
             day: ask.day,
             listings: listingsIn(asks, watch.bucket),
           }
+        : null,
+      // Buy timing (S9 part 4): the person's strategy for the item's type, its verdict and zone
+      // on the last saved numbers, and the numbers (fractions, not percents).
+      buyTiming: stats
+        ? (() => {
+            const j = judge(stats, choice);
+            return {
+              day: signal!.day,
+              strategy: choice,
+              verdict: j.verdict,
+              zoneTopBase: j.zone.top,
+              zoneBasis: j.zone.basis,
+              loweredByNewSetPattern: j.zone.pattern,
+              fallingFast: j.falling,
+              limitedData: j.limited,
+              numbers: stats,
+            };
+          })()
         : null,
     };
   });

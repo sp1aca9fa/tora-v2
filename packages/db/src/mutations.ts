@@ -50,6 +50,7 @@ import {
   sourceWarningDismissals,
   tcgSets,
   valuationSnapshots,
+  signals,
   supply,
   watches,
 } from './schema';
@@ -1088,6 +1089,8 @@ export async function mergeProducts(
     await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));
     await tx.delete(productImages).where(eq(productImages.productId, fromId));
     await moveSupply(tx, fromId, intoId);
+    // Buy timing numbers are worked out again for the merged item on the next collect.
+    await tx.delete(signals).where(eq(signals.productId, fromId));
     await clearBucketValues(tx, [fromId, intoId]);
     await tx.delete(products).where(eq(products.id, fromId));
     return into;
@@ -1120,6 +1123,7 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await tx.delete(productSources).where(eq(productSources.productId, productId));
     await tx.delete(productImages).where(eq(productImages.productId, productId));
     await tx.delete(supply).where(eq(supply.productId, productId));
+    await tx.delete(signals).where(eq(signals.productId, productId));
     await clearBucketValues(tx, [productId]);
     await tx.delete(products).where(eq(products.id, productId));
     return true;

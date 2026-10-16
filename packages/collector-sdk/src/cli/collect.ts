@@ -14,6 +14,7 @@ import {
   listUsers,
   recordActivity,
   refreshBucketValues,
+  refreshSignals,
   runSnapshots,
   loadTimeZone,
 } from '@tora/db';
@@ -203,9 +204,22 @@ if (quality.length) {
 const snap = await runSnapshots(db);
 // Today's value of everything held, read by the pages instead of every sale.
 const saved = await refreshBucketValues(db);
+// Buy timing numbers for everything held or watched (S9), from the values just saved. A failure
+// here (e.g. the database not migrated yet) never stops the run.
+let signalsSaved: { saved: number; withPattern: number } | null = null;
+try {
+  signalsSaved = await refreshSignals(db);
+} catch (error) {
+  console.log(`buy timing: stopped (${errorText(error)})`);
+}
 progress.done();
 console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
 console.log(`values: ${saved.values} saved, ${saved.removed} removed`);
+if (signalsSaved) {
+  console.log(
+    `buy timing: ${signalsSaved.saved} item(s) and condition(s), ${signalsSaved.withPattern} with a new-set pattern`,
+  );
+}
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }

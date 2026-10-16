@@ -1,4 +1,5 @@
 // Per-user display preferences (requirements S8).
+import type { StrategyChoice } from './signals';
 
 /** Panels of the Portfolio Summary's rotating card, in their default order. */
 export const SUMMARY_PANELS = [
@@ -31,6 +32,12 @@ export interface UserPreferences {
   };
   /** Alerts outside the app (S17). */
   alerts?: AlertPrefs;
+  /** Buy strategies per item type (S9 part 4); types not listed use Tora's suggestion. */
+  buyStrategy?: {
+    byType: Record<string, StrategyChoice>;
+    /** When the person chose (the Watchlist asks until then). */
+    chosenAt?: string;
+  };
 }
 
 /** What a person is sent (S17); each kind on unless switched off. */

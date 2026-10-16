@@ -1478,7 +1478,13 @@
     "removeConfirm": "Stop watching this item in this condition?",
     "bought": "Bought it? Register the lot",
     "lowestAsk": "Lowest ask <n>{amount}</n> on {source}",
-    "askShort": "Lowest ask <n>{amount}</n>"
+    "askShort": "Lowest ask <n>{amount}</n>",
+    "strategyLine": "Buy strategy: {list}.",
+    "setupTitle": "Choose how Tora judges prices",
+    "setupText": "Before Tora tells you when to buy, pick a buy strategy for each kind of item you watch. Try each on an example first; Tora suggests one.",
+    "setupButton": "Choose a strategy",
+    "zoneShort": "good under <n>{amount}</n>",
+    "limited": "limited data"
   },
   "forSale": {
     "title": "For sale now",
@@ -1498,5 +1504,78 @@
     "set": "Released {date}",
     "item": "Released {date}",
     "first_sale": "First sale {date}"
+  },
+  "strategy": {
+    "title": "Buy strategy",
+    "intro": "How Tora decides that a price is good to buy at. Pick one for each kind of item you watch or own; try each on an example first. A target price on a watch always counts too.",
+    "suggestAll": "{count, plural, one {One kind of item uses} other {# kinds of item use}} Tora's suggestion until you choose.",
+    "useSuggestions": "Use Tora's suggestions",
+    "noTypes": "Watch an item first: the strategies are chosen per kind of item.",
+    "notAdvice": "Worked out from past prices only: no strategy is a sure thing.",
+    "example": "Tried on:",
+    "chartLegend": "The last 12 months of daily prices. Dots: the days this strategy would have said good price.",
+    "noSample": "No example yet for this kind of item: one with enough days of sales is needed.",
+    "suggested": "Suggested",
+    "inUse": "In use",
+    "calls": "{count, plural, =0 {No buy days} one {# buy day} other {# buy days}} in the last year",
+    "paidUnder": "{pct}% under the year's average",
+    "paidOver": "{pct}% over the year's average",
+    "after90": "higher 90 days later on {higher} of {checked}",
+    "marginLabel": "Under the usual price by",
+    "use": "Use {name} for {type}",
+    "name": {
+      "steady": "Steady",
+      "bargain": "Bargain hunter",
+      "margin": "Margin",
+      "dip": "Catch the dip",
+      "target": "Own target only"
+    },
+    "about": {
+      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price falls fast.",
+      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price falls fast.",
+      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price falls fast.",
+      "dip": "Like Steady, but still says good price while the price falls fast, with a warning. Buys earlier; may buy before the bottom.",
+      "target": "No zone: only the target prices you set on your watches."
+    }
+  },
+  "buy": {
+    "title": "Buy timing",
+    "notYet": "Worked out after the next collect.",
+    "strategy": "Strategy for {type}: {name}.",
+    "change": "Change",
+    "verdict": {
+      "good": "Good price",
+      "wait": "Falling: wait",
+      "fair": "Fair price",
+      "high": "High",
+      "none": "No price yet"
+    },
+    "zone": "Good price at or under <n>{amount}</n>",
+    "basis": {
+      "quarter180": "the cheapest quarter of the last 180 days",
+      "tenth365": "the cheapest tenth of the last year",
+      "margin": "{pct}% under the usual price, {usual}",
+      "thin_margin": "10% under the usual price: not enough history for a range"
+    },
+    "loweredByPattern": "Lowered by the new-set pattern ({pct}).",
+    "falling": "Falling fast ({pct} in 2 weeks): wait until it flattens.",
+    "fallingDip": "Still falling fast ({pct} in 2 weeks): it may go lower.",
+    "askInZone": "A listing is in the zone now.",
+    "limited": "Limited data: {reasons}.",
+    "limitedWhy": {
+      "few_sales": "under 3 sales in 30 days",
+      "short_range": "under 10 days with sales in 180 days"
+    },
+    "reason": {
+      "fair": "Market value <n>{amount}</n> ({count, plural, one {# sale} other {# sales}} in 30 days)",
+      "position": "At or under {pct}% of the last 180 days' daily prices",
+      "trend": "Trend: {list}",
+      "weeks": "{pct} in {weeks} weeks",
+      "ask": "Lowest ask <n>{amount}</n> ({pct} against market value)",
+      "pattern": "Similar items ({items}) moved {pct} in the 90 days after day {days} from release",
+      "noPattern": "New-set pattern: not enough similar items with prices at this age yet",
+      "noRelease": "New-set pattern: no release date (only the first collected sale)",
+      "sep": ", "
+    }
   }
 }
