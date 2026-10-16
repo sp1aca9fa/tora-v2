@@ -7,6 +7,8 @@ import {
   createHolding,
   createQuerySource,
   createUser,
+  currentSupply,
+  lowestAsk,
   linkSource,
   listPendingCandidates,
   listProductSources,
@@ -384,4 +386,40 @@ it('leaves out listings already collected today, on the home PC clock', async ()
   // Another day.
   await runCollector(db, collector, { ...today, now: new Date(Date.now() + 86_400_000) });
   expect(calls).toBe(2);
+});
+
+it('saves what is for sale now, one report per source and day', async () => {
+  const { product } = await box();
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
+  let report = [
+    { bucket: 'sealed:shrink', lowestAsk: 9_000, currency: 'JPY', listings: 12 },
+    { bucket: 'sealed:no_shrink', lowestAsk: 8_000, currency: 'JPY', listings: null },
+  ];
+  const collector = fakeCollector({
+    collect: async () => ({ state: null, complete: true, supply: report }),
+  });
+  const day1 = new Date('2026-10-10T03:00:00Z');
+  await runCollector(db, collector, { ...quiet, collectOnly: true, now: day1 });
+  // A second run the same day replaces that day's numbers.
+  report = [
+    { bucket: 'sealed:shrink', lowestAsk: 9_500, currency: 'JPY', listings: 10 },
+    report[1]!,
+  ];
+  await runCollector(db, collector, { ...quiet, collectOnly: true, now: day1 });
+  let rows = (await currentSupply(db, [product.id], day1)).get(product.id)!;
+  expect(rows).toHaveLength(2);
+  expect(lowestAsk(rows, 'sealed:shrink')).toMatchObject({
+    lowestAskBase: 9_500,
+    lowestAskOriginal: 9_500,
+    listings: 10,
+    day: '2026-10-10',
+  });
+  // The next day only what is listed that day counts.
+  report = [{ bucket: 'sealed:shrink', lowestAsk: 9_800, currency: 'JPY', listings: 9 }];
+  const day2 = new Date('2026-10-11T03:00:00Z');
+  await runCollector(db, collector, { ...quiet, collectOnly: true, now: day2 });
+  rows = (await currentSupply(db, [product.id], day2)).get(product.id)!;
+  expect(rows.map((r) => [r.bucket, r.lowestAskBase])).toEqual([['sealed:shrink', 9_800]]);
+  // Too old: nothing for sale now.
+  expect((await currentSupply(db, [product.id], new Date('2026-10-20T03:00:00Z'))).size).toBe(0);
 });

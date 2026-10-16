@@ -31,7 +31,7 @@
 | S12 | Documentation for others: clone and run, build collectors, choose identity and reference sources, set up markets | built 2026-10-15 (guides in `docs/`, template plug-in, Commands page); awaiting user check |
 | S6 | Backups, download my data, spreadsheet import, import log | built 2026-10-16 (migration 0026); awaiting user check (optional later: load the JSON into an empty account) |
 | S17 | Notifications and activity log: alerts outside the app (Telegram, Discord), what triggers them, a log of what happened | built 2026-10-16 (migration 0027); awaiting user setup (CRON_SECRET, Telegram bot) and check |
-| S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | designed 2026-10-16; part 1 (watchlist) built 2026-10-16 (migration 0028); next: part 2 (for sale now) |
+| S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | designed 2026-10-16; part 1 (watchlist) built 2026-10-16 (migration 0028); part 2 (for sale now) built 2026-10-16 (migration 0029); next: part 3 (release dates and similar items) |
 | S13 | Buy suggestions: Tora proposes what to buy and when, within a budget and a target date | idea; after S9 (user, 2026-10-12) |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check | todo (user, 2026-10-14) |
@@ -141,6 +141,7 @@
 - 2026-10-16: S17 design (user): Telegram and Discord first (email and phone push to Open issues); failures at once from the home PC, a daily check in the app for runs that did not happen, everything else in one daily summary; one Activity page that also serves as the admin audit log.
 - 2026-10-16: A documentation pass is the last phase, S18 (user): it builds nothing, so it comes after S15. Plan order: S17 > S9 > S13 > S10 > S14 > S15 > S18.
 - 2026-10-16: S9 design (user): watch items (not sets), with a condition and an optional target; the lowest ask and listing count once a day in the nightly collect; rules first, Claude later; signals saved daily; the buy zone from the item's own history plus the new-set pattern pooled from every user's items of the same kind, franchise and language (release dates from the set catalog, else the item's own, else its first sale); zone and target alerts at once; signals on owned items' pages too; rule tests shown as a short results card.
+- 2026-10-16: S9 part 2, what is for sale: an ask is per unit (a lot's price divided by its size, the lot named); a SNKRDUNK card ask over 2.5 times the condition's recent single-card trades is taken for a lot and not used (the condition buttons do not say the lot size); Mercari asks pass the same filters as its sales, under 30 % of the item's own sales are not searched; 駿河屋 counts its own stock as one listing plus its marketplace's; Yahoo! Auctions is left out for now (bids, not asks). Found on the way: Mercari and Yahoo kept other sealed products of a set (デッキビルドBOX as the booster box), now left out; 駿河屋 saved games' prices without a condition since 10/15 (S16's game condition list), fixed.
 ---
 
 # CORE
@@ -852,6 +853,12 @@ Built, part 1 (2026-10-16, migration 0028):
 - Watchlist page (menu, between Portfolio and Actions): each watched item and condition with today's market value in that condition, how far it is from the target (at or under it in green, first), or the last sale. "Watch an item" uses the Add steps (existing, new, or a catalog set's sealed product), then the condition and target instead of the purchase.
 - Item pages open for watched items too (not only owned ones); a Watching card (owned or not) lists the person's watches of the item to change or remove and watches it in another condition; a watched item not owned links to registering the lot.
 - Collectors match and collect watched items (with owned and opened ones) and cover watched conditions; their values are saved after each collect like owned ones. A merge moves watches; a watched item is never deleted as unused. Watches are in the account download (JSON). MCP tool `watchlist`.
+
+Built, part 2 (2026-10-16, migration 0029):
+- Table `supply`: per item, source, condition and day, the lowest ask per unit (base currency and the source's own) and how many listings (null when the source does not say). Plug-ins return it with each collect (`CollectResult.supply`, docs/collectors.md); a second collect the same day replaces that day. A source's last day within 3 days counts as "for sale now"; a condition missing that day had nothing listed. Merges move it; deleted items drop it.
+- SNKRDUNK: cards from the condition buttons (`/v2/products/{id}/size-chips`, one small request), lowest ask per condition, the count only when the site shows it; sealed from the product page's lot sizes, the cheapest per unit and every new listing counted. Not the old sales-history endpoint. Mercari: the item's saved search on items for sale, cheapest first, up to 3 pages. 駿河屋: the store's stock and its marketplace from the search it already reads.
+- Item pages: a "For sale now" card per condition (the item's own first): the lowest ask, the listing count, each source's ask linked to its listing, lots named, a likely lot left out with the reason. The Watching card and the Watchlist show the lowest ask in the watched condition, green at or under the target; the Watchlist ranks by the value or the ask, whichever is nearer the target. MCP `watchlist` adds the lowest ask (sources Claude may not read left out).
+- Checked live on one SNKRDUNK card and box, a Mercari box search and a 駿河屋 game (nothing saved), and in the browser (en 1280, ja 390).
 
 ## S13: Buy suggestions
 

@@ -186,6 +186,11 @@ Return a `CollectResult`:
 - `title`, `url`, `imageUrl`: the listing as it is now (the item gets its first listing's picture).
 - `recentSales`: the newest trades as the page shows them, when it shows times like "3 hours ago"
   (`approximate: true`); shown as "last sale".
+- `supply` (optional): what is for sale now, one entry per condition with something listed:
+  `{ bucket, lowestAsk, currency, listings, url }`. `lowestAsk` is per unit in the site's own
+  currency (divide a lot's price by its size); `listings` is null when the site does not say how
+  many. Saved once a day and shown on item pages and the Watchlist as asking prices, never sales.
+  Leave it out when the site cannot tell.
 
 Long histories: read a few pages per run (the template uses 5) and resume. For histories that
 give only a day and no sale ID, `sweepHistory` in `@tora/collector-sdk` saves complete days only

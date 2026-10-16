@@ -1,4 +1,11 @@
-import { bucketValueKey, imageVersions, listWatches, savedBucketValues } from '@tora/db';
+import {
+  bucketValueKey,
+  currentSupply,
+  imageVersions,
+  listWatches,
+  lowestAsk,
+  savedBucketValues,
+} from '@tora/db';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -26,7 +33,7 @@ export default async function WatchlistPage() {
     getTranslations(),
     getMoney(),
   ]);
-  const [values, images] = await Promise.all([
+  const [values, images, supply] = await Promise.all([
     savedBucketValues(
       db,
       rows.map((r) => ({ product: r.product, bucket: r.watch.bucket || null })),
@@ -35,16 +42,24 @@ export default async function WatchlistPage() {
       db,
       rows.map((r) => r.product.id),
     ),
+    currentSupply(
+      db,
+      rows.map((r) => r.product.id),
+    ),
   ]);
   const items = rows.map((r) => {
     const value = values.get(bucketValueKey(r.product.id, r.watch.bucket || null));
     const now = value?.valuation.unitBase ?? null;
     const target = r.watch.targetPriceBase;
+    const ask = lowestAsk(supply.get(r.product.id) ?? [], r.watch.bucket);
+    // The value or the lowest ask, whichever is closer to the target.
+    const near = [now, ask?.lowestAskBase ?? null].filter((n): n is number => n !== null);
     return {
       ...r,
       now,
+      ask,
       last: value?.last ?? null,
-      gap: now !== null && target ? now - target : null,
+      gap: near.length && target ? Math.min(...near) - target : null,
     };
   });
   // Under the target first, then closest to it, then the rest as added.
@@ -73,7 +88,7 @@ export default async function WatchlistPage() {
         </p>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {items.map(({ watch, product, now, last, gap }) => {
+          {items.map(({ watch, product, now, ask, last, gap }) => {
             const details = [
               lotConditionLabel(watch, product, t),
               t(`kind.${product.kind}`),
@@ -98,7 +113,7 @@ export default async function WatchlistPage() {
                       <p className="truncate text-xs text-muted-foreground">{watch.note}</p>
                     )}
                   </div>
-                  <div className="shrink-0 space-y-0.5 text-right text-sm">
+                  <div className="max-w-[45%] shrink-0 space-y-0.5 text-right text-sm">
                     <p
                       className={
                         now !== null ? 'font-medium tabular-nums' : 'text-muted-foreground'
@@ -106,6 +121,21 @@ export default async function WatchlistPage() {
                     >
                       {now !== null ? money(now) : t('watchlist.noPrice')}
                     </p>
+                    {ask && (
+                      <p
+                        className={cn(
+                          'text-xs',
+                          target && ask.lowestAskBase! <= target
+                            ? 'font-medium text-emerald-700 dark:text-emerald-400'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {t.rich('watchlist.askShort', {
+                          amount: money(ask.lowestAskBase!),
+                          n: (chunks) => <span className="tabular-nums">{chunks}</span>,
+                        })}
+                      </p>
+                    )}
                     {target ? (
                       <p
                         className={cn(

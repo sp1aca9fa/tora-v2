@@ -1472,6 +1472,22 @@
     "edit": "編集",
     "remove": "ウォッチをやめる",
     "removeConfirm": "この状態でのウォッチをやめますか？",
-    "bought": "購入しましたか？ロットを登録"
+    "bought": "購入しましたか？ロットを登録",
+    "lowestAsk": "最安出品 <n>{amount}</n>（{source}）",
+    "askShort": "最安出品 <n>{amount}</n>"
+  },
+  "forSale": {
+    "title": "現在の出品",
+    "info": "状態ごとの最安出品価格（毎晩の収集で取得、{date}）。出品価格であり、取引価格ではありません。",
+    "none": "まだ情報がありません。毎晩の収集で、出品を表示するサイトから読み取ります。",
+    "anyCondition": "状態指定なし",
+    "yours": "あなたの区分",
+    "lowest": "{amount}〜",
+    "nothing": "出品なし",
+    "nothingShort": "なし",
+    "listings": "{count}件",
+    "listingsMore": "{count}件以上",
+    "lot": "（1個あたり、{count}個セット）",
+    "lotOnly": "まとめ売りとみられるため除外"
   }
 }

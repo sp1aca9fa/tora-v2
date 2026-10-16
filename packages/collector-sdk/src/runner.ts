@@ -15,6 +15,7 @@ import {
   QUERY_SOURCE_ID,
   updateSourceQuery,
   saveCandidates,
+  saveSupply,
   suggestFromKnownProducts,
   startRun,
   syncProductDetails,
@@ -263,6 +264,23 @@ export async function runCollector(
               )),
             imageUrl: result.imageUrl,
           });
+          if (result.supply) {
+            const rows = [];
+            for (const { lowestAsk, ...s } of result.supply) {
+              const c = lowestAsk === null ? null : await toBase(lowestAsk, s.currency, now);
+              rows.push({
+                ...s,
+                productId: product.id,
+                source: collector.source,
+                day: today,
+                lowestAskBase: c?.amount ?? null,
+                lowestAskOriginal: lowestAsk,
+                fxRate: c?.rate ?? null,
+                fetchedAt: inAppZone(now.toISOString()),
+              });
+            }
+            await saveSupply(db, rows);
+          }
           const title = result.title ?? link.title;
           if (!link.detailsSyncedAt && title && collector.productDetails) {
             const changed = await syncProductDetails(

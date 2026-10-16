@@ -1,5 +1,8 @@
 import {
   canEditProduct,
+  currentSupply,
+  listingsIn,
+  lowestAsk,
   dismissedSourceWarnings,
   foreignPrices,
   getProduct,
@@ -28,6 +31,7 @@ import { lotConditionLabel, productMeta, customFieldLines } from '@/lib/product-
 import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
+import { ForSale } from './for-sale';
 import { WatchCard } from './watch-card';
 import { getMoney } from '@/lib/money-server';
 import { getTaxonomy } from '@/lib/taxonomy';
@@ -66,20 +70,23 @@ export default async function ProductPage({ params }: Params) {
   const mainBucket =
     [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (watches[0]?.bucket || null);
   const compare = await compareBucket(product, mainBucket);
-  const [t, format, valuations, japan, history, images, foreign, dismissed] = await Promise.all([
-    getTranslations(),
-    getFormatter(),
-    valueHoldings(
-      db,
-      user.id,
-      owned.map((holding) => ({ holding, product })),
-    ),
-    compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
-    priceHistory(db, product.id, 365),
-    imageVersions(db, [product.id]),
-    foreignPrices(db, product.id),
-    dismissedSourceWarnings(db, user.id),
-  ]);
+  const [t, format, valuations, japan, history, images, foreign, dismissed, supply] =
+    await Promise.all([
+      getTranslations(),
+      getFormatter(),
+      valueHoldings(
+        db,
+        user.id,
+        owned.map((holding) => ({ holding, product })),
+      ),
+      compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
+      priceHistory(db, product.id, 365),
+      imageVersions(db, [product.id]),
+      foreignPrices(db, product.id),
+      dismissedSourceWarnings(db, user.id),
+      currentSupply(db, [product.id]),
+    ]);
+  const forSale = supply.get(product.id) ?? [];
   const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueBase ?? null]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
   // By each lot's tracking switches (S8): spent counts lots counted in cost, value those counted
@@ -111,6 +118,17 @@ export default async function ProductPage({ params }: Params) {
         target: w.targetPriceBase,
         note: w.note,
         defaults: w,
+        ask: (() => {
+          const best = lowestAsk(forSale, w.bucket);
+          return (
+            best && {
+              price: best.lowestAskBase!,
+              source: sourceLabel(best.source),
+              url: best.url,
+              listings: listingsIn(forSale, w.bucket),
+            }
+          );
+        })(),
       }))}
     />
   );
@@ -285,6 +303,7 @@ export default async function ProductPage({ params }: Params) {
               foreign={foreign}
             />
           )}
+          <ForSale rows={forSale} mainBucket={mainBucket} />
         </>
       }
       sources={

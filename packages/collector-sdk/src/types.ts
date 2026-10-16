@@ -63,6 +63,26 @@ export interface CollectResult {
   imageUrl?: string | null;
   /** Search-based sources: the search actually run, when the collector filled it in. */
   query?: SourceQuery;
+  /**
+   * What is for sale now (S9 part 2): the lowest ask and the number of listings per condition,
+   * every condition with something for sale. Left out when the source cannot tell.
+   */
+  supply?: SupplyInput[];
+}
+
+/** One condition's listings on a source today, in the source's own currency. */
+export interface SupplyInput {
+  /** Valuation bucket (e.g. `raw:A`, `sealed:shrink`); null when the source does not say. */
+  bucket: string | null;
+  /** Per unit, in `currency`'s smallest unit; null when the source shows none (e.g. lots only). */
+  lowestAsk: number | null;
+  /** ISO 4217. */
+  currency: string;
+  /** Null when the source does not say how many. */
+  listings: number | null;
+  /** The cheapest listing, or the page listing them. */
+  url?: string | null;
+  raw?: unknown;
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

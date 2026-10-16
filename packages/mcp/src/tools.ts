@@ -30,6 +30,9 @@ import {
   valueHolding,
   loadSourceRegistry,
   listWatches,
+  listingsIn,
+  lowestAsk,
+  currentSupply,
   savedBucketValues,
   bucketValueKey,
 } from '@tora/db';
@@ -682,7 +685,7 @@ export async function querySql(db: Db, sql: string, limit = 200) {
 
 /**
  * The user's watchlist (S9): each watched item and condition, the target price, and today's
- * market value in that condition (sources Claude may not read are left out).
+ * market value and lowest ask in that condition (sources Claude may not read are left out).
  */
 export async function watchlist(db: Db, userId: string) {
   const rows = await listWatches(db, userId);
@@ -691,9 +694,15 @@ export async function watchlist(db: Db, userId: string) {
     db,
     rows.map((r) => ({ product: r.product, bucket: r.watch.bucket || null })),
   );
+  const supply = await currentSupply(
+    db,
+    rows.map((r) => r.product.id),
+  );
   return rows.map(({ watch, product }) => {
     const v = values.get(bucketValueKey(product.id, watch.bucket || null))?.valuation;
     const hidden = !!v?.source && noAi.includes(v.source);
+    const asks = (supply.get(product.id) ?? []).filter((s) => !noAi.includes(s.source));
+    const ask = lowestAsk(asks, watch.bucket);
     return {
       watchId: watch.id,
       productId: product.id,
@@ -714,6 +723,15 @@ export async function watchlist(db: Db, userId: string) {
               confidence: v.confidence,
             }
           : null,
+      // What is for sale now (asking prices, not sales), from the last nightly collect.
+      lowestAsk: ask
+        ? {
+            unitBase: ask.lowestAskBase,
+            source: ask.source,
+            day: ask.day,
+            listings: listingsIn(asks, watch.bucket),
+          }
+        : null,
     };
   });
 }

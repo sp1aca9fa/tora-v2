@@ -795,6 +795,42 @@ export const watches = sqliteTable(
   ],
 );
 
+/**
+ * What is for sale now (S9 part 2): per item, source and condition, the lowest ask and how many
+ * listings, once a day with the collect. A bucket with nothing for sale has no ask and 0 listings.
+ */
+export const supply = sqliteTable(
+  'supply',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id),
+    source: text('source').notNull(),
+    /** Valuation bucket ('' when the source does not say the condition). */
+    bucket: text('bucket').notNull(),
+    /** The app's local date of the collect. */
+    day: text('day').notNull(),
+    /** Per unit, in the base currency. */
+    lowestAskBase: integer('lowest_ask_base'),
+    /** Per unit, in `currency` as the source shows it. */
+    lowestAskOriginal: integer('lowest_ask_original'),
+    currency: text('currency'),
+    fxRate: real('fx_rate'),
+    /** Null when the source does not say how many. */
+    listings: integer('listings'),
+    /** The cheapest listing, or the page listing them. */
+    url: text('url'),
+    raw: text('raw', { mode: 'json' }).$type<unknown>(),
+    fetchedAt: text('fetched_at').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('supply_product_source_bucket_day_uq').on(t.productId, t.source, t.bucket, t.day),
+    index('supply_product_day_idx').on(t.productId, t.day),
+  ],
+);
+
 export const ALERT_CHANNEL_KINDS = ['telegram', 'discord'] as const;
 export type AlertChannelKind = (typeof ALERT_CHANNEL_KINDS)[number];
 
@@ -846,3 +882,4 @@ export type CollectorRun = typeof collectorRuns.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type AlertChannel = typeof alertChannels.$inferSelect;
 export type Watch = typeof watches.$inferSelect;
+export type Supply = typeof supply.$inferSelect;

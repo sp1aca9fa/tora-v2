@@ -1472,6 +1472,22 @@
     "edit": "Edit",
     "remove": "Stop watching",
     "removeConfirm": "Stop watching this item in this condition?",
-    "bought": "Bought it? Register the lot"
+    "bought": "Bought it? Register the lot",
+    "lowestAsk": "Lowest ask <n>{amount}</n> on {source}",
+    "askShort": "Lowest ask <n>{amount}</n>"
+  },
+  "forSale": {
+    "title": "For sale now",
+    "info": "Lowest asking price per condition, read with the nightly collect ({date}). Asking prices, not sales.",
+    "none": "Nothing reported yet. The nightly collect reads what is for sale on the sources that show it.",
+    "anyCondition": "Any condition",
+    "yours": "yours",
+    "lowest": "from {amount}",
+    "nothing": "Nothing for sale",
+    "nothingShort": "none",
+    "listings": "{count, plural, one {# listing} other {# listings}}",
+    "listingsMore": "{count}+ listings",
+    "lot": "(each, in a lot of {count})",
+    "lotOnly": "looks like a lot, left out"
   }
 }

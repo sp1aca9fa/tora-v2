@@ -9,6 +9,7 @@ import { FormError } from '@/components/form-error';
 import { useMoney } from '@/components/money-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { WatchTargetFields } from '../../add/add-flow';
 import { removeWatchAction, saveWatchAction } from '../../watchlist/actions';
 
@@ -18,6 +19,8 @@ export interface WatchRow {
   target: number | null;
   note: string | null;
   defaults: ConditionDefaults;
+  /** The lowest ask in this condition today (S9 part 2), across sources. */
+  ask: { price: number; source: string; url: string | null; listings: number | null } | null;
 }
 
 function WatchForm({
@@ -117,6 +120,29 @@ export function WatchCard({
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
+                    {w.ask && (
+                      <p
+                        className={cn(
+                          'text-xs',
+                          w.target && w.ask.price <= w.target
+                            ? 'font-medium text-emerald-700 dark:text-emerald-400'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        <a
+                          href={w.ask.url ?? undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {t.rich('watchlist.lowestAsk', {
+                            amount: money(w.ask.price),
+                            source: w.ask.source,
+                            n: (chunks) => <span className="tabular-nums">{chunks}</span>,
+                          })}
+                        </a>
+                      </p>
+                    )}
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setEditing(w.id)}>
                     {t('watchlist.edit')}

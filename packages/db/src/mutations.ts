@@ -30,6 +30,7 @@ import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
 import { loadSourceRegistry } from './registry';
+import { moveSupply } from './supply';
 import { clearBucketValues } from './valuation';
 import {
   type Holding,
@@ -49,6 +50,7 @@ import {
   sourceWarningDismissals,
   tcgSets,
   valuationSnapshots,
+  supply,
   watches,
 } from './schema';
 
@@ -1023,7 +1025,7 @@ export async function flagForReview(
 
 /**
  * Merges a duplicate product into another (same category and kind): its lots, sales data, manual
- * prices, watches and listings move over, then the duplicate is deleted. Listings the target already has,
+ * prices, watches, listings and what was for sale move over, then the duplicate is deleted. Listings the target already has,
  * the duplicate's pending suggestions and its picture are dropped. Products are shared, so other
  * users' lots of the duplicate move too (they are the same item).
  */
@@ -1085,6 +1087,7 @@ export async function mergeProducts(
     await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, fromId));
     await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));
     await tx.delete(productImages).where(eq(productImages.productId, fromId));
+    await moveSupply(tx, fromId, intoId);
     await clearBucketValues(tx, [fromId, intoId]);
     await tx.delete(products).where(eq(products.id, fromId));
     return into;
@@ -1116,6 +1119,7 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
       .where(eq(sourceWarningDismissals.productId, productId));
     await tx.delete(productSources).where(eq(productSources.productId, productId));
     await tx.delete(productImages).where(eq(productImages.productId, productId));
+    await tx.delete(supply).where(eq(supply.productId, productId));
     await clearBucketValues(tx, [productId]);
     await tx.delete(products).where(eq(products.id, productId));
     return true;
