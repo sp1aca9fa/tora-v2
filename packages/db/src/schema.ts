@@ -447,12 +447,15 @@ export const suggestions = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    /** exclude_sale | exclude_word | fix_product, or sale_ok / search_ok (judged fine, kept as memory) */
+    /**
+     * exclude_sale | exclude_word | fix_product | link_set, or sale_ok / search_ok (judged fine,
+     * kept as memory)
+     */
     kind: text('kind').notNull(),
     /** What it is about, unique per kind: an observation ID, "<source ID>|<word>", a product ID. */
     targetKey: text('target_key').notNull(),
     productId: text('product_id').references(() => products.id, { onDelete: 'cascade' }),
-    /** What accepting does: { observationId } | { sourceId, word } | { changes } */
+    /** What accepting does: { observationId } | { sourceId, word } | { changes } | { setId } */
     payload: text('payload', { mode: 'json' })
       .$type<Record<string, unknown>>()
       .notNull()

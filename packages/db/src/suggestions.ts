@@ -5,6 +5,7 @@ import { toLocalIso } from '@tora/core';
 import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError, canEditProduct } from './mutations';
+import { linkProductSet } from './release';
 import {
   type Suggestion,
   priceObservations,
@@ -16,7 +17,8 @@ import { setObservationExcluded, updateSourceQuery, userHoldsProduct } from './s
 import type { User } from './schema';
 import { clearBucketValues } from './valuation';
 
-export type SuggestionKind = 'exclude_sale' | 'exclude_word' | 'fix_product';
+/** `link_set`: an item's catalog set, when its set code or name matches only loosely (S9). */
+export type SuggestionKind = 'exclude_sale' | 'exclude_word' | 'fix_product' | 'link_set';
 /** Verdicts kept only so the same thing is not judged again. */
 export type VerdictKind = 'sale_ok' | 'search_ok';
 
@@ -99,6 +101,16 @@ async function applySuggestion(
   s: Suggestion,
 ): Promise<void> {
   const payload = s.payload as Record<string, unknown>;
+  if (s.kind === 'link_set' && s.productId) {
+    // Filed to the person who made the item (or the admins), owned or not.
+    const [product] = await db.select().from(products).where(eq(products.id, s.productId));
+    if (!product) throw new DomainError('not_found');
+    if (!canEditProduct(user, product)) throw new DomainError('forbidden');
+    if (!(await linkProductSet(db, product.id, String(payload.setId ?? '')))) {
+      throw new DomainError('not_found');
+    }
+    return;
+  }
   if (!s.productId || !(await userHoldsProduct(db, user.id, s.productId))) {
     throw new DomainError('not_found');
   }

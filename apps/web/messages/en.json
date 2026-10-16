@@ -893,7 +893,8 @@
     "kind": {
       "exclude_sale": "Exclude a sale",
       "exclude_word": "Skip listings with a word",
-      "fix_product": "Fix product details"
+      "fix_product": "Fix product details",
+      "link_set": "Link to a catalog set"
     },
     "sale": "{price} on {date} ({source}); the value is {value}.",
     "unsure": "The models were not sure: check the listing.",
@@ -903,7 +904,8 @@
     "accept": {
       "exclude_sale": "Exclude",
       "exclude_word": "Skip the word",
-      "fix_product": "Apply"
+      "fix_product": "Apply",
+      "link_set": "Link"
     },
     "dismiss": "Dismiss",
     "openListing": "Open the listing on {source}",
@@ -919,7 +921,9 @@
     "decision": {
       "accepted": "accepted",
       "dismissed": "dismissed"
-    }
+    },
+    "set": "Catalog set: {name} ({code}), released {date}",
+    "setBefore": "The item says: {name} ({code}). Its release date comes from the set."
   },
   "compare": {
     "title": "{primary} vs {secondary}",
@@ -1489,5 +1493,10 @@
     "listingsMore": "{count}+ listings",
     "lot": "(each, in a lot of {count})",
     "lotOnly": "looks like a lot, left out"
+  },
+  "release": {
+    "set": "Released {date}",
+    "item": "Released {date}",
+    "first_sale": "First sale {date}"
   }
 }

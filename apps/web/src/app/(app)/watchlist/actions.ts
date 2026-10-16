@@ -1,7 +1,14 @@
 'use server';
 
 import { productClass } from '@tora/core';
-import { addWatch, getProduct, removeWatch, suggestFromKnownProducts, updateWatch } from '@tora/db';
+import {
+  addWatch,
+  getProduct,
+  linkSets,
+  removeWatch,
+  suggestFromKnownProducts,
+  updateWatch,
+} from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -36,6 +43,7 @@ export async function createWatchAction(_prev: FormState, formData: FormData): P
   if (!result.ok) return result.state;
   // Offer a linked look-alike's listing right away, as for a new lot.
   await suggestFromKnownProducts(db, result.value.product.id);
+  await linkSets(db, [result.value.product.id]);
   revalidatePath('/', 'layout');
   redirect(`/products/${result.value.product.id}`);
 }

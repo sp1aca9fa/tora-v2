@@ -24,6 +24,7 @@ import {
   submitGrading,
   suggestFromKnownProducts,
   updateProduct,
+  linkSets,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -242,7 +243,12 @@ export async function editProductAction(
   return handle(
     formData,
     z.object({}),
-    (_d, { db, session }) => updateProduct(db, session.user, productId, input),
+    async (_d, { db, session }) => {
+      const product = await updateProduct(db, session.user, productId, input);
+      // A set code or name typed now may name a catalog set (S9).
+      await linkSets(db, [productId]);
+      return product;
+    },
     () => (backTo.startsWith('/holdings/') ? backTo : '/'),
   );
 }

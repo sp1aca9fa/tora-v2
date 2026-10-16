@@ -26,3 +26,4 @@ export * from './lot-sheet';
 export * from './account-data';
 export * from './watches';
 export * from './supply';
+export * from './release';

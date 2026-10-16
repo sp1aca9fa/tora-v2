@@ -17,6 +17,7 @@ import {
   searchSets,
   resolvePurchaseLink,
   suggestFromKnownProducts,
+  linkSets,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -174,6 +175,8 @@ export async function createHoldingAction(
   if (!result.ok) return result.state;
   // Offer a linked look-alike's listing right away (no need to wait for the collector).
   await suggestFromKnownProducts(db, result.value.product.id);
+  // Its catalog set (S9): linked when sure, else suggested on Actions.
+  await linkSets(db, [result.value.product.id]);
   // Added by hand for a purchase link that could not be imported: that link is done.
   const linkId = String(formData.get('purchaseLinkId') ?? '');
   if (linkId) await resolvePurchaseLink(db, user.id, linkId, result.value.holding.id);

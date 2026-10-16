@@ -10,6 +10,7 @@ import {
   clearAllBucketValues,
   createDb,
   inferLotSizes,
+  linkSets,
   listUsers,
   recordActivity,
   refreshBucketValues,
@@ -182,6 +183,13 @@ progress.update('pictures, lot sizes, chart', 0.3);
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);
 log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+// Items without a catalog set: linked when sure, suggested on Actions when not (S9).
+const sets = await linkSets(db);
+if (sets.linked || sets.suggested) {
+  log(
+    `sets: ${sets.linked} item(s) linked to the catalog, ${sets.suggested} to confirm on Actions`,
+  );
+}
 progress.update('pictures, lot sizes, chart', 0.5);
 // The quality gate first: a supporting source that disagrees with the reference is not valued.
 // Listing details some sources may keep only for a while (e.g. eBay's listing IDs).

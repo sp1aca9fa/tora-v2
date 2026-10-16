@@ -124,13 +124,33 @@ export async function SuggestionCard({
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        {t('suggestions.why', {
-          reason: s.reason,
-          model: (s.model ?? '').replace(/^claude-/, ''),
-          confidence: Math.round((s.confidence ?? 0) * 100),
-        })}
-      </p>
+      {s.kind === 'link_set' && (
+        <div className="space-y-0.5">
+          <p>
+            {t('suggestions.set', {
+              name: String((evidence.set as Record<string, unknown>)?.name ?? ''),
+              code: empty((evidence.set as Record<string, unknown>)?.code),
+              date: empty((evidence.set as Record<string, unknown>)?.releaseDate),
+            })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t('suggestions.setBefore', {
+              name: empty((evidence.before as Record<string, unknown>)?.setName),
+              code: empty((evidence.before as Record<string, unknown>)?.setCode),
+            })}
+          </p>
+        </div>
+      )}
+
+      {s.kind !== 'link_set' && (
+        <p className="text-xs text-muted-foreground">
+          {t('suggestions.why', {
+            reason: s.reason,
+            model: (s.model ?? '').replace(/^claude-/, ''),
+            confidence: Math.round((s.confidence ?? 0) * 100),
+          })}
+        </p>
+      )}
       <form className="space-y-2">
         <Textarea
           name="note"

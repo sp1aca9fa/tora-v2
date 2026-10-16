@@ -893,7 +893,8 @@
     "kind": {
       "exclude_sale": "販売記録を除外",
       "exclude_word": "語を含む出品を除外",
-      "fix_product": "商品情報の修正"
+      "fix_product": "商品情報の修正",
+      "link_set": "カタログのセットに紐付け"
     },
     "sale": "{date}に{price}（{source}）。評価額は{value}です。",
     "unsure": "モデルも判断できませんでした。出品を確認してください。",
@@ -903,7 +904,8 @@
     "accept": {
       "exclude_sale": "除外する",
       "exclude_word": "除外語に追加",
-      "fix_product": "適用する"
+      "fix_product": "適用する",
+      "link_set": "紐付ける"
     },
     "dismiss": "却下",
     "openListing": "{source}で出品を開く",
@@ -919,7 +921,9 @@
     "decision": {
       "accepted": "承認",
       "dismissed": "却下"
-    }
+    },
+    "set": "カタログのセット: {name}（{code}）、{date}発売",
+    "setBefore": "商品の記載: {name}（{code}）。発売日はセットから取ります。"
   },
   "compare": {
     "title": "{primary}と{secondary}の比較",
@@ -1489,5 +1493,10 @@
     "listingsMore": "{count}件以上",
     "lot": "（1個あたり、{count}個セット）",
     "lotOnly": "まとめ売りとみられるため除外"
+  },
+  "release": {
+    "set": "{date}発売",
+    "item": "{date}発売",
+    "first_sale": "初めての取引 {date}"
   }
 }

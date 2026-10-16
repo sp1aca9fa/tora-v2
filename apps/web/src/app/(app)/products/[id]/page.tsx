@@ -1,6 +1,7 @@
 import {
   canEditProduct,
   currentSupply,
+  releaseDates,
   listingsIn,
   lowestAsk,
   dismissedSourceWarnings,
@@ -70,7 +71,7 @@ export default async function ProductPage({ params }: Params) {
   const mainBucket =
     [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (watches[0]?.bucket || null);
   const compare = await compareBucket(product, mainBucket);
-  const [t, format, valuations, japan, history, images, foreign, dismissed, supply] =
+  const [t, format, valuations, japan, history, images, foreign, dismissed, supply, released] =
     await Promise.all([
       getTranslations(),
       getFormatter(),
@@ -85,7 +86,9 @@ export default async function ProductPage({ params }: Params) {
       foreignPrices(db, product.id),
       dismissedSourceWarnings(db, user.id),
       currentSupply(db, [product.id]),
+      releaseDates(db, [product]),
     ]);
+  const release = released.get(product.id);
   const forSale = supply.get(product.id) ?? [];
   const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueBase ?? null]));
   const units = owned.reduce((n, h) => n + h.quantity, 0);
@@ -156,7 +159,7 @@ export default async function ProductPage({ params }: Params) {
               {customFieldLines(product, await getTaxonomy(), await getLocale(), t)
                 .map((l) => ` · ${l.label}: ${l.value}`)
                 .join('')}
-              {product.releaseDate && ` · ${t('add.released', { date: product.releaseDate })}`}
+              {release && ` · ${t(`release.${release.from}`, { date: release.date })}`}
               {canEditProduct(user, product) && (
                 <>
                   {' · '}

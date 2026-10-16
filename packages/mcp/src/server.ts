@@ -97,7 +97,7 @@ server.registerTool(
   {
     title: 'Product detail',
     description:
-      'One product: its details, every lot (cost, date, shop, order ID, condition / grade, review flags) with how each lot is valued, its price sources (listing or saved search query, references, learned categories, last collected, sales count) and pending link suggestions.',
+      'One product: its details, every lot (cost, date, shop, order ID, condition / grade, review flags) with how each lot is valued, its price sources (listing or saved search query, references, learned categories, last collected, sales count) pending link suggestions, its release date (from the set catalog, its own, or its first sale) and how many similar items share its group (same kind, franchise and language; games: kind and platform).',
     inputSchema: { productId: z.string() },
   },
   async ({ productId }) => json(await productDetail(db, user.id, productId)),

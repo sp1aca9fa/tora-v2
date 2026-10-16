@@ -25,6 +25,9 @@ import {
   priceHistory,
   sameNameKey,
   productLots,
+  releaseDates,
+  similarKey,
+  similarProducts,
   schema,
   summarizeByProduct,
   valueHolding,
@@ -162,15 +165,20 @@ export async function listProducts(
 export async function productDetail(db: Db, userId: string, productId: string) {
   const product = await getProduct(db, productId);
   if (!product) return { error: 'not found' };
-  const [lots, sources, candidates, market] = await Promise.all([
+  const [lots, sources, candidates, market, released, similar] = await Promise.all([
     productLots(db, userId, productId),
     listProductSources(db, productId),
     listPendingCandidates(db, productId),
     loadMarketData(db, userId, [productId]),
+    releaseDates(db, [product]),
+    similarProducts(db, product),
   ]);
   return {
     product,
     class: productClass(product),
+    // S9: the set catalog's date, else the item's own, else its first collected sale.
+    release: released.get(productId) ?? null,
+    similarItems: { group: similarKey(product), count: similar.length },
     lots: lots.map((h) => ({
       holdingId: h.id,
       status: h.status,
