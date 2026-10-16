@@ -6,6 +6,7 @@ import {
   type SignalStats,
   localDate,
   marketCurrency,
+  marketTrend,
   newSetPattern,
   productClass,
   seriesStats,
@@ -195,6 +196,34 @@ export async function refreshSignals(
     }
   }
 
+  // The market per group of similar items: every item's 12-week trend (any person's items), on
+  // the condition with the most days of sales.
+  const markets = new Map<string, SignalStats['market']>();
+  {
+    const keys = new Set(pairs.map((p) => similarKey(p.product)).filter((k) => k !== null));
+    const members = (await db.select().from(products)).filter((p) => keys.has(similarKey(p) ?? ''));
+    const recent = await dailySeries(
+      db,
+      members.map((p) => p.id),
+      toLocalIso(new Date(now.getTime() - 100 * DAY)),
+    );
+    const longest = new Map<string, DayPrice[]>();
+    for (const [key, s] of recent) {
+      const id = key.slice(0, key.indexOf('|'));
+      if (s.length > (longest.get(id)?.length ?? 0)) longest.set(id, s);
+    }
+    for (const key of keys) {
+      const group = members.filter((p) => similarKey(p) === key);
+      markets.set(
+        key,
+        marketTrend(
+          group.map((p) => longest.get(p.id) ?? []),
+          today,
+        ),
+      );
+    }
+  }
+
   const rows: { productId: string; bucket: string; source: string | null; stats: SignalStats }[] =
     [];
   let withPattern = 0;
@@ -226,6 +255,7 @@ export async function refreshSignals(
         ask: ask?.lowestAskBase ?? null,
         ageDays,
         releaseFrom: r?.from ?? null,
+        market: markets.get(similarKey(product) ?? '') ?? null,
         pattern,
       },
     });

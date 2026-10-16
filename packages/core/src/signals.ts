@@ -36,6 +36,9 @@ export const FALLING_2W = -0.05;
 /** The new-set pattern: how far ahead it looks and how many similar items it needs. */
 export const PATTERN_HORIZON = 90;
 export const PATTERN_MIN_ITEMS = 3;
+/** Similar items needed for the market trend, and the 12-week fall that means "wait". */
+export const MARKET_MIN_ITEMS = 5;
+export const MARKET_FALLING_12W = -0.15;
 /** Items older than this (days since release) are past the new-set pattern. */
 export const PATTERN_MAX_AGE = 365;
 
@@ -64,6 +67,8 @@ export interface SignalStats {
   /** Days since release (S9 part 3's release date), and where that date came from. */
   ageDays: number | null;
   releaseFrom: 'set' | 'item' | 'first_sale' | null;
+  /** The market: the median 12-week change of similar items (5+), e.g. a broad fall. */
+  market: { items: number; change84: number } | null;
   /** Similar items at this age: their typical change over the next 90 days. */
   pattern: { items: number; change: number; horizonDays: number } | null;
 }
@@ -123,7 +128,7 @@ export function seriesStats(
   series: DayPrice[],
   asOf: string,
   fair?: number | null,
-): Omit<SignalStats, 'ask' | 'ageDays' | 'releaseFrom' | 'pattern'> {
+): Omit<SignalStats, 'ask' | 'ageDays' | 'releaseFrom' | 'market' | 'pattern'> {
   const end = dayNumber(asOf);
   const within = (days: number) =>
     series.filter((p) => {
@@ -234,6 +239,8 @@ export interface Judgement {
   zone: BuyZone;
   /** Falling fast (2 weeks down over 5 % and 4 weeks down). */
   falling: boolean;
+  /** Similar items as a group are down over 15 % in 12 weeks. */
+  marketFalling: boolean;
   /** Little data: the reasons (shown as a warning). */
   limited: ('few_sales' | 'short_range')[];
   /** The lowest ask is in the zone now. */
@@ -247,14 +254,17 @@ export const isFalling = (s: Pick<SignalStats, 'trend14' | 'trend28'>) =>
 export function judge(stats: SignalStats, choice: StrategyChoice): Judgement {
   const zone = buyZone(stats, choice);
   const falling = isFalling(stats);
+  const marketFalling = !!stats.market && stats.market.change84 < MARKET_FALLING_12W;
   const limited: Judgement['limited'] = [];
   if (stats.sales30 < 3) limited.push('few_sales');
   if (stats.q25d180 === null) limited.push('short_range');
   const askInZone = zone.top !== null && stats.ask !== null && stats.ask <= zone.top;
-  const base = { zone, falling, limited, askInZone };
+  const base = { zone, falling, marketFalling, limited, askInZone };
   if (stats.fair === null) return { verdict: 'none', ...base };
   if (zone.top !== null && stats.fair <= zone.top) {
-    return { verdict: falling && choice.strategy !== 'dip' ? 'wait' : 'good', ...base };
+    // A fall of the item or of its whole market waits, except for Catch the dip (it warns).
+    const wait = (falling || marketFalling) && choice.strategy !== 'dip';
+    return { verdict: wait ? 'wait' : 'good', ...base };
   }
   if (stats.q75d180 !== null && stats.fair > stats.q75d180) return { verdict: 'high', ...base };
   return { verdict: 'fair', ...base };
@@ -298,6 +308,7 @@ export function replay(
       ask: null,
       ageDays: null,
       releaseFrom: null,
+      market: null,
       pattern: null,
     };
     if (stats.fair === null) continue;
@@ -322,4 +333,14 @@ export function strategyOf(
   itemType: string,
 ): StrategyChoice {
   return prefs?.buyStrategy?.byType[itemType] ?? suggestedStrategy(itemType);
+}
+
+/** The market trend of a group: the median 12-week change of its items' daily prices. */
+export function marketTrend(series: DayPrice[][], asOf: string): SignalStats['market'] {
+  const end = dayNumber(asOf);
+  const changes = series
+    .map((s) => fittedChange(s, end, 84))
+    .filter((c): c is number => c !== null);
+  if (changes.length < MARKET_MIN_ITEMS) return null;
+  return { items: changes.length, change84: median(changes)! };
 }

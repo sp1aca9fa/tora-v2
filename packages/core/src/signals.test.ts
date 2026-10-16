@@ -6,6 +6,7 @@ import {
   dailyPrices,
   fittedChange,
   judge,
+  marketTrend,
   newSetPattern,
   quantile,
   replay,
@@ -39,6 +40,7 @@ const stats = (over: Partial<SignalStats>): SignalStats => ({
   ask: null,
   ageDays: null,
   releaseFrom: null,
+  market: null,
   pattern: null,
   ...over,
 });
@@ -98,6 +100,20 @@ describe('zones and verdicts', () => {
     expect(judge(falling, { strategy: 'dip' })).toMatchObject({ verdict: 'good', falling: true });
     expect(judge(stats({ fair: 12000 }), { strategy: 'steady' }).verdict).toBe('high');
     expect(judge(stats({}), { strategy: 'steady' }).verdict).toBe('fair');
+  });
+
+  it('waits while the whole market falls, except Catch the dip', () => {
+    const low = stats({ fair: 8500, market: { items: 20, change84: -0.29 } });
+    expect(judge(low, { strategy: 'steady' })).toMatchObject({
+      verdict: 'wait',
+      marketFalling: true,
+    });
+    expect(judge(low, { strategy: 'dip' }).verdict).toBe('good');
+    const mild = stats({ fair: 8500, market: { items: 20, change84: -0.05 } });
+    expect(judge(mild, { strategy: 'steady' }).verdict).toBe('good');
+    expect(marketTrend([days('2026-01-01', 84, () => 1000)], '2026-03-25')).toBeNull();
+    const five = Array.from({ length: 5 }, () => days('2026-01-01', 84, (i) => 1000 - i * 4));
+    expect(marketTrend(five, '2026-03-25')!.change84).toBeLessThan(-0.25);
   });
 
   it('Bargain and Margin, and own target only', () => {

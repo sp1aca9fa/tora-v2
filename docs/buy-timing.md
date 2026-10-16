@@ -43,7 +43,7 @@ watch always counts too.
 | Catch the dip   | like Steady, and still while falling fast (with a warning)    |               |
 | Own target only | never: only the watch's target price                          |               |
 
-All but Catch the dip say "Falling: wait" while the price falls fast. Without enough history for
+All but Catch the dip say "Falling: wait" while the price falls fast, or while its market does: the median 12-week change of similar items (5 or more, any person's) is under -15 %. Over the two years of collected prices up to October 2026 the market-wide check never triggered (dips were short); it was added for the broad fall from July 2026 (cards' median -29 % in 12 weeks), longer than any before it. Without enough history for
 a range, the zone is 10 % under the usual price (with almost none, under today's value, so only a
 listing can be in it), and the app says the data is limited. In the first year, the new-set
 pattern lowers the zone when similar items kept falling at that age.

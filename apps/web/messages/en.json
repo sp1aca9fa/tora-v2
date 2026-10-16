@@ -1534,10 +1534,10 @@
       "target": "Own target only"
     },
     "about": {
-      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price falls fast.",
-      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price falls fast.",
-      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price falls fast.",
-      "dip": "Like Steady, but still says good price while the price falls fast, with a warning. Buys earlier; may buy before the bottom.",
+      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price or its market falls fast.",
+      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price or its market falls fast.",
+      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price or its market falls fast.",
+      "dip": "Like Steady, but still says good price while the price or its market falls fast, with a warning. Buys earlier; may buy before the bottom.",
       "target": "No zone: only the target prices you set on your watches."
     }
   },
@@ -1578,7 +1578,10 @@
       "pattern": "Similar items ({items}) moved {pct} in the 90 days after day {days} from release",
       "noPattern": "New-set pattern: not enough similar items with prices at this age yet",
       "noRelease": "New-set pattern: no release date (only the first collected sale)",
-      "sep": ", "
-    }
+      "sep": ", ",
+      "market": "Similar items ({items}): {pct} over 12 weeks"
+    },
+    "marketFalling": "The market is falling: similar items ({items}) are {pct} over 12 weeks. Wait until it flattens.",
+    "marketFallingDip": "The market is still falling: similar items ({items}) are {pct} over 12 weeks. It may go lower."
   }
 }

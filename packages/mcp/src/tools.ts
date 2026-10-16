@@ -769,6 +769,7 @@ export async function watchlist(db: Db, userId: string) {
               zoneBasis: j.zone.basis,
               loweredByNewSetPattern: j.zone.pattern,
               fallingFast: j.falling,
+              marketFalling: j.marketFalling,
               limitedData: j.limited,
               numbers: stats,
             };

@@ -77,6 +77,11 @@ export async function BuyTiming({
       }),
     );
   }
+  if (stats.market) {
+    reasons.push(
+      t('buy.reason.market', { items: stats.market.items, pct: pct(stats.market.change84) }),
+    );
+  }
   if (stats.ask !== null && stats.fair) {
     reasons.push(
       t.rich('buy.reason.ask', {
@@ -139,6 +144,14 @@ export async function BuyTiming({
           <p className="text-amber-700 dark:text-amber-300">
             {t(choice.strategy === 'dip' ? 'buy.fallingDip' : 'buy.falling', {
               pct: pct(stats.trend14 ?? 0),
+            })}
+          </p>
+        )}
+        {j.marketFalling && stats.market && (
+          <p className="text-amber-700 dark:text-amber-300">
+            {t(choice.strategy === 'dip' ? 'buy.marketFallingDip' : 'buy.marketFalling', {
+              items: stats.market.items,
+              pct: pct(stats.market.change84),
             })}
           </p>
         )}
