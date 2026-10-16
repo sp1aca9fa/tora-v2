@@ -145,6 +145,8 @@
 - 2026-10-16: S9 part 3: catalog links only when sure (code and name agree, or one names a single set), the rest confirmed on Actions; a link never changes the item's own set name or code (searches stay as they are); games are grouped by a normalized platform.
 - 2026-10-16: S9 part 4 design (user): buy strategies per person and item type, five of them, preset to Tora's suggestion, tried on a fixed sample before choosing; chosen on the Watchlist as a setup step, not in Settings; limited data is shown with a warning, never hidden.
 - 2026-10-16: S9 part 4: the new-set pattern uses only real release dates (the set catalog's or the item's own), never a first collected sale: a dry run on the real data gave games a 12-day age because collecting started then. The first sale is still shown as such.
+- 2026-10-17: Turso rows read at 75 % of the free plan's 500M by the 17th (user). Measured on a local copy of the backup: the Portfolio's trade counts scanned about 1.7M rows on every view, a collect's closing steps about 8M. Trade counts are now counted once per collect and saved (app setting `tradeCounts`); the strategy sample search runs at most weekly; analyses on the real data run on the nightly backup copy, not on Turso. More caching of page data until the next collect, and incremental collect steps, are for S14.
+- 2026-10-17: Alerts for a collect that stopped early say why (the reason read from that run's part of collect.log, e.g. a migration not run yet), that it retries next hour, and how to read the log (`pnpm collect:log`, new); Settings > Activity shows the reason (user: the old message was not self-explanatory).
 ---
 
 # CORE

@@ -1229,7 +1229,8 @@
       "install": "Installs the Windows task: after logging on and at 12:00, retried hourly until a run finishes that day.",
       "perMarket": "One task per market at its own hour, when one night is not enough for every collector.",
       "force": "Runs the scheduled collect now, even if today's already finished.",
-      "log": "Follows the collect log."
+      "log": "Follows the collect log.",
+      "lastLog": "The end of the collect log: why the last run stopped, what each source did"
     },
     "imports": {
       "title": "Imports and review",
@@ -1317,8 +1318,8 @@
   "alertText": {
     "test": "Tora: test message. Alerts will arrive here.",
     "connected": "Tora: alerts will arrive in this chat.",
-    "collectFailed": "Tora: the collect failed.",
-    "collectStopped": "Tora: the collect stopped (exit code {code}). See collect.log on the home PC.",
+    "collectFailed": "Tora: the nightly collect finished, but some sources had problems:",
+    "collectStopped": "Tora: the nightly collect stopped before it finished, so no prices were saved this time.\nReason: {reason}\nIt tries again at the next hourly run.",
     "sourceLine": "{source}: {status}",
     "status_failed": "failed",
     "status_blocked": "blocked by the site",
@@ -1333,7 +1334,8 @@
     "method_email": "Order emails",
     "method_links": "Purchase links",
     "method_file": "Spreadsheet",
-    "method_claude": "Through Claude"
+    "method_claude": "Through Claude",
+    "logHint": "Full log: run pnpm collect:log on the home PC, in the tora-v2 folder."
   },
   "alerts": {
     "title": "Alerts",
@@ -1448,7 +1450,8 @@
     "role": {
       "admin": "admin",
       "member": "member"
-    }
+    },
+    "reason": "Reason: {reason}"
   },
   "watchlist": {
     "intro": "Items you want to buy, in the condition you want, with today's market price. Items at or under your target come first.",

@@ -1,5 +1,5 @@
 // `pnpm alerts <command>`: alerts outside the app from the home PC (requirements S17).
-//   after-run --since <time> [--collect-exit N] [--backup-exit N]
+//   after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <collect.log>]
 //       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
 //       stopped before it could record itself and sends failures to admins at once.
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
@@ -15,6 +15,7 @@ import {
   alertFailures,
   checkMissedRuns,
   sendSummaries,
+  stoppedReason,
 } from '../alerts';
 import { createDb } from '../client';
 import { dbConfigFromEnv, findRepoRoot, loadRootEnv } from '../env';
@@ -32,6 +33,7 @@ const { values, positionals } = parseArgs({
     since: { type: 'string' },
     'collect-exit': { type: 'string' },
     'backup-exit': { type: 'string' },
+    log: { type: 'string' },
   },
 });
 const db = createDb(dbConfigFromEnv());
@@ -62,11 +64,20 @@ if (command === 'after-run') {
     if (!code) continue;
     const last = await lastActivity(db, kind);
     if (last && last.occurredAt >= since) continue;
+    // Why, from this run's part of the log (e.g. a migration not run yet).
+    let reason: string | null = null;
+    if (values.log) {
+      try {
+        reason = stoppedReason(readFileSync(values.log, 'utf8').slice(-200_000));
+      } catch {
+        // No log: the exit code only.
+      }
+    }
     await recordActivity(db, {
       kind,
       level: 'failed',
-      detail: { exitCode: code, error: `exit code ${code}` },
-      href: kind === 'collect' ? '/settings/collectors' : '/settings/activity',
+      detail: { exitCode: code, error: reason ?? `exit code ${code}` },
+      href: '/settings/activity',
     });
   }
   const failures = await alertFailures(db, ctx, since);
@@ -79,7 +90,7 @@ if (command === 'after-run') {
   );
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] | check',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check',
   );
   process.exit(1);
 }

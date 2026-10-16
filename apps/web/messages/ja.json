@@ -1229,7 +1229,8 @@
       "install": "Windowsタスクを登録します：ログオン後と12:00に実行し、その日の実行が終わるまで1時間ごとに再試行します。",
       "perMarket": "一晩ですべてのコレクターが終わらない場合、市場ごとに別の時刻のタスクを登録します。",
       "force": "今日の実行が終わっていても、スケジュール実行を今すぐ行います。",
-      "log": "収集ログを表示し続けます。"
+      "log": "収集ログを表示し続けます。",
+      "lastLog": "収集ログの末尾: 前回の実行が止まった理由や各ソースの結果"
     },
     "imports": {
       "title": "インポートとレビュー",
@@ -1317,8 +1318,8 @@
   "alertText": {
     "test": "Tora: テストメッセージです。アラートはここに届きます。",
     "connected": "Tora: アラートはこのチャットに届きます。",
-    "collectFailed": "Tora: 収集に失敗しました。",
-    "collectStopped": "Tora: 収集が止まりました（終了コード {code}）。自宅PCの collect.log を確認してください。",
+    "collectFailed": "Tora: 夜間の収集は終わりましたが、一部のソースで問題がありました:",
+    "collectStopped": "Tora: 夜間の収集が途中で止まったため、今回は価格が保存されていません。\n理由: {reason}\n次の1時間ごとの実行で再試行します。",
     "sourceLine": "{source}: {status}",
     "status_failed": "失敗",
     "status_blocked": "サイトにブロックされました",
@@ -1333,7 +1334,8 @@
     "method_email": "注文メール",
     "method_links": "購入リンク",
     "method_file": "表計算ファイル",
-    "method_claude": "Claude経由"
+    "method_claude": "Claude経由",
+    "logHint": "ログ全体: 自宅PCの tora-v2 フォルダで pnpm collect:log を実行してください。"
   },
   "alerts": {
     "title": "アラート",
@@ -1448,7 +1450,8 @@
     "role": {
       "admin": "管理者",
       "member": "メンバー"
-    }
+    },
+    "reason": "理由: {reason}"
   },
   "watchlist": {
     "intro": "買いたい商品を、欲しい状態で、今日の相場とともに一覧に。目標価格以下のものが先頭に来ます。",

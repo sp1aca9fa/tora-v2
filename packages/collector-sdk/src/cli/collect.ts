@@ -15,9 +15,11 @@ import {
   recordActivity,
   refreshBucketValues,
   refreshSignals,
+  refreshTradeCounts,
   runSnapshots,
   loadTimeZone,
 } from '@tora/db';
+import { INSIGHT_PERIODS } from '@tora/core';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -204,6 +206,12 @@ if (quality.length) {
 const snap = await runSnapshots(db);
 // Today's value of everything held, read by the pages instead of every sale.
 const saved = await refreshBucketValues(db);
+// The Portfolio's trade counts, saved so its page does not scan the sales on every view.
+try {
+  await refreshTradeCounts(db, INSIGHT_PERIODS);
+} catch (error) {
+  console.log(`trade counts: stopped (${errorText(error)})`);
+}
 // Buy timing numbers for everything held or watched (S9), from the values just saved. A failure
 // here (e.g. the database not migrated yet) never stops the run.
 let signalsSaved: { saved: number; withPattern: number } | null = null;

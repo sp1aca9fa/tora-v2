@@ -72,7 +72,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
           .filter(Boolean)
           .join(', ');
         const lines = d.exitCode
-          ? [t('activity.collectStopped', { code: Number(d.exitCode) })]
+          ? [
+              t('activity.collectStopped', { code: Number(d.exitCode) }),
+              ...(d.error && !/^exit code/.test(String(d.error))
+                ? [t('activity.reason', { reason: String(d.error) })]
+                : []),
+            ]
           : [t('activity.collect', { observations: format.number(Number(d.observations ?? 0)) })];
         if (scope) lines.push(t('activity.collectScope', { scope }));
         for (const s of sources.filter((s) => s.status !== 'ok')) {

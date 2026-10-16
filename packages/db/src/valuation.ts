@@ -34,6 +34,7 @@ import {
   type Holding,
   type HoldingEvent,
   type Product,
+  appSettings,
   bucketValues,
   holdingEvents,
   holdings,
@@ -1416,9 +1417,24 @@ export async function moversByPeriod(
  * Sales counted per period for every item anyone holds (one pass): `mine` marks the user's own
  * items. Sorted by the caller per period.
  */
-export async function tradeCounts(db: Db, userId: string, periods: readonly number[]) {
+/** Saved trade counts (app setting `tradeCounts`): per owned item, sales per period. */
+interface SavedTradeCounts {
+  day: string;
+  periods: number[];
+  counts: Record<string, number[]>;
+}
+
+/**
+ * Counts the sales of every owned item over each period and saves them (end of a collect: only
+ * collects add sales). The Portfolio reads the saved counts instead of scanning the sales.
+ */
+export async function refreshTradeCounts(
+  db: Db,
+  periods: readonly number[],
+  now = new Date(),
+): Promise<SavedTradeCounts> {
   const longest = Math.max(...periods);
-  const since = (days: number) => toLocalIso(new Date(Date.now() - days * DAY));
+  const since = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
   const counts = Object.fromEntries(
     periods.map((days) => [
       `d${days}`,
@@ -1426,13 +1442,8 @@ export async function tradeCounts(db: Db, userId: string, periods: readonly numb
     ]),
   );
   const rows = await db
-    .select({
-      product: products,
-      mine: sql<number>`max(case when ${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.userId} = ${userId} and ${holdings.status} = 'owned') then 1 else 0 end)`,
-      ...counts,
-    })
+    .select({ productId: priceObservations.productId, ...counts })
     .from(priceObservations)
-    .innerJoin(products, eq(products.id, priceObservations.productId))
     .where(
       and(
         sql`${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.status} = 'owned')`,
@@ -1442,14 +1453,53 @@ export async function tradeCounts(db: Db, userId: string, periods: readonly numb
       ),
     )
     .groupBy(priceObservations.productId);
-  return rows.map((r) => {
-    const row = r as unknown as Record<string, unknown>;
-    return {
-      product: r.product,
-      mine: Number(r.mine) === 1,
-      sales: new Map(periods.map((days) => [days, Number(row[`d${days}`] ?? 0)])),
-    };
-  });
+  const saved: SavedTradeCounts = {
+    day: localDate(now),
+    periods: [...periods],
+    counts: Object.fromEntries(
+      rows.map((r) => {
+        const row = r as unknown as Record<string, unknown>;
+        return [r.productId, periods.map((days) => Number(row[`d${days}`] ?? 0))];
+      }),
+    ),
+  };
+  await db
+    .insert(appSettings)
+    .values({ key: 'tradeCounts', value: saved })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: saved, updatedAt: toLocalIso(now) },
+    });
+  return saved;
+}
+
+/**
+ * Sales per period of the owned items (the Portfolio's most traded panels), from the counts the
+ * last collect saved; worked out here only when none were saved in the last 2 days.
+ */
+export async function tradeCounts(db: Db, userId: string, periods: readonly number[]) {
+  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'tradeCounts'));
+  let saved = row?.value as SavedTradeCounts | undefined;
+  const fresh =
+    saved &&
+    saved.periods.join() === periods.join() &&
+    saved.day >= localDate(new Date(Date.now() - 2 * DAY));
+  if (!fresh) saved = await refreshTradeCounts(db, periods);
+  const ids = Object.keys(saved!.counts);
+  if (ids.length === 0) return [];
+  const [items, mine] = await Promise.all([
+    db.select().from(products).where(inArray(products.id, ids)),
+    db
+      .selectDistinct({ productId: holdings.productId })
+      .from(holdings)
+      .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned'))),
+  ]);
+  const own = new Set(mine.map((m) => m.productId));
+  return items.map((product) => ({
+    product,
+    mine: own.has(product.id),
+    sales: new Map(periods.map((days, i) => [days, saved!.counts[product.id]?.[i] ?? 0])),
+  }));
 }
 
 /** Forget every saved value (a source's role changed: every item is valued again). */

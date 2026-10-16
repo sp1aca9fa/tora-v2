@@ -62,6 +62,6 @@ if [ "$backup_rc" != 0 ]; then
 fi
 # Alerts (S17); their own failure never fails the run.
 pnpm --silent alerts after-run --since "$started" --collect-exit "$collect_rc" \
-  --backup-exit "$backup_rc" >>"$LOG" 2>&1 || echo "alerts failed; see above" >>"$LOG"
+  --backup-exit "$backup_rc" --log "$LOG" >>"$LOG" 2>&1 || echo "alerts failed; see above" >>"$LOG"
 [ "$ok" = 1 ] || exit 1
 echo "$today" >"$STAMP"

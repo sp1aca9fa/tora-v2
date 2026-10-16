@@ -44,6 +44,11 @@ random 0-5 min, loads nvm, and logs to
 rather than one fixed time. Arguments are passed on (`--market jp`), each set with its own daily
 stamp and lock.
 
+To read the end of that log (why the last run stopped, what each source did), run
+`pnpm collect:log` in the repo folder; `tail -f ~/.local/state/tora/collect.log` follows a run
+live. A run that stops early sends admins the reason read from the log (e.g. a database migration
+not run yet) and records it on Settings > Activity; the schedule tries again the next hour.
+
 **Windows Task Scheduler** (recommended when the PC is not always on), from WSL, no admin needed:
 
 ```bash

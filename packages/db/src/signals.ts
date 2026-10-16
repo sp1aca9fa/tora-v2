@@ -294,8 +294,18 @@ async function pickSamples(db: Db, now: Date): Promise<void> {
   const types = new Set(all.map((p) => productClass(p)));
   const kept = Object.fromEntries(Object.entries(current).filter(([, s]) => byId.has(s.productId)));
   const missing = [...types].filter((t) => !kept[t]);
-  if (missing.length === 0 && Object.keys(kept).length === Object.keys(current).length) return;
-  if (missing.length) {
+  // Looking scans two years of sales: types without a sample are looked for once a week.
+  const [checked] = await db
+    .select()
+    .from(appSettings)
+    .where(eq(appSettings.key, 'strategySamplesChecked'));
+  const lookedRecently =
+    typeof checked?.value === 'string' &&
+    checked.value >= localDate(new Date(now.getTime() - 7 * DAY));
+  const look = missing.length > 0 && !lookedRecently;
+  if (!look && Object.keys(kept).length === Object.keys(current).length) return;
+  if (look) {
+    await saveSetting(db, 'strategySamplesChecked', localDate(now));
     const since = toLocalIso(new Date(now.getTime() - 2 * 365 * DAY));
     const counts = await db
       .select({

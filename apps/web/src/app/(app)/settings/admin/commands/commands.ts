@@ -34,6 +34,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
       { key: 'install', command: './scripts/install-windows-task.sh' },
       { key: 'perMarket', command: 'AT=01:00 ./scripts/install-windows-task.sh --market <market>' },
       { key: 'force', command: 'FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh' },
+      { key: 'lastLog', command: 'pnpm collect:log' },
       { key: 'log', command: 'tail -f ~/.local/state/tora/collect.log' },
     ],
   },

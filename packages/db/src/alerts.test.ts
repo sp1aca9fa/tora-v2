@@ -16,6 +16,7 @@ import {
   sendSummaries,
   setTelegramBot,
   telegramCode,
+  stoppedReason,
 } from './alerts';
 import { type Db, createDb } from './client';
 import { finishImportRun, saveImportRows, startImportRun } from './imports';
@@ -191,4 +192,25 @@ it('connects a Telegram chat from the code sent to the bot', async () => {
   // Removing the bot stops every Telegram channel.
   await setTelegramBot(db, null, SECRET, fakeFetch);
   expect(await channelsOf(db, member)).toEqual([]);
+});
+
+it('reads why a run stopped from the collect log, without the pnpm noise', () => {
+  const log = [
+    '=== 2026-10-16T19:02:04+09:00 ===',
+    'values: 93 saved, 0 removed',
+    '=== 2026-10-17T00:04:03+09:00  ===',
+    '$ tsx src/cli/collect.ts',
+    'Database: libsql://example.turso.io',
+    'Database is missing migration(s): 0030_signals. Run `pnpm db:migrate` first.',
+    '[ELIFECYCLE] Command failed with exit code 1.',
+    'Error: ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL',
+    '',
+    '  × "pnpm recursive run" failed in /home/x/tora-v2/packages/collector-sdk',
+    'collect failed (exit 1); will retry on the next trigger',
+    '',
+  ].join('\n');
+  expect(stoppedReason(log)).toBe(
+    'Database is missing migration(s): 0030_signals. Run `pnpm db:migrate` first.',
+  );
+  expect(stoppedReason('=== 2026-10-17 ===\n$ tsx x\n')).toBeNull();
 });

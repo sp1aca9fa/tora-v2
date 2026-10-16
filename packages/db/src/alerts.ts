@@ -358,13 +358,37 @@ async function adminsToAlert(db: Db): Promise<User[]> {
 const linkLine = (t: AlertTexts, base: string | null, href: string | null) =>
   base && href ? `\n${base.replace(/\/$/, '')}${href}` : '';
 
+/** Lines of a run's log that are only noise for a person (pnpm's wrapper, progress bars). */
+const LOG_NOISE =
+  /^(\$ |\[ELIFECYCLE\]|Error: ERR_PNPM|\s*[×│]|\[[█░]|Database: |collect failed \(exit|backup failed \(exit|alerts failed)/;
+
+/**
+ * Why a run stopped, from the collect log (scripts/collect-cron.sh): the last meaningful lines
+ * of the run that started last (after its "=== <time>" header). Null when nothing says.
+ */
+export function stoppedReason(log: string): string | null {
+  const start = log.lastIndexOf('\n=== ');
+  const lines = (start >= 0 ? log.slice(start + 1) : log)
+    .split('\n')
+    .slice(1)
+    .map((l) => l.trim())
+    .filter((l) => l && !LOG_NOISE.test(l));
+  const reason = lines.slice(-2).join(' ');
+  return reason ? reason.slice(0, 300) : null;
+}
+
 /** The message about a failed (or missed) run, in one person's language. */
 function failureText(t: AlertTexts, entry: Activity, base: string | null): string {
   const d = entry.detail as Record<string, unknown>;
   const lines: string[] = [];
   if (entry.kind === 'collect') {
     lines.push(
-      d.exitCode ? fill(t.collectStopped!, { code: Number(d.exitCode) }) : t.collectFailed!,
+      d.exitCode
+        ? fill(t.collectStopped!, {
+            code: Number(d.exitCode),
+            reason: String(d.error ?? `exit code ${Number(d.exitCode)}`),
+          })
+        : t.collectFailed!,
     );
     for (const s of (d.sources as { source: string; status: string }[] | undefined) ?? []) {
       if (s.status !== 'ok')
@@ -372,6 +396,7 @@ function failureText(t: AlertTexts, entry: Activity, base: string | null): strin
           fill(t.sourceLine!, { source: s.source, status: t[`status_${s.status}`] ?? s.status }),
         );
     }
+    if (t.logHint) lines.push(t.logHint);
   } else if (entry.kind === 'backup') {
     lines.push(fill(t.backupFailed!, { error: String(d.error ?? '') }));
   } else if (entry.kind === 'check') {
