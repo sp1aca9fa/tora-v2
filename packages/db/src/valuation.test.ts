@@ -115,6 +115,7 @@ async function scenario() {
     // History for the chart: a week ago the cards sold lower.
     sold(pika.product.id, 'raw:A', 2_000, 40),
   ]);
+  await refreshPriceDays(db);
   return { box, pika, mew, amiibo };
 }
 
@@ -245,7 +246,6 @@ describe('portfolio (scenario 7)', () => {
 
   it('builds daily medians for the price chart', async () => {
     const { mew } = await scenario();
-    await refreshPriceDays(db);
     const points = await priceHistory(db, mew.product.id, 365, now);
     expect(points).toHaveLength(5);
     expect(points.every((p) => p.bucket === 'raw:A' && p.count === 1)).toBe(true);

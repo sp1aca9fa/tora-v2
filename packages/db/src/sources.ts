@@ -424,7 +424,10 @@ export async function activeSources(
   );
 }
 
-/** Inserts observations, skipping ones already stored (same source + external_ref). */
+/**
+ * Inserts observations, skipping ones already stored (same source + external_ref), and rebuilds
+ * the sales per day of the days they fall on.
+ */
 export async function insertObservations(db: Db, rows: NewPriceObservation[]): Promise<number> {
   let added = 0;
   // Sales the user vouched for (a pasted listing) are included even if stored excluded before.
@@ -451,6 +454,8 @@ export async function insertObservations(db: Db, rows: NewPriceObservation[]): P
   }
   if (added > 0 || vouched.length > 0) {
     await clearBucketValues(db, [...new Set([...vouched, ...rows].map((r) => r.productId))]);
+    // The sales per day of the days just added, so they never lag behind the sales.
+    await refreshPriceDays(db, { marksOnly: true });
   }
   return added;
 }

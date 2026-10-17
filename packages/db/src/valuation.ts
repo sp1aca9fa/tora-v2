@@ -43,6 +43,7 @@ import {
   holdings,
   manualPrices,
   portfolioCharts,
+  priceDays,
   priceObservations,
   productSources,
   products,
@@ -217,6 +218,7 @@ export async function loadHoldingsMarketData(
   const { pools } = settings;
   if (productIds.length === 0) return { observations, recent, manual, ...settings };
   const currency = await valuedCurrency(db);
+  const sourceKeys = (await loadSourceRegistry(db)).sources.map((x) => x.key);
   // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
   // window are never used, so extra is safe).
   const exact = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
@@ -250,31 +252,28 @@ export async function loadHoldingsMarketData(
     n180: number;
     n365: number;
   }[] = [];
+  // Counted from the sales per day, whole days inside each window only: a count is never above
+  // the exact one, so a window is never too short (a longer one loads more, which is safe).
+  const sinceDay = since.slice(0, 10);
+  const inside = (days: number) => exact(days).slice(0, 10);
+  const [d30, d180, d365] = [inside(30), inside(180), inside(LONG_WINDOW)];
+  const counted = new Map<string, (typeof counts)[number]>();
+  for (const d of await soldDays(db, productIds, { since: sinceDay, currency })) {
+    const key = `${d.productId}|${d.source}|${d.bucket ?? ''}`;
+    let c = counted.get(key);
+    if (!c) {
+      c = { productId: d.productId, source: d.source, bucket: d.bucket, n30: 0, n180: 0, n365: 0 };
+      counted.set(key, c);
+    }
+    if (d.day > d30) c.n30 += d.prices.length;
+    if (d.day > d180) c.n180 += d.prices.length;
+    if (d.day > d365) c.n365 += d.prices.length;
+  }
+  counts.push(...counted.values());
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
-    const within = (from: string) =>
-      sql<number>`sum(case when ${priceObservations.observedAt} >= ${from} then 1 else 0 end)`;
-    counts.push(
-      ...(await db
-        .select({
-          productId: priceObservations.productId,
-          source: priceObservations.source,
-          bucket: priceObservations.bucket,
-          n30: within(exact(30)),
-          n180: within(exact(180)),
-          n365: within(exact(LONG_WINDOW)),
-        })
-        .from(priceObservations)
-        .where(
-          and(
-            inArray(priceObservations.productId, ids),
-            valuedSales(currency),
-            gte(priceObservations.observedAt, since),
-          ),
-        )
-        .groupBy(priceObservations.productId, priceObservations.source, priceObservations.bucket)),
-    );
-    // Shops' asking and buy prices are used for 30 days only.
+    // Shops' asking and buy prices are used for 30 days only (each source named: the item +
+    // source index then reads only those days).
     add(
       await db
         .select(columns)
@@ -282,6 +281,7 @@ export async function loadHoldingsMarketData(
         .where(
           and(
             inArray(priceObservations.productId, ids),
+            inArray(priceObservations.source, sourceKeys),
             inArray(priceObservations.observationType, ['buylist', 'listing']),
             or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
             eq(priceObservations.excluded, false),
@@ -1519,26 +1519,24 @@ export async function refreshTradeCounts(
   periods: readonly number[],
   now = new Date(),
 ): Promise<SavedTradeCounts> {
+  // From the sales per day: whole days.
   const longest = Math.max(...periods);
-  const since = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
   const counts = Object.fromEntries(
     periods.map((days) => [
       `d${days}`,
-      sql<number>`sum(case when ${priceObservations.observedAt} >= ${since(days)} then 1 else 0 end)`,
+      sql<number>`sum(case when ${priceDays.day} >= ${daysBack(days, now)} then json_array_length(${priceDays.prices}) else 0 end)`,
     ]),
   );
   const rows = await db
-    .select({ productId: priceObservations.productId, ...counts })
-    .from(priceObservations)
+    .select({ productId: priceDays.productId, ...counts })
+    .from(priceDays)
     .where(
       and(
-        sql`${priceObservations.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.status} = 'owned')`,
-        eq(priceObservations.observationType, 'sold'),
-        eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, since(longest)),
+        sql`${priceDays.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.status} = 'owned')`,
+        gte(priceDays.day, daysBack(longest, now)),
       ),
     )
-    .groupBy(priceObservations.productId);
+    .groupBy(priceDays.productId);
   const saved: SavedTradeCounts = {
     day: localDate(now),
     periods: [...periods],

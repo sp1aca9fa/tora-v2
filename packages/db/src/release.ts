@@ -2,13 +2,13 @@
 // from the set code or name they have (unsure links are suggested on Actions), take the set's
 // release date (else their own, else their first collected sale), and are grouped with similar
 // items for the new-set pattern.
-import { and, eq, inArray, isNull, min, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, min, ne, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { fileSuggestion } from './suggestions';
 import {
   type Product,
   type TcgSet,
-  priceObservations,
+  priceDays,
   products,
   suggestions,
   tcgSets,
@@ -223,16 +223,12 @@ export async function releaseDates(
   }
   for (let i = 0; i < rest.length; i += 500) {
     const rows = await db
-      .select({ id: priceObservations.productId, first: min(priceObservations.observedAt) })
-      .from(priceObservations)
+      .select({ id: priceDays.productId, first: min(priceDays.day) })
+      .from(priceDays)
       .where(
-        and(
-          inArray(priceObservations.productId, rest.slice(i, i + 500)),
-          eq(priceObservations.observationType, 'sold'),
-          eq(priceObservations.excluded, false),
-        ),
+        and(inArray(priceDays.productId, rest.slice(i, i + 500)), sql`${priceDays.prices} <> '[]'`),
       )
-      .groupBy(priceObservations.productId);
+      .groupBy(priceDays.productId);
     for (const r of rows) {
       if (r.first) out.set(r.id, { date: r.first.slice(0, 10), from: 'first_sale' });
     }

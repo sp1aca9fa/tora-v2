@@ -15,13 +15,13 @@ await exitIfUnmigrated(db);
 await loadTimeZone(db);
 const lots = await inferLotSizes(db);
 console.log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+const days = await refreshPriceDays(db);
+console.log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
 const quality = await checkSourceQuality(db);
 if (quality.length) {
   console.log(`source quality changed: ${quality.join(', ')}`);
   await clearAllBucketValues(db);
 }
-const days = await refreshPriceDays(db);
-console.log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
 const r = await runSnapshots(db);
 console.log(`snapshots: ${r.days} day(s), ${r.rows} row(s) updated, ${r.removed} removed`);
 const v = await refreshBucketValues(db);

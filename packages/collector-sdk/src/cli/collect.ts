@@ -187,6 +187,14 @@ progress.update('pictures, lot sizes, chart', 0.3);
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);
 log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+// The sales per day that the pages and the steps below read (the days changed by this run and
+// the lot sizes; everything once a week).
+try {
+  const days = await refreshPriceDays(db);
+  log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
+} catch (error) {
+  log(`sales per day: stopped (${errorText(error)})`);
+}
 // Items without a catalog set: linked when sure, suggested on Actions when not (S9).
 const sets = await linkSets(db);
 if (sets.linked || sets.suggested) {
@@ -203,14 +211,6 @@ const quality = await checkSourceQuality(db);
 if (quality.length) {
   log(`source quality changed: ${quality.join(', ')}`);
   await clearAllBucketValues(db);
-}
-// The sales per day the pages and buy timing read (the days changed by this run and the steps
-// above; everything once a week).
-try {
-  const days = await refreshPriceDays(db);
-  log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
-} catch (error) {
-  log(`sales per day: stopped (${errorText(error)})`);
 }
 const snap = await runSnapshots(db);
 // Today's value of everything held, read by the pages instead of every sale.

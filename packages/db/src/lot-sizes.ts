@@ -2,9 +2,10 @@
 // `estimateLotSize`). Re-runnable: each trade is recomputed from its original lot price, against
 // the trades of the same product, source and condition within a few days of it.
 import { estimateLotSize } from '@tora/core';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { priceObservations } from './schema';
+import { refreshPriceDays } from './price-days';
+import { priceDays, priceObservations } from './schema';
 import { clearBucketValues } from './valuation';
 
 const DAY = 86_400_000;
@@ -12,11 +13,14 @@ const DAY = 86_400_000;
 const REFERENCE_DAYS = 3;
 
 export async function inferLotSizes(db: Db): Promise<{ checked: number; updated: number }> {
+  // Items with estimated lots among their kept sales (from the sales per day, any marked days
+  // rebuilt first).
+  await refreshPriceDays(db, { marksOnly: true });
   const productIds = (
     await db
-      .selectDistinct({ id: priceObservations.productId })
-      .from(priceObservations)
-      .where(eq(priceObservations.quantityInferred, true))
+      .selectDistinct({ id: priceDays.productId })
+      .from(priceDays)
+      .where(gt(priceDays.estimated, 0))
   ).map((r) => r.id);
   let checked = 0;
   const updates: { id: string; priceBase: number }[] = [];

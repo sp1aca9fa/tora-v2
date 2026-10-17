@@ -20,6 +20,7 @@ import {
   type SourceOrder,
   byPriority,
   inClassOrder,
+  localDate,
   median,
   productClass,
   resolveCurrency,
@@ -30,7 +31,7 @@ import {
 } from '@tora/core';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { appSettings, priceObservations, products, sources } from './schema';
+import { appSettings, priceDays, priceObservations, products, sources } from './schema';
 
 /** Saves the plug-ins' descriptions (collectors, at the start of a run); roles chosen stay. */
 export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void> {
@@ -235,33 +236,36 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
   const registry = await loadSourceRegistry(db);
   const rows = await db.select().from(sources);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
-  const since = toLocalIso(new Date(now.getTime() - 90 * 86_400_000));
-  const sales = await db
+  // The last 90 days (whole days) of kept sales, from the sales per day.
+  const since = localDate(new Date(now.getTime() - 90 * 86_400_000));
+  const days = await db
     .select({
-      productId: priceObservations.productId,
+      productId: priceDays.productId,
       category: products.category,
       itemType: products.itemType,
       kind: products.kind,
-      source: priceObservations.source,
-      bucket: priceObservations.bucket,
-      priceBase: priceObservations.priceBase,
+      source: priceDays.source,
+      bucket: priceDays.bucket,
+      prices: priceDays.prices,
     })
-    .from(priceObservations)
-    .innerJoin(products, eq(products.id, priceObservations.productId))
+    .from(priceDays)
+    .innerJoin(products, eq(products.id, priceDays.productId))
     .where(
       and(
-        eq(priceObservations.observationType, 'sold'),
-        eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, since),
+        inArray(
+          priceDays.source,
+          rows.map((r) => r.key),
+        ),
+        gte(priceDays.day, since),
       ),
     );
   // Prices per class, item + condition, source.
   const byKey = new Map<string, { cls: ProductClass; by: Map<string, number[]> }>();
-  for (const s of sales) {
-    if (!s.bucket) continue;
-    const key = `${s.productId}|${s.bucket}`;
-    const e = byKey.get(key) ?? { cls: productClass(s), by: new Map<string, number[]>() };
-    e.by.set(s.source, [...(e.by.get(s.source) ?? []), s.priceBase]);
+  for (const d of days) {
+    if (!d.bucket || d.prices.length === 0) continue;
+    const key = `${d.productId}|${d.bucket}`;
+    const e = byKey.get(key) ?? { cls: productClass(d), by: new Map<string, number[]>() };
+    e.by.set(d.source, [...(e.by.get(d.source) ?? []), ...d.prices]);
     byKey.set(key, e);
   }
   const at = toLocalIso(now);
