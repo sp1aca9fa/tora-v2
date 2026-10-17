@@ -12,15 +12,16 @@ import {
   seriesStats,
   toLocalIso,
 } from '@tora/core';
-import { and, desc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
+import { refreshPriceDays, soldDays } from './price-days';
 import { loadSourceRegistry, saveSetting } from './registry';
 import { releaseDates, similarKey } from './release';
 import {
   type Product,
   appSettings,
   holdings,
-  priceObservations,
+  priceDays,
   products,
   signals,
   watches,
@@ -37,7 +38,7 @@ const seriesKey = (productId: string, source: string, bucket: string | null) =>
 
 /**
  * Daily medians of kept sales in the primary market's currency, per product, source and bucket
- * (`seriesKey`), oldest first; from `since` (ISO) or all.
+ * (`seriesKey`), oldest first; from `since` (ISO, whole days) or all. Read from `price_days`.
  */
 export async function dailySeries(
   db: Db,
@@ -47,43 +48,20 @@ export async function dailySeries(
   const out = new Map<string, DayPrice[]>();
   if (productIds.length === 0) return out;
   const currency = marketCurrency(await loadSourceRegistry(db));
-  for (let i = 0; i < productIds.length; i += 100) {
-    const rows = await db
-      .select({
-        productId: priceObservations.productId,
-        source: priceObservations.source,
-        bucket: priceObservations.bucket,
-        day: sql<string>`substr(${priceObservations.observedAt}, 1, 10)`,
-        prices: sql<string>`group_concat(${priceObservations.priceBase})`,
-      })
-      .from(priceObservations)
-      .where(
-        and(
-          inArray(priceObservations.productId, productIds.slice(i, i + 100)),
-          eq(priceObservations.observationType, 'sold'),
-          eq(priceObservations.excluded, false),
-          or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
-          since ? gte(priceObservations.observedAt, since) : undefined,
-        ),
-      )
-      .groupBy(
-        priceObservations.productId,
-        priceObservations.source,
-        priceObservations.bucket,
-        sql`substr(${priceObservations.observedAt}, 1, 10)`,
-      );
-    for (const r of rows) {
-      const prices = r.prices
-        .split(',')
-        .map(Number)
-        .sort((a, b) => a - b);
-      const mid = Math.floor(prices.length / 2);
-      const price = prices.length % 2 ? prices[mid]! : (prices[mid - 1]! + prices[mid]!) / 2;
-      const key = seriesKey(r.productId, r.source, r.bucket);
-      const list = out.get(key) ?? [];
-      list.push({ day: r.day, price, count: prices.length });
-      out.set(key, list);
-    }
+  const days = new Map<string, { key: string; day: string; prices: number[] }>();
+  for (const r of await soldDays(db, productIds, { since: since?.slice(0, 10), currency })) {
+    const key = seriesKey(r.productId, r.source, r.bucket);
+    const d = days.get(`${key}|${r.day}`);
+    if (d) d.prices.push(...r.prices);
+    else days.set(`${key}|${r.day}`, { key, day: r.day, prices: [...r.prices] });
+  }
+  for (const { key, day, prices } of days.values()) {
+    prices.sort((a, b) => a - b);
+    const mid = Math.floor(prices.length / 2);
+    const price = prices.length % 2 ? prices[mid]! : (prices[mid - 1]! + prices[mid]!) / 2;
+    const list = out.get(key) ?? [];
+    list.push({ day, price, count: prices.length });
+    out.set(key, list);
   }
   for (const list of out.values()) list.sort((a, b) => a.day.localeCompare(b.day));
   return out;
@@ -148,6 +126,8 @@ export async function refreshSignals(
 }> {
   const pairs = await valuedPairs(db);
   if (pairs.length === 0) return { saved: 0, withPattern: 0, rows: [] };
+  // The daily prices come from the sales per day: any days still marked are rebuilt first.
+  await refreshPriceDays(db, { marksOnly: true });
   const today = localDate(now);
   const productIds = [...new Set(pairs.map((p) => p.product.id))];
   const since = toLocalIso(new Date(now.getTime() - SERIES_DAYS * DAY));
@@ -336,24 +316,19 @@ async function pickSamples(db: Db, now: Date): Promise<void> {
   if (!look && Object.keys(kept).length === Object.keys(current).length) return;
   if (look) {
     await saveSetting(db, 'strategySamplesChecked', localDate(now));
-    const since = toLocalIso(new Date(now.getTime() - 2 * 365 * DAY));
+    const since = localDate(new Date(now.getTime() - 2 * 365 * DAY));
+    const days = sql<number>`count(DISTINCT ${priceDays.day})`;
     const counts = await db
       .select({
-        productId: priceObservations.productId,
-        source: priceObservations.source,
-        bucket: priceObservations.bucket,
-        n: sql<number>`count(DISTINCT substr(${priceObservations.observedAt}, 1, 10))`,
+        productId: priceDays.productId,
+        source: priceDays.source,
+        bucket: priceDays.bucket,
+        n: days,
       })
-      .from(priceObservations)
-      .where(
-        and(
-          eq(priceObservations.observationType, 'sold'),
-          eq(priceObservations.excluded, false),
-          gte(priceObservations.observedAt, since),
-        ),
-      )
-      .groupBy(priceObservations.productId, priceObservations.source, priceObservations.bucket)
-      .orderBy(desc(sql`count(DISTINCT substr(${priceObservations.observedAt}, 1, 10))`));
+      .from(priceDays)
+      .where(and(sql`${priceDays.prices} <> '[]'`, gte(priceDays.day, since)))
+      .groupBy(priceDays.productId, priceDays.source, priceDays.bucket)
+      .orderBy(desc(days));
     for (const c of counts) {
       const p = byId.get(c.productId);
       const type = p && productClass(p);

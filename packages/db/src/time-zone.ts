@@ -4,6 +4,7 @@ import { appTimeZone, isTimeZone, offsetPeriods, offsetText, toLocalIso } from '
 import { type SQL, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
+import { refreshPriceDays } from './price-days';
 import { loadSourceRegistry, setTimeZoneSetting } from './registry';
 
 /** JSON columns that may hold times (sale times, event payloads, a collector's progress). */
@@ -113,5 +114,7 @@ export async function changeTimeZone(db: Db, to: string, now = new Date()): Prom
     }
   }
   await setTimeZoneSetting(db, to);
+  // Sales may now fall on other days.
+  await refreshPriceDays(db, { full: true });
   return columns.length;
 }

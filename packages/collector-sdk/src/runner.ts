@@ -13,6 +13,7 @@ import {
   productsToMatch,
   productsWithoutSource,
   QUERY_SOURCE_ID,
+  refreshPriceDays,
   updateSourceQuery,
   saveCandidates,
   saveSupply,
@@ -317,6 +318,13 @@ export async function runCollector(
 
   summary.requests = http.requests;
   summary.observationsAdded = added;
+  // The sales per day the pages read, for the days this run changed (a failure leaves them marked
+  // for the collect's closing step).
+  try {
+    await refreshPriceDays(db, { marksOnly: true });
+  } catch (e) {
+    log(`sales per day: not rebuilt (${e instanceof Error ? e.message : String(e)})`);
+  }
   await finishRun(db, runId, {
     status: summary.status,
     requests: summary.requests,

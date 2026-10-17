@@ -218,6 +218,13 @@
       "when": 1792162120730,
       "tag": "0030_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1792257860730,
+      "tag": "0031_price_days",
+      "breakpoints": true
     }
   ]
 }

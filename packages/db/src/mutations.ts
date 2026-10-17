@@ -30,6 +30,7 @@ import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
 import { loadSourceRegistry } from './registry';
+import { refreshPriceDays } from './price-days';
 import { moveSupply } from './supply';
 import { clearBucketValues } from './valuation';
 import {
@@ -1037,7 +1038,7 @@ export async function mergeProducts(
   intoId: string,
 ): Promise<Product> {
   if (fromId === intoId) throw new DomainError('invalid_input');
-  return db.transaction(async (tx) => {
+  const merged = await db.transaction(async (tx) => {
     const [from] = await tx.select().from(products).where(eq(products.id, fromId));
     const [into] = await tx.select().from(products).where(eq(products.id, intoId));
     if (!from || !into) throw new DomainError('not_found');
@@ -1095,6 +1096,8 @@ export async function mergeProducts(
     await tx.delete(products).where(eq(products.id, fromId));
     return into;
   });
+  await refreshPriceDays(db, { marksOnly: true });
+  return merged;
 }
 
 /**
@@ -1103,7 +1106,7 @@ export async function mergeProducts(
  * false, changing nothing, when any lot still refers to it.
  */
 export async function deleteUnusedProduct(db: Db, productId: string): Promise<boolean> {
-  return db.transaction(async (tx) => {
+  const deleted = await db.transaction(async (tx) => {
     const [used] = await tx
       .select({ n: count() })
       .from(holdings)
@@ -1128,6 +1131,8 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await tx.delete(products).where(eq(products.id, productId));
     return true;
   });
+  if (deleted) await refreshPriceDays(db, { marksOnly: true });
+  return deleted;
 }
 
 /**

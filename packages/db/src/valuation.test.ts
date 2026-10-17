@@ -33,6 +33,7 @@ import {
   valueHolding,
   valueHoldings,
 } from './valuation';
+import { refreshPriceDays } from './price-days';
 import { holdings, priceObservations, products } from './schema';
 import { and, eq } from 'drizzle-orm';
 import { setObservationExcluded } from './sources';
@@ -231,6 +232,7 @@ describe('portfolio (scenario 7)', () => {
 
   it('builds daily medians for the price chart', async () => {
     const { mew } = await scenario();
+    await refreshPriceDays(db);
     const points = await priceHistory(db, mew.product.id, 365, now);
     expect(points).toHaveLength(5);
     expect(points.every((p) => p.bucket === 'raw:A' && p.count === 1)).toBe(true);

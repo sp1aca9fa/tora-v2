@@ -553,7 +553,45 @@ export const priceObservations = sqliteTable(
     check('price_observations_excluded_reason_check', oneOf(t.excludedReason, EXCLUDED_REASONS)),
     uniqueIndex('price_observations_source_ref_uq').on(t.source, t.externalRef),
     index('price_observations_lookup_idx').on(t.productId, t.bucket, t.observedAt),
+    index('price_observations_source_idx').on(t.productId, t.source, t.observedAt),
   ],
+);
+
+/**
+ * The sales per item, source, condition, currency and day (requirements S19), read by the pages
+ * instead of every sale; rebuilt by `refreshPriceDays` from the days `price_days_dirty` marks.
+ */
+export const priceDays = sqliteTable(
+  'price_days',
+  {
+    productId: text('product_id').notNull(),
+    source: text('source').notNull(),
+    bucket: text('bucket'),
+    currency: text('currency'),
+    /** The app's local date. */
+    day: text('day').notNull(),
+    /** Kept sold prices in the base currency, lowest first. */
+    prices: text('prices', { mode: 'json' }).notNull().$type<number[]>(),
+    /** Kept sales whose lot size was estimated. */
+    estimated: integer('estimated').notNull(),
+    /** Every observation of the day (any type, kept or excluded). */
+    observations: integer('observations').notNull(),
+  },
+  (t) => [index('price_days_lookup_idx').on(t.productId, t.source, t.day)],
+);
+
+/**
+ * Item, source and day whose sales changed since `price_days` was built: written by triggers on
+ * `price_observations` (migration 0031), so every change is caught, whatever made it.
+ */
+export const priceDaysDirty = sqliteTable(
+  'price_days_dirty',
+  {
+    productId: text('product_id').notNull(),
+    source: text('source').notNull(),
+    day: text('day').notNull(),
+  },
+  (t) => [uniqueIndex('price_days_dirty_uq').on(t.productId, t.source, t.day)],
 );
 
 export const manualPrices = sqliteTable(

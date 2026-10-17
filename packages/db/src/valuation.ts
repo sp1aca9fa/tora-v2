@@ -29,6 +29,7 @@ import {
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
+import { daysBack, soldDays } from './price-days';
 import { loadSourceRegistry } from './registry';
 import {
   type Holding,
@@ -1160,47 +1161,29 @@ export interface PricePoint {
   estimated: number;
 }
 
-/** Daily sold medians per source + bucket for a product's price chart. */
+/** Daily sold medians per source + bucket for a product's price chart (from `price_days`). */
 export async function priceHistory(
   db: Db,
   productId: string,
   days = 365,
   now = new Date(),
 ): Promise<PricePoint[]> {
-  const since = toLocalIso(new Date(now.getTime() - days * DAY));
-  const rows = await db
-    .select({
-      observedAt: priceObservations.observedAt,
-      source: priceObservations.source,
-      bucket: priceObservations.bucket,
-      priceBase: priceObservations.priceBase,
-      quantityInferred: priceObservations.quantityInferred,
-    })
-    .from(priceObservations)
-    .where(
-      and(
-        eq(priceObservations.productId, productId),
-        eq(priceObservations.observationType, 'sold'),
-        eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, since),
-      ),
-    );
   const groups = new Map<
     string,
     { day: string; source: string; bucket: string | null; prices: number[]; estimated: number }
   >();
-  for (const r of rows) {
-    const day = r.observedAt.slice(0, 10);
-    const key = `${day}\u0000${r.source}\u0000${r.bucket ?? ''}`;
+  // A source's currencies (rarely more than one) are one point.
+  for (const r of await soldDays(db, [productId], { since: daysBack(days, now) })) {
+    const key = `${r.day}\u0000${r.source}\u0000${r.bucket ?? ''}`;
     const g = groups.get(key) ?? {
-      day,
+      day: r.day,
       source: r.source,
       bucket: r.bucket,
       prices: [],
       estimated: 0,
     };
-    g.prices.push(r.priceBase);
-    if (r.quantityInferred) g.estimated++;
+    g.prices.push(...r.prices);
+    g.estimated += r.estimated;
     groups.set(key, g);
   }
   return [...groups.values()]

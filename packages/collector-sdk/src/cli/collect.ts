@@ -14,6 +14,7 @@ import {
   listUsers,
   recordActivity,
   refreshBucketValues,
+  refreshPriceDays,
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
@@ -202,6 +203,14 @@ const quality = await checkSourceQuality(db);
 if (quality.length) {
   log(`source quality changed: ${quality.join(', ')}`);
   await clearAllBucketValues(db);
+}
+// The sales per day the pages and buy timing read (the days changed by this run and the steps
+// above; everything once a week).
+try {
+  const days = await refreshPriceDays(db);
+  log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
+} catch (error) {
+  log(`sales per day: stopped (${errorText(error)})`);
 }
 const snap = await runSnapshots(db);
 // Today's value of everything held, read by the pages instead of every sale.

@@ -243,8 +243,10 @@ export async function priceHistoryOf(
   filter: { bucket?: string; source?: string; days?: number } = {},
 ) {
   const points = await priceHistory(db, productId, filter.days ?? 365);
+  const noAi = noAiSources(await loadSourceRegistry(db));
   return points.filter(
     (p) =>
+      !noAi.includes(p.source) &&
       (!filter.bucket || p.bucket === filter.bucket) &&
       (!filter.source || p.source === filter.source),
   );
@@ -633,36 +635,39 @@ const SQL_WORDS = new Set([
   'as',
 ]);
 
+/** Tables with a row per source's sales: read through a version without the sources kept from AI. */
+const SALES_TABLES = ['price_observations', 'price_days', 'price_days_dirty'];
+
 /**
- * The query with each read of `price_observations` replaced by its rows without the given
- * sources (keeping the alias). Refused when the table is reached another way (a schema prefix).
+ * The query with each read of a sales table (`SALES_TABLES`) replaced by its rows without the
+ * given sources (keeping the alias). Refused when a table is reached another way (a schema
+ * prefix, quotes).
  */
 export function withoutSources(
   text: string,
   sources: string[],
 ): { sql: string } | { error: string } {
   if (sources.length === 0) return { sql: text };
-  if (/\b\w+\s*\.\s*price_observations\b|["`[]price_observations/i.test(text)) {
-    return { error: 'Read price_observations by its plain name.' };
-  }
   const list = sources.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
-  let rewrote = false;
-  const sql = text.replace(
-    /\b(from|join)\s+price_observations\b(?:\s+(?:as\s+)?(\w+))?/gi,
-    (_m, kw: string, alias?: string) => {
-      rewrote = true;
-      const keep = alias && !SQL_WORDS.has(alias.toLowerCase());
-      const name = keep ? alias : 'price_observations';
-      return `${kw} (select * from price_observations where source not in (${list})) as ${name}${keep ? '' : alias ? ` ${alias}` : ''}`;
-    },
-  );
-  if (
-    /\bprice_observations\b/i.test(
-      sql.replace(/\(select \* from price_observations where source not in \([^)]*\)\)/g, ''),
-    ) &&
-    !rewrote
-  ) {
-    return { error: 'Read price_observations in a FROM or JOIN.' };
+  let sql = text;
+  for (const table of SALES_TABLES) {
+    if (new RegExp(`\\b\\w+\\s*\\.\\s*${table}\\b|["\`[]${table}\\b`, 'i').test(sql)) {
+      return { error: `Read ${table} by its plain name.` };
+    }
+    const guarded = `(select * from ${table} where source not in (${list}))`;
+    let rewrote = false;
+    sql = sql.replace(
+      new RegExp(`\\b(from|join)\\s+${table}\\b(?:\\s+(?:as\\s+)?(\\w+))?`, 'gi'),
+      (_m, kw: string, alias?: string) => {
+        rewrote = true;
+        const keep = alias && !SQL_WORDS.has(alias.toLowerCase());
+        const name = keep ? alias : table;
+        return `${kw} ${guarded} as ${name}${keep ? '' : alias ? ` ${alias}` : ''}`;
+      },
+    );
+    if (!rewrote && new RegExp(`\\b${table}\\b`, 'i').test(sql.split(guarded).join(''))) {
+      return { error: `Read ${table} in a FROM or JOIN.` };
+    }
   }
   return { sql };
 }

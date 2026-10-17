@@ -4,6 +4,7 @@ import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { inferLotSizes } from '../lot-sizes';
 import { exitIfUnmigrated } from '../migrate';
+import { refreshPriceDays } from '../price-days';
 import { checkSourceQuality, loadTimeZone } from '../registry';
 import { clearAllBucketValues, refreshBucketValues, runSnapshots } from '../valuation';
 
@@ -19,6 +20,8 @@ if (quality.length) {
   console.log(`source quality changed: ${quality.join(', ')}`);
   await clearAllBucketValues(db);
 }
+const days = await refreshPriceDays(db);
+console.log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
 const r = await runSnapshots(db);
 console.log(`snapshots: ${r.days} day(s), ${r.rows} row(s) updated, ${r.removed} removed`);
 const v = await refreshBucketValues(db);

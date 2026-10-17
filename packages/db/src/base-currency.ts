@@ -11,6 +11,7 @@ import { type SQL, eq, like, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
 import { fxRateOn } from './fx';
+import { refreshPriceDays } from './price-days';
 import { loadSourceRegistry, setCurrencySettings } from './registry';
 import { fxRates, holdingEvents, productSources } from './schema';
 
@@ -163,5 +164,6 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   delete rates[to];
   if (toSetting) rates[from] = 'manual' in toSetting ? { manual: 1 / toSetting.manual } : toSetting;
   await setCurrencySettings(db, { base: to, rates });
+  await refreshPriceDays(db, { full: true });
   return storedAmounts(db);
 }

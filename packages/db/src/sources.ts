@@ -29,6 +29,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { Db } from './client';
+import { daysBack, refreshPriceDays, soldDays } from './price-days';
 import { loadSourceRegistry } from './registry';
 import { clearBucketValues } from './valuation';
 import {
@@ -41,6 +42,7 @@ import {
   appSettings,
   collectorRuns,
   holdings,
+  priceDays,
   priceObservations,
   productSources,
   products,
@@ -68,13 +70,13 @@ export async function listProductSources(db: Db, productId: string) {
     .orderBy(asc(productSources.createdAt));
   const counts = await db
     .select({
-      source: priceObservations.source,
-      n: count(),
-      latest: max(priceObservations.observedAt),
+      source: priceDays.source,
+      n: sql<number>`sum(${priceDays.observations})`,
+      latest: max(priceDays.day),
     })
-    .from(priceObservations)
-    .where(eq(priceObservations.productId, productId))
-    .groupBy(priceObservations.source);
+    .from(priceDays)
+    .where(eq(priceDays.productId, productId))
+    .groupBy(priceDays.source);
   return sources.map((s) => {
     const c = counts.find((x) => x.source === s.source);
     return { ...s, observations: c?.n ?? 0, latestObservation: c?.latest ?? null };
@@ -256,51 +258,34 @@ export interface BucketStat {
   bucket: string | null;
   count: number;
   medianBase: number | null;
+  /** The last day with a sale. */
   latest: string;
 }
 
-/** Sold count and median per source + bucket over the last `days` (plain median; S5 adds IQR). */
+/** Sold count and median per source + bucket over the last `days` (whole days, from `price_days`). */
 export async function bucketStats(
   db: Db,
   productId: string,
   days = 30,
   now = new Date(),
 ): Promise<BucketStat[]> {
-  const since = toLocalIso(new Date(now.getTime() - days * 86_400_000));
-  const rows = await db
-    .select({
-      source: priceObservations.source,
-      bucket: priceObservations.bucket,
-      price: priceObservations.priceBase,
-      at: priceObservations.observedAt,
-    })
-    .from(priceObservations)
-    .where(
-      and(
-        eq(priceObservations.productId, productId),
-        eq(priceObservations.observationType, 'sold'),
-        eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, since),
-      ),
-    );
-  const groups = new Map<string, typeof rows>();
-  for (const r of rows) {
+  const groups = new Map<string, BucketStat & { prices: number[] }>();
+  for (const r of await soldDays(db, [productId], { since: daysBack(days, now) })) {
     const key = `${r.source}\u0000${r.bucket ?? ''}`;
-    const list = groups.get(key);
-    if (list) list.push(r);
-    else groups.set(key, [r]);
+    const g = groups.get(key) ?? {
+      source: r.source,
+      bucket: r.bucket,
+      count: 0,
+      medianBase: null,
+      latest: r.day,
+      prices: [],
+    };
+    g.prices.push(...r.prices);
+    if (r.day > g.latest) g.latest = r.day;
+    groups.set(key, g);
   }
   return [...groups.values()]
-    .map((g) => ({
-      source: g[0]!.source,
-      bucket: g[0]!.bucket,
-      count: g.length,
-      medianBase: median(g.map((r) => r.price)),
-      latest: g
-        .map((r) => r.at)
-        .sort()
-        .at(-1)!,
-    }))
+    .map(({ prices, ...g }) => ({ ...g, count: prices.length, medianBase: median(prices) }))
     .sort((a, b) => b.count - a.count);
 }
 
@@ -844,6 +829,7 @@ export async function updateSourceQuery(
       );
     await clearBucketValues(tx, [link.productId]);
   });
+  await refreshPriceDays(db, { marksOnly: true });
 }
 
 /** Latest collected sales of a product from one source, excluded ones included (for review). */
@@ -867,7 +853,10 @@ export async function setObservationExcluded(
     .set({ excluded, excludedReason: excluded ? 'manual' : null })
     .where(eq(priceObservations.id, observationId))
     .returning({ productId: priceObservations.productId });
-  if (row) await clearBucketValues(db, [row.productId]);
+  if (row) {
+    await clearBucketValues(db, [row.productId]);
+    await refreshPriceDays(db, { marksOnly: true });
+  }
   return row ?? null;
 }
 
