@@ -644,7 +644,7 @@ export interface SourceHealth {
 
 /**
  * Per source: last run, linked / pending counts, listings not collected for 3+ days, and
- * buckets whose last-7-day median moved more than 50 % against the 30 days before.
+ * buckets whose last-7-day median moved more than 50 % against the 30 days before (whole days).
  */
 export async function collectorHealth(db: Db, now = new Date()): Promise<SourceHealth[]> {
   const day = 86_400_000;
@@ -683,36 +683,24 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
         ),
       );
 
-    const obs = await db
-      .select({
-        productId: priceObservations.productId,
-        bucket: priceObservations.bucket,
-        price: priceObservations.priceBase,
-        at: priceObservations.observedAt,
-      })
-      .from(priceObservations)
-      .where(
-        and(
-          eq(priceObservations.source, source),
-          eq(priceObservations.observationType, 'sold'),
-          eq(priceObservations.excluded, false),
-          gte(priceObservations.observedAt, iso(37 * day)),
-        ),
-      );
-    const recentFrom = iso(7 * day);
+    // The source's last 37 days of kept sales, from the sales per day.
+    const recentFrom = daysBack(7, now);
     const groups = new Map<
       string,
       { recent: number[]; before: number[]; productId: string; bucket: string | null }
     >();
-    for (const o of obs) {
-      const key = `${o.productId}\u0000${o.bucket ?? ''}`;
+    for (const d of await db
+      .select()
+      .from(priceDays)
+      .where(and(eq(priceDays.source, source), gte(priceDays.day, daysBack(37, now))))) {
+      const key = `${d.productId}\u0000${d.bucket ?? ''}`;
       const g = groups.get(key) ?? {
         recent: [],
         before: [],
-        productId: o.productId,
-        bucket: o.bucket,
+        productId: d.productId,
+        bucket: d.bucket,
       };
-      (o.at >= recentFrom ? g.recent : g.before).push(o.price);
+      (d.day >= recentFrom ? g.recent : g.before).push(...d.prices);
       groups.set(key, g);
     }
     const flagged = [...groups.values()].filter((g) => {

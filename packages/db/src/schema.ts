@@ -577,7 +577,10 @@ export const priceDays = sqliteTable(
     /** Every observation of the day (any type, kept or excluded). */
     observations: integer('observations').notNull(),
   },
-  (t) => [index('price_days_lookup_idx').on(t.productId, t.source, t.day)],
+  (t) => [
+    index('price_days_lookup_idx').on(t.productId, t.source, t.day),
+    index('price_days_source_day_idx').on(t.source, t.day),
+  ],
 );
 
 /**
@@ -899,6 +902,27 @@ export const signals = sqliteTable(
     index('signals_day_idx').on(t.day),
   ],
 );
+
+/** A day of a person's value-over-time chart. */
+export interface PortfolioPoint {
+  date: string;
+  valueBase: number;
+  costBase: number;
+  atCostBase: number;
+  estimatedBase: number;
+}
+
+/**
+ * Each person's value-over-time chart (requirements S19): saved by the snapshot run, and by the
+ * page when the person's lots changed since (`fingerprint`), so a view does not sum every snapshot.
+ */
+export const portfolioCharts = sqliteTable('portfolio_charts', {
+  userId: text('user_id').primaryKey(),
+  /** The lots the series was summed over (ids, costs, tracking switches). */
+  fingerprint: text('fingerprint').notNull(),
+  series: text('series', { mode: 'json' }).notNull().$type<PortfolioPoint[]>(),
+  ...timestamps,
+});
 
 export const ALERT_CHANNEL_KINDS = ['telegram', 'discord'] as const;
 export type AlertChannelKind = (typeof ALERT_CHANNEL_KINDS)[number];

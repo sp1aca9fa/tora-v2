@@ -225,6 +225,13 @@
       "when": 1792257860730,
       "tag": "0031_price_days",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1792260841254,
+      "tag": "0032_portfolio_charts",
+      "breakpoints": true
     }
   ]
 }

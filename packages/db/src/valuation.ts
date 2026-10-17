@@ -28,18 +28,21 @@ import {
   resolveTaxonomy,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 import type { Db } from './client';
 import { daysBack, soldDays } from './price-days';
 import { loadSourceRegistry } from './registry';
 import {
   type Holding,
   type HoldingEvent,
+  type PortfolioPoint,
   type Product,
   appSettings,
   bucketValues,
   holdingEvents,
   holdings,
   manualPrices,
+  portfolioCharts,
   priceObservations,
   productSources,
   products,
@@ -950,12 +953,11 @@ const MAX_HISTORY_DAYS = 3 * 366;
  */
 export async function runSnapshots(db: Db, now = new Date()) {
   const today = localDate(now);
-  const rows = (
-    await db
-      .select({ holding: holdings, product: products })
-      .from(holdings)
-      .innerJoin(products, eq(products.id, holdings.productId))
-  ).filter((r) => r.holding.status !== 'lost');
+  const all = await db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId));
+  const rows = all.filter((r) => r.holding.status !== 'lost');
   const oldest = localDate(new Date(now.getTime() - MAX_HISTORY_DAYS * DAY));
   const first = rows.reduce(
     (min, r) => (r.holding.acquiredAt.slice(0, 10) < min ? r.holding.acquiredAt.slice(0, 10) : min),
@@ -1120,35 +1122,136 @@ export async function runSnapshots(db: Db, now = new Date()) {
       db.delete(valuationSnapshots).where(inArray(valuationSnapshots.id, stale.slice(i, i + 500))),
     );
   }
+  // Each person's chart, summed from the snapshots just written (no read of them).
+  const lotsOf = new Map<string, Holding[]>();
+  for (const { holding } of all) {
+    const list = lotsOf.get(holding.userId);
+    if (list) list.push(holding);
+    else lotsOf.set(holding.userId, [holding]);
+  }
+  const byId = new Map(all.map((r) => [r.holding.id, r.holding]));
+  const snapshotsOf = new Map<string, { holding: Holding; snapshot: Row }[]>();
+  for (const snapshot of wanted.values()) {
+    const holding = byId.get(snapshot.holdingId)!;
+    const list = snapshotsOf.get(holding.userId);
+    if (list) list.push({ holding, snapshot });
+    else snapshotsOf.set(holding.userId, [{ holding, snapshot }]);
+  }
+  for (const [userId, lots] of lotsOf) {
+    const series = sumSeries(
+      (snapshotsOf.get(userId) ?? []).map(({ holding, snapshot }) => ({
+        date: snapshot.date,
+        valueBase: snapshot.valueBase ?? null,
+        quantityInferred: !!snapshot.quantityInferred,
+        holding,
+      })),
+    );
+    await retried(() => savePortfolioChart(db, userId, holdingsFingerprint(lots), series));
+  }
   return { days: days.length, rows: changed.length, removed: stale.length };
+}
+
+type ChartLot = Pick<Holding, 'id' | 'costTotalBase' | 'countInValue' | 'countInCost'>;
+
+/** What a person's chart sums of their lots: any change here needs a new sum. */
+function holdingsFingerprint(lots: ChartLot[]): string {
+  const text = lots
+    .map((h) => `${h.id}:${h.costTotalBase}:${Number(h.countInValue)}${Number(h.countInCost)}`)
+    .sort()
+    .join(',');
+  return createHash('sha256').update(text).digest('base64url');
+}
+
+/**
+ * Value and cost per day from snapshots. Lots count by their tracking switches (S8): value sums
+ * lots counted in value (at cost when they have no market value yet, `atCostBase`), cost lots
+ * counted in cost.
+ */
+function sumSeries(
+  snapshots: {
+    date: string;
+    valueBase: number | null;
+    quantityInferred: boolean;
+    holding: ChartLot;
+  }[],
+): PortfolioPoint[] {
+  const days = new Map<string, PortfolioPoint>();
+  for (const { date, valueBase, quantityInferred, holding } of snapshots) {
+    let d = days.get(date);
+    if (!d) {
+      d = { date, valueBase: 0, costBase: 0, atCostBase: 0, estimatedBase: 0 };
+      days.set(date, d);
+    }
+    if (holding.countInCost) d.costBase += holding.costTotalBase;
+    if (!holding.countInValue) continue;
+    d.valueBase += valueBase ?? holding.costTotalBase;
+    if (valueBase === null) d.atCostBase += holding.costTotalBase;
+    else if (quantityInferred) d.estimatedBase += valueBase;
+  }
+  return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function savePortfolioChart(
+  db: Db,
+  userId: string,
+  fingerprint: string,
+  series: PortfolioPoint[],
+) {
+  await db
+    .insert(portfolioCharts)
+    .values({ userId, fingerprint, series })
+    .onConflictDoUpdate({
+      target: portfolioCharts.userId,
+      set: { fingerprint, series, updatedAt: toLocalIso() },
+    });
 }
 
 /**
  * Value and cost per day for the user's chart. Cost is everything held that day; value is the
- * market value, with holdings that have no market value yet counted at cost (`atCostBase`).
+ * market value, with holdings that have no market value yet counted at cost (`atCostBase`). The
+ * saved chart while the person's lots are as it was summed over; else summed again and saved.
  */
 export async function portfolioSeries(
   db: Db,
   userId: string,
   days = MAX_HISTORY_DAYS,
   now = new Date(),
-) {
+): Promise<PortfolioPoint[]> {
   const since = localDate(new Date(now.getTime() - days * DAY));
-  return db
+  const lots = await db
     .select({
-      date: valuationSnapshots.date,
-      // Lots count by their tracking switches (S8): value lines sum lots counted in value, cost
-      // lots counted in cost.
-      valueBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} then coalesce(${valuationSnapshots.valueBase}, ${holdings.costTotalBase}) end), 0)`,
-      costBase: sql<number>`coalesce(sum(case when ${holdings.countInCost} then ${holdings.costTotalBase} end), 0)`,
-      atCostBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.valueBase} is null then ${holdings.costTotalBase} end), 0)`,
-      estimatedBase: sql<number>`coalesce(sum(case when ${holdings.countInValue} and ${valuationSnapshots.quantityInferred} then ${valuationSnapshots.valueBase} end), 0)`,
+      id: holdings.id,
+      costTotalBase: holdings.costTotalBase,
+      countInValue: holdings.countInValue,
+      countInCost: holdings.countInCost,
     })
-    .from(valuationSnapshots)
-    .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
-    .where(and(eq(holdings.userId, userId), gte(valuationSnapshots.date, since)))
-    .groupBy(valuationSnapshots.date)
-    .orderBy(asc(valuationSnapshots.date));
+    .from(holdings)
+    .where(eq(holdings.userId, userId));
+  const fingerprint = holdingsFingerprint(lots);
+  const [saved] = await db.select().from(portfolioCharts).where(eq(portfolioCharts.userId, userId));
+  let series = saved?.fingerprint === fingerprint ? saved.series : null;
+  if (!series) {
+    const byId = new Map(lots.map((l) => [l.id, l]));
+    series = sumSeries(
+      (
+        await db
+          .select({
+            date: valuationSnapshots.date,
+            holdingId: valuationSnapshots.holdingId,
+            valueBase: valuationSnapshots.valueBase,
+            quantityInferred: valuationSnapshots.quantityInferred,
+          })
+          .from(valuationSnapshots)
+          .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
+          .where(eq(holdings.userId, userId))
+      ).flatMap((r) => {
+        const holding = byId.get(r.holdingId);
+        return holding ? [{ ...r, holding }] : [];
+      }),
+    );
+    await savePortfolioChart(db, userId, fingerprint, series);
+  }
+  return series.filter((p) => p.date >= since);
 }
 
 export interface PricePoint {

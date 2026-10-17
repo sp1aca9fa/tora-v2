@@ -34,7 +34,7 @@ import {
   valueHoldings,
 } from './valuation';
 import { refreshPriceDays } from './price-days';
-import { holdings, priceObservations, products } from './schema';
+import { holdings, portfolioCharts, priceObservations, products } from './schema';
 import { and, eq } from 'drizzle-orm';
 import { setObservationExcluded } from './sources';
 
@@ -193,6 +193,19 @@ describe('portfolio (scenario 7)', () => {
     });
     // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
     expect(on(39)?.valueBase).toBe(2_000);
+    // The run saved the chart; summed again from the snapshots, it is the same.
+    await db.delete(portfolioCharts);
+    expect(await portfolioSeries(db, uid, 365, now)).toEqual(series);
+    // A lot's cost changed after the run: summed again at once.
+    const [mewtwo] = await db
+      .update(holdings)
+      .set({ costTotalBase: 800 })
+      .where(eq(holdings.costTotalBase, 700))
+      .returning();
+    expect(mewtwo).toBeDefined();
+    const after = await portfolioSeries(db, uid, 365, now);
+    expect(after.at(-1)).toMatchObject({ atCostBase: 800, costBase: 9_900 + 800 + 5_400 });
+    await db.update(holdings).set({ costTotalBase: 700 }).where(eq(holdings.id, mewtwo!.id));
 
     // Re-running writes nothing new; moving a purchase date later removes the days before it.
     expect(await runSnapshots(db, now)).toMatchObject({ rows: 0, removed: 0 });
