@@ -9,6 +9,7 @@ import { and, eq, gte, isNull } from 'drizzle-orm';
 import { actionTotal, pendingActions } from './actions';
 import { lastActivity, markAlerted, recordActivity, unalerted } from './activity';
 import type { Db } from './client';
+import { checkDbBudget } from './db-usage';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import {
   type Activity,
@@ -400,8 +401,22 @@ function failureText(t: AlertTexts, entry: Activity, base: string | null): strin
   } else if (entry.kind === 'backup') {
     lines.push(fill(t.backupFailed!, { error: String(d.error ?? '') }));
   } else if (entry.kind === 'check') {
-    const params = { hours: Number(d.hours ?? 0), last: d.last ? shortTime(String(d.last)) : '-' };
-    lines.push(fill(entry.action === 'no_backup' ? t.noBackup! : t.noCollect!, params));
+    if (entry.action === 'db_budget') {
+      const millions = (n: unknown) => (Number(n ?? 0) / 1e6).toFixed(1);
+      lines.push(
+        fill(t.dbBudget!, {
+          read: millions(d.read),
+          projected: millions(d.projected),
+          budget: millions(d.budget),
+        }),
+      );
+    } else {
+      const params = {
+        hours: Number(d.hours ?? 0),
+        last: d.last ? shortTime(String(d.last)) : '-',
+      };
+      lines.push(fill(entry.action === 'no_backup' ? t.noBackup! : t.noCollect!, params));
+    }
   }
   return lines.join('\n') + linkLine(t, base, entry.href);
 }
@@ -449,7 +464,8 @@ const MISSED_HOURS = 26;
 
 /**
  * The app's daily check: when no collect or no backup was recorded for over a day (the PC is
- * off, or its schedule stopped), records it and alerts admins. Nothing before the first run.
+ * off, or its schedule stopped), or the database's month heads past its budget, records it and
+ * alerts admins. Nothing before the first run.
  */
 export async function checkMissedRuns(
   db: Db,
@@ -474,6 +490,8 @@ export async function checkMissedRuns(
     });
     missed.push(kind);
   }
+  // The hosted database's rows read this month against the admin's budget (S19).
+  if (await checkDbBudget(db, now)) missed.push('db_budget');
   await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)));
   return missed;
 }

@@ -232,6 +232,13 @@
       "when": 1792260841254,
       "tag": "0032_portfolio_charts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1792261964225,
+      "tag": "0033_db_usage",
+      "breakpoints": true
     }
   ]
 }

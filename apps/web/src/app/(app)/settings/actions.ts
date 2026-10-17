@@ -34,6 +34,7 @@ import {
   changeBaseCurrency,
   changeTimeZone,
   setCollectWindow,
+  setRowsReadBudget,
   setMarketSettings,
   setLanguageSettings,
   categoryUsage,
@@ -344,6 +345,16 @@ export async function setCollectWindowAction(hours: number) {
   await setCollectWindow(db, hours);
   await recordAdminChange(db, user.id, 'collectWindow', { to: hours }, '/settings/collectors');
   revalidatePath('/settings/collectors');
+}
+
+/** Rows read a month before admins are alerted (admins, S19), in millions. */
+export async function setDbBudgetAction(millions: number) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !Number.isInteger(millions) || millions < 1 || millions > 500)
+    return;
+  await setRowsReadBudget(db, millions * 1_000_000);
+  await recordAdminChange(db, user.id, 'dbBudget', { to: millions }, '/settings/admin/database');
+  revalidatePath('/settings/admin/database');
 }
 
 /** Where a currency's exchange rate comes from (admins, S16): a rate plug-in or a typed rate. */

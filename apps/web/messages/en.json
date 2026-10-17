@@ -327,7 +327,7 @@
       },
       "admin": {
         "title": "Admin preferences",
-        "info": "Markets, price sources, identity pages, categories, languages, the time zone and the home PC's commands, for every account."
+        "info": "Markets, price sources, identity pages, categories, languages, the time zone, the database's usage and the home PC's commands, for every account."
       },
       "markets": {
         "title": "Markets",
@@ -348,6 +348,10 @@
       "categories": {
         "title": "Categories",
         "info": "Kinds of items, their fields and condition lists."
+      },
+      "database": {
+        "title": "Database",
+        "info": "Rows the hosted database read and wrote this month, against the free plan."
       },
       "commands": {
         "title": "Commands",
@@ -1208,6 +1212,29 @@
       "choice_empty": "A choice field needs at least one choice."
     }
   },
+  "database": {
+    "title": "Database",
+    "info": "Rows the hosted database (Turso) read and wrote this month, as its replies report them. The free plan allows 500 million rows read and 10 million written a month.",
+    "read": "{month}: {read} rows read of {free} free (at this pace, {projected} by the end of the month)",
+    "written": "{written} rows written of {free} free",
+    "budget": "Alert admins past",
+    "millions": "{m} million rows read",
+    "budgetInfo": "The app's daily check sends an alert when the month passes this, or heads past it at this pace (from the 5th).",
+    "byOrigin": "By origin",
+    "byDay": "By day (UTC)",
+    "readWritten": "{read} read, {written} written",
+    "none": "Nothing counted this month yet. Only the hosted database is counted: while Tora runs on a local file there is nothing to count.",
+    "note": "Counted from Tora's own queries. Turso's dashboard has the exact total, including anything run outside Tora.",
+    "origin": {
+      "pages": "App pages",
+      "collect": "Collect",
+      "backup": "Backup",
+      "mcp": "Claude (MCP)",
+      "alerts": "Alerts",
+      "valuate": "Valuate",
+      "migrate": "Migrate"
+    }
+  },
   "commands": {
     "info": "Commands to run on the home PC, in a terminal in the Tora folder (WSL or Linux). Nothing runs from this page: copy a command, then fill in the parts in <angle brackets>.",
     "guide": "Guide",
@@ -1328,6 +1355,7 @@
     "backupFailed": "Tora: the backup failed: {error}",
     "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
     "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
+    "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan 500 million). See Settings > Admin > Database.",
     "summaryTitle": "Tora: daily summary",
     "summaryImport": "{method}: {imported} added, {existing} already in Tora, {skipped} left out, {problem} with a problem",
     "summaryActions": "Waiting on Actions: {count}",
@@ -1425,6 +1453,7 @@
     "import": "{imported} added, {existing} already in Tora, {skipped} left out, {problem} with a problem",
     "noCollect": "No collect for {hours} hours (last {last})",
     "noBackup": "No backup for {hours} hours (last {last})",
+    "dbBudget": "Database: {read} million rows read this month, {projected} million at this pace (budget {budget} million)",
     "fromTo": "{from} to {to}",
     "none": "none",
     "admin": {
@@ -1436,6 +1465,7 @@
       "languages": "Languages",
       "identity": "Identity page",
       "collectWindow": "Night window",
+      "dbBudget": "Database budget",
       "rate": "Exchange rate",
       "currency": "Base currency",
       "timeZone": "Time zone",

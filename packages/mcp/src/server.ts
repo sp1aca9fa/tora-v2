@@ -31,7 +31,7 @@ const { values } = parseArgs({ options: { user: { type: 'string' } }, strict: fa
 loadRootEnv();
 // Allowed under Claude Code: these tools read a few hundred rows; query_sql reads the analysis copy.
 const config = dbConfigFromEnv(process.env, { allowClaude: true });
-const db = createDb(config);
+const db = createDb(config, 'mcp');
 await exitIfUnmigrated(db);
 // Times written follow the admin's time zone (S16 part 5).
 await loadTimeZone(db);

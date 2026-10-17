@@ -327,7 +327,7 @@
       },
       "admin": {
         "title": "管理者設定",
-        "info": "市場、価格ソース、識別ページ、カテゴリー、言語、タイムゾーン、自宅PCのコマンド（全アカウント共通）。"
+        "info": "市場、価格ソース、識別ページ、カテゴリー、言語、タイムゾーン、データベースの使用量、自宅PCのコマンド（全アカウント共通）。"
       },
       "markets": {
         "title": "市場",
@@ -348,6 +348,10 @@
       "categories": {
         "title": "カテゴリー",
         "info": "商品の種類、項目、状態リスト。"
+      },
+      "database": {
+        "title": "データベース",
+        "info": "今月、ホスト型データベースが読み書きした行数と無料プランの上限。"
       },
       "commands": {
         "title": "コマンド",
@@ -1208,6 +1212,29 @@
       "choice_empty": "選択リスト項目には選択肢が1つ以上必要です。"
     }
   },
+  "database": {
+    "title": "データベース",
+    "info": "今月、ホスト型データベース（Turso）が読み書きした行数です（応答に含まれる数）。無料プランの上限は、月に読み取り5億行、書き込み1,000万行です。",
+    "read": "{month}: 読み取り {read} 行（無料枠 {free} 行、このペースで月末に {projected} 行）",
+    "written": "書き込み {written} 行（無料枠 {free} 行）",
+    "budget": "管理者に通知する上限",
+    "millions": "読み取り {m} 百万行",
+    "budgetInfo": "アプリの毎日のチェックが、今月この上限を超えたとき、またはこのペースで超えそうなとき（5日以降）に通知します。",
+    "byOrigin": "発生元ごと",
+    "byDay": "日ごと（UTC）",
+    "readWritten": "読み取り {read}、書き込み {written}",
+    "none": "今月はまだ記録がありません。数えるのはホスト型データベースだけです。Toraがローカルのファイルで動いている間は記録されません。",
+    "note": "Tora自身のクエリから数えています。Tora以外で実行したものを含む正確な合計は、Tursoのダッシュボードで確認できます。",
+    "origin": {
+      "pages": "アプリのページ",
+      "collect": "収集",
+      "backup": "バックアップ",
+      "mcp": "Claude（MCP）",
+      "alerts": "通知",
+      "valuate": "評価の再計算",
+      "migrate": "マイグレーション"
+    }
+  },
   "commands": {
     "info": "自宅PCのターミナル（WSLまたはLinux）でToraのフォルダから実行するコマンドです。このページからは何も実行されません。コマンドをコピーし、<山かっこ>の部分を書き換えてください。",
     "guide": "ガイド",
@@ -1328,6 +1355,7 @@
     "backupFailed": "Tora: バックアップに失敗しました: {error}",
     "noCollect": "Tora: {hours} 時間、収集が実行されていません（最後: {last}）。自宅PCは起動していますか？",
     "noBackup": "Tora: {hours} 時間、バックアップがありません（最後: {last}）。自宅PCは起動していますか？",
+    "dbBudget": "Tora: 今月、データベースの読み取りが {read} 百万行になりました。このペースでは月末に {projected} 百万行です（上限 {budget} 百万行、無料プラン 500 百万行）。設定 > 管理者設定 > データベース を確認してください。",
     "summaryTitle": "Tora: 今日のまとめ",
     "summaryImport": "{method}: {imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
     "summaryActions": "アクションで対応待ち: {count} 件",
@@ -1425,6 +1453,7 @@
     "import": "{imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
     "noCollect": "{hours} 時間、収集なし（最後 {last}）",
     "noBackup": "{hours} 時間、バックアップなし（最後 {last}）",
+    "dbBudget": "データベース: 今月の読み取り {read} 百万行、このペースで {projected} 百万行（上限 {budget} 百万行）",
     "fromTo": "{from} から {to} へ",
     "none": "なし",
     "admin": {
@@ -1436,6 +1465,7 @@
       "languages": "言語",
       "identity": "識別ページ",
       "collectWindow": "夜間の実行時間枠",
+      "dbBudget": "データベースの上限",
       "rate": "為替レート",
       "currency": "基準通貨",
       "timeZone": "タイムゾーン",

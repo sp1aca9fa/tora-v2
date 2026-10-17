@@ -903,6 +903,21 @@ export const signals = sqliteTable(
   ],
 );
 
+/**
+ * Rows the hosted database (Turso) read and wrote, as its replies report them (requirements S19):
+ * per day (UTC, like Turso's months) and origin (pages, collect, backup, mcp, ...).
+ */
+export const dbUsage = sqliteTable(
+  'db_usage',
+  {
+    day: text('day').notNull(),
+    origin: text('origin').notNull(),
+    rowsRead: integer('rows_read').notNull(),
+    rowsWritten: integer('rows_written').notNull(),
+  },
+  (t) => [uniqueIndex('db_usage_day_origin_uq').on(t.day, t.origin)],
+);
+
 /** A day of a person's value-over-time chart. */
 export interface PortfolioPoint {
   date: string;

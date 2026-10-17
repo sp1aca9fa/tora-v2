@@ -151,6 +151,18 @@ under **Imports > Suggestions** (exclude a sale, make a search skip a word, fill
 Nothing changes until you accept one. `--dry-run` prints the verdicts only. Sources marked `noAi`
 are never sent.
 
+## The hosted database's monthly reads
+
+Turso's free plan allows 500 million rows read and 10 million written a month. Tora counts what
+its own queries read and write (Turso reports it with each reply), per day and per origin (app
+pages, collect, backup, Claude's MCP tools, ...), and shows the month so far in **Settings > Admin
+preferences > Database**, with the pace for the whole month. The app's daily check alerts admins
+when the month passes the budget set there (150 million by default), or heads past it at this pace
+from the 5th. Turso's dashboard has the exact total, including anything run outside Tora (such as
+the Turso shell). Nothing is counted while Tora runs on a local file. The pages and the collect read
+saved numbers (the sales per day, saved values and the saved Portfolio chart) instead of every
+sale; see requirements S19 for what each reads.
+
 ## Claude Code and the hosted database
 
 Programs started by Claude Code (it sets `CLAUDECODE=1`) refuse to open the hosted database

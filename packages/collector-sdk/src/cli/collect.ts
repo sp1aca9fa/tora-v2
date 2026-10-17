@@ -18,6 +18,7 @@ import {
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
+  saveUsage,
   loadTimeZone,
 } from '@tora/db';
 import { INSIGHT_PERIODS } from '@tora/core';
@@ -257,4 +258,5 @@ await recordActivity(db, {
   },
   href: '/settings/collectors',
 });
+await saveUsage(db);
 process.exit(exitCode);

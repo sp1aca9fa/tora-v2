@@ -3,7 +3,6 @@
 // The folder: BACKUP_DIR in .env (e.g. a OneDrive or Google Drive folder, so copies also leave
 // the PC), else ~/.local/share/tora/backups. Kept: the last 30 days and the first of each month
 // for 12 months.
-import { createClient } from '@libsql/client';
 import { localDate, toLocalIso } from '@tora/core';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +16,7 @@ import {
   pruneBackups,
   refreshAnalysisCopy,
 } from '../backup';
-import { createDb } from '../client';
+import { createDb, createMeteredClient } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { loadTimeZone, setLastBackup } from '../registry';
 
@@ -34,7 +33,7 @@ if (existsSync(file) && !process.argv.includes('--force')) {
   console.log(`backup: today's copy is already there (${file})`);
 } else {
   const started = Date.now();
-  const source = createClient({ ...config, intMode: 'bigint' });
+  const source = createMeteredClient({ ...config, intMode: 'bigint' });
   try {
     const r = await backupDatabase(source, file);
     const seconds = Math.round((Date.now() - started) / 1000);
@@ -68,7 +67,9 @@ try {
   const day = await refreshAnalysisCopy(dir, analysisCopyPath());
   if (day) console.log(`backup: analysis copy as of ${day} (${analysisCopyPath()})`);
 } catch (error) {
-  console.log(`backup: analysis copy not updated (${error instanceof Error ? error.message : error})`);
+  console.log(
+    `backup: analysis copy not updated (${error instanceof Error ? error.message : error})`,
+  );
 }
 const removed = await pruneBackups(dir, today);
 if (removed) console.log(`backup: ${removed} old copy(ies) deleted`);

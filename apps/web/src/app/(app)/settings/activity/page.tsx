@@ -128,10 +128,16 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
         return {
           title: t('activity.kind.check'),
           lines: [
-            t(e.action === 'no_backup' ? 'activity.noBackup' : 'activity.noCollect', {
-              hours: Number(d.hours ?? 0),
-              last: d.last ? dateTime(String(d.last)) : '-',
-            }),
+            e.action === 'db_budget'
+              ? t('activity.dbBudget', {
+                  read: (Number(d.read ?? 0) / 1e6).toFixed(1),
+                  projected: (Number(d.projected ?? 0) / 1e6).toFixed(1),
+                  budget: (Number(d.budget ?? 0) / 1e6).toFixed(1),
+                })
+              : t(e.action === 'no_backup' ? 'activity.noBackup' : 'activity.noCollect', {
+                  hours: Number(d.hours ?? 0),
+                  last: d.last ? dateTime(String(d.last)) : '-',
+                }),
           ],
         };
       case 'admin': {
