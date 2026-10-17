@@ -1,5 +1,5 @@
 import { createClient } from '@libsql/client';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
@@ -10,6 +10,7 @@ import {
   backupsToKeep,
   listBackups,
   pruneBackups,
+  refreshAnalysisCopy,
   restoreDatabase,
 } from './backup';
 import { type Db, createDb } from './client';
@@ -91,6 +92,23 @@ it('restores a backup into an empty database exactly (scenario 8)', async () => 
 
   // A database with data is never overwritten.
   await expect(restoreDatabase(file, target)).rejects.toThrow(/not empty/);
+});
+
+it('unpacks the latest backup as the analysis copy, only when newer', async () => {
+  const backups = join(dir, 'backups');
+  const target = join(dir, 'analysis', 'tora.db');
+  expect(await refreshAnalysisCopy(backups, target)).toBeNull();
+  await mkdir(backups);
+  const live = createClient({ url: `file:${join(dir, 'live.db')}` });
+  await backupDatabase(live, join(backups, backupName('2026-10-17')));
+  expect(await refreshAnalysisCopy(backups, target)).toBe('2026-10-17');
+  const copy = createDb({ url: `file:${target}` });
+  expect(await contents(copy)).toEqual(await contents(db));
+  copy.$client.close();
+  // Up to date: left alone.
+  const before = (await stat(target)).mtimeMs;
+  expect(await refreshAnalysisCopy(backups, target)).toBe('2026-10-17');
+  expect((await stat(target)).mtimeMs).toBe(before);
 });
 
 it('keeps the last 30 days and the first backup of each month for a year', async () => {

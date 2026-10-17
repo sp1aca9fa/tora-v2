@@ -8,7 +8,15 @@ import { localDate, toLocalIso } from '@tora/core';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { recordActivity } from '../activity';
-import { backupDatabase, backupDir, backupName, ensureDir, pruneBackups } from '../backup';
+import {
+  analysisCopyPath,
+  backupDatabase,
+  backupDir,
+  backupName,
+  ensureDir,
+  pruneBackups,
+  refreshAnalysisCopy,
+} from '../backup';
 import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { loadTimeZone, setLastBackup } from '../registry';
@@ -54,6 +62,13 @@ if (existsSync(file) && !process.argv.includes('--force')) {
   } finally {
     source.close();
   }
+}
+// Claude Code's heavy queries read this copy, never Turso (S19).
+try {
+  const day = await refreshAnalysisCopy(dir, analysisCopyPath());
+  if (day) console.log(`backup: analysis copy as of ${day} (${analysisCopyPath()})`);
+} catch (error) {
+  console.log(`backup: analysis copy not updated (${error instanceof Error ? error.message : error})`);
 }
 const removed = await pruneBackups(dir, today);
 if (removed) console.log(`backup: ${removed} old copy(ies) deleted`);

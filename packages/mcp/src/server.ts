@@ -7,9 +7,11 @@
 // stdout carries the protocol: log to stderr only.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDb, getUserByUsername, listUsers, loadTimeZone } from '@tora/db';
+import { type Db, createDb, getUserByUsername, listUsers, loadTimeZone } from '@tora/db';
+import { analysisCopyPath } from '@tora/db/backup';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
+import { stat } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import {
@@ -46,6 +48,25 @@ if (!user) {
 console.error(
   `tora mcp: ${user.username} on ${isRemoteUrl(config.url) ? config.url : 'local file'}`,
 );
+
+// Heavy queries read last night's backup (unpacked by `pnpm backup`), never Turso (S19); a local
+// database file is read directly.
+let analysis: { db: Db; mtimeMs: number; asOf: string } | null = null;
+async function analysisDb(): Promise<{ db: Db; asOf: string } | null> {
+  if (!isRemoteUrl(config.url)) return { db, asOf: 'live' };
+  const path = analysisCopyPath();
+  const file = await stat(path).catch(() => null);
+  if (!file) return null;
+  if (analysis?.mtimeMs !== file.mtimeMs) {
+    analysis?.db.$client.close();
+    analysis = {
+      db: createDb({ url: `file:${path}` }),
+      mtimeMs: file.mtimeMs,
+      asOf: new Date(file.mtimeMs).toISOString(),
+    };
+  }
+  return analysis;
+}
 
 const json = (value: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(value) }],
@@ -187,13 +208,21 @@ server.registerTool(
   {
     title: 'Read-only SQL',
     description:
-      'One SELECT (or WITH ... SELECT) on the SQLite (libSQL) database, run read-only with a row limit, for questions the other tools do not cover. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_base, acquired_at, ...), price_observations (product_id, source, bucket, price_base, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_base, method), holding_events. Times are ISO strings in the app time zone (with its offset).',
+      'One SELECT (or WITH ... SELECT), run read-only with a row limit, for questions the other tools do not cover. It reads the backup copy from last night (asOf in the result), not the live database: use the other tools for live numbers. Main tables: products, holdings (user_id, product_id, status, quantity, cost_total_base, acquired_at, ...), price_observations (product_id, source, bucket, price_base, observed_at, excluded, excluded_reason, raw JSON), product_sources (product_id, source, external_id, query JSON, state JSON), valuation_snapshots (date, holding_id, value_base, method), holding_events. Times are ISO strings in the app time zone (with its offset).',
     inputSchema: {
       sql: z.string().max(4000),
       limit: z.number().int().min(1).max(1000).optional().describe('default 200'),
     },
   },
-  async ({ sql, limit }) => json(await querySql(db, sql, limit)),
+  async ({ sql, limit }) => {
+    const copy = await analysisDb();
+    if (!copy) {
+      return json({
+        error: `No analysis copy yet (${analysisCopyPath()}): run \`pnpm backup\` on the home PC.`,
+      });
+    }
+    return json({ asOf: copy.asOf, ...(await querySql(copy.db, sql, limit)) });
+  },
 );
 
 await server.connect(new StdioServerTransport());

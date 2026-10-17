@@ -5,7 +5,7 @@ import { type Client, type InStatement, type ResultSet, createClient } from '@li
 import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, mkdtemp, readdir, rename, rm, stat } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 
@@ -19,6 +19,16 @@ export function backupDir(env: Record<string, string | undefined> = process.env)
 }
 
 export const backupName = (day: string) => `tora-${day}.db.gz`;
+
+/**
+ * The analysis copy (S19): the latest backup, unpacked, for Claude Code's heavy queries (the MCP
+ * `query_sql` tool, analysis scripts), so they never read Turso. `TORA_ANALYSIS_DB`, else
+ * `~/.local/share/tora/analysis/tora.db`.
+ */
+export function analysisCopyPath(env: Record<string, string | undefined> = process.env): string {
+  const data = env.XDG_DATA_HOME?.trim() || join(homedir(), '.local', 'share');
+  return env.TORA_ANALYSIS_DB?.trim() || join(data, 'tora', 'analysis', 'tora.db');
+}
 const NAME = /^tora-(\d{4}-\d{2}-\d{2})\.db\.gz$/;
 
 interface SchemaEntry {
@@ -223,6 +233,23 @@ export async function pruneBackups(dir: string, today: string): Promise<number> 
     removed++;
   }
   return removed;
+}
+
+/**
+ * Unpacks the latest backup to `target` when it is newer than the copy there (the file is
+ * replaced whole). Returns the backup's day, or null when there is no backup.
+ */
+export async function refreshAnalysisCopy(dir: string, target: string): Promise<string | null> {
+  const day = (await listBackups(dir)).at(-1);
+  if (!day) return null;
+  const file = join(dir, backupName(day));
+  const [backup, copy] = await Promise.all([stat(file), stat(target).catch(() => null)]);
+  if (copy && copy.mtimeMs >= backup.mtimeMs) return day;
+  await mkdir(dirname(target), { recursive: true });
+  const part = `${target}.part`;
+  await pipeline(createReadStream(file), createGunzip(), createWriteStream(part));
+  await rename(part, target);
+  return day;
 }
 
 export async function ensureDir(dir: string): Promise<void> {
