@@ -1,18 +1,38 @@
 // Applies estimated lot sizes to stored trades whose source did not report them (see
 // `estimateLotSize`). Re-runnable: each trade is recomputed from its original lot price, against
 // the trades of the same product, source and condition within a few days of it.
-import { estimateLotSize } from '@tora/core';
-import { and, eq, gt, inArray, sql } from 'drizzle-orm';
+import { estimateLotSize, localDate, toLocalIso } from '@tora/core';
+import { and, eq, gt, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { refreshPriceDays } from './price-days';
-import { priceDays, priceObservations } from './schema';
+import { loadSourceRegistry, saveSetting } from './registry';
+import { appSettings, priceDays, priceObservations } from './schema';
 import { clearBucketValues } from './valuation';
 
 const DAY = 86_400_000;
 /** Trades this many days before or after count as "around the same time". */
 const REFERENCE_DAYS = 3;
+/** Trades checked every night; all of them once a week. */
+const RECENT_DAYS = 14;
+const FULL_EVERY = 7 * DAY;
+const FULL_KEY = 'lotSizesFullAt';
 
-export async function inferLotSizes(db: Db): Promise<{ checked: number; updated: number }> {
+/**
+ * Estimated trades of the last `RECENT_DAYS` (their neighbours read with them), or all of them
+ * when asked or once a week (an older trade changes only when a sale near it changes).
+ */
+export async function inferLotSizes(
+  db: Db,
+  options: { full?: boolean; now?: Date } = {},
+): Promise<{ checked: number; updated: number; full: boolean }> {
+  const now = options.now ?? new Date();
+  const [last] = await db.select().from(appSettings).where(eq(appSettings.key, FULL_KEY));
+  const lastFull = typeof last?.value === 'string' ? Date.parse(last.value) : NaN;
+  const full = !!options.full || !(now.getTime() - lastFull < FULL_EVERY);
+  const recentFrom = localDate(new Date(now.getTime() - RECENT_DAYS * DAY));
+  const readFrom = localDate(new Date(now.getTime() - (RECENT_DAYS + REFERENCE_DAYS + 1) * DAY));
+  const sourceKeys = (await loadSourceRegistry(db)).sources.map((s) => s.key);
+  const bySource = sourceKeys.length ? inArray(priceDays.source, sourceKeys) : undefined;
   // Items with estimated lots among their kept sales (from the sales per day, any marked days
   // rebuilt first).
   await refreshPriceDays(db, { marksOnly: true });
@@ -20,7 +40,12 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
     await db
       .selectDistinct({ id: priceDays.productId })
       .from(priceDays)
-      .where(gt(priceDays.estimated, 0))
+      .where(
+        and(
+          gt(priceDays.estimated, 0),
+          full ? undefined : and(bySource, gte(priceDays.day, recentFrom)),
+        ),
+      )
   ).map((r) => r.id);
   let checked = 0;
   const updates: { id: string; priceBase: number }[] = [];
@@ -43,6 +68,13 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
           inArray(priceObservations.productId, productIds.slice(i, i + 50)),
           eq(priceObservations.observationType, 'sold'),
           eq(priceObservations.excluded, false),
+          // Named sources: the item + source index then reads only these days.
+          full
+            ? undefined
+            : and(
+                sourceKeys.length ? inArray(priceObservations.source, sourceKeys) : undefined,
+                gte(priceObservations.observedAt, readFrom),
+              ),
         ),
       );
     const groups = new Map<string, (typeof rows)[number][]>();
@@ -68,6 +100,7 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
         while (trades[from]!.t < trade.t - REFERENCE_DAYS * DAY) from++;
         while (to < trades.length && trades[to]!.t <= trade.t + REFERENCE_DAYS * DAY) to++;
         if (!trade.quantityInferred || trade.priceOriginal === null) continue;
+        if (!full && trade.observedAt < recentFrom) continue;
         checked++;
         const references: number[] = [];
         for (let j = from; j < to; j++) if (j !== index) references.push(trades[j]!.reference);
@@ -97,5 +130,6 @@ export async function inferLotSizes(db: Db): Promise<{ checked: number; updated:
       );
   }
   await clearBucketValues(db, [...changed]);
-  return { checked, updated: updates.length };
+  if (full) await saveSetting(db, FULL_KEY, toLocalIso(now));
+  return { checked, updated: updates.length, full };
 }

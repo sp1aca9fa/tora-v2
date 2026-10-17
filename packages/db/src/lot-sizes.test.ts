@@ -50,12 +50,31 @@ it('divides trades priced at a multiple of the going rate, and is re-runnable', 
     // Two weeks later: no neighbours, so it stays a single unit.
     trade('g', '20', 50_000),
   ]);
-  expect(await inferLotSizes(db)).toEqual({ checked: 6, updated: 2 });
+  const now = new Date('2026-10-21T12:00:00+09:00');
+  expect(await inferLotSizes(db, { now })).toEqual({ checked: 6, updated: 2, full: true });
   const price = new Map(
     (await db.select().from(priceObservations)).map((r) => [r.externalRef, r.priceBase]),
   );
   expect(price.get('c')).toBe(10_400);
   expect(price.get('e')).toBe(10_150);
   expect(price.get('g')).toBe(50_000);
-  expect(await inferLotSizes(db)).toEqual({ checked: 6, updated: 0 });
+  expect(await inferLotSizes(db, { now, full: true })).toEqual({
+    checked: 6,
+    updated: 0,
+    full: true,
+  });
+  // The next night, within the week: only the last 14 days' trades (day 20), their neighbours
+  // read with them.
+  await db
+    .insert(priceObservations)
+    .values([
+      trade('h', '19', 10_100, false),
+      trade('i', '21', 9_900, false),
+      trade('j', '21', 10_000, false),
+    ]);
+  const next = new Date('2026-10-22T12:00:00+09:00');
+  expect(await inferLotSizes(db, { now: next })).toEqual({ checked: 1, updated: 1, full: false });
+  expect(
+    (await db.select().from(priceObservations)).find((r) => r.externalRef === 'g')?.priceBase,
+  ).toBe(10_000);
 });

@@ -13,7 +13,7 @@ const db = createDb(dbConfigFromEnv());
 await exitIfUnmigrated(db);
 // Times written follow the admin's time zone (S16 part 5).
 await loadTimeZone(db);
-const lots = await inferLotSizes(db);
+const lots = await inferLotSizes(db, { full: true });
 console.log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
 const days = await refreshPriceDays(db);
 console.log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);

@@ -281,7 +281,7 @@ export async function loadHoldingsMarketData(
         .where(
           and(
             inArray(priceObservations.productId, ids),
-            inArray(priceObservations.source, sourceKeys),
+            sourceKeys.length ? inArray(priceObservations.source, sourceKeys) : undefined,
             inArray(priceObservations.observationType, ['buylist', 'listing']),
             or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
             eq(priceObservations.excluded, false),

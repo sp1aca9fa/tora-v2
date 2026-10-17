@@ -186,7 +186,9 @@ try {
 progress.update('pictures, lot sizes, chart', 0.3);
 // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
 const lots = await inferLotSizes(db);
-log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
+log(
+  `lot sizes: ${lots.checked} estimated trade(s) checked${lots.full ? ' (all)' : ''}, ${lots.updated} updated`,
+);
 // The sales per day that the pages and the steps below read (the days changed by this run and
 // the lot sizes; everything once a week).
 try {
