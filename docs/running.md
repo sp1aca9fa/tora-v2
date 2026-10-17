@@ -150,3 +150,12 @@ The checks flag sales far from an item's value and searches that keep little of 
 under **Imports > Suggestions** (exclude a sale, make a search skip a word, fill in item details).
 Nothing changes until you accept one. `--dry-run` prints the verdicts only. Sources marked `noAi`
 are never sent.
+
+## Claude Code and the hosted database
+
+Programs started by Claude Code (it sets `CLAUDECODE=1`) refuse to open the hosted database
+(Turso): its reads count against the free plan's monthly quota, and Claude's analysis questions
+are better answered from the analysis copy (see [Backups](backups.md)). The Tora MCP server is
+the exception (its tools read a few hundred rows; `query_sql` reads the analysis copy). To run a
+command against Turso from a Claude Code session anyway, prefix it yourself:
+`TORA_ALLOW_TURSO=1 pnpm ...`. A database server on this machine (localhost) is always allowed.
