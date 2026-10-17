@@ -238,19 +238,34 @@ export async function pendingMatchesForUser(db: Db, userId: string) {
 // ---------------------------------------------------------------------------------------------
 // market data (web app)
 
-/** Latest trades (sales only: store, buylist and foreign market prices are shown elsewhere). */
+/**
+ * Latest trades (sales only: store, buylist and foreign market prices are shown elsewhere): the
+ * latest of each source (one short read each on the item + source index), merged.
+ */
 export async function recentObservations(db: Db, productId: string, limit = 20) {
-  return db
-    .select()
-    .from(priceObservations)
-    .where(
-      and(
-        eq(priceObservations.productId, productId),
-        eq(priceObservations.observationType, 'sold'),
-      ),
+  const sources = (await loadSourceRegistry(db)).sources.map((s) => s.key);
+  const lists = await Promise.all(
+    sources.map((source) =>
+      db
+        .select()
+        .from(priceObservations)
+        .where(
+          and(
+            eq(priceObservations.productId, productId),
+            eq(priceObservations.source, source),
+            eq(priceObservations.observationType, 'sold'),
+          ),
+        )
+        .orderBy(desc(priceObservations.observedAt), desc(priceObservations.createdAt))
+        .limit(limit),
+    ),
+  );
+  return lists
+    .flat()
+    .sort(
+      (a, b) => b.observedAt.localeCompare(a.observedAt) || b.createdAt.localeCompare(a.createdAt),
     )
-    .orderBy(desc(priceObservations.observedAt), desc(priceObservations.createdAt))
-    .limit(limit);
+    .slice(0, limit);
 }
 
 export interface BucketStat {
