@@ -108,8 +108,12 @@ Google Takeout (a Gmail filter and label, then Mail limited to that label), then
 pnpm purchases <export.mbox> --user <username> [--source <source>]
 ```
 
+Takeout may report "No data found" for a label applied shortly before; export again later.
+
 The app never gets access to Gmail. Purchases already registered are skipped, differing ones and
-likely duplicates are asked about, cancelled orders are left out, and nothing is written before
+likely duplicates are asked about, cancelled orders are left out, items an importer leaves out on
+purpose (e.g. not collectibles) are listed, an order of several items becomes one lot per item,
+and nothing is written before
 you confirm. Imported lots wait under **Imports > Review** for their grade or packaging.
 
 **Purchase links.** For shops that send no receipt email, paste the links of what you bought under

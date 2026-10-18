@@ -101,7 +101,7 @@ for (const importer of selected) {
       exportedAt = mail.date.toISOString();
     }
     const parsed = importer.parse!(mail);
-    if (parsed) mails.push(parsed);
+    if (parsed) mails.push(...[parsed].flat());
   }
   const gathered = gatherReceipts(mails);
   const plan = await planImport(db, user.id, importer, gathered, { exportedAt });
@@ -122,6 +122,11 @@ for (const importer of selected) {
     'Could not tell what product this is (add by hand with its order ID)',
     of('unclassified'),
   );
+  if (gathered.skipped.length) {
+    console.log(`Left out on purpose (${gathered.skipped.length}):`);
+    for (const s of gathered.skipped) console.log(`  ${s.title} (${s.reason.replace(/_/g, ' ')})`);
+    console.log('');
+  }
   if (gathered.unreadable.length) {
     console.log(`Emails that could not be read (${gathered.unreadable.length}):`);
     for (const u of gathered.unreadable) console.log(`  ${u.subject} (${u.reason})`);
@@ -211,12 +216,19 @@ for (const importer of selected) {
     source: importer.source,
   });
   const outcome = await applyImport(db, user.id, importer, plan, decisions, { importRunId: run });
-  // Emails that could not be read go in the import's log too.
-  await saveImportRows(
-    db,
-    run,
-    gathered.unreadable.map((u) => ({ title: u.subject, outcome: 'problem', reason: u.reason })),
-  );
+  // Emails that could not be read and items left out go in the import's log too.
+  await saveImportRows(db, run, [
+    ...gathered.unreadable.map((u) => ({
+      title: u.subject,
+      outcome: 'problem' as const,
+      reason: u.reason,
+    })),
+    ...gathered.skipped.map((s) => ({
+      title: s.title,
+      outcome: 'skipped' as const,
+      reason: s.reason,
+    })),
+  ]);
   await finishImportRun(db, run, {
     imported: outcome.created,
     corrected: outcome.updated,

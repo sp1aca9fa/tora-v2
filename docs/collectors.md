@@ -239,10 +239,12 @@ page budget.
 ## Purchase importers
 
 A `PurchaseImporter` reads purchases from a shop into lots: from order emails
-(`matchesHeader`, `parse` returning `ReceiptMail`), and/or from links the user pastes in the app
-(`matchesLink`, `readLink`, for shops that send no receipt). `productFor` makes a new item from a
-receipt and `holdingFor` reads the lot's condition. Amounts are in the shop's currency's smallest
-unit. See [Running collectors](running.md#imports) for how imports run.
+(`matchesHeader`, `parse` returning a `ReceiptMail`, or a list for an order of several items), and/or
+from links the user pastes in the app (`matchesLink`, `readLink`, for shops that send no receipt).
+Each item of a several-item order gets its own key (`<order>#2`); items left out on purpose are
+`{ kind: 'skip', title, reason }`. `productFor` makes a new item from a receipt (an existing item
+of the same name, spaces, 「」 and ボックス/BOX aside, is reused) and `holdingFor` reads the lot's
+condition. Amounts are in the shop's currency's smallest unit. See [Running collectors](running.md#imports) for how imports run.
 
 ## Checklist before turning a source on
 

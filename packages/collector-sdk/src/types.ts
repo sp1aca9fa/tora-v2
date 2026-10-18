@@ -185,7 +185,9 @@ export type ReceiptMail =
   /** An item arrived. Shops may not say which order (SNKRDUNK does not): matched per item. */
   | { kind: 'delivered'; title: string; quantity: number; at: string }
   /** Something about an order worth a look, e.g. `deadline_missed` (the buyer may cancel). */
-  | { kind: 'notice'; orderId: string; reason: string };
+  | { kind: 'notice'; orderId: string; reason: string }
+  /** An item left out on purpose (e.g. not a collectible), with the reason; reported once. */
+  | { kind: 'skip'; title: string; reason: string; orderId?: string };
 
 /**
  * Reads a marketplace's purchases (requirements S5b): from receipt emails, from links the user
@@ -198,8 +200,8 @@ export interface PurchaseImporter {
   label: string;
   /** Cheap pre-filter on a raw header block (e.g. the sender domain). */
   matchesHeader?(rawHeader: string): boolean;
-  /** Null for mails that are not receipts or cancellations. */
-  parse?(mail: Email): ReceiptMail | null;
+  /** Null for mails that are not receipts or cancellations; a list for orders of several items. */
+  parse?(mail: Email): ReceiptMail | ReceiptMail[] | null;
   /** Whether a pasted link is this marketplace's. */
   matchesLink?(url: string): boolean;
   /** Reads a pasted link to something the user bought. */

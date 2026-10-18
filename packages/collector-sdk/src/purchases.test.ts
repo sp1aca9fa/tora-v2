@@ -248,6 +248,59 @@ describe('purchase import', () => {
     );
     expect(plan[0]).toMatchObject({ type: 'new', ref: { existing: { id: existing.product.id } } });
   });
+
+  it('reuses a product another shop names with brackets, ボックス and a set code', async () => {
+    const existing = await createHolding(
+      db,
+      userId,
+      {
+        product: {
+          category: 'tcg',
+          kind: 'booster_box',
+          name: 'ポケモンカードゲーム 拡張パック「テスト」ボックス',
+          setCode: 'sv9',
+        },
+      },
+      holdingInput({ costTotalBase: 1 }),
+    );
+    const plan = await planImport(
+      db,
+      userId,
+      importer,
+      gatherReceipts([
+        {
+          kind: 'purchase',
+          receipt: receipt('300', { title: 'ポケモンカードゲーム 拡張パック テスト BOX' }),
+        },
+      ]),
+    );
+    expect(plan[0]).toMatchObject({ type: 'new', ref: { existing: { id: existing.product.id } } });
+  });
+
+  it('keeps an order mail over its payment mail, and lists skipped items once', () => {
+    const gathered = gatherReceipts([
+      { kind: 'purchase', receipt: receipt('400', { dateApprox: true, orderedAt: 'paid' }) },
+      { kind: 'skip', title: 'Plush', reason: 'not_card_product', orderId: '400' },
+      { kind: 'purchase', receipt: receipt('400', { orderedAt: 'ordered' }) },
+      { kind: 'skip', title: 'Plush', reason: 'not_card_product', orderId: '400' },
+    ]);
+    expect(gathered.receipts.map((r) => r.orderedAt)).toEqual(['ordered']);
+    expect(gathered.skipped).toEqual([{ title: 'Plush', reason: 'not_card_product' }]);
+  });
+
+  it('cancels every item of a cancelled order', async () => {
+    const plan = await planImport(
+      db,
+      userId,
+      importer,
+      gatherReceipts([
+        { kind: 'purchase', receipt: receipt('500#1') },
+        { kind: 'purchase', receipt: receipt('500#2') },
+        { kind: 'cancel', orderId: '500' },
+      ]),
+    );
+    expect(plan.map((e) => e.type)).toEqual(['cancelled', 'cancelled']);
+  });
 });
 
 describe('review flags', () => {

@@ -35,25 +35,43 @@ export async function listingsOf(
     .orderBy(productSources.createdAt);
 }
 
-/** A shared product with the same name, kind and card identity (to avoid creating it twice). */
+/**
+ * A product name without what shops write differently: spaces, 「」 brackets, ボックス for BOX
+ * (Pokemon Center's "拡張パック ステラミラクル BOX" is SNKRDUNK's "拡張パック「ステラミラクル」ボックス").
+ */
+export const looseName = (name: string) =>
+  name
+    .normalize('NFKC')
+    .replace(/ボックス/g, 'BOX')
+    .replace(/[\s「」『』"']/g, '')
+    .toLowerCase();
+
+/**
+ * A shared product with the same name, kind and card identity, to avoid creating it twice; else
+ * one with the same loose name, whatever its set code when the input has none (a shop's name
+ * without the set code is still that product).
+ */
 export async function findSameProduct(
   db: Db,
   input: Pick<Product, 'name' | 'kind'> & Partial<Pick<Product, 'setCode' | 'cardNumber'>>,
 ): Promise<Product | null> {
   const same = (column: AnySQLiteColumn, value: string | null | undefined) =>
     value ? eq(column, value) : isNull(column);
-  const [row] = await db
+  const rows = await db
     .select()
     .from(products)
     .where(
       and(
-        eq(products.name, input.name),
         eq(products.kind, input.kind),
-        same(products.setCode, input.setCode),
+        input.setCode ? same(products.setCode, input.setCode) : undefined,
         same(products.cardNumber, input.cardNumber),
       ),
     )
-    .orderBy(products.createdAt)
-    .limit(1);
-  return row ?? null;
+    .orderBy(products.createdAt);
+  const loose = looseName(input.name);
+  return (
+    rows.find((p) => p.name === input.name && !p.setCode === !input.setCode) ??
+    rows.find((p) => looseName(p.name) === loose) ??
+    null
+  );
 }

@@ -87,6 +87,8 @@ export interface GatheredReceipts {
   receipts: PurchaseReceipt[];
   cancelled: Set<string>;
   unreadable: { subject: string; reason: string }[];
+  /** Items left out on purpose (e.g. not collectibles), with the reason. */
+  skipped: { title: string; reason: string }[];
   /** Delivery mails per item title (they may not name the order). */
   deliveries: Map<string, number>;
   /** Reasons to review an order, per transaction ID (e.g. `deadline_missed`). */
@@ -99,6 +101,8 @@ export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
   const byId = new Map<string, PurchaseReceipt>();
   const cancelled = new Set<string>();
   const unreadable: GatheredReceipts['unreadable'] = [];
+  const skipped: GatheredReceipts['skipped'] = [];
+  const skippedKeys = new Set<string>();
   const deliveries = new Map<string, number>();
   const notices = new Map<string, Set<string>>();
   let latestAt: string | null = null;
@@ -107,7 +111,11 @@ export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
   };
   for (const mail of mails) {
     if (mail.kind === 'purchase') {
-      if (!byId.has(mail.receipt.orderId)) byId.set(mail.receipt.orderId, mail.receipt);
+      // One receipt per ID; an exact date wins over an approximate one (e.g. a payment mail).
+      const had = byId.get(mail.receipt.orderId);
+      if (!had || (had.dateApprox && !mail.receipt.dateApprox)) {
+        byId.set(mail.receipt.orderId, mail.receipt);
+      }
       seen(mail.receipt.orderedAt);
     } else if (mail.kind === 'cancel') cancelled.add(mail.orderId);
     else if (mail.kind === 'delivered') {
@@ -115,10 +123,15 @@ export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
       seen(mail.at);
     } else if (mail.kind === 'notice') {
       notices.set(mail.orderId, (notices.get(mail.orderId) ?? new Set()).add(mail.reason));
+    } else if (mail.kind === 'skip') {
+      // Order and payment mails may both list it.
+      const key = `${mail.orderId ?? ''}|${titleKey(mail.title)}`;
+      if (!skippedKeys.has(key)) skipped.push({ title: mail.title, reason: mail.reason });
+      skippedKeys.add(key);
     } else unreadable.push({ subject: mail.subject, reason: mail.reason });
   }
   const receipts = [...byId.values()].sort((a, b) => a.orderedAt.localeCompare(b.orderedAt));
-  return { receipts, cancelled, unreadable, deliveries, notices, latestAt };
+  return { receipts, cancelled, unreadable, skipped, deliveries, notices, latestAt };
 }
 
 /** An existing product, or one to create from the receipt. */
@@ -235,14 +248,20 @@ export async function planImport(
   const cancelledInApp = await cancelledOrderIds(db, userId, importer.source);
   const { flags } = reviewFlags(gathered, cancelledInApp, options.exportedAt ?? gathered.latestAt);
 
+  // An item of a several-item order ("<order>#2") is cancelled with its order.
+  const orderOf = (id: string) => id.replace(/#\d+$/, '');
+  const isCancelled = (id: string) =>
+    gathered.cancelled.has(id) || gathered.cancelled.has(orderOf(id));
   const entries: PlanEntry[] = [];
   for (const receipt of gathered.receipts) {
     const existing = byOrder.get(receipt.orderId) ?? [];
-    if (cancelledInApp.has(receipt.orderId) && !gathered.cancelled.has(receipt.orderId)) {
+    const inApp =
+      cancelledInApp.has(receipt.orderId) || cancelledInApp.has(orderOf(receipt.orderId));
+    if (inApp && !isCancelled(receipt.orderId)) {
       entries.push({ type: 'cancelledInApp', receipt });
       continue;
     }
-    if (gathered.cancelled.has(receipt.orderId)) {
+    if (isCancelled(receipt.orderId)) {
       entries.push(
         existing.length
           ? { type: 'cancelledRegistered', receipt, existing }
