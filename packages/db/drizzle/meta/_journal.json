@@ -239,6 +239,20 @@
       "when": 1792261964225,
       "tag": "0033_db_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1792310423693,
+      "tag": "0034_item_sales",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1792310788326,
+      "tag": "0035_drop_price_days",
+      "breakpoints": true
     }
   ]
 }

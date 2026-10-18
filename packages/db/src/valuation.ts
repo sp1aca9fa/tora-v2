@@ -30,7 +30,7 @@ import {
 import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Db } from './client';
-import { daysBack, soldDays } from './price-days';
+import { daysBack, loadItemSales, soldDays, unpackSales } from './item-sales';
 import { loadSourceRegistry } from './registry';
 import {
   type Holding,
@@ -43,7 +43,6 @@ import {
   holdings,
   manualPrices,
   portfolioCharts,
-  priceDays,
   priceObservations,
   productSources,
   products,
@@ -120,8 +119,80 @@ async function valuationSettings(
   };
 }
 
-/** Observations (sold + buylist) and the user's manual prices for a set of products. */
+/** Each product's manual prices (of the user; none for null) and its listings' recent sales. */
+async function manualAndRecent(db: Db, userId: string | null, productIds: string[]) {
+  const recent = new Map<string, RecentSaleInput[]>();
+  const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
+  for (let i = 0; i < productIds.length; i += 200) {
+    const ids = productIds.slice(i, i + 200);
+    if (userId) {
+      const prices = await db
+        .select()
+        .from(manualPrices)
+        .where(and(eq(manualPrices.userId, userId), inArray(manualPrices.productId, ids)));
+      for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
+    }
+    const links = await db
+      .select({
+        productId: productSources.productId,
+        source: productSources.source,
+        recentSales: productSources.recentSales,
+      })
+      .from(productSources)
+      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
+    for (const l of links) {
+      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
+      recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
+    }
+  }
+  return { recent, manual };
+}
+
+/**
+ * Observations (sales, shop asks and buy prices of the primary market's currency, kept ones, from
+ * `since`) and the user's manual prices for a set of products, from the packed item sales: one
+ * row per product.
+ */
 export async function loadMarketData(
+  db: Db,
+  userId: string | null,
+  productIds: string[],
+  now = new Date(),
+  /** Oldest observation to load (ISO); defaults to what valuing `now` needs. */
+  since: string = toLocalIso(new Date(now.getTime() - LOOKBACK_DAYS * DAY)),
+): Promise<MarketData> {
+  const observations = new Map<string, ValuationObservation[]>();
+  const settings = await valuationSettings(db);
+  if (productIds.length === 0) {
+    return { observations, recent: new Map(), manual: new Map(), ...settings };
+  }
+  const currency = await valuedCurrency(db);
+  const packed = await loadItemSales(db, productIds);
+  for (const [productId, sales] of packed) {
+    const list = unpackSales(sales, { since, currency, types: ['sold', 'buylist', 'listing'] }).map(
+      ({ currency: _currency, ...o }) => o,
+    );
+    if (list.length) observations.set(productId, list);
+  }
+  return { observations, ...(await manualAndRecent(db, userId, productIds)), ...settings };
+}
+
+/** Market data for valuing these products' buckets today (see `loadMarketData`). */
+export async function loadHoldingsMarketData(
+  db: Db,
+  /** Whose manual prices to load; null for none. */
+  userId: string | null,
+  wanted: { productId: string; bucket: string | null }[],
+  now = new Date(),
+): Promise<MarketData> {
+  return loadMarketData(db, userId, [...new Set(wanted.map((w) => w.productId))], now);
+}
+
+/**
+ * `loadMarketData` from the raw sales, each with its id (for tools that point at single sales:
+ * the odd-sales review, the MCP tools). The same observations otherwise.
+ */
+export async function rawMarketData(
   db: Db,
   userId: string,
   productIds: string[],
@@ -171,188 +242,6 @@ export async function loadMarketData(
       .from(manualPrices)
       .where(and(eq(manualPrices.userId, userId), inArray(manualPrices.productId, ids)));
     for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
-    const links = await db
-      .select({
-        productId: productSources.productId,
-        source: productSources.source,
-        recentSales: productSources.recentSales,
-      })
-      .from(productSources)
-      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
-    for (const l of links) {
-      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
-      recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
-    }
-  }
-  return { observations, recent, manual, ...(await valuationSettings(db)) };
-}
-
-/** Sales a valuation may use (the filters of `loadMarketData`). */
-const valuedSales = (currency: string) =>
-  and(
-    eq(priceObservations.observationType, 'sold'),
-    or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
-    eq(priceObservations.excluded, false),
-  );
-
-/**
- * Market data for valuing holdings today, with only the sales their valuation can reach: the
- * same results as `loadMarketData` for these buckets, a fraction of the rows (popular boxes sell
- * hundreds a month, and graded sales of grades not held are never used). Sales are counted per
- * product, source and bucket first; each held bucket then loads from the shortest window that
- * decides its value and confidence (see `valueUnit`): 30 days with 5+ sales, 180 with 3+ in 180
- * days, a year with 3+ in a year, else everything, its similar conditions included.
- */
-export async function loadHoldingsMarketData(
-  db: Db,
-  /** Whose manual prices to load; null for none. */
-  userId: string | null,
-  wanted: { productId: string; bucket: string | null }[],
-  now = new Date(),
-): Promise<MarketData> {
-  const productIds = [...new Set(wanted.map((w) => w.productId))];
-  const observations = new Map<string, ValuationObservation[]>();
-  const recent = new Map<string, RecentSaleInput[]>();
-  const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
-  const settings = await valuationSettings(db);
-  const { pools } = settings;
-  if (productIds.length === 0) return { observations, recent, manual, ...settings };
-  const currency = await valuedCurrency(db);
-  const sourceKeys = (await loadSourceRegistry(db)).sources.map((x) => x.key);
-  // Sales are counted over the exact windows and loaded with a day of margin (rows older than a
-  // window are never used, so extra is safe).
-  const exact = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
-  const ago = (days: number) => toLocalIso(new Date(now.getTime() - (days + 1) * DAY));
-  const since = ago(LOOKBACK_DAYS);
-  const [c30, c180, c365] = [ago(30), ago(180), ago(LONG_WINDOW)];
-  const add = (rows: (ValuationObservation & { productId: string })[]) => {
-    for (const { productId, ...o } of rows) {
-      const list = observations.get(productId);
-      if (list) list.push(o);
-      else observations.set(productId, [o]);
-    }
-  };
-  const columns = {
-    id: priceObservations.id,
-    productId: priceObservations.productId,
-    source: priceObservations.source,
-    bucket: priceObservations.bucket,
-    priceBase: priceObservations.priceBase,
-    observedAt: priceObservations.observedAt,
-    observationType: priceObservations.observationType,
-    excluded: priceObservations.excluded,
-    quantityInferred: priceObservations.quantityInferred,
-  };
-
-  const counts: {
-    productId: string;
-    source: string;
-    bucket: string | null;
-    n30: number;
-    n180: number;
-    n365: number;
-  }[] = [];
-  // Counted from the sales per day, whole days inside each window only: a count is never above
-  // the exact one, so a window is never too short (a longer one loads more, which is safe).
-  const sinceDay = since.slice(0, 10);
-  const inside = (days: number) => exact(days).slice(0, 10);
-  const [d30, d180, d365] = [inside(30), inside(180), inside(LONG_WINDOW)];
-  const counted = new Map<string, (typeof counts)[number]>();
-  for (const d of await soldDays(db, productIds, { since: sinceDay, currency })) {
-    const key = `${d.productId}|${d.source}|${d.bucket ?? ''}`;
-    let c = counted.get(key);
-    if (!c) {
-      c = { productId: d.productId, source: d.source, bucket: d.bucket, n30: 0, n180: 0, n365: 0 };
-      counted.set(key, c);
-    }
-    if (d.day > d30) c.n30 += d.prices.length;
-    if (d.day > d180) c.n180 += d.prices.length;
-    if (d.day > d365) c.n365 += d.prices.length;
-  }
-  counts.push(...counted.values());
-  for (let i = 0; i < productIds.length; i += 200) {
-    const ids = productIds.slice(i, i + 200);
-    // Shops' asking and buy prices are used for 30 days only (each source named: the item +
-    // source index then reads only those days).
-    add(
-      await db
-        .select(columns)
-        .from(priceObservations)
-        .where(
-          and(
-            inArray(priceObservations.productId, ids),
-            sourceKeys.length ? inArray(priceObservations.source, sourceKeys) : undefined,
-            inArray(priceObservations.observationType, ['buylist', 'listing']),
-            or(isNull(priceObservations.currency), eq(priceObservations.currency, currency)),
-            eq(priceObservations.excluded, false),
-            gte(priceObservations.observedAt, c30),
-          ),
-        ),
-    );
-  }
-
-  // Oldest sale needed per product + source + bucket.
-  const from = new Map<string, { productId: string; source: string; bucket: string; at: string }>();
-  const need = (productId: string, source: string, bucket: string, at: string) => {
-    const key = `${productId}|${source}|${bucket}`;
-    const had = from.get(key);
-    if (!had || at < had.at) from.set(key, { productId, source, bucket, at });
-  };
-  for (const { productId, bucket } of wanted) {
-    if (!bucket) continue;
-    const family = bucketFamily(bucket, pools);
-    const ofProduct = counts.filter((c) => c.productId === productId && c.bucket !== null);
-    for (const source of new Set(ofProduct.map((c) => c.source))) {
-      const own = ofProduct.find((c) => c.source === source && c.bucket === bucket);
-      const [n30, n180, n365] = [
-        Number(own?.n30 ?? 0),
-        Number(own?.n180 ?? 0),
-        Number(own?.n365 ?? 0),
-      ];
-      const at = n30 >= 5 ? c30 : n180 >= 3 ? c180 : n365 >= 3 ? c365 : since;
-      if (own) need(productId, source, bucket, at);
-      // No own window holds 3 sales: similar conditions are pooled.
-      if (at === since && family !== null) {
-        for (const c of ofProduct) {
-          if (c.source === source && bucketFamily(c.bucket!, pools) === family) {
-            need(productId, source, c.bucket!, since);
-          }
-        }
-      }
-    }
-  }
-  const byStart = new Map<string, { productId: string; source: string; bucket: string }[]>();
-  for (const { at, ...key } of from.values()) byStart.set(at, [...(byStart.get(at) ?? []), key]);
-  for (const [at, keys] of byStart) {
-    for (let i = 0; i < keys.length; i += 300) {
-      const rows = sql.join(
-        keys.slice(i, i + 300).map((k) => sql`(${k.productId}, ${k.source}, ${k.bucket})`),
-        sql`, `,
-      );
-      add(
-        await db
-          .select(columns)
-          .from(priceObservations)
-          .where(
-            and(
-              sql`(${priceObservations.productId}, ${priceObservations.source}, ${priceObservations.bucket}) in (values ${rows})`,
-              valuedSales(currency),
-              gte(priceObservations.observedAt, at),
-            ),
-          ),
-      );
-    }
-  }
-
-  for (let i = 0; i < productIds.length; i += 200) {
-    const ids = productIds.slice(i, i + 200);
-    if (userId) {
-      const prices = await db
-        .select()
-        .from(manualPrices)
-        .where(and(eq(manualPrices.userId, userId), inArray(manualPrices.productId, ids)));
-      for (const p of prices) manual.set(p.productId, [...(manual.get(p.productId) ?? []), p]);
-    }
     const links = await db
       .select({
         productId: productSources.productId,
@@ -1264,7 +1153,7 @@ export interface PricePoint {
   estimated: number;
 }
 
-/** Daily sold medians per source + bucket for a product's price chart (from `price_days`). */
+/** Daily sold medians per source + bucket for a product's price chart (from its packed sales). */
 export async function priceHistory(
   db: Db,
   productId: string,
@@ -1519,33 +1408,25 @@ export async function refreshTradeCounts(
   periods: readonly number[],
   now = new Date(),
 ): Promise<SavedTradeCounts> {
-  // From the sales per day: whole days.
-  const longest = Math.max(...periods);
-  const counts = Object.fromEntries(
-    periods.map((days) => [
-      `d${days}`,
-      sql<number>`sum(case when ${priceDays.day} >= ${daysBack(days, now)} then json_array_length(${priceDays.prices}) else 0 end)`,
-    ]),
+  // From the packed item sales (one row per item).
+  const since = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
+  const owned = await db
+    .selectDistinct({ id: holdings.productId })
+    .from(holdings)
+    .where(eq(holdings.status, 'owned'));
+  const packed = await loadItemSales(
+    db,
+    owned.map((o) => o.id),
   );
-  const rows = await db
-    .select({ productId: priceDays.productId, ...counts })
-    .from(priceDays)
-    .where(
-      and(
-        sql`${priceDays.productId} in (select ${holdings.productId} from ${holdings} where ${holdings.status} = 'owned')`,
-        gte(priceDays.day, daysBack(longest, now)),
-      ),
-    )
-    .groupBy(priceDays.productId);
+  const oldest = since(Math.max(...periods));
+  const counted = [...packed].map(([productId, sales]) => {
+    const at = unpackSales(sales, { since: oldest, types: ['sold'] }).map((o) => o.observedAt);
+    return [productId, periods.map((days) => at.filter((t) => t >= since(days)).length)] as const;
+  });
   const saved: SavedTradeCounts = {
     day: localDate(now),
     periods: [...periods],
-    counts: Object.fromEntries(
-      rows.map((r) => {
-        const row = r as unknown as Record<string, unknown>;
-        return [r.productId, periods.map((days) => Number(row[`d${days}`] ?? 0))];
-      }),
-    ),
+    counts: Object.fromEntries(counted.filter(([, n]) => n.some((x) => x > 0))),
   };
   await db
     .insert(appSettings)

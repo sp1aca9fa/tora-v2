@@ -2,11 +2,11 @@
 // `estimateLotSize`). Re-runnable: each trade is recomputed from its original lot price, against
 // the trades of the same product, source and condition within a few days of it.
 import { estimateLotSize, localDate, toLocalIso } from '@tora/core';
-import { and, eq, gt, gte, inArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { refreshPriceDays } from './price-days';
+import { loadItemSales, refreshItemSales } from './item-sales';
 import { loadSourceRegistry, saveSetting } from './registry';
-import { appSettings, priceDays, priceObservations } from './schema';
+import { appSettings, priceObservations } from './schema';
 import { clearBucketValues } from './valuation';
 
 const DAY = 86_400_000;
@@ -32,21 +32,18 @@ export async function inferLotSizes(
   const recentFrom = localDate(new Date(now.getTime() - RECENT_DAYS * DAY));
   const readFrom = localDate(new Date(now.getTime() - (RECENT_DAYS + REFERENCE_DAYS + 1) * DAY));
   const sourceKeys = (await loadSourceRegistry(db)).sources.map((s) => s.key);
-  const bySource = sourceKeys.length ? inArray(priceDays.source, sourceKeys) : undefined;
-  // Items with estimated lots among their kept sales (from the sales per day, any marked days
-  // rebuilt first).
-  await refreshPriceDays(db, { marksOnly: true });
-  const productIds = (
-    await db
-      .selectDistinct({ id: priceDays.productId })
-      .from(priceDays)
-      .where(
-        and(
-          gt(priceDays.estimated, 0),
-          full ? undefined : and(bySource, gte(priceDays.day, recentFrom)),
-        ),
-      )
-  ).map((r) => r.id);
+  // Items with estimated lots among their kept sales (from the packed item sales, any marked days
+  // updated first).
+  await refreshItemSales(db, { marksOnly: true });
+  const productIds = [...(await loadItemSales(db))]
+    .filter(([, sales]) =>
+      sales.groups.some(
+        (g) =>
+          g.t === 'sold' &&
+          g.e.some((i) => full || toLocalIso(new Date(g.at[i]!)).slice(0, 10) >= recentFrom),
+      ),
+    )
+    .map(([id]) => id);
   let checked = 0;
   const updates: { id: string; priceBase: number }[] = [];
   const changed = new Set<string>();

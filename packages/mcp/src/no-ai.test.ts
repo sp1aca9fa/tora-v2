@@ -16,11 +16,11 @@ describe('sources kept from AI models (query_sql)', () => {
     ).toContain("from (select * from price_observations where source not in ('ebay')) as o join");
     expect(ok('select 1 from products')).toBe('select 1 from products');
   });
-  it('guards the sales per day too', () => {
-    expect(ok('select d.day from price_days d join price_days_dirty x using (day)')).toBe(
-      "select d.day from (select * from price_days where source not in ('ebay')) as d join (select * from price_days_dirty where source not in ('ebay')) as x using (day)",
+  it('guards the change marks, and refuses the packed item sales', () => {
+    expect(ok('select x.day from price_days_dirty x')).toBe(
+      "select x.day from (select * from price_days_dirty where source not in ('ebay')) as x",
     );
-    expect(withoutSources('select * from main.price_days', ['ebay'])).toHaveProperty('error');
+    expect(withoutSources('select * from item_sales', ['ebay'])).toHaveProperty('error');
   });
   it('refuses other ways to reach the table', () => {
     expect(withoutSources('select * from main.price_observations', ['ebay'])).toHaveProperty(

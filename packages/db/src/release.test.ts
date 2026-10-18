@@ -1,4 +1,4 @@
-import { refreshPriceDays } from './price-days';
+import { refreshItemSales } from './item-sales';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -214,7 +214,7 @@ describe('with a database', () => {
         obs('2021-03-01T10:00:00.000+09:00', true),
         obs('2021-05-01T10:00:00.000+09:00', false),
       ]);
-    await refreshPriceDays(db);
+    await refreshItemSales(db);
     const dates = await releaseDates(db, [own, sold, none]);
     expect(dates.get(own.id)).toEqual({ date: '2020-01-02', from: 'item' });
     expect(dates.get(sold.id)).toEqual({ date: '2021-05-01', from: 'first_sale' });

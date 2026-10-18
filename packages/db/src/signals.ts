@@ -14,18 +14,10 @@ import {
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { refreshPriceDays, soldDays } from './price-days';
+import { loadItemSales, refreshItemSales, soldDays, soldDaysOf } from './item-sales';
 import { loadSourceRegistry, saveSetting } from './registry';
 import { releaseDates, similarKey } from './release';
-import {
-  type Product,
-  appSettings,
-  holdings,
-  priceDays,
-  products,
-  signals,
-  watches,
-} from './schema';
+import { type Product, appSettings, holdings, products, signals, watches } from './schema';
 import { currentSupply, lowestAsk } from './supply';
 import { holdingBucket, savedBucketValues } from './valuation';
 
@@ -38,7 +30,8 @@ const seriesKey = (productId: string, source: string, bucket: string | null) =>
 
 /**
  * Daily medians of kept sales in the primary market's currency, per product, source and bucket
- * (`seriesKey`), oldest first; from `since` (ISO, whole days) or all. Read from `price_days`.
+ * (`seriesKey`), oldest first; from `since` (ISO, whole days) or all. Read from the packed item
+ * sales.
  */
 export async function dailySeries(
   db: Db,
@@ -126,8 +119,8 @@ export async function refreshSignals(
 }> {
   const pairs = await valuedPairs(db);
   if (pairs.length === 0) return { saved: 0, withPattern: 0, rows: [] };
-  // The daily prices come from the sales per day: any days still marked are rebuilt first.
-  await refreshPriceDays(db, { marksOnly: true });
+  // The daily prices come from the packed item sales: any days still marked are updated first.
+  await refreshItemSales(db, { marksOnly: true });
   const today = localDate(now);
   const productIds = [...new Set(pairs.map((p) => p.product.id))];
   const since = toLocalIso(new Date(now.getTime() - SERIES_DAYS * DAY));
@@ -317,18 +310,27 @@ async function pickSamples(db: Db, now: Date): Promise<void> {
   if (look) {
     await saveSetting(db, 'strategySamplesChecked', localDate(now));
     const since = localDate(new Date(now.getTime() - 2 * 365 * DAY));
-    const days = sql<number>`count(DISTINCT ${priceDays.day})`;
-    const counts = await db
-      .select({
-        productId: priceDays.productId,
-        source: priceDays.source,
-        bucket: priceDays.bucket,
-        n: days,
-      })
-      .from(priceDays)
-      .where(and(sql`${priceDays.prices} <> '[]'`, gte(priceDays.day, since)))
-      .groupBy(priceDays.productId, priceDays.source, priceDays.bucket)
-      .orderBy(desc(days));
+    // Days with a kept sale per item, source and condition (from the packed item sales).
+    const byKey = new Map<
+      string,
+      { productId: string; source: string; bucket: string | null; days: Set<string> }
+    >();
+    for (const [productId, sales] of await loadItemSales(db)) {
+      for (const d of soldDaysOf(productId, sales, { since })) {
+        const key = `${productId}|${d.source}|${d.bucket ?? ''}`;
+        const c = byKey.get(key) ?? {
+          productId,
+          source: d.source,
+          bucket: d.bucket,
+          days: new Set(),
+        };
+        c.days.add(d.day);
+        byKey.set(key, c);
+      }
+    }
+    const counts = [...byKey.values()]
+      .map((c) => ({ ...c, n: c.days.size }))
+      .sort((a, b) => b.n - a.n);
     for (const c of counts) {
       const p = byId.get(c.productId);
       const type = p && productClass(p);

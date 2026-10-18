@@ -2,18 +2,12 @@
 // from the set code or name they have (unsure links are suggested on Actions), take the set's
 // release date (else their own, else their first collected sale), and are grouped with similar
 // items for the new-set pattern.
-import { and, eq, inArray, isNull, min, ne, sql } from 'drizzle-orm';
+import { toLocalIso } from '@tora/core';
+import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { Db } from './client';
+import { loadItemSales } from './item-sales';
 import { fileSuggestion } from './suggestions';
-import {
-  type Product,
-  type TcgSet,
-  priceDays,
-  products,
-  suggestions,
-  tcgSets,
-  users,
-} from './schema';
+import { type Product, type TcgSet, products, suggestions, tcgSets, users } from './schema';
 
 /** Set code for comparison: "sv2a" and "SV2A" are the same code. */
 export function setCodeKey(code: string | null | undefined): string | null {
@@ -221,16 +215,11 @@ export async function releaseDates(
     else if (p.releaseDate) out.set(p.id, { date: p.releaseDate.slice(0, 10), from: 'item' });
     else rest.push(p.id);
   }
-  for (let i = 0; i < rest.length; i += 500) {
-    const rows = await db
-      .select({ id: priceDays.productId, first: min(priceDays.day) })
-      .from(priceDays)
-      .where(
-        and(inArray(priceDays.productId, rest.slice(i, i + 500)), sql`${priceDays.prices} <> '[]'`),
-      )
-      .groupBy(priceDays.productId);
-    for (const r of rows) {
-      if (r.first) out.set(r.id, { date: r.first.slice(0, 10), from: 'first_sale' });
+  // The first kept sale, from the packed item sales (one row per item).
+  for (const [id, sales] of await loadItemSales(db, rest)) {
+    const first = Math.min(...sales.groups.filter((g) => g.t === 'sold').map((g) => g.at[0]!));
+    if (Number.isFinite(first)) {
+      out.set(id, { date: toLocalIso(new Date(first)).slice(0, 10), from: 'first_sale' });
     }
   }
   return out;

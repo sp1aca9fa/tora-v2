@@ -14,7 +14,7 @@ import {
   listUsers,
   recordActivity,
   refreshBucketValues,
-  refreshPriceDays,
+  refreshItemSales,
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
@@ -207,13 +207,13 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   log(
     `lot sizes: ${lots.checked} estimated trade(s) checked${lots.full ? ' (all)' : ''}, ${lots.updated} updated`,
   );
-  // The sales per day that the pages and the steps below read (the days changed by this run and
-  // the lot sizes; everything once a week).
+  // Each item's packed sales, which the pages and the steps below read (the days changed by this
+  // run and the lot sizes; everything once a week).
   try {
-    const days = await refreshPriceDays(db);
-    log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
+    const days = await refreshItemSales(db);
+    log(`item sales: ${days.items} item(s) updated${days.full ? ' (full rebuild)' : ''}`);
   } catch (error) {
-    log(`sales per day: stopped (${errorText(error)})`);
+    log(`item sales: stopped (${errorText(error)})`);
   }
   // Items without a catalog set: linked when sure, suggested on Actions when not (S9).
   const sets = await linkSets(db);

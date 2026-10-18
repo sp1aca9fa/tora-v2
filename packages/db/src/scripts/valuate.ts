@@ -4,7 +4,7 @@ import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { inferLotSizes } from '../lot-sizes';
 import { exitIfUnmigrated } from '../migrate';
-import { refreshPriceDays } from '../price-days';
+import { refreshItemSales } from '../item-sales';
 import { checkSourceQuality, loadTimeZone } from '../registry';
 import { clearAllBucketValues, refreshBucketValues, runSnapshots } from '../valuation';
 
@@ -15,8 +15,8 @@ await exitIfUnmigrated(db);
 await loadTimeZone(db);
 const lots = await inferLotSizes(db, { full: true });
 console.log(`lot sizes: ${lots.checked} estimated trade(s) checked, ${lots.updated} updated`);
-const days = await refreshPriceDays(db);
-console.log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
+const days = await refreshItemSales(db);
+console.log(`item sales: ${days.items} item(s) updated${days.full ? ' (full rebuild)' : ''}`);
 const quality = await checkSourceQuality(db);
 if (quality.length) {
   console.log(`source quality changed: ${quality.join(', ')}`);

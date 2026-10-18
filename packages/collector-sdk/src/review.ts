@@ -13,7 +13,7 @@ import {
   judgedTargets,
   reviewNotes,
   suggestionListings,
-  loadMarketData,
+  rawMarketData,
   oddSales,
   schema,
   valueHolding,
@@ -124,7 +124,7 @@ export async function buildReviewCases(
     .innerJoin(products, eq(products.id, holdings.productId))
     .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')));
   const productIds = [...new Set(rows.map((r) => r.product.id))];
-  const market = await loadMarketData(db, userId, productIds, now);
+  const market = await rawMarketData(db, userId, productIds, now);
   const valued = rows.map((r) => ({ ...r, v: valueHolding(r.holding, r.product, market, now) }));
   const judged = await judgedTargets(db, userId, [
     'exclude_sale',

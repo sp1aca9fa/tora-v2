@@ -558,33 +558,43 @@ export const priceObservations = sqliteTable(
 );
 
 /**
- * The sales per item, source, condition, currency and day (requirements S19), read by the pages
- * instead of every sale; rebuilt by `refreshPriceDays` from the days `price_days_dirty` marks.
+ * One item's kept sales, shop asks and buy prices, packed (requirements S19 part 2): Turso bills
+ * rows read, not bytes, so an item's whole history costs one row. Kept up to date from the days
+ * `price_days_dirty` marks; see `item-sales.ts`.
  */
-export const priceDays = sqliteTable(
-  'price_days',
-  {
-    productId: text('product_id').notNull(),
-    source: text('source').notNull(),
-    bucket: text('bucket'),
-    currency: text('currency'),
-    /** The app's local date. */
-    day: text('day').notNull(),
-    /** Kept sold prices in the base currency, lowest first. */
-    prices: text('prices', { mode: 'json' }).notNull().$type<number[]>(),
-    /** Kept sales whose lot size was estimated. */
-    estimated: integer('estimated').notNull(),
-    /** Every observation of the day (any type, kept or excluded). */
-    observations: integer('observations').notNull(),
-  },
-  (t) => [
-    index('price_days_lookup_idx').on(t.productId, t.source, t.day),
-    index('price_days_source_day_idx').on(t.source, t.day),
-  ],
-);
+export const itemSales = sqliteTable('item_sales', {
+  productId: text('product_id').primaryKey(),
+  sales: text('sales', { mode: 'json' }).notNull().$type<PackedSales>(),
+  updatedAt: text('updated_at')
+    .notNull()
+    .$defaultFn(() => toLocalIso())
+    .$onUpdateFn(() => toLocalIso()),
+});
+
+/** Observations of one source, condition, currency and type, oldest first. */
+export interface PackedGroup {
+  s: string;
+  b: string | null;
+  c: string | null;
+  t: (typeof OBSERVATION_TYPES)[number];
+  /** Times (ms). */
+  at: number[];
+  /** Prices in the base currency. */
+  p: number[];
+  /** Positions of the trades whose lot size was estimated. */
+  e: number[];
+}
+
+export interface PackedSales {
+  /** The kept observations. */
+  groups: PackedGroup[];
+  /** Every observation (any type, kept or excluded) per source and day. */
+  n: Record<string, Record<string, number>>;
+}
 
 /**
- * Item, source and day whose sales changed since `price_days` was built: written by triggers on
+ * Item, source and day whose sales changed since `item_sales` was built (the name is from its
+ * predecessor, `price_days`): written by triggers on
  * `price_observations` (migration 0031), so every change is caught, whatever made it.
  */
 export const priceDaysDirty = sqliteTable(

@@ -22,14 +22,20 @@ import {
   isNotNull,
   isNull,
   lt,
-  max,
   ne,
   not,
   or,
   sql,
 } from 'drizzle-orm';
 import type { Db } from './client';
-import { daysBack, refreshPriceDays, soldDays } from './price-days';
+import {
+  daysBack,
+  loadItemSales,
+  refreshItemSales,
+  soldDaysOf,
+  sourceCounts,
+  unpackSales,
+} from './item-sales';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { clearBucketValues } from './valuation';
 import {
@@ -42,7 +48,6 @@ import {
   appSettings,
   collectorRuns,
   holdings,
-  priceDays,
   priceObservations,
   productSources,
   products,
@@ -68,15 +73,7 @@ export async function listProductSources(db: Db, productId: string) {
     .from(productSources)
     .where(eq(productSources.productId, productId))
     .orderBy(asc(productSources.createdAt));
-  const counts = await db
-    .select({
-      source: priceDays.source,
-      n: sql<number>`sum(${priceDays.observations})`,
-      latest: max(priceDays.day),
-    })
-    .from(priceDays)
-    .where(eq(priceDays.productId, productId))
-    .groupBy(priceDays.source);
+  const counts = sourceCounts((await loadItemSales(db, [productId])).get(productId));
   return sources.map((s) => {
     const c = counts.find((x) => x.source === s.source);
     return { ...s, observations: c?.n ?? 0, latestObservation: c?.latest ?? null };
@@ -273,30 +270,32 @@ export interface BucketStat {
   bucket: string | null;
   count: number;
   medianBase: number | null;
-  /** The last day with a sale. */
+  /** The time of the last sale. */
   latest: string;
 }
 
-/** Sold count and median per source + bucket over the last `days` (whole days, from `price_days`). */
+/** Sold count and median per source + bucket over the last `days` (from the packed item sales). */
 export async function bucketStats(
   db: Db,
   productId: string,
   days = 30,
   now = new Date(),
 ): Promise<BucketStat[]> {
+  const since = toLocalIso(new Date(now.getTime() - days * 86_400_000));
   const groups = new Map<string, BucketStat & { prices: number[] }>();
-  for (const r of await soldDays(db, [productId], { since: daysBack(days, now) })) {
-    const key = `${r.source}\u0000${r.bucket ?? ''}`;
+  const sales = (await loadItemSales(db, [productId])).get(productId);
+  for (const o of unpackSales(sales, { since, types: ['sold'] })) {
+    const key = `${o.source}\u0000${o.bucket ?? ''}`;
     const g = groups.get(key) ?? {
-      source: r.source,
-      bucket: r.bucket,
+      source: o.source,
+      bucket: o.bucket,
       count: 0,
       medianBase: null,
-      latest: r.day,
+      latest: o.observedAt,
       prices: [],
     };
-    g.prices.push(...r.prices);
-    if (r.day > g.latest) g.latest = r.day;
+    g.prices.push(o.priceBase);
+    if (o.observedAt > g.latest) g.latest = o.observedAt;
     groups.set(key, g);
   }
   return [...groups.values()]
@@ -444,7 +443,7 @@ export async function activeSources(
 
 /**
  * Inserts observations, skipping ones already stored (same source + external_ref), and rebuilds
- * the sales per day of the days they fall on.
+ * the packed item sales of the days they fall on.
  */
 export async function insertObservations(db: Db, rows: NewPriceObservation[]): Promise<number> {
   let added = 0;
@@ -472,8 +471,8 @@ export async function insertObservations(db: Db, rows: NewPriceObservation[]): P
   }
   if (added > 0 || vouched.length > 0) {
     await clearBucketValues(db, [...new Set([...vouched, ...rows].map((r) => r.productId))]);
-    // The sales per day of the days just added, so they never lag behind the sales.
-    await refreshPriceDays(db, { marksOnly: true });
+    // The packed item sales of the days just added, so they never lag behind the sales.
+    await refreshItemSales(db, { marksOnly: true });
   }
   return added;
 }
@@ -677,6 +676,11 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
     .from(productSources)
     .union(db.selectDistinct({ source: collectorRuns.source }).from(collectorRuns));
 
+  // Every item's last 37 days of kept sales, from the packed item sales (one row per item).
+  const recentFrom = daysBack(7, now);
+  const allDays = [...(await loadItemSales(db))].flatMap(([productId, sales]) =>
+    soldDaysOf(productId, sales, { since: daysBack(37, now) }),
+  );
   const out: SourceHealth[] = [];
   for (const { source } of sources) {
     const [lastRun] = await db
@@ -706,16 +710,12 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
         ),
       );
 
-    // The source's last 37 days of kept sales, from the sales per day.
-    const recentFrom = daysBack(7, now);
     const groups = new Map<
       string,
       { recent: number[]; before: number[]; productId: string; bucket: string | null }
     >();
-    for (const d of await db
-      .select()
-      .from(priceDays)
-      .where(and(eq(priceDays.source, source), gte(priceDays.day, daysBack(37, now))))) {
+    for (const d of allDays) {
+      if (d.source !== source) continue;
       const key = `${d.productId}\u0000${d.bucket ?? ''}`;
       const g = groups.get(key) ?? {
         recent: [],
@@ -855,7 +855,7 @@ export async function updateSourceQuery(
       );
     await clearBucketValues(tx, [link.productId]);
   });
-  await refreshPriceDays(db, { marksOnly: true });
+  await refreshItemSales(db, { marksOnly: true });
 }
 
 /** Latest collected sales of a product from one source, excluded ones included (for review). */
@@ -881,7 +881,7 @@ export async function setObservationExcluded(
     .returning({ productId: priceObservations.productId });
   if (row) {
     await clearBucketValues(db, [row.productId]);
-    await refreshPriceDays(db, { marksOnly: true });
+    await refreshItemSales(db, { marksOnly: true });
   }
   return row ?? null;
 }

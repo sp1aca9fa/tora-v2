@@ -20,7 +20,6 @@ import {
   type SourceOrder,
   byPriority,
   inClassOrder,
-  localDate,
   median,
   productClass,
   resolveCurrency,
@@ -29,9 +28,10 @@ import {
   setAppTimeZone,
   toLocalIso,
 } from '@tora/core';
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { appSettings, priceDays, priceObservations, products, sources } from './schema';
+import { loadItemSales, unpackSales } from './item-sales';
+import { appSettings, priceObservations, products, sources } from './schema';
 
 /** Saves the plug-ins' descriptions (collectors, at the start of a run); roles chosen stay. */
 export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void> {
@@ -236,37 +236,30 @@ export async function checkSourceQuality(db: Db, now = new Date()): Promise<stri
   const registry = await loadSourceRegistry(db);
   const rows = await db.select().from(sources);
   const declared = Object.fromEntries(rows.map((r) => [r.key, r.roles ?? r.info.roles ?? {}]));
-  // The last 90 days (whole days) of kept sales, from the sales per day.
-  const since = localDate(new Date(now.getTime() - 90 * 86_400_000));
-  const days = await db
-    .select({
-      productId: priceDays.productId,
-      category: products.category,
-      itemType: products.itemType,
-      kind: products.kind,
-      source: priceDays.source,
-      bucket: priceDays.bucket,
-      prices: priceDays.prices,
-    })
-    .from(priceDays)
-    .innerJoin(products, eq(products.id, priceDays.productId))
-    .where(
-      and(
-        inArray(
-          priceDays.source,
-          rows.map((r) => r.key),
-        ),
-        gte(priceDays.day, since),
-      ),
-    );
+  // The last 90 days of kept sales, from the packed item sales (one row per item).
+  const since = toLocalIso(new Date(now.getTime() - 90 * 86_400_000));
+  const keys = new Set(rows.map((r) => r.key));
+  const packed = await loadItemSales(db);
+  const items = packed.size
+    ? await db
+        .select({
+          id: products.id,
+          category: products.category,
+          itemType: products.itemType,
+          kind: products.kind,
+        })
+        .from(products)
+    : [];
   // Prices per class, item + condition, source.
   const byKey = new Map<string, { cls: ProductClass; by: Map<string, number[]> }>();
-  for (const d of days) {
-    if (!d.bucket || d.prices.length === 0) continue;
-    const key = `${d.productId}|${d.bucket}`;
-    const e = byKey.get(key) ?? { cls: productClass(d), by: new Map<string, number[]>() };
-    e.by.set(d.source, [...(e.by.get(d.source) ?? []), ...d.prices]);
-    byKey.set(key, e);
+  for (const item of items) {
+    for (const o of unpackSales(packed.get(item.id), { since, types: ['sold'] })) {
+      if (!o.bucket || !keys.has(o.source)) continue;
+      const key = `${item.id}|${o.bucket}`;
+      const e = byKey.get(key) ?? { cls: productClass(item), by: new Map<string, number[]>() };
+      e.by.set(o.source, [...(e.by.get(o.source) ?? []), o.priceBase]);
+      byKey.set(key, e);
+    }
   }
   const at = toLocalIso(now);
   const changed: string[] = [];

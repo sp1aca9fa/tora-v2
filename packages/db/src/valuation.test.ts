@@ -33,7 +33,7 @@ import {
   valueHolding,
   valueHoldings,
 } from './valuation';
-import { refreshPriceDays } from './price-days';
+import { refreshItemSales } from './item-sales';
 import { holdings, portfolioCharts, priceObservations, products } from './schema';
 import { and, eq } from 'drizzle-orm';
 import { setObservationExcluded } from './sources';
@@ -115,7 +115,7 @@ async function scenario() {
     // History for the chart: a week ago the cards sold lower.
     sold(pika.product.id, 'raw:A', 2_000, 40),
   ]);
-  await refreshPriceDays(db);
+  await refreshItemSales(db);
   return { box, pika, mew, amiibo };
 }
 

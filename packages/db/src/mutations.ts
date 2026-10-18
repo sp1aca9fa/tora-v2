@@ -30,7 +30,7 @@ import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
 import { loadSourceRegistry } from './registry';
-import { refreshPriceDays } from './price-days';
+import { refreshItemSales } from './item-sales';
 import { moveSupply } from './supply';
 import { clearBucketValues } from './valuation';
 import {
@@ -1096,7 +1096,7 @@ export async function mergeProducts(
     await tx.delete(products).where(eq(products.id, fromId));
     return into;
   });
-  await refreshPriceDays(db, { marksOnly: true });
+  await refreshItemSales(db, { marksOnly: true });
   return merged;
 }
 
@@ -1131,7 +1131,7 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await tx.delete(products).where(eq(products.id, productId));
     return true;
   });
-  if (deleted) await refreshPriceDays(db, { marksOnly: true });
+  if (deleted) await refreshItemSales(db, { marksOnly: true });
   return deleted;
 }
 

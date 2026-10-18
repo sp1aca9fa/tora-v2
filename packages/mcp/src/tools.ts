@@ -14,6 +14,7 @@ import {
   listPendingCandidates,
   listProductSources,
   loadMarketData,
+  rawMarketData,
   openSuggestionCount,
   reviewNotes,
   oddSales,
@@ -375,7 +376,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     .where(and(eq(holdings.userId, userId), inArray(holdings.status, ['owned', 'consumed'])));
   const owned = rows.filter((r) => r.holding.status === 'owned');
   const productIds = [...new Set(rows.map((r) => r.product.id))];
-  const market = await loadMarketData(db, userId, productIds, now);
+  const market = await rawMarketData(db, userId, productIds, now);
   const valued = owned.map((r) => ({ ...r, v: valueHolding(r.holding, r.product, market, now) }));
   const lot = (h: Holding, p: Product) => ({ holdingId: h.id, productId: p.id, name: p.name });
   const findings: Finding[] = [];
@@ -636,7 +637,9 @@ const SQL_WORDS = new Set([
 ]);
 
 /** Tables with a row per source's sales: read through a version without the sources kept from AI. */
-const SALES_TABLES = ['price_observations', 'price_days', 'price_days_dirty'];
+const SALES_TABLES = ['price_observations', 'price_days_dirty'];
+/** Tables mixing every source's sales in one row: never read through `query_sql`. */
+const PACKED_TABLES = ['item_sales'];
 
 /**
  * The query with each read of a sales table (`SALES_TABLES`) replaced by its rows without the
@@ -648,6 +651,13 @@ export function withoutSources(
   sources: string[],
 ): { sql: string } | { error: string } {
   if (sources.length === 0) return { sql: text };
+  for (const table of PACKED_TABLES) {
+    if (new RegExp(`\\b${table}\\b`, 'i').test(text)) {
+      return {
+        error: `${table} holds every source's sales together: read price_observations instead.`,
+      };
+    }
+  }
   const list = sources.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
   let sql = text;
   for (const table of SALES_TABLES) {

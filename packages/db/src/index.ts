@@ -4,7 +4,7 @@ export * from './mutations';
 export * from './users';
 export * from './sources';
 export * from './valuation';
-export * from './price-days';
+export * from './item-sales';
 export * from './db-usage';
 export * from './purchases';
 export * from './lot-sizes';
