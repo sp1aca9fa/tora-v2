@@ -32,7 +32,7 @@ import {
   loadSourceRegistry,
   schema,
 } from '@tora/db';
-import { desc, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { ClaudeResult, ModelAlias } from './claude';
 import { termCoverage } from './match';
 import type { PurchaseImporter, PurchaseReceipt } from './types';
@@ -383,24 +383,22 @@ export async function checkContext(db: Db, userId: string): Promise<CheckContext
     owned.map(({ holding }) => holding.orderId).filter((id): id is string => !!id),
   );
   const unitValue = new Map<string, number>();
-  const [latest] = await db
-    .select({ date: schema.valuationSnapshots.date })
-    .from(schema.valuationSnapshots)
-    .orderBy(desc(schema.valuationSnapshots.date))
-    .limit(1);
+  // The latest day of the user's lots' value history (one packed row per lot).
+  const rows = await db
+    .select({ holdingId: schema.holdingValues.holdingId, days: schema.holdingValues.days })
+    .from(schema.holdingValues)
+    .where(eq(schema.holdingValues.userId, userId));
+  const latest = rows
+    .flatMap((r) => Object.keys(r.days))
+    .sort()
+    .at(-1);
   if (latest) {
-    const rows = await db
-      .select({
-        holdingId: schema.valuationSnapshots.holdingId,
-        value: schema.valuationSnapshots.valueBase,
-      })
-      .from(schema.valuationSnapshots)
-      .where(eq(schema.valuationSnapshots.date, latest.date));
     const byHolding = new Map(owned.map((o) => [o.holding.id, o]));
     for (const r of rows) {
       const o = byHolding.get(r.holdingId);
-      if (o && r.value && o.holding.quantity) {
-        unitValue.set(o.product.id, Math.round(r.value / o.holding.quantity));
+      const value = r.days[latest]?.[0];
+      if (o && value && o.holding.quantity) {
+        unitValue.set(o.product.id, Math.round(value / o.holding.quantity));
       }
     }
   }

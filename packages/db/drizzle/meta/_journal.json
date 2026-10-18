@@ -253,6 +253,20 @@
       "when": 1792310788326,
       "tag": "0035_drop_price_days",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1792311223676,
+      "tag": "0036_holding_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1792311348054,
+      "tag": "0037_drop_valuation_snapshots",
+      "breakpoints": true
     }
   ]
 }

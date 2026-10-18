@@ -12,6 +12,7 @@ import type { Db } from './client';
 import { DomainError } from './mutations';
 import { fxRateOn } from './fx';
 import { refreshItemSales } from './item-sales';
+import { runSnapshots } from './valuation';
 import { loadSourceRegistry, setCurrencySettings } from './registry';
 import { fxRates, holdingEvents, productSources } from './schema';
 
@@ -26,7 +27,6 @@ const AMOUNTS = [
   { table: 'price_observations', columns: ['price_base'], date: 'substr(observed_at, 1, 10)' },
   { table: 'manual_prices', columns: ['price_base'], date: 'substr(set_at, 1, 10)' },
   { table: 'source_candidates', columns: ['price_base'], date: 'substr(created_at, 1, 10)' },
-  { table: 'valuation_snapshots', columns: ['value_base'], date: 'date' },
   // No date of its own: today's rate.
   { table: 'products', columns: ['retail_price_base'], date: null },
 ] as const;
@@ -165,5 +165,7 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   if (toSetting) rates[from] = 'manual' in toSetting ? { manual: 1 / toSetting.manual } : toSetting;
   await setCurrencySettings(db, { base: to, rates });
   await refreshItemSales(db, { full: true });
+  // The value history, from the converted sales (each at its own day's rate).
+  await runSnapshots(db, now);
   return storedAmounts(db);
 }

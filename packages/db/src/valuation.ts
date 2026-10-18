@@ -1,5 +1,6 @@
 // Holding valuation, box view, manual prices and daily snapshots (requirements section 6, S5).
 import {
+  INSIGHT_PERIODS,
   type LastSale,
   type RecentSaleInput,
   type SourceSummary,
@@ -31,22 +32,23 @@ import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Db } from './client';
 import { daysBack, loadItemSales, soldDays, unpackSales } from './item-sales';
-import { loadSourceRegistry } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import {
   type Holding,
   type HoldingEvent,
+  type DayValue,
   type PortfolioPoint,
   type Product,
   appSettings,
   bucketValues,
   holdingEvents,
+  holdingValues,
   holdings,
   manualPrices,
   portfolioCharts,
   priceObservations,
   productSources,
   products,
-  valuationSnapshots,
   watches,
 } from './schema';
 
@@ -931,8 +933,13 @@ export async function runSnapshots(db: Db, now = new Date()) {
     return v;
   };
 
-  type Row = typeof valuationSnapshots.$inferInsert;
-  const wanted = new Map<string, Row>();
+  // Each lot's value per day, packed (one row per lot).
+  const wanted = new Map<string, Record<string, DayValue>>();
+  const put = (holdingId: string, day: string, value: DayValue) => {
+    let lot = wanted.get(holdingId);
+    if (!lot) wanted.set(holdingId, (lot = {}));
+    lot[day] = value;
+  };
   for (const { holding, product } of rows) {
     const events = eventsBy.get(holding.id) ?? [];
     const bucket = holdingBucket(holding, product);
@@ -940,104 +947,107 @@ export async function runSnapshots(db: Db, now = new Date()) {
     for (const day of days) {
       if (!heldOn(holding, events, day)) {
         // Opened (consumed): the cost stays in the chart, the value moved to the pulls.
-        if (openedDay && openedDay <= day) {
-          wanted.set(`${day}|${holding.id}`, {
-            date: day,
-            holdingId: holding.id,
-            valueBase: 0,
-            method: 'opened',
-            source: null,
-            sampleSize: 0,
-            confidence: null,
-            quantityInferred: false,
-          });
-        }
+        if (openedDay && openedDay <= day) put(holding.id, day, [0, 'opened', null, 0, null, 0]);
         continue;
       }
       const v = unitOn(holding.userId, product, bucket, day);
-      wanted.set(`${day}|${holding.id}`, {
-        date: day,
-        holdingId: holding.id,
-        valueBase: v.unitBase === null ? null : v.unitBase * holding.quantity,
-        method: v.method,
-        source: v.source,
-        sampleSize: v.sampleSize,
-        confidence: v.confidence,
-        quantityInferred: v.estimatedSamples > 0,
-      });
+      put(holding.id, day, [
+        v.unitBase === null ? null : v.unitBase * holding.quantity,
+        v.method,
+        v.source,
+        v.sampleSize,
+        v.confidence,
+        v.estimatedSamples > 0 ? 1 : 0,
+      ]);
     }
   }
 
-  const existing = await db.select().from(valuationSnapshots);
-  const stale: string[] = [];
-  const unchanged = new Set<string>();
-  for (const e of existing) {
-    const key = `${e.date}|${e.holdingId}`;
-    const w = wanted.get(key);
-    if (!w) stale.push(e.id);
-    else if (
-      w.valueBase === e.valueBase &&
-      w.method === e.method &&
-      w.source === e.source &&
-      w.sampleSize === e.sampleSize &&
-      w.confidence === e.confidence &&
-      w.quantityInferred === e.quantityInferred
-    ) {
-      unchanged.add(key);
+  // Only lots whose days changed are written; lots no longer valued are removed.
+  const byId = new Map(all.map((r) => [r.holding.id, r.holding]));
+  const writes: (typeof holdingValues.$inferInsert)[] = [];
+  const gone: string[] = [];
+  let changedDays = 0;
+  let removedDays = 0;
+  const known = new Set<string>();
+  for (const e of await db.select().from(holdingValues)) {
+    known.add(e.holdingId);
+    const lot = wanted.get(e.holdingId);
+    if (!lot) {
+      gone.push(e.holdingId);
+      removedDays += Object.keys(e.days).length;
+      continue;
+    }
+    let changed = 0;
+    let removed = 0;
+    for (const [day, v] of Object.entries(lot)) {
+      if (JSON.stringify(e.days[day]) !== JSON.stringify(v)) changed++;
+    }
+    for (const day of Object.keys(e.days)) if (!(day in lot)) removed++;
+    changedDays += changed;
+    removedDays += removed;
+    if (changed || removed) {
+      writes.push({ holdingId: e.holdingId, userId: byId.get(e.holdingId)!.userId, days: lot });
     }
   }
-  const changed = [...wanted.entries()].filter(([k]) => !unchanged.has(k)).map(([, r]) => r);
-  for (let i = 0; i < changed.length; i += 100) {
+  for (const [holdingId, lot] of wanted) {
+    if (known.has(holdingId)) continue;
+    writes.push({ holdingId, userId: byId.get(holdingId)!.userId, days: lot });
+    changedDays += Object.keys(lot).length;
+  }
+  for (let i = 0; i < writes.length; i += 20) {
     await retried(() =>
       db
-        .insert(valuationSnapshots)
-        .values(changed.slice(i, i + 100))
+        .insert(holdingValues)
+        .values(writes.slice(i, i + 20))
         .onConflictDoUpdate({
-          target: [valuationSnapshots.date, valuationSnapshots.holdingId],
-          set: {
-            valueBase: sql`excluded.value_base`,
-            method: sql`excluded.method`,
-            source: sql`excluded.source`,
-            sampleSize: sql`excluded.sample_size`,
-            confidence: sql`excluded.confidence`,
-            quantityInferred: sql`excluded.quantity_inferred`,
-            updatedAt: sql`excluded.updated_at`,
-          },
+          target: holdingValues.holdingId,
+          set: { days: sql`excluded.days`, userId: sql`excluded.user_id`, updatedAt: toLocalIso() },
         }),
     );
   }
-  for (let i = 0; i < stale.length; i += 500) {
+  for (let i = 0; i < gone.length; i += 500) {
     await retried(() =>
-      db.delete(valuationSnapshots).where(inArray(valuationSnapshots.id, stale.slice(i, i + 500))),
+      db.delete(holdingValues).where(inArray(holdingValues.holdingId, gone.slice(i, i + 500))),
     );
   }
-  // Each person's chart, summed from the snapshots just written (no read of them).
+
+  // Each person's chart, summed from the values just worked out (no read of them).
   const lotsOf = new Map<string, Holding[]>();
   for (const { holding } of all) {
     const list = lotsOf.get(holding.userId);
     if (list) list.push(holding);
     else lotsOf.set(holding.userId, [holding]);
   }
-  const byId = new Map(all.map((r) => [r.holding.id, r.holding]));
-  const snapshotsOf = new Map<string, { holding: Holding; snapshot: Row }[]>();
-  for (const snapshot of wanted.values()) {
-    const holding = byId.get(snapshot.holdingId)!;
-    const list = snapshotsOf.get(holding.userId);
-    if (list) list.push({ holding, snapshot });
-    else snapshotsOf.set(holding.userId, [{ holding, snapshot }]);
-  }
   for (const [userId, lots] of lotsOf) {
     const series = sumSeries(
-      (snapshotsOf.get(userId) ?? []).map(({ holding, snapshot }) => ({
-        date: snapshot.date,
-        valueBase: snapshot.valueBase ?? null,
-        quantityInferred: !!snapshot.quantityInferred,
-        holding,
-      })),
+      lots.flatMap((holding) =>
+        Object.entries(wanted.get(holding.id) ?? {}).map(([date, v]) => ({
+          date,
+          valueBase: v[0],
+          quantityInferred: v[5] === 1,
+          holding,
+        })),
+      ),
     );
     await retried(() => savePortfolioChart(db, userId, holdingsFingerprint(lots), series));
   }
-  return { days: days.length, rows: changed.length, removed: stale.length };
+
+  // The market movers of the Portfolio's insights (every item anyone holds), saved once a night.
+  const owned = rows.filter((r) => r.holding.status === 'owned');
+  await saveSetting(db, MARKET_MOVERS_KEY, {
+    day: today,
+    movers: Object.fromEntries(
+      INSIGHT_PERIODS.map((p) => [
+        p,
+        marketMovers(
+          owned.map((r) => ({ ...r, days: wanted.get(r.holding.id) ?? {} })),
+          today,
+          p,
+        ),
+      ]),
+    ),
+  } satisfies SavedMarketMovers);
+  return { days: days.length, rows: changedDays, removed: removedDays };
 }
 
 type ChartLot = Pick<Holding, 'id' | 'costTotalBase' | 'countInValue' | 'countInCost'>;
@@ -1124,18 +1134,19 @@ export async function portfolioSeries(
     series = sumSeries(
       (
         await db
-          .select({
-            date: valuationSnapshots.date,
-            holdingId: valuationSnapshots.holdingId,
-            valueBase: valuationSnapshots.valueBase,
-            quantityInferred: valuationSnapshots.quantityInferred,
-          })
-          .from(valuationSnapshots)
-          .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
-          .where(eq(holdings.userId, userId))
+          .select({ holdingId: holdingValues.holdingId, days: holdingValues.days })
+          .from(holdingValues)
+          .where(eq(holdingValues.userId, userId))
       ).flatMap((r) => {
         const holding = byId.get(r.holdingId);
-        return holding ? [{ ...r, holding }] : [];
+        return holding
+          ? Object.entries(r.days).map(([date, v]) => ({
+              date,
+              valueBase: v[0],
+              quantityInferred: v[5] === 1,
+              holding,
+            }))
+          : [];
       }),
     );
     await savePortfolioChart(db, userId, fingerprint, series);
@@ -1292,12 +1303,66 @@ export interface Mover {
   pct: number;
 }
 
+/** The market movers saved by the snapshot run (app setting): per period, every item held. */
+interface SavedMarketMovers {
+  day: string;
+  movers: Record<number, Mover[]>;
+}
+const MARKET_MOVERS_KEY = 'marketMovers';
+
+type MoverLot = { holding: Holding; product: Product; days: Record<string, DayValue> };
+
+/** Items worth under ¥1,000 then, and items that did not move, are left out (noise). */
+function finishMovers(list: Mover[]): Mover[] {
+  return list
+    .filter((m) => m.thenBase >= 1_000 && m.nowBase !== m.thenBase)
+    .map((m) => ({
+      ...m,
+      changeBase: m.nowBase - m.thenBase,
+      pct: Math.round(((m.nowBase - m.thenBase) / m.thenBase) * 1000) / 10,
+    }));
+}
+
+/** The day `days` before `day` (both the app's local dates). */
+const daysBefore = (day: string, days: number) =>
+  localDate(new Date(localTime(day, '12:00:00.000').getTime() - days * DAY));
+
+/** Lots' values on `day` and `days` before, where both are known. */
+function bothDays(lots: MoverLot[], day: string, days: number) {
+  const then = daysBefore(day, days);
+  return lots.flatMap((lot) => {
+    const now = lot.days[day]?.[0];
+    const before = lot.days[then]?.[0];
+    return now == null || before == null ? [] : [{ ...lot, now, before }];
+  });
+}
+
+/** Every held item by its unit value (the median over the lots holding it). */
+function marketMovers(lots: MoverLot[], day: string, days: number): Mover[] {
+  const units = new Map<string, { product: Product; now: number[]; then: number[] }>();
+  for (const lot of bothDays(lots, day, days)) {
+    const u = units.get(lot.product.id) ?? { product: lot.product, now: [], then: [] };
+    u.now.push(lot.now / lot.holding.quantity);
+    u.then.push(lot.before / lot.holding.quantity);
+    units.set(lot.product.id, u);
+  }
+  return finishMovers(
+    [...units.values()].map((u) => ({
+      product: u.product,
+      nowBase: Math.round(median(u.now)!),
+      thenBase: Math.round(median(u.then)!),
+      changeBase: 0,
+      pct: 0,
+    })),
+  );
+}
+
 /**
  * How items' market values moved over each period (requirements S8, Summary insights), from the
- * daily snapshots: the latest snapshot day against the day `days` before.
- * - mine: the user's lots still owned and counted in value, summed per item (same lots both days);
- * - market: every item anyone holds, by its unit value (the median over the lots holding it).
- * Items worth under ¥1,000 then, and items that did not move, are left out (noise).
+ * value history: the latest day against the day `days` before.
+ * - mine: the user's lots still owned and counted in value, summed per item (same lots both days),
+ *   from their packed values (one row per lot);
+ * - market: every item anyone holds, by its unit value, saved by the snapshot run.
  */
 export async function moversByPeriod(
   db: Db,
@@ -1306,84 +1371,42 @@ export async function moversByPeriod(
 ): Promise<{ mine: Map<number, Mover[]>; market: Map<number, Mover[]> }> {
   const mine = new Map<number, Mover[]>();
   const market = new Map<number, Mover[]>();
-  const [latest] = await db
-    .select({ date: sql<string | null>`max(${valuationSnapshots.date})` })
-    .from(valuationSnapshots);
-  if (!latest?.date) return { mine, market };
-  const noon = localTime(latest.date, '12:00:00.000').getTime();
-  const thenOf = (days: number) => localDate(new Date(noon - days * DAY));
-  const rows = await db
-    .select({
-      product: products,
-      holdingId: holdings.id,
-      userId: holdings.userId,
-      countInValue: holdings.countInValue,
-      quantity: holdings.quantity,
-      date: valuationSnapshots.date,
-      valueBase: valuationSnapshots.valueBase,
-    })
-    .from(valuationSnapshots)
-    .innerJoin(holdings, eq(holdings.id, valuationSnapshots.holdingId))
+  const saved = await readSetting<SavedMarketMovers>(db, MARKET_MOVERS_KEY);
+  const lots = await db
+    .select({ holding: holdings, product: products, days: holdingValues.days })
+    .from(holdings)
     .innerJoin(products, eq(products.id, holdings.productId))
+    .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
     .where(
       and(
+        eq(holdings.userId, userId),
         eq(holdings.status, 'owned'),
-        inArray(valuationSnapshots.date, [latest.date, ...periods.map(thenOf)]),
+        eq(holdings.countInValue, true),
       ),
     );
-  const valueOn = new Map<string, number>(); // holdingId|date -> value
-  const lots = new Map<string, (typeof rows)[number]>();
-  for (const r of rows) {
-    if (r.valueBase === null) continue;
-    valueOn.set(`${r.holdingId}|${r.date}`, r.valueBase);
-    lots.set(r.holdingId, r);
-  }
-  const finish = (list: Mover[]) =>
-    list
-      .filter((m) => m.thenBase >= 1_000 && m.nowBase !== m.thenBase)
-      .map((m) => ({
-        ...m,
-        changeBase: m.nowBase - m.thenBase,
-        pct: Math.round(((m.nowBase - m.thenBase) / m.thenBase) * 1000) / 10,
-      }));
+  const day =
+    saved?.day ??
+    lots
+      .flatMap((l) => Object.keys(l.days))
+      .sort()
+      .at(-1);
+  if (!day) return { mine, market };
   for (const days of periods) {
-    const then = thenOf(days);
     const own = new Map<string, Mover>();
-    const units = new Map<string, { product: Product; now: number[]; then: number[] }>();
-    for (const lot of lots.values()) {
-      const now = valueOn.get(`${lot.holdingId}|${latest.date}`);
-      const before = valueOn.get(`${lot.holdingId}|${then}`);
-      if (now === undefined || before === undefined) continue;
-      if (lot.userId === userId && lot.countInValue) {
-        const m = own.get(lot.product.id) ?? {
-          product: lot.product,
-          nowBase: 0,
-          thenBase: 0,
-          changeBase: 0,
-          pct: 0,
-        };
-        m.nowBase += now;
-        m.thenBase += before;
-        own.set(lot.product.id, m);
-      }
-      const u = units.get(lot.product.id) ?? { product: lot.product, now: [], then: [] };
-      u.now.push(now / lot.quantity);
-      u.then.push(before / lot.quantity);
-      units.set(lot.product.id, u);
+    for (const lot of bothDays(lots, day, days)) {
+      const m = own.get(lot.product.id) ?? {
+        product: lot.product,
+        nowBase: 0,
+        thenBase: 0,
+        changeBase: 0,
+        pct: 0,
+      };
+      m.nowBase += lot.now;
+      m.thenBase += lot.before;
+      own.set(lot.product.id, m);
     }
-    mine.set(days, finish([...own.values()]));
-    market.set(
-      days,
-      finish(
-        [...units.values()].map((u) => ({
-          product: u.product,
-          nowBase: Math.round(median(u.now)!),
-          thenBase: Math.round(median(u.then)!),
-          changeBase: 0,
-          pct: 0,
-        })),
-      ),
-    );
+    mine.set(days, finishMovers([...own.values()]));
+    market.set(days, saved?.movers[days] ?? []);
   }
   return { mine, market };
 }

@@ -15,7 +15,6 @@ import {
   REGIONS,
   SET_TYPES,
   USER_ROLES,
-  VALUATION_CONFIDENCES,
   newId,
   toLocalIso,
   type NoticeLevels,
@@ -626,27 +625,26 @@ export const manualPrices = sqliteTable(
   (t) => [index('manual_prices_lookup_idx').on(t.userId, t.productId, t.bucket, t.setAt)],
 );
 
-export const valuationSnapshots = sqliteTable(
-  'valuation_snapshots',
+/** One day of a lot's value: value (null: none), method, source, samples, confidence, estimated. */
+export type DayValue = [number | null, string, string | null, number, string | null, 0 | 1];
+
+/**
+ * A lot's value history, packed (requirements S19 part 2): every day it was held, in one row, so
+ * the snapshot run and the Portfolio read one row per lot. Rebuilt from the sales by the snapshot
+ * run; see `runSnapshots`.
+ */
+export const holdingValues = sqliteTable(
+  'holding_values',
   {
-    id: id(),
-    date: text('date').notNull(),
-    holdingId: text('holding_id')
+    holdingId: text('holding_id').primaryKey(),
+    userId: text('user_id').notNull(),
+    days: text('days', { mode: 'json' }).notNull().$type<Record<string, DayValue>>(),
+    updatedAt: text('updated_at')
       .notNull()
-      .references(() => holdings.id),
-    valueBase: integer('value_base'),
-    method: text('method').notNull(),
-    source: text('source'),
-    sampleSize: integer('sample_size').notNull().default(0),
-    confidence: text('confidence', { enum: VALUATION_CONFIDENCES }),
-    /** The value used sales whose lot size was estimated. */
-    quantityInferred: integer('quantity_inferred', { mode: 'boolean' }).notNull().default(false),
-    ...timestamps,
+      .$defaultFn(() => toLocalIso())
+      .$onUpdateFn(() => toLocalIso()),
   },
-  (t) => [
-    check('valuation_snapshots_confidence_check', oneOf(t.confidence, VALUATION_CONFIDENCES)),
-    uniqueIndex('valuation_snapshots_date_holding_uq').on(t.date, t.holdingId),
-  ],
+  (t) => [index('holding_values_user_idx').on(t.userId)],
 );
 
 /**

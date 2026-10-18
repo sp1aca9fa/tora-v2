@@ -53,7 +53,7 @@ const {
   purchaseLinks,
   sourceWarningDismissals,
   suggestions,
-  valuationSnapshots,
+  holdingValues,
 } = schema;
 
 loadRootEnv();
@@ -83,7 +83,7 @@ const lotIds = (
 ).map((h) => h.id);
 for (let i = 0; i < lotIds.length; i += 200) {
   const ids = lotIds.slice(i, i + 200);
-  await db.delete(valuationSnapshots).where(inArray(valuationSnapshots.holdingId, ids));
+  await db.delete(holdingValues).where(inArray(holdingValues.holdingId, ids));
   await db.delete(holdingEvents).where(inArray(holdingEvents.holdingId, ids));
 }
 await db.delete(purchaseLinks).where(eq(purchaseLinks.userId, uid));

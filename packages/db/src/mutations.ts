@@ -50,7 +50,7 @@ import {
   sourceCandidates,
   sourceWarningDismissals,
   tcgSets,
-  valuationSnapshots,
+  holdingValues,
   signals,
   supply,
   watches,
@@ -940,7 +940,7 @@ export async function deleteHolding(db: Db, userId: string, id: string): Promise
       .from(holdingEvents)
       .where(and(eq(holdingEvents.holdingId, id), eq(holdingEvents.type, 'split')));
     if ((children?.n ?? 0) > 0 || (splits?.n ?? 0) > 0) throw new DomainError('has_dependents');
-    await tx.delete(valuationSnapshots).where(eq(valuationSnapshots.holdingId, id));
+    await tx.delete(holdingValues).where(eq(holdingValues.holdingId, id));
     await tx.delete(holdingEvents).where(eq(holdingEvents.holdingId, id));
     await tx.delete(holdings).where(eq(holdings.id, id));
   });
@@ -974,7 +974,7 @@ export async function markOrderCancelled(
       .from(holdings)
       .where(inArray(holdings.parentHoldingId, ids));
     if ((children?.n ?? 0) > 0) throw new DomainError('has_dependents');
-    await tx.delete(valuationSnapshots).where(inArray(valuationSnapshots.holdingId, ids));
+    await tx.delete(holdingValues).where(inArray(holdingValues.holdingId, ids));
     await tx.delete(holdingEvents).where(inArray(holdingEvents.holdingId, ids));
     await tx.delete(holdings).where(inArray(holdings.id, ids));
     await tx
