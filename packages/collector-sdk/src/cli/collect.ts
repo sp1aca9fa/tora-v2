@@ -187,6 +187,8 @@ progress.next('pictures, lot sizes, chart');
 try {
   const images = await downloadProductImages(db, new PoliteHttp({ maxRequests: 40 }), {
     log: (m) => log(`[images] ${m}`),
+    isVariant: (source, title) =>
+      !!title && !!collectors.find((c) => c.source === source)?.variantListing?.(title),
   });
   log(`images: ${images.saved} saved, ${images.failed} failed`);
 } catch (error) {

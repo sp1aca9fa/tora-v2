@@ -1,6 +1,6 @@
 // Downloads product pictures once and stores them as small WebP thumbnails (requirements S5c), so
 // the web app serves them itself. Runs on the home PC after the collectors, at the polite pace.
-import { type Db, productsNeedingImages, saveProductImage } from '@tora/db';
+import { type Db, type VariantListing, productsNeedingImages, saveProductImage } from '@tora/db';
 import sharp from 'sharp';
 import { BlockedError, type PoliteHttp, RequestCapError } from './http';
 
@@ -25,12 +25,17 @@ export async function toThumbnail(input: Buffer) {
 export async function downloadProductImages(
   db: Db,
   http: PoliteHttp,
-  options: { limit?: number; log?: (message: string) => void } = {},
+  options: {
+    limit?: number;
+    log?: (message: string) => void;
+    /** Listings never preferred for the picture (the collectors' `variantListing`). */
+    isVariant?: VariantListing;
+  } = {},
 ): Promise<{ saved: number; failed: number }> {
   const log = options.log ?? (() => {});
   let saved = 0;
   let failed = 0;
-  for (const product of await productsNeedingImages(db, options.limit ?? 30)) {
+  for (const product of await productsNeedingImages(db, options.limit ?? 30, options.isVariant)) {
     if (!/^https:\/\//.test(product.imageUrl)) continue;
     try {
       const { data } = await http.bytes(product.imageUrl);

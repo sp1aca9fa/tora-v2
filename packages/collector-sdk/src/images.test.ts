@@ -1,3 +1,4 @@
+import { TEST_SOURCES } from '@tora/db/testing';
 import {
   type Db,
   createDb,
@@ -5,6 +6,7 @@ import {
   createUser,
   getProductImage,
   linkSource,
+  saveSourceInfos,
   schema,
   unlinkSource,
 } from '@tora/db';
@@ -99,4 +101,40 @@ it('takes the picture from the linked listing, and follows a relink', async () =
   );
   expect(await downloadProductImages(db, http())).toEqual({ saved: 1, failed: 0 });
   expect((await getProductImage(db, product.id))?.sourceUrl).toBe('https://cdn.example/right.png');
+});
+
+it('prefers the identity source and a plain listing over a variant, whatever was linked first', async () => {
+  await saveSourceInfos(db, TEST_SOURCES);
+  const png = await sharp({ create: { width: 50, height: 50, channels: 3, background: '#000' } })
+    .png()
+    .toBuffer();
+  const fetchImpl = (async () =>
+    new Response(png, { headers: { 'content-type': 'image/png' } })) as unknown as typeof fetch;
+  const http = new PoliteHttp({ minDelayMs: 0, maxDelayMs: 0, sleep: async () => {}, fetchImpl });
+  const box = await createProduct(db, uid, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Box',
+    imageUrl: 'https://cdn.example/seller.png',
+  });
+  await linkSource(
+    db,
+    box.id,
+    { source: 'surugaya', externalId: '9', title: 'Box' },
+    'https://cdn.example/shop.png',
+  );
+  await linkSource(
+    db,
+    box.id,
+    { source: 'snkrdunk', externalId: '1', title: '【シュリンクなし】 Box' },
+    'https://cdn.example/no-shrink.png',
+  );
+  await linkSource(
+    db,
+    box.id,
+    { source: 'snkrdunk', externalId: '2', title: 'Box' },
+    'https://cdn.example/shrink.png',
+  );
+  await downloadProductImages(db, http, { isVariant: (_s, t) => !!t?.startsWith('【') });
+  expect((await getProductImage(db, box.id))?.sourceUrl).toBe('https://cdn.example/shrink.png');
 });

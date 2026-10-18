@@ -126,6 +126,11 @@ export interface Collector {
    * listing is the source of truth). Null when the title says nothing reliable (e.g. a variant).
    */
   productDetails?(title: string, product: Product): ProductDetails | null;
+  /**
+   * Whether a listing shows the product in one condition only (e.g. SNKRDUNK's 【シュリンクなし】
+   * boxes): its picture is never the product's while a plain listing has one.
+   */
+  variantListing?(title: string): boolean;
 }
 
 export type ProductDetails = Partial<
