@@ -14,6 +14,7 @@ import {
   checkMissedRuns,
   connectTelegram,
   sendSummaries,
+  sendWatchAlerts,
   setTelegramBot,
   telegramCode,
   stoppedReason,
@@ -22,7 +23,9 @@ import { type Db, createDb } from './client';
 import { finishImportRun, saveImportRows, startImportRun } from './imports';
 import { migrateDb } from './migrate';
 import { saveSourceInfos } from './registry';
-import { activity, alertChannels } from './schema';
+import { createProduct } from './mutations';
+import { activity, alertChannels, signals, supply, watches } from './schema';
+import { addWatch } from './watches';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
 
@@ -72,6 +75,12 @@ const TEXTS: Record<string, Record<string, string>> = {
       '{method}: {imported} added, {existing} existing, {skipped} skipped, {problem} problems',
     summaryActions: 'actions {count}',
     method_file: 'Spreadsheet',
+    buyTitle: 'buy',
+    buyZone: '{name}: good {price} under {zone}',
+    buyLimited: '(limited)',
+    buyTarget: '{name}: ask {price} {source} under {target}',
+    summaryDrops: 'drops',
+    summaryDrop: '{name}: {price} {pct}',
   },
   ja: { summaryTitle: 'まとめ' },
 };
@@ -173,6 +182,80 @@ it('sends each person a daily summary of imports that did not add every row', as
   expect(await sendSummaries(db, ctx)).toBe(0);
   const [after] = await db.select().from(activity).where(eq(activity.kind, 'import'));
   expect(after!.alertedAt).not.toBeNull();
+});
+
+it('alerts a watch entering the buy zone or with an ask under its target, again after 14 days out', async () => {
+  await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
+  const product = await createProduct(db, member, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Box',
+    franchise: 'pokemon',
+    region: 'jp',
+  });
+  const { watch } = await addWatch(
+    db,
+    member,
+    { productId: product.id },
+    { packagingState: 'sealed_shrink', targetPriceBase: 9000 },
+  );
+  const stats = (fair: number) => ({
+    fair,
+    sales30: 5,
+    days180: 40,
+    days365: 80,
+    usual180: 10_000,
+    q25d180: 9_500,
+    q75d180: 10_500,
+    q10d365: 9_000,
+    cheaperThan180: 0.8,
+    trend14: 0,
+    trend28: 0,
+    trend84: 0,
+    ask: null,
+    ageDays: null,
+    releaseFrom: null,
+    market: null,
+    pattern: null,
+  });
+  const night = async (day: string, fair: number, ask: number) => {
+    await db.delete(signals);
+    await db.delete(supply);
+    await db
+      .insert(signals)
+      .values({ productId: product.id, bucket: watch.bucket, day, stats: stats(fair) });
+    await db.insert(supply).values({
+      productId: product.id,
+      source: 'snkrdunk',
+      bucket: watch.bucket,
+      day,
+      lowestAskBase: ask,
+      fetchedAt: `${day}T03:00:00`,
+    });
+    sent = [];
+    return sendWatchAlerts(db, ctx, new Date(`${day}T12:00:00Z`));
+  };
+  // In the zone (Steady: under the lower quarter) and an ask under the target: both, one message.
+  expect(await night('2026-11-01', 9_000, 8_500)).toEqual({ sent: 1, alerts: 2 });
+  expect(sent[0]!.text).toBe(
+    'buy\n\nBox: good ¥9,000 under ¥9,500\n\nBox: ask ¥8,500 SNKRDUNK under ¥9,000',
+  );
+  // Still in: nothing. Out for 5 days and back: nothing.
+  expect(await night('2026-11-02', 9_000, 8_500)).toEqual({ sent: 0, alerts: 0 });
+  await night('2026-11-03', 10_000, 9_500);
+  expect(await night('2026-11-08', 9_000, 8_500)).toEqual({ sent: 0, alerts: 0 });
+  // Out for 14 days: again.
+  await night('2026-11-09', 10_000, 9_500);
+  expect(await night('2026-11-23', 9_000, 9_500)).toEqual({ sent: 1, alerts: 1 });
+  // An old signal (the collect failed) says nothing, and the memory is kept.
+  const [before] = await db.select().from(watches);
+  await db.delete(supply);
+  expect(await sendWatchAlerts(db, ctx, new Date('2026-12-30T12:00:00Z'))).toEqual({
+    sent: 0,
+    alerts: 0,
+  });
+  const [after] = await db.select().from(watches);
+  expect(after!.alertState).toEqual(before!.alertState);
 });
 
 it('connects a Telegram chat from the code sent to the bot', async () => {

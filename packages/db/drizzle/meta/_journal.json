@@ -295,6 +295,13 @@
       "when": 1792314929553,
       "tag": "0041_product_line",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "6",
+      "when": 1792321378348,
+      "tag": "0042_watch_alerts",
+      "breakpoints": true
     }
   ]
 }

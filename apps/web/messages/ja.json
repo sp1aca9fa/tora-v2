@@ -1381,7 +1381,13 @@
     "method_links": "購入リンク",
     "method_file": "表計算ファイル",
     "method_claude": "Claude経由",
-    "logHint": "ログ全体: 自宅PCの tora-v2 フォルダで pnpm collect:log を実行してください。"
+    "logHint": "ログ全体: 自宅PCの tora-v2 フォルダで pnpm collect:log を実行してください。",
+    "buyTitle": "Tora: 買い時",
+    "buyZone": "{name}: 買い時、{price}（買いゾーン {zone}以下）。",
+    "buyLimited": "データ不足。",
+    "buyTarget": "{name}: {source}に{price}の出品、目標 {target}以下です。",
+    "summaryDrops": "急落（1週間で15%以上）:",
+    "summaryDrop": "{name}: {price}、7日間で{pct}"
   },
   "alerts": {
     "title": "アラート",
@@ -1428,7 +1434,9 @@
       "not_found": "「開始」のメッセージがまだ見つかりません。Telegram で「開始」を押してから、もう一度「確認」を押してください。",
       "no_bot": "Telegram ボットがまだ設定されていません。",
       "no_secret": "サーバーに AUTH_SECRET が設定されていません。"
-    }
+    },
+    "buy": "ウォッチ中の商品: 買い時、または目標以下の出品（毎晩の収集後すぐ）",
+    "drops": "所有・ウォッチ中の商品の急落、1週間で15%以上（朝のまとめ）"
   },
   "activity": {
     "title": "アクティビティ",
@@ -1537,7 +1545,8 @@
     "setupText": "Toraが買い時を伝える前に、ウォッチしている種類ごとに購入戦略を選んでください。まず例で試せます。Toraのおすすめもあります。",
     "setupButton": "戦略を選ぶ",
     "zoneShort": "<n>{amount}</n>以下で買い時",
-    "limited": "データ不足"
+    "limited": "データ不足",
+    "alertLimited": "データ不足でも買い時を通知する"
   },
   "forSale": {
     "title": "現在の出品",
@@ -1672,6 +1681,20 @@
       "lowShort": "180日 下",
       "highShort": "180日 上",
       "askShort": "出品"
+    },
+    "ruleTest": {
+      "title": "ルールの検証",
+      "about": "似た商品（{items}件{group}）の全期間の価格で{name}を検証。",
+      "notYet": "次の収集後に計算されます。",
+      "few": "検証できる過去のシグナルがまだ足りません: 90日後の価格があるもの{count}件（{min}件必要）。",
+      "signals": "過去の買いシグナル（{count}件）",
+      "result": "90日後に上がっていたのは{checked}回中{higher}回（{pct}%）、典型的な変化 {change}",
+      "anyDay": "いつ買っても",
+      "anyResult": "90日後に上がっていたのは{pct}%、典型的な変化 {change}",
+      "better": "過去は、いつ買うよりも良い結果でした。",
+      "worse": "過去は、いつ買うよりも悪い結果でした: ゾーンでは安く買えましたが、その後もしばらく下がることが多くありました。",
+      "same": "過去は、いつ買ってもほぼ同じ結果でした。",
+      "how": "過去の価格だけによる検証で、約束ではありません。シグナルは買い時が続いた期間の初日で、各日はそれ以前の価格だけで判断しています（相場全体の確認と新セットのパターンは除く）。{date}に計算。"
     }
   },
   "lines": {

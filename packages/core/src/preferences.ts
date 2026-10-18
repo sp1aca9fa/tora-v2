@@ -48,6 +48,10 @@ export interface AlertPrefs {
   imports?: boolean;
   /** Daily summary: what waits on the Actions page. */
   actions?: boolean;
+  /** Watched items: the buy zone (Good price) and an ask under the target (at once, S9). */
+  buy?: boolean;
+  /** Daily summary: sharp drops of owned and watched items (S9). */
+  drops?: boolean;
   /** The messages' language (one of the admin's two); the app's primary when unset. */
   language?: string;
 }
@@ -58,6 +62,8 @@ export function alertPrefs(prefs: UserPreferences | null | undefined) {
     failures: a.failures ?? true,
     imports: a.imports ?? true,
     actions: a.actions ?? true,
+    buy: a.buy ?? true,
+    drops: a.drops ?? true,
     language: a.language ?? null,
   };
 }

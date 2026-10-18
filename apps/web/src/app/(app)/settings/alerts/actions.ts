@@ -64,6 +64,8 @@ export async function saveAlertPrefsAction(_: AlertState, form: FormData): Promi
       failures: form.get('failures') === 'on',
       imports: form.get('imports') === 'on',
       actions: form.get('actions') === 'on',
+      buy: form.get('buy') === 'on',
+      drops: form.get('drops') === 'on',
       ...(isLocale(language) && { language }),
     },
   });

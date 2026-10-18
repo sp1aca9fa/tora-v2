@@ -10,7 +10,10 @@ import {
   newSetPattern,
   quantile,
   replay,
+  ruleTests,
   seriesStats,
+  stepAlert,
+  strategyKey,
   suggestedStrategy,
   typicalLowAge,
 } from './signals';
@@ -262,5 +265,53 @@ describe('replay', () => {
     expect(r.calls.length).toBeGreaterThan(0);
     expect(r.avgPaid!).toBeLessThan(r.avgAll!);
     expect(r.higher).toBe(r.checked);
+  });
+});
+
+describe('alerts and rule tests', () => {
+  it('alerts on entering, and again only after 14 days out', () => {
+    let a = stepAlert(undefined, true, '2026-01-01');
+    expect(a.send).toBe(true);
+    a = stepAlert(a.state, true, '2026-01-02');
+    expect(a.send).toBe(false);
+    a = stepAlert(a.state, false, '2026-01-05');
+    expect(a.state.offSince).toBe('2026-01-05');
+    // Back after 5 days out: quiet.
+    a = stepAlert(a.state, true, '2026-01-10');
+    expect(a.send).toBe(false);
+    a = stepAlert(a.state, false, '2026-01-12');
+    a = stepAlert(a.state, false, '2026-01-20');
+    expect(a.state.offSince).toBe('2026-01-12');
+    // 14 days after the last exit: sent again.
+    a = stepAlert(a.state, true, '2026-01-26');
+    expect(a).toEqual({ state: { on: true, sent: '2026-01-26' }, send: true });
+    expect(stepAlert(undefined, false, '2026-01-01')).toEqual({
+      state: { on: false, offSince: undefined, sent: undefined },
+      send: false,
+    });
+  });
+
+  it('counts each stretch in the zone once, checks it 90 days later, next to any day', () => {
+    const series = days('2025-01-01', 730, (i) => (i >= 600 && i < 620 ? 800 : 1000 + (i % 7)));
+    const [steady, dip] = ruleTests(
+      [series, series],
+      [{ strategy: 'steady' }, { strategy: 'dip' }],
+      '2026-12-31',
+    );
+    const days_ = replay(series, { strategy: 'steady' }, '2026-12-31', 730).calls.length;
+    expect(steady!.items).toBe(2);
+    expect(steady!.signals).toBeGreaterThan(0);
+    expect(steady!.signals).toBeLessThan(days_ * 2);
+    expect(steady!.higher).toBe(steady!.checked);
+    expect(steady!.change!).toBeGreaterThan(0);
+    expect(dip!.signals).toBeGreaterThan(0);
+    expect(steady!.anyChecked).toBeGreaterThan(steady!.checked);
+    expect(ruleTests([], [{ strategy: 'steady' }], '2026-12-31')[0]).toMatchObject({
+      items: 0,
+      signals: 0,
+      change: null,
+    });
+    expect(strategyKey({ strategy: 'margin', margin: 15 })).toBe('margin:15');
+    expect(strategyKey({ strategy: 'steady' })).toBe('steady');
   });
 });

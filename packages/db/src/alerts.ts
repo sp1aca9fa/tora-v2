@@ -2,25 +2,49 @@
 // Discord (a webhook per person). Failures of the home PC's runs go out at once to admins; imports
 // with rows not added and what waits on Actions go out in one daily summary per person. The home
 // PC sends failures after its runs (`pnpm alerts after-run`); the app's morning check (a Vercel
-// cron job) sends "nothing ran" and the summaries, so they never arrive in the night.
+// cron job) sends "nothing ran" and the summaries, so they never arrive in the night. Watched
+// items (S9 part 5): the buy zone and an ask under the target go out at once after the collect,
+// sharp drops of owned and watched items in the summary.
 import { decryptSecret, encryptSecret, keyedHash } from '@tora/auth';
-import { alertPrefs, localDate, toLocalIso } from '@tora/core';
-import { and, eq, gte, isNull } from 'drizzle-orm';
+import {
+  ALERT_QUIET_DAYS,
+  type AlertState,
+  SHARP_DROP_7D,
+  type SignalStats,
+  alertPrefs,
+  baseCurrency,
+  fromMinor,
+  judge,
+  localDate,
+  productClass,
+  stepAlert,
+  strategyOf,
+  toLocalIso,
+} from '@tora/core';
+import { and, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { actionTotal, pendingActions } from './actions';
 import { lastActivity, markAlerted, recordActivity, unalerted } from './activity';
 import type { Db } from './client';
 import { checkDbBudget } from './db-usage';
+import { holdingBucket } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import {
   type Activity,
   type AlertChannel,
   type AlertChannelKind,
+  type Product,
   type User,
   activity,
   alertChannels,
   appSettings,
+  holdings,
+  products,
+  signals,
   users,
+  watches,
 } from './schema';
+import { latestSignals } from './signals';
+import { currentSupply, lowestAsk } from './supply';
 
 /** The `alertText` messages of one language (flat keys, `{name}` placeholders). */
 export type AlertTexts = Record<string, string>;
@@ -336,16 +360,32 @@ export async function sendTest(db: Db, user: User, channelId: string, ctx: Alert
   return deliverTo(db, channel.id, texts.test ?? 'Tora: test message.', ctx);
 }
 
-/** A person's messages: their chosen language, else the app's primary. */
-async function textsFor(db: Db, user: User | null, ctx: AlertContext): Promise<AlertTexts> {
+/** A person's messages' language: their choice, else the app's primary. */
+async function localeFor(db: Db, user: User | null): Promise<string> {
   const languages = (await loadSourceRegistry(db)).languages;
   const chosen = alertPrefs(user?.preferences).language;
-  const locale =
-    chosen && (chosen === languages?.primary || chosen === languages?.secondary)
-      ? chosen
-      : (languages?.primary ?? 'en');
+  return chosen && (chosen === languages?.primary || chosen === languages?.secondary)
+    ? chosen
+    : (languages?.primary ?? 'en');
+}
+
+/** A person's messages: their chosen language, else the app's primary. */
+async function textsFor(db: Db, user: User | null, ctx: AlertContext): Promise<AlertTexts> {
+  const locale = await localeFor(db, user);
   return { ...(await ctx.texts('en')), ...(await ctx.texts(locale)) };
 }
+
+/** Amounts in the base currency, in a person's language. */
+async function moneyFor(db: Db, user: User): Promise<(minor: number) => string> {
+  const [locale, registry] = await Promise.all([localeFor(db, user), loadSourceRegistry(db)]);
+  const base = baseCurrency(registry);
+  const format = new Intl.NumberFormat(locale, { style: 'currency', currency: base });
+  return (minor) => format.format(fromMinor(minor, base));
+}
+
+/** A condition in a few words for a message: "graded:PSA:10" -> "PSA 10". */
+const conditionWords = (bucket: string) =>
+  bucket.replace(/^(graded|raw|sealed|cond):/, '').replaceAll(':', ' ');
 
 /** Admins who want failures, with at least one channel. */
 async function adminsToAlert(db: Db): Promise<User[]> {
@@ -518,6 +558,9 @@ function notAdded(entry: Activity) {
  */
 export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date()): Promise<number> {
   const state = (await readSetting<Record<string, string>>(db, 'alertSummaries')) ?? {};
+  // Sharp drops already shown: person -> item and condition -> day.
+  const dropsShown =
+    (await readSetting<Record<string, Record<string, string>>>(db, 'alertDrops')) ?? {};
   const base = await appUrl(db);
   let sent = 0;
   const people = await db.select().from(users).where(isNull(users.disabledAt));
@@ -561,16 +604,222 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
       const count = actionTotal(items);
       if (count) lines.push(fill(t.summaryActions!, { count }) + linkLine(t, base, '/actions'));
     }
+    const drops = prefs.drops ? await sharpDrops(db, user.id, dropsShown[user.id] ?? {}, now) : [];
+    if (drops.length) {
+      const money = await moneyFor(db, user);
+      lines.push(
+        [
+          t.summaryDrops ?? 'Sharp drops (15% or more in a week):',
+          ...drops.map(
+            (d) =>
+              fill(t.summaryDrop ?? '{name}: {price}, {pct} in 7 days', {
+                name: d.product.name + (d.bucket ? ` (${conditionWords(d.bucket)})` : ''),
+                price: money(d.fair),
+                pct: `${Math.round(d.change * 100)}%`,
+              }) + linkLine(t, base, `/products/${d.product.id}`),
+          ),
+        ].join('\n'),
+      );
+    }
     if (lines.length === 0) continue;
     const delivered = await sendToUser(db, user.id, [t.summaryTitle!, ...lines].join('\n\n'), ctx);
     if (delivered === 0) continue;
     sent += delivered;
     state[user.id] = toLocalIso(now);
+    if (drops.length) {
+      const today = localDate(now);
+      dropsShown[user.id] = {
+        ...dropsShown[user.id],
+        ...Object.fromEntries(drops.map((d) => [d.key, today])),
+      };
+    }
     await markAlerted(
       db,
       imports.map((e) => e.id),
     );
   }
   await saveSetting(db, 'alertSummaries', state);
+  await saveSetting(db, 'alertDrops', dropsShown);
   return sent;
+}
+
+/** A watch's alert memory, read back. */
+type WatchAlertState = { zone?: AlertState; target?: AlertState };
+
+/**
+ * Watched items' alerts, at once after the nightly collect (S9 part 5): a watch whose verdict
+ * turned Good price (by its person's strategy; with little data only when the watch allows it),
+ * and a watch whose lowest ask went under its target. Each again only after 14 days out. Only
+ * today's numbers count (a collect that failed says nothing). Every watch's memory is kept up to
+ * date, also for people without a channel or with these alerts off, so turning them on later
+ * does not send old news.
+ */
+export async function sendWatchAlerts(
+  db: Db,
+  ctx: AlertContext,
+  now = new Date(),
+): Promise<{ sent: number; alerts: number }> {
+  const today = localDate(now);
+  const rows = await db
+    .select({ watch: watches, product: products, user: users })
+    .from(watches)
+    .innerJoin(products, eq(products.id, watches.productId))
+    .innerJoin(users, eq(users.id, watches.userId))
+    .where(isNull(users.disabledAt));
+  if (rows.length === 0) return { sent: 0, alerts: 0 };
+  const ids = [...new Set(rows.map((r) => r.product.id))];
+  const [stats, supply] = await Promise.all([
+    latestSignals(
+      db,
+      rows.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket || null })),
+      now,
+    ),
+    currentSupply(db, ids, now),
+  ]);
+  const base = await appUrl(db);
+  const sourceLabel = new Map(
+    (await loadSourceRegistry(db)).sources.map((s) => [s.key, s.label] as const),
+  );
+  const byUser = new Map<string, { user: User; lines: string[] }>();
+  let alerts = 0;
+  for (const { watch, product, user } of rows) {
+    const state: WatchAlertState = { ...(watch.alertState ?? {}) };
+    const signal = stats.get(`${product.id}|${watch.bucket}`);
+    const fresh = signal?.day === today ? (signal.stats as SignalStats) : null;
+    const lines: string[] = [];
+    const t = await textsFor(db, user, ctx);
+    const money = await moneyFor(db, user);
+    const name =
+      product.name +
+      (rows.filter((r) => r.user.id === user.id && r.product.id === product.id).length > 1 &&
+      watch.bucket
+        ? ` (${conditionWords(watch.bucket)})`
+        : '');
+    const href = `/products/${product.id}/buy${watch.bucket ? `?condition=${encodeURIComponent(watch.bucket)}` : ''}`;
+    if (fresh) {
+      const j = judge(fresh, strategyOf(user.preferences, productClass(product)));
+      const good = j.verdict === 'good' && (watch.alertLimited || j.limited.length === 0);
+      const step = stepAlert(state.zone, good, today);
+      state.zone = step.state;
+      if (step.send && fresh.fair !== null && j.zone.top !== null) {
+        lines.push(
+          fill(t.buyZone ?? '{name}: good price, {price} (buy zone under {zone}).', {
+            name,
+            price: money(fresh.fair),
+            zone: money(j.zone.top),
+          }) +
+            (j.limited.length ? ` ${t.buyLimited ?? ''}` : '') +
+            linkLine(t, base, href),
+        );
+      }
+    }
+    // Today's asks only: a source that read nothing tonight says nothing.
+    const ask = lowestAsk(
+      (supply.get(product.id) ?? []).filter((r) => r.day === today),
+      watch.bucket,
+    );
+    if (watch.targetPriceBase && ask) {
+      const under = ask.lowestAskBase !== null && ask.lowestAskBase <= watch.targetPriceBase;
+      const step = stepAlert(state.target, under, today);
+      state.target = step.state;
+      if (step.send) {
+        lines.push(
+          fill(t.buyTarget ?? '{name}: an ask at {price} ({source}), under your target {target}.', {
+            name,
+            price: money(ask.lowestAskBase!),
+            source: sourceLabel.get(ask.source) ?? ask.source,
+            target: money(watch.targetPriceBase),
+          }) +
+            linkLine(t, base, ask.url ? null : href) +
+            (ask.url ? `\n${ask.url}` : ''),
+        );
+      }
+    }
+    if (JSON.stringify(state) !== JSON.stringify(watch.alertState ?? {})) {
+      await db.update(watches).set({ alertState: state }).where(eq(watches.id, watch.id));
+    }
+    if (lines.length === 0 || !alertPrefs(user.preferences).buy) continue;
+    alerts += lines.length;
+    const entry = byUser.get(user.id) ?? { user, lines: [] };
+    entry.lines.push(...lines);
+    byUser.set(user.id, entry);
+  }
+  let sent = 0;
+  for (const { user, lines } of byUser.values()) {
+    const t = await textsFor(db, user, ctx);
+    sent += await sendToUser(
+      db,
+      user.id,
+      [t.buyTitle ?? 'Tora: buy timing', ...lines].join('\n\n'),
+      ctx,
+    );
+  }
+  return { sent, alerts };
+}
+
+/**
+ * Sharp drops for a person's daily summary (S9 part 5): owned and watched items whose market
+ * value fell 15 % or more in 7 days (from the saved daily numbers), each item at most once in 14
+ * days (`shown`: item and condition -> day last shown).
+ */
+export async function sharpDrops(
+  db: Db,
+  userId: string,
+  shown: Record<string, string>,
+  now = new Date(),
+): Promise<{ key: string; product: Product; bucket: string; fair: number; change: number }[]> {
+  const today = localDate(now);
+  const day = (d: string) => Math.floor(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
+  const pairs = new Map<string, { product: Product; bucket: string }>();
+  for (const { holding, product } of await db
+    .select({ holding: holdings, product: products })
+    .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
+    .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')))) {
+    const bucket = holdingBucket(holding, product) ?? '';
+    pairs.set(`${product.id}|${bucket}`, { product, bucket });
+  }
+  for (const { watch, product } of await db
+    .select({ watch: watches, product: products })
+    .from(watches)
+    .innerJoin(products, eq(products.id, watches.productId))
+    .where(eq(watches.userId, userId))) {
+    pairs.set(`${product.id}|${watch.bucket}`, { product, bucket: watch.bucket });
+  }
+  if (pairs.size === 0) return [];
+  const ids = [...new Set([...pairs.values()].map((p) => p.product.id))];
+  const from = localDate(new Date(now.getTime() - 10 * 86_400_000));
+  const byPair = new Map<string, { day: string; fair: number | null }[]>();
+  for (let i = 0; i < ids.length; i += 200) {
+    for (const r of await db
+      .select({
+        productId: signals.productId,
+        bucket: signals.bucket,
+        day: signals.day,
+        stats: signals.stats,
+      })
+      .from(signals)
+      .where(and(inArray(signals.productId, ids.slice(i, i + 200)), gte(signals.day, from)))) {
+      const key = `${r.productId}|${r.bucket}`;
+      if (!pairs.has(key)) continue;
+      const list = byPair.get(key) ?? [];
+      list.push({ day: r.day, fair: (r.stats as SignalStats).fair });
+      byPair.set(key, list);
+    }
+  }
+  const out = [];
+  for (const [key, list] of byPair) {
+    list.sort((a, b) => a.day.localeCompare(b.day));
+    const last = list.at(-1)!;
+    // Today's or yesterday's numbers, against those of 7 days before (a day either way).
+    if (last.fair === null || day(today) - day(last.day) > 1) continue;
+    const before = list.find((r) => Math.abs(day(last.day) - day(r.day) - 7) <= 1 && r.fair);
+    if (!before?.fair) continue;
+    const change = last.fair / before.fair - 1;
+    if (change > SHARP_DROP_7D) continue;
+    if (shown[key] && day(today) - day(shown[key]) < ALERT_QUIET_DAYS) continue;
+    const pair = pairs.get(key)!;
+    out.push({ key, product: pair.product, bucket: pair.bucket, fair: last.fair, change });
+  }
+  return out.sort((a, b) => a.change - b.change);
 }

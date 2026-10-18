@@ -16,6 +16,8 @@ export interface WatchInput extends WatchCondition {
   /** Per unit, in the base currency; null for none. */
   targetPriceBase?: number | null;
   note?: string | null;
+  /** Buy zone alerts with little data too (unset: on for a new watch, kept on a change). */
+  alertLimited?: boolean;
 }
 
 function fields(product: Product, input: WatchInput) {
@@ -37,6 +39,7 @@ function fields(product: Product, input: WatchInput) {
     bucket: deriveBucket({ productClass: productClass(product), ...condition }) ?? '',
     targetPriceBase: target,
     note: input.note?.trim() || null,
+    ...(input.alertLimited !== undefined && { alertLimited: input.alertLimited }),
   };
 }
 
@@ -57,7 +60,11 @@ export async function addWatch(
     .values({ userId, productId: product.id, ...values })
     .onConflictDoUpdate({
       target: [watches.userId, watches.productId, watches.bucket],
-      set: { targetPriceBase: values.targetPriceBase, note: values.note },
+      set: {
+        targetPriceBase: values.targetPriceBase,
+        note: values.note,
+        ...(values.alertLimited !== undefined && { alertLimited: values.alertLimited }),
+      },
     })
     .returning();
   return { watch: watch!, product };
@@ -90,7 +97,19 @@ export async function updateWatch(
       );
     if (taken) throw new DomainError('duplicate_watch');
   }
-  const [watch] = await db.update(watches).set(values).where(eq(watches.id, watchId)).returning();
+  // A new condition or target starts its alerts afresh (S9 part 5).
+  const state = row.watch.alertState ?? {};
+  const alertState =
+    values.bucket !== row.watch.bucket
+      ? null
+      : values.targetPriceBase !== row.watch.targetPriceBase
+        ? { zone: state.zone }
+        : state;
+  const [watch] = await db
+    .update(watches)
+    .set({ ...values, alertState })
+    .where(eq(watches.id, watchId))
+    .returning();
   return watch!;
 }
 

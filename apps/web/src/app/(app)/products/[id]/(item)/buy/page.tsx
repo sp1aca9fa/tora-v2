@@ -1,4 +1,11 @@
-import { currentSupply, holdingBucket, listingsIn, lowestAsk, priceHistory } from '@tora/db';
+import {
+  currentSupply,
+  holdingBucket,
+  listingsIn,
+  lowestAsk,
+  priceHistory,
+  ruleTestFor,
+} from '@tora/db';
 import { judge, productClass, strategyOf } from '@tora/core';
 import { Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -9,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { lotConditionLabel } from '@/lib/product-display';
 import { sourceLabels } from '@/lib/sources';
 import { cn } from '@/lib/utils';
-import { BuyReasons, BuyVerdict } from '../../buy-timing';
+import { BuyReasons, BuyVerdict, RuleTestCard } from '../../buy-timing';
 import { ForSale } from '../../for-sale';
 import { loadItem, loadSignal } from '../../item-data';
 import { WatchCard } from '../../watch-card';
@@ -38,16 +45,17 @@ export default async function BuyPage({ params, searchParams }: Props) {
     ),
   ];
   const bucket = asked && conditions.includes(asked) ? asked : mainBucket;
-  const [t, sourceLabel, stats, history, supply] = await Promise.all([
+  const cls = productClass(product);
+  const choice = strategyOf(user.preferences, cls);
+  const [t, sourceLabel, stats, history, supply, ruleTest] = await Promise.all([
     getTranslations(),
     sourceLabels(),
     loadSignal(id, bucket),
     priceHistory(db, product.id, 365),
     currentSupply(db, [product.id]),
+    ruleTestFor(db, product, bucket, choice),
   ]);
   const forSale = supply.get(product.id) ?? [];
-  const cls = productClass(product);
-  const choice = strategyOf(user.preferences, cls);
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
 
   // Wide screens: the verdict, the chart and the reasons on the left; what is for sale and the
@@ -110,7 +118,9 @@ export default async function BuyPage({ params, searchParams }: Props) {
 
         {stats && <BuyReasons stats={stats} />}
 
-        {/* S9 part 5: the rule test card goes here. */}
+        {choice.strategy !== 'target' && (
+          <RuleTestCard test={ruleTest} strategyName={t(`strategy.name.${choice.strategy}`)} />
+        )}
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1">
@@ -127,6 +137,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
                 label: lotConditionLabel(w, product, t),
                 target: w.targetPriceBase,
                 note: w.note,
+                alertLimited: w.alertLimited,
                 defaults: w,
                 ask: best && {
                   price: best.lowestAskBase!,

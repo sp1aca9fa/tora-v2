@@ -15,6 +15,9 @@ from past prices only and is never a sure thing.
   the zone, and the person's watches. One condition at a time: the main one, or another the person
   watches or owns.
 - **Watchlist > Buy strategy**: the strategies per item type, tried on three fixed examples (below).
+- **Alerts** (Telegram or Discord, see [Alerts](alerts.md)): a watched item turning Good price, or
+  its lowest ask going under the target, right after the nightly collect; sharp drops in the
+  morning summary.
 - MCP tool `watchlist`: the verdict, the zone and the numbers, for a Claude chat.
 
 ## The numbers (saved daily)
@@ -79,3 +82,15 @@ card over a year), a long fall (a box falling for months, then flat, then recove
 after release). Per example: the days each strategy would have called a buy, the average price
 paid against the period's average, and how often the price was higher 90 days later. Each past day
 is judged only on the prices before it.
+
+## Rule tests
+
+The Buy timing page shows how the person's strategy did on the whole price history of similar
+items (the item's line when it has 3 or more items and enough signals, else the whole group),
+worked out after each collect: each past signal (the first day of each stretch at Good price, each
+day judged only on the prices before it, without the market check or the new-set pattern) is
+checked against the typical price 90 days later, next to buying on any day. Shown from 10 checked
+signals. On the data up to October 2026 the zones paid less than average but were no sign of a
+rise: Steady signals were followed by a higher price 90 days later less often than any day (sealed
+boxes 25 % against 67 %, PSA 10 cards 33 % against 58 %), because a fall into the cheapest quarter
+usually went on for a while. Rethinking the strategies is planned with S13.

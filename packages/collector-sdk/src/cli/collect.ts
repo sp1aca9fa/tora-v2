@@ -17,6 +17,7 @@ import {
   checkItemSales,
   getProduct,
   refreshItemSales,
+  refreshRuleTests,
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
@@ -201,6 +202,7 @@ const closedOn = await readSetting<string>(db, CLOSED_KEY);
 let snap: Awaited<ReturnType<typeof runSnapshots>> | null = null;
 let saved: Awaited<ReturnType<typeof refreshBucketValues>> | null = null;
 let signalsSaved: { saved: number; withPattern: number; lineSuggestions: number } | null = null;
+let ruleGroups = 0;
 if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   log('closing steps: already done today and nothing fetched since, left out');
 } else {
@@ -274,6 +276,12 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   } catch (error) {
     console.log(`buy timing: stopped (${errorText(error)})`);
   }
+  // Rule tests on the whole history of each group of similar items (S9 part 5).
+  try {
+    ruleGroups = await refreshRuleTests(db);
+  } catch (error) {
+    console.log(`rule tests: stopped (${errorText(error)})`);
+  }
   await saveSetting(db, CLOSED_KEY, localDate());
 }
 progress.done();
@@ -291,6 +299,7 @@ if (signalsSaved) {
     log(`set lines: ${signalsSaved.lineSuggestions} to confirm on Actions`);
   }
 }
+if (ruleGroups) console.log(`rule tests: ${ruleGroups} group(s) of similar items`);
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }

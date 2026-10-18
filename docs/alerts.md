@@ -11,10 +11,18 @@ happened (Settings > Activity).
 | No collect or no backup for over 26 hours (the PC is off)                 | Admins      | The morning check                                                            | The app (Vercel cron)           |
 | Imports that did not add every row (already in Tora, left out, a problem) | Each person | The morning summary (at most one a day, only when there is something to say) | The app (Vercel cron)           |
 | How many things wait on Actions                                           | Each person | The morning summary                                                          | The app (Vercel cron)           |
+| A watched item turned Good price, or its lowest ask went under the target | Each person | Right after the nightly collect (again only after 14 days out)               | The home PC (`collect-cron.sh`) |
+| Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app (Vercel cron)           |
 
 Each person picks their channels, switches each kind on or off and chooses the language of the
 messages in **Settings > Alerts**. A failure at night arrives at night; Telegram and Discord can
 mute a chat.
+
+Buy alerts follow each person's buy strategy (see [Buy timing](buy-timing.md)) and use only that
+night's numbers, so a failed collect sends none. A Good price with little data is sent unless the
+watch's "Alert on Good price even with limited data" is off. Tora remembers each watch's state:
+an item that slips out of its zone and back within 14 days does not alert twice; changing a
+watch's condition or target starts over.
 
 ## Setting up (admin, once)
 

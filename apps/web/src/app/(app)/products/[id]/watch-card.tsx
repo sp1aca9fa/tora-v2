@@ -18,6 +18,8 @@ export interface WatchRow {
   label: string | null;
   target: number | null;
   note: string | null;
+  /** Buy zone alerts with little data too. */
+  alertLimited: boolean;
   defaults: ConditionDefaults;
   /** The lowest ask in this condition today (S9 part 2), across sources. */
   ask: { price: number; source: string; url: string | null; listings: number | null } | null;
@@ -46,7 +48,10 @@ function WatchForm({
       <input type="hidden" name="productId" value={productId} />
       {watch && <input type="hidden" name="watchId" value={watch.id} />}
       <ConditionFields cls={cls} defaults={watch?.defaults} />
-      <WatchTargetFields retail={retail} defaults={{ target: watch?.target, note: watch?.note }} />
+      <WatchTargetFields
+        retail={retail}
+        defaults={{ target: watch?.target, note: watch?.note, alertLimited: watch?.alertLimited }}
+      />
       <FormError state={state} />
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={pending}>

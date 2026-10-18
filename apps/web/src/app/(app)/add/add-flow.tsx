@@ -692,12 +692,13 @@ export function WatchTargetFields({
   defaults = {},
 }: {
   retail?: number | null;
-  defaults?: { target?: number | null; note?: string | null };
+  defaults?: { target?: number | null; note?: string | null; alertLimited?: boolean };
 }) {
   const t = useTranslations();
   const money = useMoney();
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <input type="hidden" name="alertLimitedShown" value="1" />
       <Field
         label={t('watchlist.target')}
         htmlFor="w-target"
@@ -718,6 +719,15 @@ export function WatchTargetFields({
       <Field label={t('fields.notes')} htmlFor="w-note">
         <Textarea id="w-note" name="note" rows={2} defaultValue={defaults.note ?? undefined} />
       </Field>
+      <label className="flex items-start gap-2 text-sm sm:col-span-2">
+        <input
+          type="checkbox"
+          name="alertLimited"
+          defaultChecked={defaults.alertLimited ?? true}
+          className="mt-0.5 size-4 shrink-0"
+        />
+        {t('watchlist.alertLimited')}
+      </label>
     </div>
   );
 }

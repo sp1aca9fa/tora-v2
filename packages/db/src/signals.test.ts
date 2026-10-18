@@ -6,7 +6,7 @@ import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, mergeProducts } from './mutations';
 import { priceObservations, products, signals, suggestions, tcgSets } from './schema';
-import { latestSignals, refreshSignals } from './signals';
+import { latestSignals, refreshRuleTests, refreshSignals, ruleTestFor } from './signals';
 import { createUser } from './users';
 import { addWatch } from './watches';
 import { eq } from 'drizzle-orm';
@@ -188,4 +188,26 @@ it('learns the new-release wait per set line, and suggests a line for an item un
   expect(r.lineSuggestions).toBe(1);
   const [filed] = await db.select().from(suggestions);
   expect(filed).toMatchObject({ kind: 'set_line', productId: odd.id, payload: { line: 'sub' } });
+});
+
+it('tests the strategies on the whole history of similar items and saves them for pages', async () => {
+  const boxes = await Promise.all(['Box A', 'Box B', 'Box C'].map((n) => box(n)));
+  // A year and a half around 10,000 with a dip to 8,000 a year ago, then back.
+  for (const p of boxes) {
+    await sales(p.id, 540, (back) =>
+      back >= 350 && back < 370 ? 8_000 : 10_000 + (back % 5) * 20,
+    );
+  }
+  await addWatch(db, uid, { productId: boxes[0]!.id }, { packagingState: 'sealed_shrink' });
+  await refreshSignals(db, NOW);
+  expect(await refreshRuleTests(db, NOW)).toBe(1);
+  const steady = await ruleTestFor(db, boxes[0]!, 'sealed:shrink', { strategy: 'steady' });
+  expect(steady).toMatchObject({ line: null, day: '2026-10-16', result: { items: 3 } });
+  expect(steady!.result.checked).toBeGreaterThan(0);
+  expect(steady!.result.anyChecked).toBeGreaterThan(steady!.result.checked);
+  // A margin nobody chose, and own target only: no test.
+  expect(
+    await ruleTestFor(db, boxes[0]!, 'sealed:shrink', { strategy: 'margin', margin: 30 }),
+  ).toBeNull();
+  expect(await ruleTestFor(db, boxes[0]!, 'sealed:shrink', { strategy: 'target' })).toBeNull();
 });

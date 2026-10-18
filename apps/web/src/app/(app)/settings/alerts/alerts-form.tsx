@@ -155,7 +155,14 @@ export function AlertPrefsForm({
   languages,
 }: {
   admin: boolean;
-  prefs: { failures: boolean; imports: boolean; actions: boolean; language: string };
+  prefs: {
+    failures: boolean;
+    imports: boolean;
+    actions: boolean;
+    buy: boolean;
+    drops: boolean;
+    language: string;
+  };
   languages: { code: string; name: string }[];
 }) {
   const t = useTranslations('alerts');
@@ -163,8 +170,8 @@ export function AlertPrefsForm({
     saveAlertPrefsAction,
     {},
   );
-  const kinds = (admin ? ['failures', 'imports', 'actions'] : ['imports', 'actions']) as (
-    'failures' | 'imports' | 'actions'
+  const kinds = [...(admin ? ['failures'] : []), 'buy', 'imports', 'actions', 'drops'] as (
+    'failures' | 'imports' | 'actions' | 'buy' | 'drops'
   )[];
   return (
     <form action={formAction} className="space-y-4 text-sm">

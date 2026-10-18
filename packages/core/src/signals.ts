@@ -49,6 +49,12 @@ export const NEW_RELEASE_DAYS = 90;
 /** A full first year: prices from within this many days of release to at least this age. */
 export const FULL_YEAR = { from: 30, to: 300 } as const;
 
+/** Alerts (S9 part 5): quiet days before the same alert again, and a sharp drop over 7 days. */
+export const ALERT_QUIET_DAYS = 14;
+export const SHARP_DROP_7D = -0.15;
+/** Rule tests: past signals checked 90 days later needed before a result is shown. */
+export const RULE_TEST_MIN_SIGNALS = 10;
+
 /** What is saved each day per item and condition. Fractions, not percents. */
 export interface SignalStats {
   /** Today's fair value (the item's market value); null without one. */
@@ -393,6 +399,114 @@ export function replay(
     l.length ? Math.round(l.reduce((a, b) => a + b, 0) / l.length) : null;
   return { calls, avgPaid: avg(paid), avgAll: avg(all), checked, higher };
 }
+
+/** One alert's memory per watch (S9 part 5): in the condition now, since when out, last sent. */
+export interface AlertState {
+  on: boolean;
+  /** The day it went out of the condition (absent: never in, or in now). */
+  offSince?: string;
+  /** The day the alert was last sent. */
+  sent?: string;
+}
+
+/**
+ * The next state of an alert and whether to send it: once on entering the condition, and again
+ * only after it was out for `ALERT_QUIET_DAYS` or more (a short dip out and back says nothing).
+ */
+export function stepAlert(
+  state: AlertState | undefined,
+  on: boolean,
+  today: string,
+): { state: AlertState; send: boolean } {
+  const prev = state ?? { on: false };
+  if (!on) {
+    return {
+      state: { on: false, offSince: prev.on ? today : prev.offSince, sent: prev.sent },
+      send: false,
+    };
+  }
+  if (prev.on) return { state: prev, send: false };
+  const quiet =
+    !prev.sent || !prev.offSince || dayNumber(today) - dayNumber(prev.offSince) >= ALERT_QUIET_DAYS;
+  return { state: { on: true, sent: quiet ? today : prev.sent }, send: quiet };
+}
+
+export interface RuleTestResult {
+  /** Items with prices in the test. */
+  items: number;
+  /** Past buy signals (the first day of each stretch of "good price"), and those checked 90 days later. */
+  signals: number;
+  checked: number;
+  higher: number;
+  /** The median change 90 days later, over the checked signals (null without any). */
+  change: number | null;
+  /** The same for buying on any day with sales. */
+  anyChecked: number;
+  anyHigher: number;
+  anyChange: number | null;
+}
+
+/**
+ * A rule test (S9 part 5): a strategy on the whole history of a group of similar items. Each day
+ * with sales is judged only on the prices up to it (no market or new-set pattern); a signal is
+ * the first day of each stretch it said "good price", checked against the typical price 90 days
+ * later; buying on any day is the comparison. Several strategies are tested on one pass.
+ */
+export function ruleTests(
+  group: DayPrice[][],
+  choices: StrategyChoice[],
+  asOf: string,
+): RuleTestResult[] {
+  const end = dayNumber(asOf);
+  const results = choices.map(() => ({ signals: 0, changes: [] as number[] }));
+  const any: number[] = [];
+  let items = 0;
+  for (const series of group) {
+    if (series.length === 0) continue;
+    items++;
+    const prev = choices.map(() => false);
+    for (const p of series) {
+      const d = dayNumber(p.day);
+      if (d > end) break;
+      const stats: SignalStats = {
+        ...seriesStats(series, p.day),
+        ask: null,
+        ageDays: null,
+        releaseFrom: null,
+        market: null,
+        pattern: null,
+      };
+      if (stats.fair === null) continue;
+      const later =
+        d + PATTERN_HORIZON + 7 <= end ? priceAround(series, d + PATTERN_HORIZON) : null;
+      const change = later !== null ? later / stats.fair - 1 : null;
+      if (change !== null) any.push(change);
+      choices.forEach((choice, i) => {
+        const good = judge(stats, choice).verdict === 'good';
+        if (good && !prev[i]) {
+          results[i]!.signals++;
+          if (change !== null) results[i]!.changes.push(change);
+        }
+        prev[i] = good;
+      });
+    }
+  }
+  const anyHigher = any.filter((c) => c > 0).length;
+  return results.map((r) => ({
+    items,
+    signals: r.signals,
+    checked: r.changes.length,
+    higher: r.changes.filter((c) => c > 0).length,
+    change: median(r.changes),
+    anyChecked: any.length,
+    anyHigher,
+    anyChange: median(any),
+  }));
+}
+
+/** A strategy as a key (rule tests are saved per strategy, margins apart). */
+export const strategyKey = (c: StrategyChoice) =>
+  c.strategy === 'margin' ? `margin:${c.margin ?? DEFAULT_MARGIN}` : c.strategy;
 
 /** A person's strategy for an item type: their choice, else Tora's suggestion. */
 export function strategyOf(

@@ -1,9 +1,14 @@
 // Buy timing (requirements S9 part 4): the numbers saved daily per item and condition held or
-// watched (after the collect), the set line suggestions, and what pages read.
+// watched (after the collect), the set line suggestions, the rule tests (part 5), and what pages
+// read.
 import {
   type DayPrice,
+  type RuleTestResult,
   type SignalStats,
+  type StrategyChoice,
+  DEFAULT_MARGIN,
   PATTERN_MIN_ITEMS,
+  RULE_TEST_MIN_SIGNALS,
   byLine,
   earlyChange,
   localDate,
@@ -12,14 +17,16 @@ import {
   median,
   newSetPattern,
   productClass,
+  ruleTests,
   seriesStats,
+  strategyKey,
   toLocalIso,
   typicalLowAge,
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { refreshItemSales, soldDays } from './item-sales';
-import { loadSourceRegistry } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, holdings, products, signals, users, watches } from './schema';
 import { fileSuggestion } from './suggestions';
@@ -417,4 +424,109 @@ export async function heldItemTypes(db: Db, userId: string): Promise<string[]> {
     .innerJoin(products, eq(products.id, holdings.productId))
     .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')));
   return [...new Set(rows.map((r) => productClass(r)))];
+}
+
+/** Saved rule tests: per group of similar items and condition (and line), per strategy. */
+interface SavedRuleTests {
+  day: string;
+  groups: Record<string, { line: string | null; byStrategy: Record<string, RuleTestResult> }>;
+}
+
+const RULE_TESTS_KEY = 'ruleTests';
+
+/**
+ * The rule tests (S9 part 5), worked out after the collect for every group of similar items that
+ * someone holds or watches an item of, on the group's whole history, for every strategy (each
+ * margin someone chose apart) and saved in one setting. An item's line is tested on its own
+ * when it gives enough signals (3+ items), else the whole group.
+ */
+export async function refreshRuleTests(db: Db, now = new Date()): Promise<number> {
+  const pairs = await valuedPairs(db);
+  const allProducts = await db.select().from(products);
+  const lines = await productLines(db, allProducts);
+  const margins = new Set([DEFAULT_MARGIN]);
+  for (const u of await db.select({ preferences: users.preferences }).from(users)) {
+    for (const c of Object.values(u.preferences?.buyStrategy?.byType ?? {})) {
+      if (c.strategy === 'margin' && c.margin) margins.add(c.margin);
+    }
+  }
+  const choices: StrategyChoice[] = [
+    { strategy: 'steady' },
+    { strategy: 'bargain' },
+    { strategy: 'dip' },
+    ...[...margins].map((margin): StrategyChoice => ({ strategy: 'margin', margin })),
+  ];
+  const today = localDate(now);
+  const wanted = new Map<string, { key: string; bucket: string | null; line: string | null }>();
+  for (const { product, bucket } of pairs) {
+    const key = similarKey(product);
+    if (!key) continue;
+    const line = lines.get(product.id) ?? null;
+    wanted.set(`${key}|${bucket ?? ''}|${line ?? ''}`, { key, bucket, line });
+  }
+  const groups: SavedRuleTests['groups'] = {};
+  const keys = new Set([...wanted.values()].map((w) => w.key));
+  for (const key of keys) {
+    const members = allProducts.filter((p) => similarKey(p) === key);
+    const history = await dailySeries(
+      db,
+      members.map((p) => p.id),
+    );
+    const done = new Map<string, RuleTestResult[]>();
+    for (const [id, w] of wanted) {
+      if (w.key !== key) continue;
+      const seriesOf = (list: Product[]) =>
+        list.flatMap((p) => {
+          const s = pickSeries(history, p.id, w.bucket);
+          return s ? [s.series] : [];
+        });
+      // The same group is asked for by several lines: each test is worked out once.
+      const test = (line: string | null) => {
+        const memo = `${w.bucket ?? ''}|${line ?? ''}`;
+        if (!done.has(memo)) {
+          const list = line ? members.filter((p) => lines.get(p.id) === line) : members;
+          done.set(memo, ruleTests(seriesOf(list), choices, today));
+        }
+        return done.get(memo)!;
+      };
+      let line: string | null = null;
+      let results: RuleTestResult[] | null = null;
+      if (w.line) {
+        const own = test(w.line);
+        if (
+          own[0] &&
+          own[0].items >= PATTERN_MIN_ITEMS &&
+          own.some((r) => r.checked >= RULE_TEST_MIN_SIGNALS)
+        ) {
+          line = w.line;
+          results = own;
+        }
+      }
+      results ??= test(null);
+      groups[id] = {
+        line,
+        byStrategy: Object.fromEntries(choices.map((c, i) => [strategyKey(c), results![i]!])),
+      };
+    }
+  }
+  await saveSetting(db, RULE_TESTS_KEY, { day: today, groups } satisfies SavedRuleTests);
+  return Object.keys(groups).length;
+}
+
+/** An item's rule test for a person's strategy (null before the first, or for own target only). */
+export async function ruleTestFor(
+  db: Db,
+  product: Product,
+  bucket: string | null,
+  choice: StrategyChoice,
+): Promise<{ result: RuleTestResult; line: string | null; day: string } | null> {
+  const key = similarKey(product);
+  if (!key || choice.strategy === 'target') return null;
+  const [saved, lines] = await Promise.all([
+    readSetting<SavedRuleTests>(db, RULE_TESTS_KEY),
+    productLines(db, [product]),
+  ]);
+  const group = saved?.groups[`${key}|${bucket ?? ''}|${lines.get(product.id) ?? ''}`];
+  const result = group?.byStrategy[strategyKey(choice)];
+  return result ? { result, line: group.line, day: saved!.day } : null;
 }

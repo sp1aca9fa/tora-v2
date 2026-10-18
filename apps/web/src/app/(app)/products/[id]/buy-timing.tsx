@@ -1,6 +1,8 @@
 import {
   type Judgement,
   NEW_RELEASE_DAYS,
+  RULE_TEST_MIN_SIGNALS,
+  type RuleTestResult,
   type SignalStats,
   type StrategyChoice,
   judge,
@@ -280,6 +282,90 @@ export async function BuyReasons({ stats }: { stats: SignalStats }) {
             </section>
           ))}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** How far a strategy's share must be from any day's to be called better or worse. */
+const RULE_TEST_MARGIN = 0.05;
+
+/**
+ * The rule test (S9 part 5): the person's strategy on the whole price history of similar items,
+ * each past signal checked 90 days later, always next to buying on any day. Never a sure thing.
+ */
+export async function RuleTestCard({
+  test,
+  strategyName,
+}: {
+  test: { result: RuleTestResult; line: string | null; day: string } | null;
+  strategyName: string;
+}) {
+  const t = await getTranslations();
+  const r = test?.result;
+  const share = (h: number, n: number) => (n ? h / n : 0);
+  const mine = r ? share(r.higher, r.checked) : 0;
+  const any = r ? share(r.anyHigher, r.anyChecked) : 0;
+  const compare =
+    mine >= any + RULE_TEST_MARGIN ? 'better' : mine <= any - RULE_TEST_MARGIN ? 'worse' : 'same';
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('buy.ruleTest.title')}</CardTitle>
+        {r && (
+          <CardDescription>
+            {t('buy.ruleTest.about', {
+              name: strategyName,
+              items: r.items,
+              group: test.line ? t('buy.group.line', { line: lineLabel(test.line, t) }) : '',
+            })}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {!r ? (
+          <p className="text-muted-foreground">{t('buy.ruleTest.notYet')}</p>
+        ) : r.checked < RULE_TEST_MIN_SIGNALS ? (
+          <p className="text-muted-foreground">
+            {t('buy.ruleTest.few', { count: r.checked, min: RULE_TEST_MIN_SIGNALS })}
+          </p>
+        ) : (
+          <>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1">
+              <dt className="text-muted-foreground">
+                {t('buy.ruleTest.signals', { count: r.checked })}
+              </dt>
+              <dd className="tabular-nums">
+                {t('buy.ruleTest.result', {
+                  higher: r.higher,
+                  checked: r.checked,
+                  pct: Math.round(mine * 100),
+                  change: pct(r.change ?? 0),
+                })}
+              </dd>
+              <dt className="text-muted-foreground">{t('buy.ruleTest.anyDay')}</dt>
+              <dd className="tabular-nums">
+                {t('buy.ruleTest.anyResult', {
+                  pct: Math.round(any * 100),
+                  change: pct(r.anyChange ?? 0),
+                })}
+              </dd>
+            </dl>
+            <p
+              className={cn(
+                compare === 'better' && 'text-emerald-700 dark:text-emerald-400',
+                compare === 'worse' && 'text-amber-700 dark:text-amber-300',
+              )}
+            >
+              {t(`buy.ruleTest.${compare}`)}
+            </p>
+          </>
+        )}
+        {test && (
+          <p className="text-xs text-muted-foreground">
+            {t('buy.ruleTest.how', { date: test.day })}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

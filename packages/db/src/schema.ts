@@ -17,6 +17,7 @@ import {
   USER_ROLES,
   newId,
   toLocalIso,
+  type AlertState,
   type NoticeLevels,
   type ProductClass,
   type SignalStats,
@@ -841,6 +842,13 @@ export const watches = sqliteTable(
     /** Buy at or under this, per unit, in the base currency. */
     targetPriceBase: integer('target_price_base'),
     note: text('note'),
+    /** Buy zone alerts even when the signal has little data (S9 part 5). */
+    alertLimited: integer('alert_limited', { mode: 'boolean' }).notNull().default(true),
+    /** What the alerts remember (S9 part 5): the buy zone's and the target's. */
+    alertState: text('alert_state', { mode: 'json' }).$type<{
+      zone?: AlertState;
+      target?: AlertState;
+    }>(),
     ...timestamps,
   },
   (t) => [

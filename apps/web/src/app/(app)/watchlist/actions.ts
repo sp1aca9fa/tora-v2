@@ -29,6 +29,10 @@ const watchSchema = z.object({
   note: optText,
 });
 
+/** The "alert even with limited data" switch, when the form showed it (S9 part 5). */
+const alertLimitedFrom = (formData: FormData) =>
+  formData.get('alertLimitedShown') ? formData.get('alertLimited') === 'on' : undefined;
+
 /** Watches an item picked, typed or chosen from the catalog in the watch steps (S9). */
 export async function createWatchAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const { db, user } = await authed();
@@ -45,6 +49,7 @@ export async function createWatchAction(_prev: FormState, formData: FormData): P
       ...input,
       targetPriceBase: base.data.targetPriceBase || null,
       note: base.data.note ?? null,
+      alertLimited: alertLimitedFrom(formData),
     }),
   );
   if (!result.ok) return result.state;
@@ -73,7 +78,12 @@ export async function saveWatchAction(
   if ('state' in condition) return condition.state;
   const { input, missing } = conditionInputFrom(productClass(product), condition.data);
   if (missing.length) return { error: 'check', fields: missing };
-  const watch = { ...input, targetPriceBase: d.targetPriceBase || null, note: d.note ?? null };
+  const watch = {
+    ...input,
+    targetPriceBase: d.targetPriceBase || null,
+    note: d.note ?? null,
+    alertLimited: alertLimitedFrom(formData),
+  };
   const result = await runDomain(async () => {
     if (d.watchId) await updateWatch(db, user.id, d.watchId, watch);
     else await addWatch(db, user.id, { productId: product.id }, watch);

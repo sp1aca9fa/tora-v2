@@ -1381,7 +1381,13 @@
     "method_links": "Purchase links",
     "method_file": "Spreadsheet",
     "method_claude": "Through Claude",
-    "logHint": "Full log: run pnpm collect:log on the home PC, in the tora-v2 folder."
+    "logHint": "Full log: run pnpm collect:log on the home PC, in the tora-v2 folder.",
+    "buyTitle": "Tora: buy timing",
+    "buyZone": "{name}: Good price, {price} (buy zone under {zone}).",
+    "buyLimited": "Limited data.",
+    "buyTarget": "{name}: an ask at {price} on {source}, under your target {target}.",
+    "summaryDrops": "Sharp drops (15% or more in a week):",
+    "summaryDrop": "{name}: {price}, {pct} in 7 days"
   },
   "alerts": {
     "title": "Alerts",
@@ -1428,7 +1434,9 @@
       "not_found": "Tora did not find your Start message yet. Press Start in Telegram, then Check again.",
       "no_bot": "No Telegram bot is set up yet.",
       "no_secret": "AUTH_SECRET is not set on the server."
-    }
+    },
+    "buy": "Watched items: Good price, or an ask under your target (at once, after the nightly collect)",
+    "drops": "Sharp drops of owned and watched items, 15% or more in a week (morning summary)"
   },
   "activity": {
     "title": "Activity",
@@ -1537,7 +1545,8 @@
     "setupText": "Before Tora tells you when to buy, pick a buy strategy for each kind of item you watch. Try each on an example first; Tora suggests one.",
     "setupButton": "Choose a strategy",
     "zoneShort": "good under <n>{amount}</n>",
-    "limited": "limited data"
+    "limited": "limited data",
+    "alertLimited": "Alert on Good price even with limited data"
   },
   "forSale": {
     "title": "For sale now",
@@ -1672,6 +1681,20 @@
       "lowShort": "180d low",
       "highShort": "180d high",
       "askShort": "Ask"
+    },
+    "ruleTest": {
+      "title": "Rule test",
+      "about": "{name} on the whole price history of similar items ({items}{group}).",
+      "notYet": "Worked out after the next collect.",
+      "few": "Not enough past signals to test yet: {count} with a price 90 days later ({min} needed).",
+      "signals": "Past buy signals ({count})",
+      "result": "higher 90 days later {higher} of {checked} times ({pct}%), typical change {change}",
+      "anyDay": "Buying on any day",
+      "anyResult": "higher 90 days later {pct}% of the time, typical change {change}",
+      "better": "Better than buying on any day, in the past.",
+      "worse": "Worse than buying on any day, in the past: the zone paid less, but prices often kept falling for a while.",
+      "same": "About the same as buying on any day, in the past.",
+      "how": "Past prices only: a test, not a promise. A signal is the first day of each stretch at Good price, each day judged on the prices before it (without the market check and the new-set pattern). Worked out {date}."
     }
   },
   "lines": {

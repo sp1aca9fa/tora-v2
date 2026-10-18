@@ -1,7 +1,8 @@
 // `pnpm alerts <command>`: alerts outside the app from the home PC (requirements S17).
 //   after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <collect.log>]
 //       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
-//       stopped before it could record itself and sends failures to admins at once.
+//       stopped before it could record itself and sends failures to admins at once, then the
+//       watched items' buy zone and target alerts (S9 part 5; from today's numbers only).
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
 //       each person at most once in 20 hours).
 import { localDate, toLocalIso } from '@tora/core';
@@ -15,6 +16,7 @@ import {
   alertFailures,
   checkMissedRuns,
   sendSummaries,
+  sendWatchAlerts,
   stoppedReason,
 } from '../alerts';
 import { createDb } from '../client';
@@ -82,6 +84,8 @@ if (command === 'after-run') {
   }
   const failures = await alertFailures(db, ctx, since);
   console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
+  const buy = await sendWatchAlerts(db, ctx);
+  console.log(`alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`);
 } else if (command === 'check') {
   const missed = await checkMissedRuns(db, ctx);
   const summaries = await sendSummaries(db, ctx);
