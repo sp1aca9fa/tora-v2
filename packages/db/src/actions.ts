@@ -8,9 +8,11 @@ import {
   type NoticeType,
   type ProductClass,
   type SourceQuality,
+  conditionListOf,
   countsInBadge,
   noticeLevelsFor,
   noticeRank,
+  productClass,
 } from '@tora/core';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -200,7 +202,8 @@ export async function pendingActions(
         ? source === second
           ? 'secondary_identity'
           : 'second_source'
-        : product.category === 'tcg'
+        : // Cards and sealed TCG (always asked for); other items, TCG supplies too, when not cheap.
+          ['card_grades', 'sealed'].includes(conditionListOf(productClass(product)))
           ? 'tcg_main_source'
           : 'game_main_source';
       sourceItems.push({

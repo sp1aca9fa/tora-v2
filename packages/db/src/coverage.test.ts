@@ -165,6 +165,13 @@ it('lists actions as cards by level: main sources and grades red, games and seco
     lot(5000),
   );
   await setSourceWarningDismissed(db, userId, game.product.id, true);
+  // A TCG supply follows the item rule: asked for when not cheap, at the item level.
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'supply', name: 'デッキシールド' } },
+    lot(4445),
+  );
 
   const items = await pendingActions(db, userId);
   expect(
@@ -172,13 +179,14 @@ it('lists actions as cards by level: main sources and grades red, games and seco
   ).toEqual([
     ['red', 'tcg_main_source', 'ピカチュウ'],
     ['red', 'card_grade', 'ピカチュウ'],
+    ['blue', 'game_main_source', 'デッキシールド'],
     ['blue', 'second_source', 'ミュウ'],
     // Dismissed: no 駿河屋 card for the game, its condition still asked.
     ['blue', 'game_condition', 'ASTRAL CHAIN'],
   ]);
   const first = items[0]!;
   expect(first.kind === 'source' && first.candidates.map((c) => c.score)).toEqual([0.95, 0.9]);
-  expect(actionTotal(items)).toBe(4);
+  expect(actionTotal(items)).toBe(5);
 });
 
 it("follows the user's notice levels; quiet ones are listed but not counted", async () => {
