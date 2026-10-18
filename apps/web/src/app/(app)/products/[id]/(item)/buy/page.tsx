@@ -50,62 +50,70 @@ export default async function BuyPage({ params, searchParams }: Props) {
   const choice = strategyOf(user.preferences, cls);
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
 
+  // Wide screens: the verdict, the chart and the reasons on the left; what is for sale and the
+  // watches beside them. Phones keep that order in one column.
   return (
-    <div className="space-y-5">
-      {conditions.length > 1 && (
-        <nav className="flex flex-wrap gap-1.5" aria-label={t('valuation.bucket')}>
-          {conditions.map((b) => (
-            <Link
-              key={b}
-              href={
-                b === mainBucket
-                  ? `/products/${id}/buy`
-                  : `/products/${id}/buy?condition=${encodeURIComponent(b)}`
-              }
-              aria-current={b === bucket ? 'page' : undefined}
-              className={cn(
-                'rounded-full border px-2.5 py-1 font-mono text-xs',
-                b === bucket
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'text-muted-foreground',
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+      <div className="space-y-5">
+        {conditions.length > 1 && (
+          <nav className="flex flex-wrap gap-1.5" aria-label={t('valuation.bucket')}>
+            {conditions.map((b) => (
+              <Link
+                key={b}
+                href={
+                  b === mainBucket
+                    ? `/products/${id}/buy`
+                    : `/products/${id}/buy?condition=${encodeURIComponent(b)}`
+                }
+                aria-current={b === bucket ? 'page' : undefined}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 font-mono text-xs',
+                  b === bucket
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {b}
+              </Link>
+            ))}
+          </nav>
+        )}
+
+        <BuyVerdict
+          stats={stats}
+          choice={choice}
+          typeLabel={t.has(`sourceRoles.class.${cls}`) ? t(`sourceRoles.class.${cls}`) : cls}
+          condition={bucket}
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('valuation.history')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PriceChart
+              key={bucket}
+              points={history}
+              defaultBucket={bucket}
+              sourceLabels={Object.fromEntries(
+                history.map((p) => [p.source, sourceLabel(p.source)]),
               )}
-            >
-              {b}
-            </Link>
-          ))}
-        </nav>
-      )}
+              guides={
+                stats
+                  ? { zoneTop, low: stats.q25d180, high: stats.q75d180, ask: stats.ask }
+                  : undefined
+              }
+              className="h-72 xl:h-96"
+            />
+          </CardContent>
+        </Card>
 
-      <BuyVerdict
-        stats={stats}
-        choice={choice}
-        typeLabel={t.has(`sourceRoles.class.${cls}`) ? t(`sourceRoles.class.${cls}`) : cls}
-        condition={bucket}
-      />
+        {stats && <BuyReasons stats={stats} />}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('valuation.history')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PriceChart
-            key={bucket}
-            points={history}
-            defaultBucket={bucket}
-            sourceLabels={Object.fromEntries(history.map((p) => [p.source, sourceLabel(p.source)]))}
-            guides={
-              stats
-                ? { zoneTop, low: stats.q25d180, high: stats.q75d180, ask: stats.ask }
-                : undefined
-            }
-            className="h-72"
-          />
-        </CardContent>
-      </Card>
+        {/* S9 part 5: the rule test card goes here. */}
+      </div>
 
-      {stats && <BuyReasons stats={stats} />}
-
-      <div className="grid items-start gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1">
         <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} />
         <div className="space-y-3">
           <WatchCard
@@ -140,9 +148,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
         </div>
       </div>
 
-      {/* S9 part 5: the rule test card goes here. */}
-
-      <p className="text-xs text-muted-foreground">{t('strategy.notAdvice')}</p>
+      <p className="text-xs text-muted-foreground xl:col-span-2">{t('strategy.notAdvice')}</p>
     </div>
   );
 }

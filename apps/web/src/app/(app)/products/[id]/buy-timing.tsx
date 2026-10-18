@@ -260,23 +260,26 @@ export async function BuyReasons({ stats }: { stats: SignalStats }) {
       <CardHeader>
         <CardTitle>{t('buy.reasonsTitle')}</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm md:grid-cols-3">
-        {groups.map(([key, items]) => (
-          <section key={key} className="space-y-1.5">
-            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              {t(`buy.groups.${key}`)}
-            </h3>
-            {items.length ? (
-              <ul className="space-y-1">
-                {items.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">-</p>
-            )}
-          </section>
-        ))}
+      {/* Three groups side by side once the card is wide enough, whatever the screen. */}
+      <CardContent className="@container">
+        <div className="grid gap-4 text-sm @2xl:grid-cols-3">
+          {groups.map(([key, items]) => (
+            <section key={key} className="space-y-1.5">
+              <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {t(`buy.groups.${key}`)}
+              </h3>
+              {items.length ? (
+                <ul className="space-y-1">
+                  {items.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">-</p>
+              )}
+            </section>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

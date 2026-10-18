@@ -68,7 +68,7 @@ export default async function DetailsPage({ params }: Params) {
   ];
 
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
       <div className="space-y-5">
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-3">
@@ -169,7 +169,7 @@ export default async function DetailsPage({ params }: Params) {
                 .map(([label, v]) => (
                   <div key={label} className="contents">
                     <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="break-words">{v}</dd>
+                    <dd className="[overflow-wrap:anywhere]">{v}</dd>
                   </div>
                 ))}
             </dl>

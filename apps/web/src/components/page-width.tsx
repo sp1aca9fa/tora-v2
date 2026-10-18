@@ -8,7 +8,7 @@ const WIDE = [
   /^\/$/,
   /^\/items$/,
   /^\/actions$/,
-  /^\/products\/[^/]+$/,
+  /^\/products\/[^/]+(\/(buy|details))?$/,
   /^\/holdings\/(?!grades$)[^/]+$/,
   /^\/imports$/,
 ];
