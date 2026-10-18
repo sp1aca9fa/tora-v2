@@ -1,0 +1,1 @@
+ALTER TABLE `item_sales` ADD `checked_at` text;

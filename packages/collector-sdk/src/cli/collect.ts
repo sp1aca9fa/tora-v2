@@ -14,6 +14,8 @@ import {
   listUsers,
   recordActivity,
   refreshBucketValues,
+  checkItemSales,
+  getProduct,
   refreshItemSales,
   refreshSignals,
   refreshTradeCounts,
@@ -214,6 +216,30 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
     log(`item sales: ${days.items} item(s) updated${days.full ? ' (full rebuild)' : ''}`);
   } catch (error) {
     log(`item sales: stopped (${errorText(error)})`);
+  }
+  // The self-check: a few items packed again from their raw sales and compared (a difference is
+  // fixed and sent to admins as a failed check).
+  try {
+    const check = await checkItemSales(db);
+    if (check.fixed.length) {
+      const names = (await Promise.all(check.fixed.map((id) => getProduct(db, id)))).map(
+        (p) => p?.name ?? '?',
+      );
+      log(
+        `self-check: ${check.fixed.length} of ${check.checked} item(s) differed, fixed: ${names.join(', ')}`,
+      );
+      await recordActivity(db, {
+        kind: 'check',
+        action: 'self_check',
+        level: 'failed',
+        detail: { checked: check.checked, fixed: names },
+        href: '/settings/activity',
+      });
+    } else {
+      log(`self-check: ${check.checked} item(s) match their sales`);
+    }
+  } catch (error) {
+    log(`self-check: stopped (${errorText(error)})`);
   }
   // Items without a catalog set: linked when sure, suggested on Actions when not (S9).
   const sets = await linkSets(db);

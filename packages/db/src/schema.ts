@@ -564,6 +564,8 @@ export const priceObservations = sqliteTable(
 export const itemSales = sqliteTable('item_sales', {
   productId: text('product_id').primaryKey(),
   sales: text('sales', { mode: 'json' }).notNull().$type<PackedSales>(),
+  /** When the nightly self-check last compared it with the raw sales. */
+  checkedAt: text('checked_at'),
   updatedAt: text('updated_at')
     .notNull()
     .$defaultFn(() => toLocalIso())

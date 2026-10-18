@@ -161,7 +161,7 @@ when the month passes the budget set there (150 million by default), or heads pa
 from the 5th. Turso's dashboard has the exact total, including anything run outside Tora (such as
 the Turso shell). Nothing is counted while Tora runs on a local file. The pages and the collect read
 saved numbers (the sales per day, saved values and the saved Portfolio chart) instead of every
-sale; see requirements S19 for what each reads.
+sale; see requirements S19 for what each reads. Every night a self-check packs a few items again from their raw sales and compares them with what is saved; a difference is fixed and admins get an alert. `pnpm rebuild` rebuilds every saved result from the raw sales (after a restore, or if the self-check keeps finding differences).
 
 ## Claude Code and the hosted database
 

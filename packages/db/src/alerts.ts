@@ -401,7 +401,9 @@ function failureText(t: AlertTexts, entry: Activity, base: string | null): strin
   } else if (entry.kind === 'backup') {
     lines.push(fill(t.backupFailed!, { error: String(d.error ?? '') }));
   } else if (entry.kind === 'check') {
-    if (entry.action === 'db_budget') {
+    if (entry.action === 'self_check') {
+      lines.push(fill(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
+    } else if (entry.action === 'db_budget') {
       const millions = (n: unknown) => (Number(n ?? 0) / 1e6).toFixed(1);
       lines.push(
         fill(t.dbBudget!, {

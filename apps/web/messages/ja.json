@@ -1356,6 +1356,7 @@
     "noCollect": "Tora: {hours} 時間、収集が実行されていません（最後: {last}）。自宅PCは起動していますか？",
     "noBackup": "Tora: {hours} 時間、バックアップがありません（最後: {last}）。自宅PCは起動していますか？",
     "dbBudget": "Tora: 今月、データベースの読み取りが {read} 百万行になりました。このペースでは月末に {projected} 百万行です（上限 {budget} 百万行、無料プラン 500 百万行）。設定 > 管理者設定 > データベース を確認してください。",
+    "selfCheck": "Tora: 毎晩のセルフチェックで、保存された価格が収集した販売データと一致しなかったため、作り直しました: {items}。繰り返す場合は開発者に知らせてください。",
     "summaryTitle": "Tora: 今日のまとめ",
     "summaryImport": "{method}: {imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
     "summaryActions": "アクションで対応待ち: {count} 件",
@@ -1454,6 +1455,7 @@
     "noCollect": "{hours} 時間、収集なし（最後 {last}）",
     "noBackup": "{hours} 時間、バックアップなし（最後 {last}）",
     "dbBudget": "データベース: 今月の読み取り {read} 百万行、このペースで {projected} 百万行（上限 {budget} 百万行）",
+    "selfCheck": "セルフチェック: 保存された価格が販売データと異なっていたため作り直しました（{items}）",
     "fromTo": "{from} から {to} へ",
     "none": "なし",
     "admin": {

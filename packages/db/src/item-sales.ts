@@ -3,7 +3,8 @@
 // item pages read one row per item instead of its every sale, with the same results (exact times
 // kept). Triggers on price_observations mark the days that changed (`price_days_dirty`);
 // `refreshItemSales` replaces those days in the packed rows after the collect and after changes
-// made in the app, and rebuilds everything once a week.
+// made in the app, and rebuilds everything once a month; `checkItemSales` compares a few items
+// with their raw sales every night.
 import { type ValuationObservation, localDate, toLocalIso } from '@tora/core';
 import { and, eq, gte, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -19,8 +20,8 @@ import {
 } from './schema';
 
 const DAY = 86_400_000;
-/** Everything is rebuilt this often, whatever the marks say. */
-const FULL_EVERY = 7 * DAY;
+/** Everything is rebuilt this often, whatever the marks say (the nightly self-check between). */
+const FULL_EVERY = 30 * DAY;
 /** Past this many marked days (e.g. after a base currency change), everything is rebuilt. */
 const FULL_ABOVE = 20_000;
 const BUILT_KEY = 'itemSalesBuiltAt';
@@ -172,7 +173,7 @@ export async function loadItemSales(
 
 /**
  * Replaces the marked days in the packed rows, or rebuilds everything when asked, when there is
- * no build yet, when the last full build is a week old or when very many days are marked
+ * no build yet, when the last full build is a month old or when very many days are marked
  * (`marksOnly`, after a change in the app: only when there is no build yet). Returns the items
  * written.
  */
@@ -289,6 +290,71 @@ export async function refreshItemSales(
   if (last) await db.delete(priceDaysDirty).where(sql`rowid <= ${last}`);
   if (full) await saveSetting(db, BUILT_KEY, toLocalIso(now));
   return { items: written, full };
+}
+
+/** Packed sales in a fixed order, to compare two of them. */
+function canonical(sales: PackedSales): string {
+  const groups = sales.groups
+    .filter((g) => g.at.length > 0)
+    .map((g) => [g.s, g.b, g.c, g.t, g.at, g.p, g.e] as const)
+    .sort((a, b) => JSON.stringify(a.slice(0, 4)).localeCompare(JSON.stringify(b.slice(0, 4))));
+  const counts = Object.entries(sales.n)
+    .map(([source, perDay]) => [source, Object.entries(perDay).sort()] as const)
+    .sort();
+  return JSON.stringify([groups, counts]);
+}
+
+/**
+ * The nightly self-check (requirements S19 part 2): the items checked longest ago, up to about
+ * `rows` raw sales, are packed again from their raw sales and compared with their saved row; a
+ * difference is fixed at once and returned (the caller tells admins). Items with changes still
+ * marked are left for the next night.
+ */
+export async function checkItemSales(
+  db: Db,
+  options: { rows?: number; now?: Date } = {},
+): Promise<{ checked: number; fixed: string[] }> {
+  const budget = options.rows ?? 20_000;
+  const now = toLocalIso(options.now ?? new Date());
+  const queue = await db
+    .select({ productId: itemSales.productId })
+    .from(itemSales)
+    .orderBy(sql`${itemSales.checkedAt} is not null`, itemSales.checkedAt)
+    .limit(100);
+  const marked = new Set(
+    (await db.selectDistinct({ id: priceDaysDirty.productId }).from(priceDaysDirty)).map(
+      (m) => m.id,
+    ),
+  );
+  const checked: string[] = [];
+  const fixed: string[] = [];
+  let spent = 0;
+  for (const { productId } of queue) {
+    if (marked.has(productId)) continue;
+    const saved = (await loadItemSales(db, [productId])).get(productId);
+    if (!saved) continue;
+    const size = Object.values(saved.n).reduce(
+      (a, perDay) => a + Object.values(perDay).reduce((x, y) => x + y, 0),
+      0,
+    );
+    if (checked.length > 0 && spent + size > budget) break;
+    const fresh = packSales(
+      await db
+        .select(observationColumns)
+        .from(priceObservations)
+        .where(eq(priceObservations.productId, productId)),
+    );
+    spent += size;
+    checked.push(productId);
+    if (canonical(fresh) !== canonical(saved)) {
+      await writeSales(db, [{ productId, sales: fresh }]);
+      fixed.push(productId);
+    }
+  }
+  if (checked.length) {
+    await db.update(itemSales).set({ checkedAt: now }).where(inArray(itemSales.productId, checked));
+  }
+  return { checked: checked.length, fixed };
 }
 
 /** An item's kept observations as valuations take them, from `since` (ISO) when given. */

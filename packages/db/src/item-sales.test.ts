@@ -5,11 +5,18 @@ import { toLocalIso } from '@tora/core';
 import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
-import { loadItemSales, refreshItemSales, soldDays, sourceCounts, unpackSales } from './item-sales';
+import {
+  checkItemSales,
+  loadItemSales,
+  refreshItemSales,
+  soldDays,
+  sourceCounts,
+  unpackSales,
+} from './item-sales';
 import { migrateDb } from './migrate';
 import { createProduct, mergeProducts } from './mutations';
 import { saveSetting } from './registry';
-import { priceDaysDirty, priceObservations } from './schema';
+import { itemSales, priceDaysDirty, priceObservations } from './schema';
 import { setObservationExcluded } from './sources';
 import { createUser } from './users';
 
@@ -122,4 +129,30 @@ it('follows a merge, and rebuilds everything once a week', async () => {
   expect(await refreshItemSales(db, { marksOnly: true })).toMatchObject({ full: false });
   expect(await refreshItemSales(db)).toMatchObject({ full: true });
   expect((await days(b.id))[0]).toMatchObject({ prices: [100, 300] });
+});
+
+it('the self-check finds a saved row that drifted from the sales, fixes it, and skips marked items', async () => {
+  const a = await box('A');
+  const b = await box('B');
+  await db
+    .insert(priceObservations)
+    .values([
+      sale(a.id, '2026-10-01T02:00:00.000Z', 100),
+      sale(a.id, '2026-10-02T02:00:00.000Z', 200),
+      sale(b.id, '2026-10-01T02:00:00.000Z', 300),
+    ]);
+  await refreshItemSales(db);
+  expect(await checkItemSales(db)).toEqual({ checked: 2, fixed: [] });
+  // A's row loses a sale behind the marks' back (as a bug would).
+  const drifted = (await loadItemSales(db, [a.id])).get(a.id)!;
+  drifted.groups[0]!.at.pop();
+  drifted.groups[0]!.p.pop();
+  await db
+    .update(itemSales)
+    .set({ sales: drifted, checkedAt: null })
+    .where(eq(itemSales.productId, a.id));
+  // B has a change still marked: left for the next night.
+  await db.insert(priceObservations).values([sale(b.id, '2026-10-03T02:00:00.000Z', 310)]);
+  expect(await checkItemSales(db)).toEqual({ checked: 1, fixed: [a.id] });
+  expect((await days(a.id)).map((d) => d.prices)).toEqual([[100], [200]]);
 });

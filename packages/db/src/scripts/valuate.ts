@@ -1,4 +1,4 @@
-// `pnpm valuate`: rebuilds the valuation snapshots behind the value-over-time chart.
+// `pnpm valuate`: rebuilds the value history behind the value-over-time chart, and today's values.
 // `pnpm collect` already does this after collecting; use this to refresh without collecting.
 import { createDb } from '../client';
 import { dbConfigFromEnv, loadRootEnv } from '../env';
