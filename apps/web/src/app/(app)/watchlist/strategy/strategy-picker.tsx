@@ -6,13 +6,14 @@ import {
   type ReplayResult,
   STRATEGIES,
   type StrategyChoice,
+  type StrategyExample,
   type StrategyKey,
-  replay,
+  replayExample,
+  strategyExamples,
 } from '@tora/core';
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
-import { useMoney } from '@/components/money-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs } from '@/components/ui/tabs';
@@ -26,17 +27,18 @@ export interface StrategyTypeView {
   current: StrategyChoice;
   /** The person chose for this type (else the current one is the suggestion). */
   chosen: boolean;
-  sample: { name: string; productId: string; condition: string | null; series: DayPrice[] } | null;
 }
 
-export function StrategyPicker({ types, asOf }: { types: StrategyTypeView[]; asOf: string }) {
+const EXAMPLES = strategyExamples();
+
+export function StrategyPicker({ types }: { types: StrategyTypeView[] }) {
   const t = useTranslations('strategy');
   const [pending, start] = useTransition();
   const unchosen = types.filter((v) => !v.chosen);
   const panels = types.map((v) => ({
     key: v.type,
     label: v.label,
-    content: <TypePanel view={v} asOf={asOf} />,
+    content: <TypePanel view={v} />,
   }));
   return (
     <div className="space-y-4">
@@ -73,28 +75,24 @@ export function StrategyPicker({ types, asOf }: { types: StrategyTypeView[]; asO
 const same = (a: StrategyChoice, b: StrategyChoice) =>
   a.strategy === b.strategy && (a.strategy !== 'margin' || a.margin === b.margin);
 
-function TypePanel({ view, asOf }: { view: StrategyTypeView; asOf: string }) {
+function TypePanel({ view }: { view: StrategyTypeView }) {
   const t = useTranslations('strategy');
-  const money = useMoney();
   const [pending, start] = useTransition();
+  const [example, setExample] = useState<StrategyExample>(EXAMPLES[0]!);
   const [picked, setPicked] = useState<StrategyKey>(view.current.strategy);
   const [margin, setMargin] = useState(
     view.current.margin ?? view.suggested.margin ?? DEFAULT_MARGIN,
   );
-  const series = useMemo(() => view.sample?.series ?? [], [view.sample]);
   const results = useMemo(() => {
     const out = {} as Record<StrategyKey, ReplayResult | null>;
     for (const s of STRATEGIES) {
-      out[s] =
-        s === 'target' || s === 'margin' || !series.length
-          ? null
-          : replay(series, { strategy: s }, asOf);
+      out[s] = s === 'target' || s === 'margin' ? null : replayExample(example, { strategy: s });
     }
     return out;
-  }, [series, asOf]);
+  }, [example]);
   const marginResult = useMemo(
-    () => (series.length ? replay(series, { strategy: 'margin', margin }, asOf) : null),
-    [series, asOf, margin],
+    () => replayExample(example, { strategy: 'margin', margin }),
+    [example, margin],
   );
   const resultOf = (s: StrategyKey) => (s === 'margin' ? marginResult : results[s]);
   const choice: StrategyChoice =
@@ -103,29 +101,26 @@ function TypePanel({ view, asOf }: { view: StrategyTypeView; asOf: string }) {
 
   return (
     <div className="space-y-4">
-      {view.sample ? (
-        <div className="space-y-2 rounded-xl border bg-card p-4">
-          <p className="text-sm">
-            {t('example')} <span className="font-medium">{view.sample.name}</span>
-            {view.sample.condition && (
-              <span className="ml-1 font-mono text-xs text-muted-foreground">
-                {view.sample.condition}
-              </span>
-            )}
-          </p>
-          <SampleChart
-            series={series}
-            asOf={asOf}
-            calls={resultOf(picked)?.calls ?? []}
-            label={(n) => money(n)}
-          />
-          <p className="text-xs text-muted-foreground">{t('chartLegend')}</p>
+      <div className="space-y-2 rounded-xl border bg-card p-4">
+        <p className="text-xs text-muted-foreground">{t('exampleIntro')}</p>
+        <div className="flex flex-wrap gap-2" role="group">
+          {EXAMPLES.map((e) => (
+            <Button
+              key={e.key}
+              type="button"
+              size="sm"
+              variant={e.key === example.key ? 'default' : 'outline'}
+              aria-pressed={e.key === example.key}
+              onClick={() => setExample(e)}
+            >
+              {t(`examples.${e.key}`)}
+            </Button>
+          ))}
         </div>
-      ) : (
-        <p className="rounded-xl border bg-card px-4 py-4 text-sm text-muted-foreground">
-          {t('noSample')}
-        </p>
-      )}
+        <p className="text-sm">{t(`exampleAbout.${example.key}`)}</p>
+        <ExampleChart example={example} calls={resultOf(picked)?.calls ?? []} />
+        <p className="text-xs text-muted-foreground">{t('chartLegend')}</p>
+      </div>
 
       <ul className="grid gap-2 sm:grid-cols-2">
         {STRATEGIES.map((s) => {
@@ -208,21 +203,11 @@ function TypePanel({ view, asOf }: { view: StrategyTypeView; asOf: string }) {
   );
 }
 
-/** The sample's daily prices over the last year, with the days a strategy called a buy. */
-function SampleChart({
-  series,
-  asOf,
-  calls,
-  label,
-}: {
-  series: DayPrice[];
-  asOf: string;
-  calls: string[];
-  label: (n: number) => string;
-}) {
-  const end = Date.parse(`${asOf}T00:00:00Z`);
-  const start = end - 365 * 86_400_000;
-  const points = series.filter((p) => {
+/** An example's daily prices over its period, with the days a strategy called a buy. */
+function ExampleChart({ example, calls }: { example: StrategyExample; calls: string[] }) {
+  const end = Date.parse(`${example.asOf}T00:00:00Z`);
+  const start = end - example.days * 86_400_000;
+  const points: DayPrice[] = example.series.filter((p) => {
     const d = Date.parse(`${p.day}T00:00:00Z`);
     return d > start && d <= end;
   });
@@ -230,6 +215,12 @@ function SampleChart({
   const prices = points.map((p) => p.price);
   const lo = Math.min(...prices);
   const hi = Math.max(...prices);
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+  // Rescaled prices mean nothing as amounts: the axis says how far from the period's average.
+  const label = (v: number) => {
+    const pct = Math.round((v / avg - 1) * 100);
+    return `${pct > 0 ? '+' : ''}${pct}%`;
+  };
   const W = 600;
   const H = 160;
   const x = (day: string) => ((Date.parse(`${day}T00:00:00Z`) - start) / (end - start)) * W;

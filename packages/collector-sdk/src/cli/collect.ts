@@ -200,7 +200,7 @@ const fetched = results.reduce((n, r) => n + r.requests, 0);
 const closedOn = await readSetting<string>(db, CLOSED_KEY);
 let snap: Awaited<ReturnType<typeof runSnapshots>> | null = null;
 let saved: Awaited<ReturnType<typeof refreshBucketValues>> | null = null;
-let signalsSaved: { saved: number; withPattern: number } | null = null;
+let signalsSaved: { saved: number; withPattern: number; lineSuggestions: number } | null = null;
 if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   log('closing steps: already done today and nothing fetched since, left out');
 } else {
@@ -287,6 +287,9 @@ if (signalsSaved) {
   console.log(
     `buy timing: ${signalsSaved.saved} item(s) and condition(s), ${signalsSaved.withPattern} with a new-set pattern`,
   );
+  if (signalsSaved.lineSuggestions) {
+    log(`set lines: ${signalsSaved.lineSuggestions} to confirm on Actions`);
+  }
 }
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });

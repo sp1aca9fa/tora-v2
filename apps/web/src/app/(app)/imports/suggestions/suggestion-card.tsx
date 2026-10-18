@@ -9,6 +9,7 @@ import { decideSuggestionAction } from './actions';
 import { sourceLabels } from '@/lib/sources';
 import type { Money } from '@/lib/money';
 import { getMoney } from '@/lib/money-server';
+import { lineLabel } from '@/lib/product-display';
 
 /**
  * One data review suggestion: what it would change, why, and Accept / Dismiss with a note
@@ -33,6 +34,7 @@ export async function SuggestionCard({
   const evidence = (s.evidence ?? {}) as Record<string, unknown>;
   const listings = (evidence.listings as SuggestionListing[] | undefined) ?? [];
   const keptCount = listings.filter((l) => l.kept).length;
+  const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
   return (
     <>
       <div className="flex items-baseline justify-between gap-3">
@@ -142,7 +144,20 @@ export async function SuggestionCard({
         </div>
       )}
 
-      {s.kind !== 'link_set' && (
+      {s.kind === 'set_line' && (
+        <p>
+          {t('suggestions.line', {
+            line: lineLabel(String(payload.line ?? ''), t),
+            pct: pct(Number(evidence.change)),
+            groupPct: pct(Number((evidence.group as Record<string, unknown>)?.change)),
+            groupItems: Number((evidence.group as Record<string, unknown>)?.items),
+            linePct: pct(Number((evidence.line as Record<string, unknown>)?.change)),
+            lineItems: Number((evidence.line as Record<string, unknown>)?.items),
+          })}
+        </p>
+      )}
+
+      {s.kind !== 'link_set' && s.kind !== 'set_line' && (
         <p className="text-xs text-muted-foreground">
           {t('suggestions.why', {
             reason: s.reason,

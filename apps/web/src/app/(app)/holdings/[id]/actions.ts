@@ -25,6 +25,7 @@ import {
   suggestFromKnownProducts,
   updateProduct,
   linkSets,
+  setProductLine,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -247,6 +248,10 @@ export async function editProductAction(
       const product = await updateProduct(db, session.user, productId, input);
       // A set code or name typed now may name a catalog set (S9).
       await linkSets(db, [productId]);
+      // The set line picked by hand, or automatic (S9).
+      if (formData.has('line')) {
+        await setProductLine(db, session.user, productId, String(formData.get('line')) || null);
+      }
       return product;
     },
     () => (backTo.startsWith('/holdings/') ? backTo : '/'),

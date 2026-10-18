@@ -41,6 +41,13 @@ export const MARKET_MIN_ITEMS = 5;
 export const MARKET_FALLING_12W = -0.15;
 /** Items older than this (days since release) are past the new-set pattern. */
 export const PATTERN_MAX_AGE = 365;
+/**
+ * A new release (a real release date) waits until the age at which similar items usually hit
+ * their first-year low; this many days when too few similar items have a full first year.
+ */
+export const NEW_RELEASE_DAYS = 90;
+/** A full first year: prices from within this many days of release to at least this age. */
+export const FULL_YEAR = { from: 30, to: 300 } as const;
 
 /** What is saved each day per item and condition. Fractions, not percents. */
 export interface SignalStats {
@@ -67,10 +74,17 @@ export interface SignalStats {
   /** Days since release (S9 part 3's release date), and where that date came from. */
   ageDays: number | null;
   releaseFrom: 'set' | 'item' | 'first_sale' | null;
-  /** The market: the median 12-week change of similar items (5+), e.g. a broad fall. */
-  market: { items: number; change84: number } | null;
+  /** The item's set line (main expansion, high class pack, ...); missing on older rows. */
+  line?: string | null;
+  /**
+   * The market: the median 12-week change of similar items (5+), e.g. a broad fall. `line`: the
+   * study used the item's line only (null or missing: the whole group).
+   */
+  market: { items: number; change84: number; line?: string | null } | null;
   /** Similar items at this age: their typical change over the next 90 days. */
-  pattern: { items: number; change: number; horizonDays: number } | null;
+  pattern: { items: number; change: number; horizonDays: number; line?: string | null } | null;
+  /** The age at which similar items usually hit their first-year low (3+ with a full year). */
+  lowAge?: { age: number; items: number; line: string | null } | null;
 }
 
 const DAY = 86_400_000;
@@ -128,7 +142,7 @@ export function seriesStats(
   series: DayPrice[],
   asOf: string,
   fair?: number | null,
-): Omit<SignalStats, 'ask' | 'ageDays' | 'releaseFrom' | 'market' | 'pattern'> {
+): Omit<SignalStats, 'ask' | 'ageDays' | 'releaseFrom' | 'market' | 'pattern' | 'lowAge'> {
   const end = dayNumber(asOf);
   const within = (days: number) =>
     series.filter((p) => {
@@ -191,6 +205,43 @@ export function newSetPattern(
   return { items: changes.length, change: median(changes)!, horizonDays: PATTERN_HORIZON };
 }
 
+/**
+ * The age (days since release) at which similar items usually hit their first-year low: per item
+ * with a full first year (prices from its first month to past day 300, a year ago or more), the
+ * age of its lowest typical price (±7 days); the median of 3 or more items.
+ */
+export function typicalLowAge(
+  others: { release: string; series: DayPrice[] }[],
+  asOf: string,
+): { age: number; items: number } | null {
+  const today = dayNumber(asOf);
+  const ages: number[] = [];
+  for (const o of others) {
+    const release = dayNumber(o.release);
+    if (release + PATTERN_MAX_AGE + 7 > today) continue;
+    const year = o.series
+      .map((p) => dayNumber(p.day) - release)
+      .filter((age) => age >= 0 && age <= PATTERN_MAX_AGE);
+    if (!year.length || year[0]! > FULL_YEAR.from || year.at(-1)! < FULL_YEAR.to) continue;
+    let low: { age: number; price: number } | null = null;
+    for (const age of year) {
+      const price = priceAround(o.series, release + age);
+      if (price !== null && (!low || price < low.price)) low = { age, price };
+    }
+    if (low) ages.push(low.age);
+  }
+  if (ages.length < PATTERN_MIN_ITEMS) return null;
+  return { age: Math.round(median(ages)!), items: ages.length };
+}
+
+/** How an item's price moved in its first months: from day 7 to day 97 after release. */
+export function earlyChange(release: string, series: DayPrice[]): number | null {
+  const start = dayNumber(release) + 7;
+  const a = priceAround(series, start);
+  const b = priceAround(series, start + PATTERN_HORIZON);
+  return a && b ? b / a - 1 : null;
+}
+
 export type ZoneBasis = 'quarter180' | 'tenth365' | 'margin' | 'thin_margin';
 
 export interface BuyZone {
@@ -241,6 +292,13 @@ export interface Judgement {
   falling: boolean;
   /** Similar items as a group are down over 15 % in 12 weeks. */
   marketFalling: boolean;
+  /**
+   * A new release (a real release date) younger than the age similar items usually hit their
+   * low at (else 90 days): wait, new releases often drop in their first months.
+   */
+  newRelease: boolean;
+  /** The days that wait lasts (from release). */
+  waitDays: number;
   /** Little data: the reasons (shown as a warning). */
   limited: ('few_sales' | 'short_range')[];
   /** The lowest ask is in the zone now. */
@@ -259,11 +317,17 @@ export function judge(stats: SignalStats, choice: StrategyChoice): Judgement {
   if (stats.sales30 < 3) limited.push('few_sales');
   if (stats.q25d180 === null) limited.push('short_range');
   const askInZone = zone.top !== null && stats.ask !== null && stats.ask <= zone.top;
-  const base = { zone, falling, marketFalling, limited, askInZone };
+  const waitDays = stats.lowAge?.age ?? NEW_RELEASE_DAYS;
+  const newRelease =
+    stats.ageDays !== null &&
+    (stats.releaseFrom === 'set' || stats.releaseFrom === 'item') &&
+    stats.ageDays < waitDays;
+  const base = { zone, falling, marketFalling, newRelease, waitDays, limited, askInZone };
   if (stats.fair === null) return { verdict: 'none', ...base };
   if (zone.top !== null && stats.fair <= zone.top) {
-    // A fall of the item or of its whole market waits, except for Catch the dip (it warns).
-    const wait = (falling || marketFalling) && choice.strategy !== 'dip';
+    // A fall of the item or of its whole market waits, and so does a new release, except for
+    // Catch the dip (it warns).
+    const wait = (falling || marketFalling || newRelease) && choice.strategy !== 'dip';
     return { verdict: wait ? 'wait' : 'good', ...base };
   }
   if (stats.q75d180 !== null && stats.fair > stats.q75d180) return { verdict: 'high', ...base };
@@ -283,14 +347,16 @@ export interface ReplayResult {
 
 /**
  * What a strategy would have said each day of the last `days` (rule tests and the "try a
- * strategy" view): each day judged only on the prices up to it (no new-set pattern), and each
- * call checked against the price 90 days later.
+ * strategy" view): each day judged only on the prices up to it (no new-set pattern; with a
+ * `release` date, the new-release wait of `waitDays`), and each call checked against the price
+ * 90 days later.
  */
 export function replay(
   series: DayPrice[],
   choice: StrategyChoice,
   asOf: string,
   days = 365,
+  release?: { day: string; waitDays: number },
 ): ReplayResult {
   const end = dayNumber(asOf);
   const period = series.filter((p) => {
@@ -306,10 +372,11 @@ export function replay(
     const stats: SignalStats = {
       ...seriesStats(series, p.day),
       ask: null,
-      ageDays: null,
-      releaseFrom: null,
+      ageDays: release ? dayNumber(p.day) - dayNumber(release.day) : null,
+      releaseFrom: release ? 'item' : null,
       market: null,
       pattern: null,
+      lowAge: release ? { age: release.waitDays, items: 0, line: null } : null,
     };
     if (stats.fair === null) continue;
     all.push(stats.fair);

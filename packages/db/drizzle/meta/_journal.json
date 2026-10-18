@@ -288,6 +288,13 @@
       "when": 1792313135318,
       "tag": "0040_product_sources_product_source",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1792314929553,
+      "tag": "0041_product_line",
+      "breakpoints": true
     }
   ]
 }

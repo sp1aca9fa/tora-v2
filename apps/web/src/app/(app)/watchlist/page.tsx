@@ -19,7 +19,7 @@ import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
 import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
-import { VERDICT_STYLE } from '../products/[id]/buy-timing';
+import { VERDICT_STYLE, verdictKey } from '../products/[id]/buy-timing';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('watchlist') };
@@ -219,7 +219,7 @@ export default async function WatchlistPage() {
                       <span
                         className={cn('rounded px-1.5 font-medium', VERDICT_STYLE[judged.verdict])}
                       >
-                        {t(`buy.verdict.${judged.verdict}`)}
+                        {t(`buy.verdict.${verdictKey(judged)}`)}
                       </span>
                       {judged.zone.top !== null && (
                         <span className="text-muted-foreground">

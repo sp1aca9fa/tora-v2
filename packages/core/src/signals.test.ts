@@ -12,7 +12,10 @@ import {
   replay,
   seriesStats,
   suggestedStrategy,
+  typicalLowAge,
 } from './signals';
+import { byLine, lineFromTitle } from './lines';
+import { STRATEGY_EXAMPLES, replayExample, strategyExamples } from './strategy-examples';
 
 /** Daily prices from `start` for `n` days, by a function of the day index. */
 function days(start: string, n: number, price: (i: number) => number): DayPrice[] {
@@ -116,6 +119,27 @@ describe('zones and verdicts', () => {
     expect(marketTrend(five, '2026-03-25')!.change84).toBeLessThan(-0.25);
   });
 
+  it('waits on a new release until the age similar items usually hit their low, else 90 days', () => {
+    const young = stats({ fair: 8500, ageDays: 100, releaseFrom: 'set' });
+    // Too few similar items with a full year: 90 days, so day 100 no longer waits.
+    expect(judge(young, { strategy: 'steady' })).toMatchObject({
+      verdict: 'good',
+      newRelease: false,
+      waitDays: 90,
+    });
+    const learned = { ...young, lowAge: { age: 150, items: 4, line: 'sub' } };
+    expect(judge(learned, { strategy: 'steady' })).toMatchObject({
+      verdict: 'wait',
+      newRelease: true,
+      waitDays: 150,
+    });
+    // Catch the dip warns instead; a first collected sale is not a release date.
+    expect(judge(learned, { strategy: 'dip' }).verdict).toBe('good');
+    expect(
+      judge({ ...learned, releaseFrom: 'first_sale' }, { strategy: 'steady' }).newRelease,
+    ).toBe(false);
+  });
+
   it('Bargain and Margin, and own target only', () => {
     expect(buyZone(stats({}), { strategy: 'bargain' }).top).toBe(8000);
     expect(buyZone(stats({ usual180: 12000 }), { strategy: 'margin', margin: 20 }).top).toBe(9600);
@@ -177,6 +201,56 @@ describe('new-set pattern', () => {
     expect(
       newSetPattern(105, [late, item('2025-02-01'), item('2025-03-01')], '2026-01-01')?.items,
     ).toBe(3);
+  });
+});
+
+describe('new-release wait and lines', () => {
+  it('learns the age of the first-year low from items with a full first year', () => {
+    const v = (low: number) => (i: number) => 1000 + Math.abs(i - low) * 3;
+    const others = [
+      { release: '2024-01-01', series: days('2024-01-01', 365, v(100)) },
+      { release: '2024-02-01', series: days('2024-02-01', 365, v(120)) },
+      { release: '2024-03-01', series: days('2024-03-01', 365, v(200)) },
+      // Collected only from day 60: not a full first year.
+      { release: '2024-01-01', series: days('2024-03-01', 300, v(10)) },
+    ];
+    const low = typicalLowAge(others, '2026-01-01')!;
+    expect(low.items).toBe(3);
+    expect(low.age).toBeGreaterThanOrEqual(113);
+    expect(low.age).toBeLessThanOrEqual(120);
+    // A year not over yet does not count.
+    expect(typicalLowAge(others, '2025-01-15')).toBeNull();
+  });
+
+  it('reads Pokemon lines from titles, and studies the line when it has enough items', () => {
+    expect(lineFromTitle('拡張パック「バトルパートナーズ」')).toBe('main');
+    expect(lineFromTitle('ポケモンカードゲーム 強化拡張パック「ポケモンカード151」ボックス')).toBe(
+      'sub',
+    );
+    expect(lineFromTitle('ハイクラスパック 「シャイニートレジャーex」')).toBe('high_class');
+    expect(lineFromTitle('拡張パック「30th CELEBRATION」')).toBe('special');
+    expect(lineFromTitle('スタートデッキGenerations')).toBeNull();
+    const items = [{ line: 'a' }, { line: 'a' }, { line: 'b' }, { line: null }];
+    const count = (l: typeof items) => (l.length >= 2 ? { n: l.length } : null);
+    expect(byLine('a', items, count)).toEqual({ n: 2, line: 'a' });
+    expect(byLine('b', items, count)).toEqual({ n: 4, line: null });
+    expect(byLine(null, items, count)).toEqual({ n: 4, line: null });
+  });
+
+  it('tries the strategies on the three fixed examples, the new set waiting 90 days', () => {
+    const examples = strategyExamples();
+    expect(examples.map((e) => e.key)).toEqual([...STRATEGY_EXAMPLES]);
+    for (const e of examples) {
+      const steady = replayExample(e, { strategy: 'steady' });
+      const dip = replayExample(e, { strategy: 'dip' });
+      expect(steady.calls.length).toBeGreaterThan(0);
+      expect(dip.calls.length).toBeGreaterThanOrEqual(steady.calls.length);
+    }
+    const newSet = examples.find((e) => e.key === 'new_set')!;
+    const first = replayExample(newSet, { strategy: 'steady' }).calls[0]!;
+    expect(Date.parse(first) - Date.parse(newSet.release!.day)).toBeGreaterThanOrEqual(
+      90 * 86_400_000,
+    );
   });
 });
 

@@ -16,3 +16,5 @@ export * from './sources';
 export * from './money';
 export * from './csv';
 export * from './signals';
+export * from './lines';
+export * from './strategy-examples';

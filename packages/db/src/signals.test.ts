@@ -5,8 +5,8 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, mergeProducts } from './mutations';
-import { priceObservations, products, signals, tcgSets } from './schema';
-import { latestSignals, refreshSignals, strategySamples } from './signals';
+import { priceObservations, products, signals, suggestions, tcgSets } from './schema';
+import { latestSignals, refreshSignals } from './signals';
 import { createUser } from './users';
 import { addWatch } from './watches';
 import { eq } from 'drizzle-orm';
@@ -56,7 +56,7 @@ const box = (name: string, setId?: string) =>
     ...(setId ? { setId } : {}),
   });
 
-it('saves the numbers per watched item and day, once a day, and picks a sample', async () => {
+it('saves the numbers per watched item and day, once a day', async () => {
   const p = await box('Box A');
   await sales(p.id, 200, (back) => 10_000 + back * 10);
   await addWatch(db, uid, { productId: p.id }, { packagingState: 'sealed_shrink' });
@@ -76,7 +76,6 @@ it('saves the numbers per watched item and day, once a day, and picks a sample',
   expect(s.pattern).toBeNull();
   const latest = await latestSignals(db, [{ productId: p.id, bucket: 'sealed:shrink' }], NOW);
   expect(latest.size).toBe(1);
-  expect((await strategySamples(db)).sealed?.productId).toBe(p.id);
 });
 
 it('uses the new-set pattern of similar items with release dates, and drops a merged item', async () => {
@@ -117,4 +116,76 @@ it('uses the new-set pattern of similar items with release dates, and drops a me
   await mergeProducts(db, { id: uid, role: 'admin' }, dup.id, young.id);
   expect(await db.select().from(signals).where(eq(signals.productId, dup.id))).toEqual([]);
   expect(await db.select().from(products).where(eq(products.id, dup.id))).toEqual([]);
+});
+
+it('learns the new-release wait per set line, and suggests a line for an item unlike its group', async () => {
+  const DAY = 86_400_000;
+  const set = async (key: string, title: string, date: string) =>
+    (
+      await db
+        .insert(tcgSets)
+        .values({
+          franchise: 'pokemon',
+          region: 'jp',
+          name: key,
+          nameAlias: title,
+          setType: 'expansion',
+          releaseDate: date,
+          source: 'test',
+          sourceKey: key,
+        })
+        .returning()
+    )[0]!;
+  // A first year of daily sales from release, priced by age.
+  const year = async (productId: string, date: string, price: (age: number) => number) => {
+    const end = new Date(Date.parse(`${date}T12:00:00+09:00`) + 399 * DAY);
+    await sales(productId, 400, (back) => price(399 - back), end);
+  };
+  // Sub-expansions fall to a low at day 150; main expansions rise from release.
+  const dip = (age: number) => 400 + Math.abs(age - 150) * 4;
+  const rise = (age: number) => 1000 + age;
+  for (const [i, date] of ['2024-06-01', '2024-07-01', '2024-08-01'].entries()) {
+    const sub = await set(`sub${i}`, `強化拡張パック「Sub ${i}」`, date);
+    await year((await box(`Sub box ${i}`, sub.id)).id, date, dip);
+    const main = await set(`main${i}`, `拡張パック「Main ${i}」`, date);
+    await year((await box(`Main box ${i}`, main.id)).id, date, rise);
+  }
+  // No set and no pack words in its name: no line, though its prices move like the sub-expansions.
+  const odd = await createProduct(db, uid, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Odd box',
+    franchise: 'pokemon',
+    region: 'jp',
+    releaseDate: '2024-09-01',
+  });
+  await year(odd.id, '2024-09-01', dip);
+
+  const newSub = await box(
+    'New sub',
+    (await set('subN', '強化拡張パック「New」', '2026-09-01')).id,
+  );
+  const newHigh = await box(
+    'New high',
+    (await set('hiN', 'ハイクラスパック「New」', '2026-09-01')).id,
+  );
+  for (const p of [newSub, newHigh]) {
+    await sales(p.id, 40, () => 1000);
+    await addWatch(db, uid, { productId: p.id }, { packagingState: 'sealed_shrink' });
+  }
+  const r = await refreshSignals(db, NOW);
+  const stats = new Map((await db.select().from(signals)).map((s) => [s.productId, s.stats]));
+  // The sub-expansions' own low; the high class line has no items with a full year: all of them.
+  // (The ±7-day typical price is flat around the bottom of the V: the earliest of it counts.)
+  expect(stats.get(newSub.id)).toMatchObject({ line: 'sub', lowAge: { items: 3, line: 'sub' } });
+  expect(stats.get(newSub.id)!.lowAge!.age).toBeGreaterThanOrEqual(143);
+  expect(stats.get(newSub.id)!.lowAge!.age).toBeLessThanOrEqual(150);
+  expect(stats.get(newHigh.id)).toMatchObject({
+    line: 'high_class',
+    lowAge: { items: 7, line: null },
+  });
+
+  expect(r.lineSuggestions).toBe(1);
+  const [filed] = await db.select().from(suggestions);
+  expect(filed).toMatchObject({ kind: 'set_line', productId: odd.id, payload: { line: 'sub' } });
 });

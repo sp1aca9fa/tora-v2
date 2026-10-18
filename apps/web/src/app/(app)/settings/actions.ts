@@ -43,6 +43,7 @@ import {
   setSourceOrder,
   setSourceRoles,
   recordAdminChange,
+  saveSetLineList,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
@@ -355,6 +356,15 @@ export async function setDbBudgetAction(millions: number) {
   await setRowsReadBudget(db, millions * 1_000_000);
   await recordAdminChange(db, user.id, 'dbBudget', { to: millions }, '/settings/admin/database');
   revalidatePath('/settings/admin/database');
+}
+
+/** The set lines group studies can use (admins, S9). */
+export async function saveSetLinesAction(lines: string[]) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !Array.isArray(lines)) return;
+  await saveSetLineList(db, lines.map(String));
+  await recordAdminChange(db, user.id, 'setLines', {}, '/settings/admin/categories');
+  revalidatePath('/settings/admin/categories');
 }
 
 /** Where a currency's exchange rate comes from (admins, S16): a rate plug-in or a typed rate. */

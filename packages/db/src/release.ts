@@ -2,12 +2,22 @@
 // from the set code or name they have (unsure links are suggested on Actions), take the set's
 // release date (else their own, else their first collected sale), and are grouped with similar
 // items for the new-set pattern.
-import { toLocalIso } from '@tora/core';
+import { SET_LINES, lineFromTitle, toLocalIso } from '@tora/core';
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadItemSales } from './item-sales';
+import { DomainError, canEditProduct } from './mutations';
+import { readSetting, saveSetting } from './registry';
 import { fileSuggestion } from './suggestions';
-import { type Product, type TcgSet, products, suggestions, tcgSets, users } from './schema';
+import {
+  type Product,
+  type TcgSet,
+  type User,
+  products,
+  suggestions,
+  tcgSets,
+  users,
+} from './schema';
 
 /** Set code for comparison: "sv2a" and "SV2A" are the same code. */
 export function setCodeKey(code: string | null | undefined): string | null {
@@ -223,6 +233,69 @@ export async function releaseDates(
     }
   }
   return out;
+}
+
+/** The admin's list of set lines: built-in keys (`SET_LINES`) and names they added. */
+export async function setLineList(db: Pick<Db, 'select'>): Promise<string[]> {
+  return (await readSetting<string[]>(db, 'setLines')) ?? [...SET_LINES];
+}
+
+export async function saveSetLineList(db: Db, lines: string[]): Promise<void> {
+  const clean = [...new Set(lines.map((l) => l.trim()).filter((l) => l && l.length <= 60))];
+  await saveSetting(db, 'setLines', clean.slice(0, 20));
+}
+
+/** Sets an item's line by hand (null: automatic), by the person who made it or an admin. */
+export async function setProductLine(
+  db: Db,
+  actor: Pick<User, 'id' | 'role'>,
+  productId: string,
+  line: string | null,
+): Promise<void> {
+  const [product] = await db.select().from(products).where(eq(products.id, productId));
+  if (!product) throw new DomainError('not_found');
+  if (!canEditProduct(actor, product)) throw new DomainError('forbidden');
+  if (line && line !== product.line && !(await setLineList(db)).includes(line)) {
+    throw new DomainError('invalid_input');
+  }
+  if ((product.line ?? null) === line) return;
+  await db.update(products).set({ line }).where(eq(products.id, productId));
+}
+
+/**
+ * Each item's set line: set by hand, else (Pokemon) what its catalog set's official title or its
+ * own name says (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); only lines on the
+ * admin's list.
+ */
+export async function productLines(
+  db: Pick<Db, 'select'>,
+  items: Pick<Product, 'id' | 'setId' | 'line' | 'franchise' | 'name'>[],
+): Promise<Map<string, string | null>> {
+  const list = new Set(await setLineList(db));
+  const setIds = [
+    ...new Set(
+      items.filter((p) => !p.line && p.franchise === 'pokemon' && p.setId).map((p) => p.setId!),
+    ),
+  ];
+  const titles = new Map<string, string>();
+  for (let i = 0; i < setIds.length; i += 200) {
+    for (const s of await db
+      .select({ id: tcgSets.id, name: tcgSets.name, alias: tcgSets.nameAlias })
+      .from(tcgSets)
+      .where(inArray(tcgSets.id, setIds.slice(i, i + 200)))) {
+      titles.set(s.id, s.alias ?? s.name);
+    }
+  }
+  return new Map(
+    items.map((p) => {
+      const line =
+        p.line ??
+        (p.franchise === 'pokemon'
+          ? ((p.setId ? lineFromTitle(titles.get(p.setId)) : null) ?? lineFromTitle(p.name))
+          : null);
+      return [p.id, line && list.has(line) ? line : null];
+    }),
+  );
 }
 
 /** A platform for comparison: "Nintendo Switch" is "switch", "PlayStation 5" is "ps5". */

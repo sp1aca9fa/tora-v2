@@ -1,11 +1,13 @@
 import { categoryDef } from '@tora/core';
-import { canEditProduct, getProduct } from '@tora/db';
+import { canEditProduct, getProduct, productLines, setLineList } from '@tora/db';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { editProductAction } from '@/app/(app)/holdings/[id]/actions';
 import { ActionForm } from '@/components/action-form';
 import { authed } from '@/lib/auth/guard';
-import { franchiseLabel } from '@/lib/product-display';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { franchiseLabel, lineLabel } from '@/lib/product-display';
 import { getTaxonomy } from '@/lib/taxonomy';
 import { EditProductFields } from './edit-fields';
 
@@ -26,6 +28,12 @@ export default async function EditProductPage({
   const back = from?.startsWith('/holdings/') || from?.startsWith('/products/') ? from : '/';
   // TCG keeps the franchise picked with chips (the set catalog); others type it.
   const isTcg = !!categoryDef(taxonomy, product.category)?.setCatalog;
+  // The set line (S9): automatic unless set here.
+  const [list, auto] = isTcg
+    ? await Promise.all([setLineList(db), productLines(db, [{ ...product, line: null }])])
+    : [[], new Map<string, string | null>()];
+  const autoLine = auto.get(product.id);
+  const options = product.line && !list.includes(product.line) ? [...list, product.line] : list;
 
   return (
     <div className="space-y-5">
@@ -54,6 +62,24 @@ export default async function EditProductPage({
           franchiseInput={!isTcg}
           defaults={product}
         />
+        {isTcg && (
+          <div className="space-y-1.5">
+            <Label htmlFor="line">{t('lineField.label')}</Label>
+            <NativeSelect id="line" name="line" defaultValue={product.line ?? ''}>
+              <option value="">
+                {autoLine
+                  ? t('lineField.auto', { line: lineLabel(autoLine, t) })
+                  : t('lineField.autoNone')}
+              </option>
+              {options.map((l) => (
+                <option key={l} value={l}>
+                  {lineLabel(l, t)}
+                </option>
+              ))}
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">{t('lineField.hint')}</p>
+          </div>
+        )}
       </ActionForm>
     </div>
   );

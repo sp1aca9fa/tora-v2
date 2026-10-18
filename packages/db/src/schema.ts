@@ -159,6 +159,11 @@ export const products = sqliteTable(
     setId: text('set_id').references(() => tcgSets.id),
     setName: text('set_name'),
     setCode: text('set_code'),
+    /**
+     * Its set line set by hand (main expansion, high class pack, ...: the admin's list, S9); null
+     * takes the line its catalog set's title or its own name says (Pokemon), else none.
+     */
+    line: text('line'),
     variant: text('variant'),
     cardNumber: text('card_number'),
     rarity: text('rarity'),
@@ -448,8 +453,8 @@ export const suggestions = sqliteTable(
       .notNull()
       .references(() => users.id),
     /**
-     * exclude_sale | exclude_word | fix_product | link_set, or sale_ok / search_ok (judged fine,
-     * kept as memory)
+     * exclude_sale | exclude_word | fix_product | link_set | set_line, or sale_ok / search_ok
+     * (judged fine, kept as memory)
      */
     kind: text('kind').notNull(),
     /** What it is about, unique per kind: an observation ID, "<source ID>|<word>", a product ID. */

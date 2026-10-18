@@ -26,6 +26,7 @@ import {
   priceHistory,
   sameNameKey,
   productLots,
+  productLines,
   releaseDates,
   latestSignals,
   getUserById,
@@ -168,13 +169,14 @@ export async function listProducts(
 export async function productDetail(db: Db, userId: string, productId: string) {
   const product = await getProduct(db, productId);
   if (!product) return { error: 'not found' };
-  const [lots, sources, candidates, market, released, similar] = await Promise.all([
+  const [lots, sources, candidates, market, released, similar, lines] = await Promise.all([
     productLots(db, userId, productId),
     listProductSources(db, productId),
     listPendingCandidates(db, productId),
     loadMarketData(db, userId, [productId]),
     releaseDates(db, [product]),
     similarProducts(db, product),
+    productLines(db, [product]),
   ]);
   return {
     product,
@@ -182,6 +184,8 @@ export async function productDetail(db: Db, userId: string, productId: string) {
     // S9: the set catalog's date, else the item's own, else its first collected sale.
     release: released.get(productId) ?? null,
     similarItems: { group: similarKey(product), count: similar.length },
+    // S9: its set line (by hand, else from the Pokemon set title); group studies use it.
+    line: lines.get(productId) ?? null,
     lots: lots.map((h) => ({
       holdingId: h.id,
       status: h.status,
@@ -785,6 +789,9 @@ export async function watchlist(db: Db, userId: string) {
               loweredByNewSetPattern: j.zone.pattern,
               fallingFast: j.falling,
               marketFalling: j.marketFalling,
+              // A new release waits until similar items' usual first-year low (else 90 days).
+              newRelease: j.newRelease,
+              newReleaseWaitDays: j.waitDays,
               limitedData: j.limited,
               numbers: stats,
             };

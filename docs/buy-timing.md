@@ -6,11 +6,11 @@ from past prices only and is never a sure thing.
 
 ## Where it shows
 
-- **Watchlist**: each watched item and condition gets a verdict (Good price, Falling: wait, Fair
-  price, High) and the price under which it is a good buy. Until a person has chosen a buy
-  strategy, the Watchlist asks them to (top of the page).
+- **Watchlist**: each watched item and condition gets a verdict (Good price, Falling: wait, New
+  release: wait, Fair price, High) and the price under which it is a good buy. Until a person has
+  chosen a buy strategy, the Watchlist asks them to (top of the page).
 - **Item pages**: a Buy timing card for the item's main condition, with the zone and the reasons.
-- **Watchlist > Buy strategy**: the strategies per item type, tried on an example (below).
+- **Watchlist > Buy strategy**: the strategies per item type, tried on three fixed examples (below).
 - MCP tool `watchlist`: the verdict, the zone and the numbers, for a Claude chat.
 
 ## The numbers (saved daily)
@@ -29,6 +29,18 @@ At the end of each `pnpm collect`, for every item and condition someone owns or 
   own; a first collected sale is shown but not used here). In an item's first year, similar items
   (same kind, franchise and language; games: kind and platform) with prices at this age and 90
   days later give the typical change; 3 or more items are needed.
+- **The new-release wait**: the age at which similar items usually hit their first-year low (the
+  median over items with a full first year: prices from their first month to past day 300, released
+  a year ago or more; 3 or more needed).
+- **Set lines**: a set's place in its franchise's releases (main expansion, sub-expansion, high
+  class pack, special or anniversary; the list is an admin setting under Settings > Admin
+  preferences > Categories). Pokemon items get theirs from the official set title (拡張パック,
+  強化拡張パック, ハイクラスパック, anniversary or concept packs); others are set by hand on the
+  item's edit page, by the person who made it or an admin. The new-set pattern, the new-release
+  wait and the market use the item's line when it has 3 or more items (5 for the market), else the
+  whole group, and the app says which ("Similar items (4, Sub-expansion only)"). Tora suggests a
+  line on Actions for an item without one whose first 3 months moved 20 points or more unlike its
+  group and within 10 points of a line's items.
 
 ## Strategies
 
@@ -48,8 +60,18 @@ a range, the zone is 10 % under the usual price (with almost none, under today's
 listing can be in it), and the app says the data is limited. In the first year, the new-set
 pattern lowers the zone when similar items kept falling at that age.
 
-The strategy page tries each strategy on a fixed example per item type (the item with the most
-days of sales, picked once by the collect; app setting `strategySamples`): its last year with the
-days each strategy would have called a buy, the average price paid against the year's average,
-and how often the price was higher 90 days later. Each past day is judged only on the prices
-before it.
+A new release (a real release date, not a first collected sale) says "New release: wait" until
+the age at which similar items usually hit their first-year low, or 90 days when fewer than 3
+similar items have a full first year (Catch the dip warns instead). Why learned and not fixed: a
+backtest on the 16 items with a real release date and early prices (October 2026) found the lows
+at about day 119 for one box, past day 63 for another and day 112-357 for singles; a fixed 90 days
+is arbitrary, and a "price has settled" rule was fooled by pauses in a falling price.
+
+The strategy page tries each strategy on three fixed examples, the same for everyone and
+independent of anyone's items (`packages/core/src/strategy-examples.ts`): real SNKRDUNK price
+series with the item hidden, the dates moved and the prices rescaled. Steady with dips (a PSA 10
+card over a year), a long fall (a box falling for months, then flat, then recovering) and a new set
+(a box from its release: hype, a dip, a recovery; strategies other than Catch the dip wait 90 days
+after release). Per example: the days each strategy would have called a buy, the average price
+paid against the period's average, and how often the price was higher 90 days later. Each past day
+is judged only on the prices before it.

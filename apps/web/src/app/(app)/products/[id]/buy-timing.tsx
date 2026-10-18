@@ -1,8 +1,9 @@
-import { type SignalStats, type StrategyChoice, judge } from '@tora/core';
+import { type Judgement, type SignalStats, type StrategyChoice, judge } from '@tora/core';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
+import { lineLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
 
 export const VERDICT_STYLE: Record<string, string> = {
@@ -12,6 +13,10 @@ export const VERDICT_STYLE: Record<string, string> = {
   high: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
   none: 'bg-muted text-muted-foreground',
 };
+
+/** The verdict's label: a wait only for a new release says so. */
+export const verdictKey = (j: Judgement) =>
+  j.verdict === 'wait' && j.newRelease && !j.falling && !j.marketFalling ? 'newRelease' : j.verdict;
 
 /**
  * Buy timing (S9 part 4): the verdict of the person's strategy on today's numbers, the buy zone
@@ -50,6 +55,13 @@ export async function BuyTiming({
   }
   const j = judge(stats, choice);
   const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
+  // Which items a group study used: the item's line only, or all of them (S9).
+  const group = (study: { line?: string | null } | null | undefined) =>
+    study?.line
+      ? t('buy.group.line', { line: lineLabel(study.line, t) })
+      : stats.line
+        ? t('buy.group.all')
+        : '';
   const reasons: React.ReactNode[] = [];
   if (stats.fair !== null) {
     reasons.push(
@@ -79,7 +91,11 @@ export async function BuyTiming({
   }
   if (stats.market) {
     reasons.push(
-      t('buy.reason.market', { items: stats.market.items, pct: pct(stats.market.change84) }),
+      t('buy.reason.market', {
+        items: stats.market.items,
+        group: group(stats.market),
+        pct: pct(stats.market.change84),
+      }),
     );
   }
   if (stats.ask !== null && stats.fair) {
@@ -96,6 +112,7 @@ export async function BuyTiming({
       stats.pattern
         ? t('buy.reason.pattern', {
             items: stats.pattern.items,
+            group: group(stats.pattern),
             pct: pct(stats.pattern.change),
             days: stats.ageDays,
           })
@@ -118,7 +135,7 @@ export async function BuyTiming({
         <CardTitle className="flex flex-wrap items-center gap-2">
           {t('buy.title')}
           <span className={cn('rounded px-2 py-0.5 text-sm font-medium', VERDICT_STYLE[j.verdict])}>
-            {t(`buy.verdict.${j.verdict}`)}
+            {t(`buy.verdict.${verdictKey(j)}`)}
           </span>
           {condition && (
             <span className="font-mono text-xs font-normal text-muted-foreground">{condition}</span>
@@ -151,8 +168,23 @@ export async function BuyTiming({
           <p className="text-amber-700 dark:text-amber-300">
             {t(choice.strategy === 'dip' ? 'buy.marketFallingDip' : 'buy.marketFalling', {
               items: stats.market.items,
+              group: group(stats.market),
               pct: pct(stats.market.change84),
             })}
+          </p>
+        )}
+        {j.newRelease && stats.ageDays !== null && (
+          <p className="text-amber-700 dark:text-amber-300">
+            {choice.strategy === 'dip'
+              ? t('buy.newReleaseDip', { days: stats.ageDays, wait: j.waitDays })
+              : stats.lowAge
+                ? t('buy.newRelease', {
+                    days: stats.ageDays,
+                    items: stats.lowAge.items,
+                    group: group(stats.lowAge),
+                    wait: j.waitDays,
+                  })
+                : t('buy.newReleaseDefault', { days: stats.ageDays, wait: j.waitDays })}
           </p>
         )}
         {j.askInZone && (

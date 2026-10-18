@@ -3,6 +3,7 @@ import {
   currentSupply,
   releaseDates,
   latestSignals,
+  productLines,
   listingsIn,
   lowestAsk,
   dismissedSourceWarnings,
@@ -29,7 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { sourceLabels } from '@/lib/sources';
 import { authed } from '@/lib/auth/guard';
-import { lotConditionLabel, productMeta, customFieldLines } from '@/lib/product-display';
+import { customFieldLines, lineLabel, lotConditionLabel, productMeta } from '@/lib/product-display';
 import { ItemLayout } from './item-layout';
 import { MarketCompare, compareBucket } from './market-compare';
 import { PriceSources } from './price-sources';
@@ -85,6 +86,7 @@ export default async function ProductPage({ params }: Params) {
     supply,
     released,
     timing,
+    lines,
   ] = await Promise.all([
     getTranslations(),
     getFormatter(),
@@ -101,7 +103,9 @@ export default async function ProductPage({ params }: Params) {
     currentSupply(db, [product.id]),
     releaseDates(db, [product]),
     latestSignals(db, [{ productId: product.id, bucket: mainBucket }]),
+    productLines(db, [product]),
   ]);
+  const line = lines.get(product.id);
   const release = released.get(product.id);
   const forSale = supply.get(product.id) ?? [];
   const values = new Map(owned.map((h) => [h.id, valuations.get(h.id)?.valueBase ?? null]));
@@ -173,6 +177,7 @@ export default async function ProductPage({ params }: Params) {
               {customFieldLines(product, await getTaxonomy(), await getLocale(), t)
                 .map((l) => ` · ${l.label}: ${l.value}`)
                 .join('')}
+              {line && ` · ${lineLabel(line, t)}`}
               {release && ` · ${t(`release.${release.from}`, { date: release.date })}`}
               {canEditProduct(user, product) && (
                 <>

@@ -1,23 +1,28 @@
 // Buy timing (requirements S9 part 4): the numbers saved daily per item and condition held or
-// watched (after the collect), the fixed sample per item type the strategies are tried on, and
-// what pages read.
+// watched (after the collect), the set line suggestions, and what pages read.
 import {
   type DayPrice,
   type SignalStats,
+  PATTERN_MIN_ITEMS,
+  byLine,
+  earlyChange,
   localDate,
   marketCurrency,
   marketTrend,
+  median,
   newSetPattern,
   productClass,
   seriesStats,
   toLocalIso,
+  typicalLowAge,
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { loadItemSales, refreshItemSales, soldDays, soldDaysOf } from './item-sales';
-import { loadSourceRegistry, saveSetting } from './registry';
-import { releaseDates, similarKey } from './release';
-import { type Product, appSettings, holdings, products, signals, watches } from './schema';
+import { refreshItemSales, soldDays } from './item-sales';
+import { loadSourceRegistry } from './registry';
+import { productLines, releaseDates, similarKey } from './release';
+import { type Product, holdings, products, signals, users, watches } from './schema';
+import { fileSuggestion } from './suggestions';
 import { currentSupply, lowestAsk } from './supply';
 import { holdingBucket, savedBucketValues } from './valuation';
 
@@ -105,7 +110,7 @@ async function valuedPairs(db: Db): Promise<{ product: Product; bucket: string |
 
 /**
  * Today's numbers for every item and condition held or watched, saved (one row per day; a second
- * collect the same day replaces it). Then the fixed samples are picked if missing.
+ * collect the same day replaces it). Then set lines are suggested for items unlike their group.
  */
 export async function refreshSignals(
   db: Db,
@@ -115,10 +120,12 @@ export async function refreshSignals(
 ): Promise<{
   saved: number;
   withPattern: number;
+  /** Set lines suggested on Actions. */
+  lineSuggestions: number;
   rows: { productId: string; bucket: string; source: string | null; stats: SignalStats }[];
 }> {
   const pairs = await valuedPairs(db);
-  if (pairs.length === 0) return { saved: 0, withPattern: 0, rows: [] };
+  if (pairs.length === 0) return { saved: 0, withPattern: 0, lineSuggestions: 0, rows: [] };
   // The daily prices come from the packed item sales: any days still marked are updated first.
   await refreshItemSales(db, { marksOnly: true });
   const today = localDate(now);
@@ -134,9 +141,15 @@ export async function refreshSignals(
     ),
   ]);
 
-  // The new-set pattern per group and bucket, for items in their first year: every similar
-  // item's whole history (any person's), loaded once per group.
-  const groups = new Map<string, { id: string; release: string; series: DayPrice[] }[]>();
+  // Group studies use the item's set line when it has enough items, else the whole group.
+  const allProducts = await db.select().from(products);
+  const lines = await productLines(db, allProducts);
+
+  // The new-set pattern and the new-release wait per group and bucket, for items in their first
+  // year: every similar item's whole history (any person's), loaded once per group.
+  type Member = { id: string; release: string; series: DayPrice[]; line: string | null };
+  const groups = new Map<string, Member[]>();
+  const lowAges = new Map<string, SignalStats['lowAge']>();
   // A first collected sale is not a release date (collecting may start years later): the
   // pattern needs the set's date or the item's own, for the item and the items it is compared to.
   const known = (r: { from: string } | undefined) => !!r && r.from !== 'first_sale';
@@ -146,7 +159,7 @@ export async function refreshSignals(
   });
   if (young.length) {
     const keys = new Set(young.map((p) => similarKey(p.product)).filter((k) => k !== null));
-    const all = (await db.select().from(products)).filter((p) => keys.has(similarKey(p) ?? ''));
+    const all = allProducts.filter((p) => keys.has(similarKey(p) ?? ''));
     const [history, dates] = await Promise.all([
       dailySeries(
         db,
@@ -163,7 +176,9 @@ export async function refreshSignals(
         all.flatMap((o) => {
           const r = dates.get(o.id);
           const s = pickSeries(history, o.id, p.bucket);
-          return r && known(r) && s ? [{ id: o.id, release: r.date, series: s.series }] : [];
+          return r && known(r) && s
+            ? [{ id: o.id, release: r.date, series: s.series, line: lines.get(o.id) ?? null }]
+            : [];
         }),
       );
     }
@@ -174,7 +189,7 @@ export async function refreshSignals(
   const markets = new Map<string, SignalStats['market']>();
   {
     const keys = new Set(pairs.map((p) => similarKey(p.product)).filter((k) => k !== null));
-    const members = (await db.select().from(products)).filter((p) => keys.has(similarKey(p) ?? ''));
+    const members = allProducts.filter((p) => keys.has(similarKey(p) ?? ''));
     const recent = await dailySeries(
       db,
       members.map((p) => p.id),
@@ -185,13 +200,20 @@ export async function refreshSignals(
       const id = key.slice(0, key.indexOf('|'));
       if (s.length > (longest.get(id)?.length ?? 0)) longest.set(id, s);
     }
-    for (const key of keys) {
-      const group = members.filter((p) => similarKey(p) === key);
+    for (const { product } of pairs) {
+      const key = similarKey(product);
+      const line = lines.get(product.id) ?? null;
+      if (!key || markets.has(`${key}|${line ?? ''}`)) continue;
+      const group = members
+        .filter((p) => similarKey(p) === key)
+        .map((p) => ({ line: lines.get(p.id) ?? null, series: longest.get(p.id) ?? [] }));
       markets.set(
-        key,
-        marketTrend(
-          group.map((p) => longest.get(p.id) ?? []),
-          today,
+        `${key}|${line ?? ''}`,
+        byLine(line, group, (g) =>
+          marketTrend(
+            g.map((m) => m.series),
+            today,
+          ),
         ),
       );
     }
@@ -213,10 +235,25 @@ export async function refreshSignals(
     const ageDays = r
       ? Math.floor((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${r.date}T00:00:00Z`)) / DAY)
       : null;
-    const others = (groups.get(`${similarKey(product)}|${bucket ?? ''}`) ?? []).filter(
-      (o) => o.id !== product.id,
-    );
-    const pattern = ageDays !== null && known(r) ? newSetPattern(ageDays, others, today) : null;
+    const line = lines.get(product.id) ?? null;
+    const groupKey = `${similarKey(product)}|${bucket ?? ''}`;
+    const others = (groups.get(groupKey) ?? []).filter((o) => o.id !== product.id);
+    const firstYear = ageDays !== null && ageDays <= 365 && known(r);
+    const pattern = firstYear
+      ? byLine(line, others, (o) => newSetPattern(ageDays!, o, today))
+      : null;
+    // An item in its first year never has a full first year itself: one study per group and line.
+    let lowAge: SignalStats['lowAge'] = null;
+    if (firstYear) {
+      const lowKey = `${groupKey}|${line ?? ''}`;
+      if (!lowAges.has(lowKey)) {
+        lowAges.set(
+          lowKey,
+          byLine(line, others, (o) => typicalLowAge(o, today)),
+        );
+      }
+      lowAge = lowAges.get(lowKey) ?? null;
+    }
     if (pattern) withPattern++;
     const ask = lowestAsk(supply.get(product.id) ?? [], bucket ?? '');
     rows.push({
@@ -228,12 +265,14 @@ export async function refreshSignals(
         ask: ask?.lowestAskBase ?? null,
         ageDays,
         releaseFrom: r?.from ?? null,
-        market: markets.get(similarKey(product) ?? '') ?? null,
+        line,
+        market: markets.get(`${similarKey(product)}|${line ?? ''}`) ?? null,
         pattern,
+        lowAge,
       },
     });
   }
-  if (!save) return { saved: 0, withPattern, rows };
+  if (!save) return { saved: 0, withPattern, lineSuggestions: 0, rows };
   const at = toLocalIso(now);
   for (let i = 0; i < rows.length; i += 100) {
     await db
@@ -246,8 +285,96 @@ export async function refreshSignals(
         set: { source: sql`excluded.source`, stats: sql`excluded.stats`, updatedAt: at },
       });
   }
-  await pickSamples(db, now);
-  return { saved: rows.length, withPattern, rows };
+  const lineSuggestions = await suggestLines(db, allProducts, lines);
+  return { saved: rows.length, withPattern, lineSuggestions, rows };
+}
+
+/** An item's first months unlike its group's by this much, and like a line's within this. */
+const UNLIKE_GROUP = 0.2;
+const LIKE_LINE = 0.1;
+
+/**
+ * Suggests a set line for items without one whose prices behave unlike their group: their change
+ * over the first months after release (day 7 to 97) is 20 points or more from the group's typical
+ * one and within 10 points of a line's (3+ items). Filed on Actions to the person who made the
+ * item, else the admins.
+ */
+export async function suggestLines(
+  db: Db,
+  all: Product[],
+  lines: Map<string, string | null>,
+): Promise<number> {
+  const tcg = all.filter((p) => p.category === 'tcg' && similarKey(p));
+  if (!tcg.some((p) => !lines.get(p.id))) return 0;
+  const dates = await releaseDates(db, tcg);
+  const known = tcg.filter((p) => {
+    const r = dates.get(p.id);
+    return r && r.from !== 'first_sale';
+  });
+  if (!known.some((p) => !lines.get(p.id))) return 0;
+  // Each item on its condition with the most days of sales.
+  const longest = new Map<string, DayPrice[]>();
+  for (const [key, s] of await dailySeries(
+    db,
+    known.map((p) => p.id),
+  )) {
+    const id = key.slice(0, key.indexOf('|'));
+    if (s.length > (longest.get(id)?.length ?? 0)) longest.set(id, s);
+  }
+  const byGroup = new Map<string, { product: Product; line: string | null; change: number }[]>();
+  for (const p of known) {
+    const change = earlyChange(dates.get(p.id)!.date, longest.get(p.id) ?? []);
+    if (change === null) continue;
+    const key = similarKey(p)!;
+    byGroup.set(key, [
+      ...(byGroup.get(key) ?? []),
+      { product: p, line: lines.get(p.id) ?? null, change },
+    ]);
+  }
+  let admins: string[] | null = null;
+  let filed = 0;
+  for (const items of byGroup.values()) {
+    for (const it of items) {
+      if (it.line) continue;
+      const rest = items.filter((o) => o !== it);
+      if (rest.length < PATTERN_MIN_ITEMS) continue;
+      const typical = median(rest.map((o) => o.change))!;
+      if (Math.abs(it.change - typical) < UNLIKE_GROUP) continue;
+      const byLineChanges = new Map<string, number[]>();
+      for (const o of rest) {
+        if (o.line) byLineChanges.set(o.line, [...(byLineChanges.get(o.line) ?? []), o.change]);
+      }
+      let best: { line: string; change: number; items: number } | null = null;
+      for (const [line, changes] of byLineChanges) {
+        if (changes.length < PATTERN_MIN_ITEMS) continue;
+        const change = median(changes)!;
+        if (!best || Math.abs(it.change - change) < Math.abs(it.change - best.change)) {
+          best = { line, change, items: changes.length };
+        }
+      }
+      if (!best || Math.abs(it.change - best.change) > LIKE_LINE) continue;
+      admins ??= (await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin'))).map(
+        (u) => u.id,
+      );
+      for (const userId of it.product.createdBy ? [it.product.createdBy] : admins) {
+        const done = await fileSuggestion(db, {
+          userId,
+          kind: 'set_line',
+          targetKey: it.product.id,
+          productId: it.product.id,
+          payload: { line: best.line },
+          reason: 'line',
+          evidence: {
+            change: it.change,
+            group: { items: rest.length, change: typical },
+            line: { items: best.items, change: best.change },
+          },
+        });
+        if (done) filed++;
+      }
+    }
+  }
+  return filed;
 }
 
 /** Days after which an item's last numbers no longer count as today's. */
@@ -276,89 +403,6 @@ export async function latestSignals(
     }
   }
   return out;
-}
-
-/** The fixed sample per item type the strategies are tried on (app setting). */
-export interface StrategySample {
-  productId: string;
-  bucket: string | null;
-  source: string;
-}
-
-/**
- * Picks, once per item type, the item and condition with the most days with sales over the last
- * two years (the same for everyone; kept while the item exists).
- */
-async function pickSamples(db: Db, now: Date): Promise<void> {
-  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'strategySamples'));
-  const current = (row?.value ?? {}) as Record<string, StrategySample>;
-  const all = await db.select().from(products);
-  const byId = new Map(all.map((p) => [p.id, p]));
-  const types = new Set(all.map((p) => productClass(p)));
-  const kept = Object.fromEntries(Object.entries(current).filter(([, s]) => byId.has(s.productId)));
-  const missing = [...types].filter((t) => !kept[t]);
-  // Looking scans two years of sales: types without a sample are looked for once a week.
-  const [checked] = await db
-    .select()
-    .from(appSettings)
-    .where(eq(appSettings.key, 'strategySamplesChecked'));
-  const lookedRecently =
-    typeof checked?.value === 'string' &&
-    checked.value >= localDate(new Date(now.getTime() - 7 * DAY));
-  const look = missing.length > 0 && !lookedRecently;
-  if (!look && Object.keys(kept).length === Object.keys(current).length) return;
-  if (look) {
-    await saveSetting(db, 'strategySamplesChecked', localDate(now));
-    const since = localDate(new Date(now.getTime() - 2 * 365 * DAY));
-    // Days with a kept sale per item, source and condition (from the packed item sales).
-    const byKey = new Map<
-      string,
-      { productId: string; source: string; bucket: string | null; days: Set<string> }
-    >();
-    for (const [productId, sales] of await loadItemSales(db)) {
-      for (const d of soldDaysOf(productId, sales, { since })) {
-        const key = `${productId}|${d.source}|${d.bucket ?? ''}`;
-        const c = byKey.get(key) ?? {
-          productId,
-          source: d.source,
-          bucket: d.bucket,
-          days: new Set(),
-        };
-        c.days.add(d.day);
-        byKey.set(key, c);
-      }
-    }
-    const counts = [...byKey.values()]
-      .map((c) => ({ ...c, n: c.days.size }))
-      .sort((a, b) => b.n - a.n);
-    for (const c of counts) {
-      const p = byId.get(c.productId);
-      const type = p && productClass(p);
-      if (!type || kept[type] || !missing.includes(type) || c.n < 30) continue;
-      kept[type] = { productId: c.productId, bucket: c.bucket, source: c.source };
-    }
-  }
-  await saveSetting(db, 'strategySamples', kept);
-}
-
-/** The fixed samples, by item type. */
-export async function strategySamples(db: Db): Promise<Record<string, StrategySample>> {
-  const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'strategySamples'));
-  return (row?.value ?? {}) as Record<string, StrategySample>;
-}
-
-/** A sample's product and its daily prices over the last two years (a year replayed, each day
- * judged on the year before it). */
-export async function sampleSeries(
-  db: Db,
-  sample: StrategySample,
-  now = new Date(),
-): Promise<{ product: Product; series: DayPrice[] } | null> {
-  const [product] = await db.select().from(products).where(eq(products.id, sample.productId));
-  if (!product) return null;
-  const since = toLocalIso(new Date(now.getTime() - 2 * 365 * DAY));
-  const all = await dailySeries(db, [product.id], since);
-  return { product, series: all.get(seriesKey(product.id, sample.source, sample.bucket)) ?? [] };
 }
 
 /** The item types a person owns (for their strategy choices). */

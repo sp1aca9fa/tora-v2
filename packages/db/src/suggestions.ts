@@ -17,8 +17,12 @@ import { setObservationExcluded, updateSourceQuery, userHoldsProduct } from './s
 import type { User } from './schema';
 import { clearBucketValues } from './valuation';
 
-/** `link_set`: an item's catalog set, when its set code or name matches only loosely (S9). */
-export type SuggestionKind = 'exclude_sale' | 'exclude_word' | 'fix_product' | 'link_set';
+/**
+ * `link_set`: an item's catalog set, when its set code or name matches only loosely (S9).
+ * `set_line`: a set line for an item whose prices behave unlike its group's (S9).
+ */
+export type SuggestionKind =
+  'exclude_sale' | 'exclude_word' | 'fix_product' | 'link_set' | 'set_line';
 /** Verdicts kept only so the same thing is not judged again. */
 export type VerdictKind = 'sale_ok' | 'search_ok';
 
@@ -101,6 +105,16 @@ async function applySuggestion(
   s: Suggestion,
 ): Promise<void> {
   const payload = s.payload as Record<string, unknown>;
+  if (s.kind === 'set_line' && s.productId) {
+    const [product] = await db.select().from(products).where(eq(products.id, s.productId));
+    if (!product) throw new DomainError('not_found');
+    if (!canEditProduct(user, product)) throw new DomainError('forbidden');
+    await db
+      .update(products)
+      .set({ line: String(payload.line ?? '') || null })
+      .where(eq(products.id, product.id));
+    return;
+  }
   if (s.kind === 'link_set' && s.productId) {
     // Filed to the person who made the item (or the admins), owned or not.
     const [product] = await db.select().from(products).where(eq(products.id, s.productId));

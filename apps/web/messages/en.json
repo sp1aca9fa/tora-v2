@@ -898,7 +898,8 @@
       "exclude_sale": "Exclude a sale",
       "exclude_word": "Skip listings with a word",
       "fix_product": "Fix product details",
-      "link_set": "Link to a catalog set"
+      "link_set": "Link to a catalog set",
+      "set_line": "Mark a set line"
     },
     "sale": "{price} on {date} ({source}); the value is {value}.",
     "unsure": "The models were not sure: check the listing.",
@@ -909,7 +910,8 @@
       "exclude_sale": "Exclude",
       "exclude_word": "Skip the word",
       "fix_product": "Apply",
-      "link_set": "Link"
+      "link_set": "Link",
+      "set_line": "Mark it"
     },
     "dismiss": "Dismiss",
     "openListing": "Open the listing on {source}",
@@ -927,7 +929,8 @@
       "dismissed": "dismissed"
     },
     "set": "Catalog set: {name} ({code}), released {date}",
-    "setBefore": "The item says: {name} ({code}). Its release date comes from the set."
+    "setBefore": "The item says: {name} ({code}). Its release date comes from the set.",
+    "line": "Mark it as {line}: in its first 3 months it moved {pct}, unlike similar items ({groupPct}, {groupItems} items) but like {line} items ({linePct}, {lineItems} items)."
   },
   "compare": {
     "title": "{primary} vs {secondary}",
@@ -1477,7 +1480,8 @@
       "user2fa": "Authenticator reset",
       "userDevices": "Devices signed out",
       "userDisabled": "Account disabled",
-      "userEnabled": "Account enabled"
+      "userEnabled": "Account enabled",
+      "setLines": "Set lines"
     },
     "role": {
       "admin": "admin",
@@ -1542,19 +1546,17 @@
   },
   "strategy": {
     "title": "Buy strategy",
-    "intro": "How Tora decides that a price is good to buy at. Pick one for each kind of item you watch or own; try each on an example first. A target price on a watch always counts too.",
+    "intro": "How Tora decides that a price is good to buy at. Pick one for each kind of item you watch or own; try each on the three examples first. A target price on a watch always counts too.",
     "suggestAll": "{count, plural, one {One kind of item uses} other {# kinds of item use}} Tora's suggestion until you choose.",
     "useSuggestions": "Use Tora's suggestions",
     "noTypes": "Watch an item first: the strategies are chosen per kind of item.",
     "notAdvice": "Worked out from past prices only: no strategy is a sure thing.",
-    "example": "Tried on:",
-    "chartLegend": "The last 12 months of daily prices. Dots: the days this strategy would have said good price.",
-    "noSample": "No example yet for this kind of item: one with enough days of sales is needed.",
+    "chartLegend": "Daily prices over the example, against its average. Dots: the days this strategy would have said good price.",
     "suggested": "Suggested",
     "inUse": "In use",
-    "calls": "{count, plural, =0 {No buy days} one {# buy day} other {# buy days}} in the last year",
-    "paidUnder": "{pct}% under the year's average",
-    "paidOver": "{pct}% over the year's average",
+    "calls": "{count, plural, =0 {No buy days} one {# buy day} other {# buy days}}",
+    "paidUnder": "{pct}% under the average",
+    "paidOver": "{pct}% over the average",
     "after90": "higher 90 days later on {higher} of {checked}",
     "marginLabel": "Under the usual price by",
     "use": "Use {name} for {type}",
@@ -1566,11 +1568,22 @@
       "target": "Own target only"
     },
     "about": {
-      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price or its market falls fast.",
-      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price or its market falls fast.",
-      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price or its market falls fast.",
-      "dip": "Like Steady, but still says good price while the price or its market falls fast, with a warning. Buys earlier; may buy before the bottom.",
+      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price or its market falls fast, and while a new release is younger than the age similar items usually hit their low at.",
+      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price or its market falls fast, and on new releases.",
+      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price or its market falls fast, and on new releases.",
+      "dip": "Like Steady, but still says good price while the price or its market falls fast, or on a new release, with a warning. Buys earlier; may buy before the bottom.",
       "target": "No zone: only the target prices you set on your watches."
+    },
+    "exampleIntro": "Three fixed examples, the same for everyone: real price histories with the item hidden and the prices rescaled.",
+    "examples": {
+      "steady": "Steady with dips",
+      "fall": "A long fall",
+      "new_set": "A new set"
+    },
+    "exampleAbout": {
+      "steady": "A card over a year: no trend, with dips along the way.",
+      "fall": "A box falling for months, then flat, then starting to recover.",
+      "new_set": "A box from its release: hype, a dip over the first months, then a recovery. Strategies other than Catch the dip wait 90 days after release."
     }
   },
   "buy": {
@@ -1583,7 +1596,8 @@
       "wait": "Falling: wait",
       "fair": "Fair price",
       "high": "High",
-      "none": "No price yet"
+      "none": "No price yet",
+      "newRelease": "New release: wait"
     },
     "zone": "Good price at or under <n>{amount}</n>",
     "basis": {
@@ -1607,13 +1621,39 @@
       "trend": "Trend: {list}",
       "weeks": "{pct} in {weeks} weeks",
       "ask": "Lowest ask <n>{amount}</n> ({pct} against market value)",
-      "pattern": "Similar items ({items}) moved {pct} in the 90 days after day {days} from release",
+      "pattern": "Similar items ({items}{group}) moved {pct} in the 90 days after day {days} from release",
       "noPattern": "New-set pattern: not enough similar items with prices at this age yet",
       "noRelease": "New-set pattern: no release date (only the first collected sale)",
       "sep": ", ",
-      "market": "Similar items ({items}): {pct} over 12 weeks"
+      "market": "Similar items ({items}{group}): {pct} over 12 weeks"
     },
-    "marketFalling": "The market is falling: similar items ({items}) are {pct} over 12 weeks. Wait until it flattens.",
-    "marketFallingDip": "The market is still falling: similar items ({items}) are {pct} over 12 weeks. It may go lower."
+    "marketFalling": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. Wait until it flattens.",
+    "marketFallingDip": "The market is still falling: similar items ({items}{group}) are {pct} over 12 weeks. It may go lower.",
+    "newRelease": "New release ({days} days): similar items ({items}{group}) usually hit their first-year low around day {wait}. Wait until then.",
+    "newReleaseDefault": "New release ({days} days): new releases often drop in their first months. Wait until day {wait} (too few similar items with a full first year to learn when).",
+    "newReleaseDip": "New release ({days} days): prices often drop until about day {wait}. It may go lower.",
+    "group": {
+      "line": ", {line} only",
+      "all": ", all lines"
+    }
+  },
+  "lines": {
+    "main": "Main expansion",
+    "sub": "Sub-expansion",
+    "high_class": "High class pack",
+    "special": "Special or anniversary"
+  },
+  "setLines": {
+    "title": "Set lines",
+    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough (3 or more), else with the whole group. Pokemon items get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
+    "builtIn": "Built in",
+    "others": "Other lines, one per line",
+    "saved": "Saved."
+  },
+  "lineField": {
+    "label": "Set line",
+    "auto": "Automatic: {line}",
+    "autoNone": "Automatic: none",
+    "hint": "Group studies compare it with items of the same line when there are enough (Settings > Admin preferences > Categories has the list)."
   }
 }

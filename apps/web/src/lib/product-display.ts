@@ -1,4 +1,5 @@
 import {
+  SET_LINES,
   TCG_FRANCHISES,
   type Taxonomy,
   conditionListOf,
@@ -16,6 +17,11 @@ export function franchiseLabel(franchise: string | null, t: T): string | null {
   return (TCG_FRANCHISES as readonly string[]).includes(franchise)
     ? t(`franchise.${franchise}`)
     : franchise;
+}
+
+/** Set line label: the built-in lines are translated, the admin's own shown as entered. */
+export function lineLabel(line: string, t: T): string {
+  return (SET_LINES as readonly string[]).includes(line) ? t(`lines.${line}`) : line;
 }
 
 /** One-line description: kind · franchise · region · platform · set · number · rarity. */
