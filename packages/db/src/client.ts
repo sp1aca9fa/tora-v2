@@ -6,13 +6,18 @@ import { UsageMeter, defaultOrigin } from './usage';
 
 const meters = new WeakMap<object, UsageMeter>();
 
+/** How long a local file's writer waits for another one to finish. */
+const LOCAL_BUSY_MS = 60_000;
+
 /**
  * A libsql client; a hosted database's counts the rows its replies report, per day and `origin`
  * (see `UsageMeter`; a local file has no such counts), saved on the way out of a program that
  * ends by itself.
  */
 export function createMeteredClient(config: Config, origin = defaultOrigin()): Client {
-  if (config.url.startsWith('file:')) return createClient(config);
+  // A local file takes one writer at a time: the app, a collect and a manual run wait their turn
+  // instead of failing at once with SQLITE_BUSY (the driver's default wait is none).
+  if (config.url.startsWith('file:')) return createClient({ timeout: LOCAL_BUSY_MS, ...config });
   const meter = new UsageMeter(origin);
   const client = createClient({ ...config, fetch: meter.fetch });
   meter.client = client;
