@@ -33,7 +33,7 @@
 | S17 | Notifications and activity log: alerts outside the app (Telegram, Discord), what triggers them, a log of what happened | done (user, 2026-10-17: accepted, no major issues seen; a deep-dive review in S10); CRON_SECRET and the Telegram bot after the switch back to Turso |
 | S9 | Watchlist and buy timing: track items not owned yet, find good prices to buy at | designed 2026-10-16; part 1 (watchlist) built 2026-10-16 (migration 0028); part 2 (for sale now) built 2026-10-16 (migration 0029); part 3 (release dates and similar items) built 2026-10-16; part 4 (signals, buy strategies) built 2026-10-17 (migration 0030); next: part 5 (alerts, rule tests); parts 1-4 accepted (user, 2026-10-17: accepted, no major issues seen; a deep-dive review in S10). the new-release wait learned per group, set lines and the fixed strategy examples built 2026-10-18 (migration 0041; branch `new-release-90d` superseded, can be deleted); next: part 5 |
 | S19 | Database reads within Turso's free plan, reliably and with leeway; then the switch back to Turso | built 2026-10-18 (about 50M rows read a month measured, 10 % of the free plan; counter and alert in Settings > Admin preferences > Database); part 2 built 2026-10-18 (10 users within half the free plan: about 14 % measured on a simulated 10-user database); left: the switch back after 2026-11-01 (Tora runs locally until then) |
-| S22 | Item page as sub pages: Market, Buy timing (redesigned from the card), Lots & details | next (user, 2026-10-18) |
+| S22 | Item page as sub pages: Market, Buy timing (redesigned from the card), Lots & details | built 2026-10-18, awaiting user check |
 | S23 | Pokemon Center Online purchase import from its order and lottery-win emails | todo, after S9 part 5 (user, 2026-10-18); needs a sample email from the user |
 | S24 | Japanese TCG shops as sources (magi, Card Rush, 遊々亭, カードラボ, 晴れる屋2, ...): asks, stock, 買取 | todo, after S23 (user, 2026-10-18) |
 | S20 | Box opening value: at what box price opening is worth it (pull rates, hit card prices) | todo, after S9 part 5 (user, 2026-10-17) |
@@ -1026,6 +1026,13 @@ Decided 2026-10-18 (user): the item page shows too much at once. One header on e
 - Market (default): the price history chart, large; key numbers (market value, sales in 30 days, 4 and 12 week change, 180-day range); Japan vs US.
 - Buy timing: the verdict first (zone, strategy and Change, the new-release wait, falling, limited data); the price history with the buy zone band, the 180-day quarters and the lowest ask; the reasons in three groups (where it sits; trend and market; new release and pattern, each saying line or all); for sale now against the zone, and the person's watches and targets; S9 part 5's rule test card goes here; not advice.
 - Lots & details: the lots with P/L, item details, edit and merge, the price sources setup.
+
+Built 2026-10-18:
+- Routes in a route group (`products/[id]/(item)/`) so the header layout stays off the edit and merge pages. The header shows units, market value and P/L (watched only: the market value); the item's kind, franchise and set moved to Lots & details.
+- `item-data.ts`: the item, lots, watches and main condition, the signal and the lot values, each cached per request, so the layout and the page read them once; moving between sub pages re-renders only the page.
+- Market: five key numbers in the main condition (market value, sales in 30 days, 4 and 12 week change, 180-day range = lower to upper quarter of daily prices), the price history (taller), Japan vs US.
+- Buy timing: condition chips when the person watches or owns more than one condition (`?condition=`, the Watchlist links with the watched one); the verdict card; the chart with the buy zone shaded under its top, the 180-day quarters dotted and the lowest ask dashed (the scale stretches to show them); the reasons in three groups, the third saying the release age, when similar items bottom out (or the 90 days used) and the pattern; for sale now with "in the buy zone" or "N % above" on the condition's lowest ask; watches and "Bought it"; a marked place for S9 part 5's rule test card; not advice.
+- Lots & details: the lots with P/L and the total spent, an item details list with "Edit or merge", the price sources (links to `#sources` now open `/products/[id]/details#sources`).
 
 ## S23: Pokemon Center Online purchase import
 

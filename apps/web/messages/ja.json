@@ -875,9 +875,23 @@
     "toReview": "確認待ち",
     "cost": "取得額",
     "tab": {
-      "overview": "概要",
       "market": "相場",
-      "sources": "価格ソース"
+      "buy": "買い時",
+      "details": "取引と詳細"
+    },
+    "noLots": "登録した取引はありません（ウォッチ中）。",
+    "spentTotal": "合計の取得額: {amount}",
+    "details": "商品の詳細",
+    "editOrMerge": "編集・統合",
+    "market": {
+      "value": "相場",
+      "sales30": "30日間の取引",
+      "change4": "4週間",
+      "change12": "12週間",
+      "range": "180日の価格帯",
+      "rangeHint": "直近180日の日ごとの価格の中央の半分（下位4分の1から上位4分の1まで）。",
+      "condition": "{condition}の数値です。",
+      "historyInfo": "直近1年の日ごとの取引価格の中央値（ソースごとに1本の線）。"
     }
   },
   "merge": {
@@ -1537,7 +1551,9 @@
     "listings": "{count}件",
     "listingsMore": "{count}件以上",
     "lot": "（1個あたり、{count}個セット）",
-    "lotOnly": "まとめ売りとみられるため除外"
+    "lotOnly": "まとめ売りとみられるため除外",
+    "inZone": "買いゾーン内",
+    "aboveZone": "買いゾーンより{pct}%高い"
   },
   "release": {
     "set": "{date}発売",
@@ -1625,7 +1641,14 @@
       "noPattern": "新セットのパターン: この時期の価格がある似た商品がまだ足りません",
       "noRelease": "新セットのパターン: 発売日が不明（最初に収集した取引のみ）",
       "sep": "、",
-      "market": "似た商品（{items}件{group}）: 12週間で{pct}"
+      "market": "似た商品（{items}件{group}）: 12週間で{pct}",
+      "noMarket": "似た商品: 相場を判断するには少なすぎます（5件必要）",
+      "noAge": "発売日が不明",
+      "age": "発売から{days}日",
+      "ageFirstSale": "最初に収集した取引から{days}日（発売日が不明なため、新発売の待ちはありません）",
+      "lowAge": "似た商品（{items}件{group}）は発売{age}日目ごろに1年目の底値をつけることが多いです",
+      "noLowAge": "1年目のデータがそろった似た商品が少なく、底値の時期を学べません: {wait}日目を使います",
+      "pastFirstYear": "発売から1年以上: 新発売の待ちとパターンはありません"
     },
     "marketFalling": "相場が下落中: 似た商品（{items}件{group}）が12週間で{pct}。落ち着くまで待ちましょう。",
     "marketFallingDip": "相場はまだ下落中: 似た商品（{items}件{group}）が12週間で{pct}。さらに下がるかもしれません。",
@@ -1635,6 +1658,20 @@
     "group": {
       "line": "、{line}のみ",
       "all": "、全種類"
+    },
+    "reasonsTitle": "理由",
+    "groups": {
+      "where": "今の位置",
+      "trend": "推移と相場",
+      "release": "新発売とパターン"
+    },
+    "chart": {
+      "zone": "買いゾーン: {amount}以下",
+      "range": "通常の価格帯（180日）: {low} - {high}",
+      "ask": "最安出品: {amount}",
+      "lowShort": "180日 下",
+      "highShort": "180日 上",
+      "askShort": "出品"
     }
   },
   "lines": {

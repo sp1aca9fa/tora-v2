@@ -1,4 +1,10 @@
-import { type Judgement, type SignalStats, type StrategyChoice, judge } from '@tora/core';
+import {
+  type Judgement,
+  NEW_RELEASE_DAYS,
+  type SignalStats,
+  type StrategyChoice,
+  judge,
+} from '@tora/core';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,11 +24,26 @@ export const VERDICT_STYLE: Record<string, string> = {
 export const verdictKey = (j: Judgement) =>
   j.verdict === 'wait' && j.newRelease && !j.falling && !j.marketFalling ? 'newRelease' : j.verdict;
 
+/** Which items a group study used: the item's line only, or all of them (S9). */
+function groupLabel(
+  stats: SignalStats,
+  t: Awaited<ReturnType<typeof getTranslations>>,
+): (study: { line?: string | null } | null | undefined) => string {
+  return (study) =>
+    study?.line
+      ? t('buy.group.line', { line: lineLabel(study.line, t) })
+      : stats.line
+        ? t('buy.group.all')
+        : '';
+}
+
+const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
+
 /**
- * Buy timing (S9 part 4): the verdict of the person's strategy on today's numbers, the buy zone
- * and every number behind it. Never a sure thing.
+ * Buy timing's verdict (S9 part 4, S22): the person's strategy on today's numbers, the buy zone,
+ * and what makes it wait. Never a sure thing.
  */
-export async function BuyTiming({
+export async function BuyVerdict({
   stats,
   choice,
   typeLabel,
@@ -54,74 +75,7 @@ export async function BuyTiming({
     );
   }
   const j = judge(stats, choice);
-  const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
-  // Which items a group study used: the item's line only, or all of them (S9).
-  const group = (study: { line?: string | null } | null | undefined) =>
-    study?.line
-      ? t('buy.group.line', { line: lineLabel(study.line, t) })
-      : stats.line
-        ? t('buy.group.all')
-        : '';
-  const reasons: React.ReactNode[] = [];
-  if (stats.fair !== null) {
-    reasons.push(
-      t.rich('buy.reason.fair', {
-        amount: money(stats.fair),
-        count: stats.sales30,
-        n: (c) => <span className="amount tabular-nums">{c}</span>,
-      }),
-    );
-  }
-  if (stats.cheaperThan180 !== null) {
-    reasons.push(t('buy.reason.position', { pct: Math.round(stats.cheaperThan180 * 100) }));
-  }
-  const trends = [
-    ['2', stats.trend14],
-    ['4', stats.trend28],
-    ['12', stats.trend84],
-  ].filter((x): x is [string, number] => x[1] !== null);
-  if (trends.length) {
-    reasons.push(
-      t('buy.reason.trend', {
-        list: trends
-          .map(([w, v]) => t('buy.reason.weeks', { weeks: w, pct: pct(v) }))
-          .join(t('buy.reason.sep')),
-      }),
-    );
-  }
-  if (stats.market) {
-    reasons.push(
-      t('buy.reason.market', {
-        items: stats.market.items,
-        group: group(stats.market),
-        pct: pct(stats.market.change84),
-      }),
-    );
-  }
-  if (stats.ask !== null && stats.fair) {
-    reasons.push(
-      t.rich('buy.reason.ask', {
-        amount: money(stats.ask),
-        pct: pct(stats.ask / stats.fair - 1),
-        n: (c) => <span className="amount tabular-nums">{c}</span>,
-      }),
-    );
-  }
-  if (stats.ageDays !== null && stats.ageDays <= 365) {
-    reasons.push(
-      stats.pattern
-        ? t('buy.reason.pattern', {
-            items: stats.pattern.items,
-            group: group(stats.pattern),
-            pct: pct(stats.pattern.change),
-            days: stats.ageDays,
-          })
-        : stats.releaseFrom === 'first_sale'
-          ? t('buy.reason.noRelease')
-          : t('buy.reason.noPattern'),
-    );
-  }
-
+  const group = groupLabel(stats, t);
   const basis = j.zone.basis
     ? t(`buy.basis.${j.zone.basis}`, {
         pct: choice.margin ?? 10,
@@ -133,8 +87,9 @@ export async function BuyTiming({
     <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          {t('buy.title')}
-          <span className={cn('rounded px-2 py-0.5 text-sm font-medium', VERDICT_STYLE[j.verdict])}>
+          <span
+            className={cn('rounded px-2.5 py-1 text-base font-semibold', VERDICT_STYLE[j.verdict])}
+          >
             {t(`buy.verdict.${verdictKey(j)}`)}
           </span>
           {condition && (
@@ -142,21 +97,24 @@ export async function BuyTiming({
           )}
         </CardTitle>
         {j.zone.top !== null && (
-          <CardDescription>
+          <CardDescription className="text-base">
             {t.rich('buy.zone', {
               amount: money(j.zone.top),
               n: (c) => (
-                <span className="amount font-medium text-foreground tabular-nums">{c}</span>
+                <span className="amount font-semibold text-foreground tabular-nums">{c}</span>
               ),
             })}
-            {basis && ` (${basis})`}
+            {basis && <span className="text-sm"> ({basis})</span>}
             {j.zone.pattern && stats.pattern && (
-              <> {t('buy.loweredByPattern', { pct: pct(stats.pattern.change) })}</>
+              <span className="text-sm">
+                {' '}
+                {t('buy.loweredByPattern', { pct: pct(stats.pattern.change) })}
+              </span>
             )}
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
+      <CardContent className="space-y-2 text-sm">
         {j.falling && (
           <p className="text-amber-700 dark:text-amber-300">
             {t(choice.strategy === 'dip' ? 'buy.fallingDip' : 'buy.falling', {
@@ -197,13 +155,128 @@ export async function BuyTiming({
             })}
           </p>
         )}
-        <ul className="list-disc space-y-0.5 pl-5 text-muted-foreground">
-          {reasons.map((r, i) => (
-            <li key={i}>{r}</li>
-          ))}
-        </ul>
         {strategyLine}
-        <p className="text-xs text-muted-foreground">{t('strategy.notAdvice')}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The numbers behind the verdict in three groups (S22): where today's price sits, the trend and
+ * the market, the new release and the new-set pattern. Group studies say which items they used.
+ */
+export async function BuyReasons({ stats }: { stats: SignalStats }) {
+  const [t, money] = await Promise.all([getTranslations(), getMoney()]);
+  const group = groupLabel(stats, t);
+  const amount = (c: React.ReactNode) => <span className="amount tabular-nums">{c}</span>;
+
+  const where: React.ReactNode[] = [];
+  if (stats.fair !== null) {
+    where.push(
+      t.rich('buy.reason.fair', { amount: money(stats.fair), count: stats.sales30, n: amount }),
+    );
+  }
+  if (stats.cheaperThan180 !== null) {
+    where.push(t('buy.reason.position', { pct: Math.round(stats.cheaperThan180 * 100) }));
+  }
+  if (stats.ask !== null && stats.fair) {
+    where.push(
+      t.rich('buy.reason.ask', {
+        amount: money(stats.ask),
+        pct: pct(stats.ask / stats.fair - 1),
+        n: amount,
+      }),
+    );
+  }
+
+  const trend: React.ReactNode[] = [];
+  const trends = [
+    ['2', stats.trend14],
+    ['4', stats.trend28],
+    ['12', stats.trend84],
+  ].filter((x): x is [string, number] => x[1] !== null);
+  if (trends.length) {
+    trend.push(
+      t('buy.reason.trend', {
+        list: trends
+          .map(([w, v]) => t('buy.reason.weeks', { weeks: w, pct: pct(v) }))
+          .join(t('buy.reason.sep')),
+      }),
+    );
+  }
+  trend.push(
+    stats.market
+      ? t('buy.reason.market', {
+          items: stats.market.items,
+          group: group(stats.market),
+          pct: pct(stats.market.change84),
+        })
+      : t('buy.reason.noMarket'),
+  );
+
+  const release: React.ReactNode[] = [];
+  if (stats.ageDays === null) {
+    release.push(t('buy.reason.noAge'));
+  } else if (stats.releaseFrom === 'first_sale') {
+    release.push(t('buy.reason.ageFirstSale', { days: stats.ageDays }));
+  } else {
+    release.push(t('buy.reason.age', { days: stats.ageDays }));
+  }
+  if (stats.ageDays !== null && stats.ageDays > 365) {
+    release.push(t('buy.reason.pastFirstYear'));
+  } else if (stats.ageDays !== null) {
+    if (stats.releaseFrom !== 'first_sale') {
+      release.push(
+        stats.lowAge
+          ? t('buy.reason.lowAge', {
+              items: stats.lowAge.items,
+              group: group(stats.lowAge),
+              age: stats.lowAge.age,
+            })
+          : t('buy.reason.noLowAge', { wait: NEW_RELEASE_DAYS }),
+      );
+    }
+    release.push(
+      stats.pattern
+        ? t('buy.reason.pattern', {
+            items: stats.pattern.items,
+            group: group(stats.pattern),
+            pct: pct(stats.pattern.change),
+            days: stats.ageDays,
+          })
+        : stats.releaseFrom === 'first_sale'
+          ? t('buy.reason.noRelease')
+          : t('buy.reason.noPattern'),
+    );
+  }
+
+  const groups: [string, React.ReactNode[]][] = [
+    ['where', where],
+    ['trend', trend],
+    ['release', release],
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('buy.reasonsTitle')}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4 text-sm md:grid-cols-3">
+        {groups.map(([key, items]) => (
+          <section key={key} className="space-y-1.5">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              {t(`buy.groups.${key}`)}
+            </h3>
+            {items.length ? (
+              <ul className="space-y-1">
+                {items.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">-</p>
+            )}
+          </section>
+        ))}
       </CardContent>
     </Card>
   );

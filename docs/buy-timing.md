@@ -9,7 +9,11 @@ from past prices only and is never a sure thing.
 - **Watchlist**: each watched item and condition gets a verdict (Good price, Falling: wait, New
   release: wait, Fair price, High) and the price under which it is a good buy. Until a person has
   chosen a buy strategy, the Watchlist asks them to (top of the page).
-- **Item pages**: a Buy timing card for the item's main condition, with the zone and the reasons.
+- **Item pages, Buy timing** (`/products/<id>/buy`; the Watchlist opens it): the verdict, the price
+  history with the buy zone shaded, the 180-day quarters and the lowest ask, the reasons in three
+  groups (where it sits; trend and market; new release and pattern), what is for sale now against
+  the zone, and the person's watches. One condition at a time: the main one, or another the person
+  watches or owns.
 - **Watchlist > Buy strategy**: the strategies per item type, tried on three fixed examples (below).
 - MCP tool `watchlist`: the verdict, the zone and the numbers, for a Claude chat.
 

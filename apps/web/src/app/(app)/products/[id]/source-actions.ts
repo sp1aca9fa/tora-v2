@@ -45,7 +45,7 @@ export async function unlinkSourceAction(sourceId: string) {
   const { db } = await authed();
   const s = await getProductSource(db, sourceId);
   if (s && (await allowed(s.productId))) await unlinkSource(db, sourceId);
-  revalidatePath(`/products/${s?.productId}`);
+  revalidatePath(`/products/${s?.productId}`, 'layout');
 }
 
 export async function linkUrlAction(
@@ -113,7 +113,7 @@ export async function updateQueryAction(
     extra: { ...link.query?.extra, auto: false, edited: true },
   };
   await updateSourceQuery(db, sourceId, query);
-  revalidatePath(`/products/${link.productId}`);
+  revalidatePath(`/products/${link.productId}`, 'layout');
   return { saved: true };
 }
 
@@ -121,7 +121,7 @@ export async function reactivateSourceAction(sourceId: string) {
   const { db } = await authed();
   const link = await getProductSource(db, sourceId);
   if (link && (await allowed(link.productId))) await reactivateSource(db, sourceId);
-  revalidatePath(`/products/${link?.productId}`);
+  revalidatePath(`/products/${link?.productId}`, 'layout');
 }
 
 /** Excludes one collected sale by hand (or includes it again). */
@@ -130,7 +130,7 @@ export async function excludeObservationAction(observationId: string, excluded: 
   const obs = await getObservation(db, observationId);
   if (obs && (await allowed(obs.productId)))
     await setObservationExcluded(db, observationId, excluded);
-  revalidatePath(`/products/${obs?.productId}`);
+  revalidatePath(`/products/${obs?.productId}`, 'layout');
 }
 
 /** Adds a listing link of this exact item to a search (read by the next collect). */
@@ -148,7 +148,7 @@ export async function addReferenceAction(
   if (!references.includes(url)) {
     await setSourceReferences(db, sourceId, [...references, url].slice(-20));
   }
-  revalidatePath(`/products/${link.productId}`);
+  revalidatePath(`/products/${link.productId}`, 'layout');
   return { saved: true };
 }
 
@@ -162,5 +162,5 @@ export async function removeReferenceAction(sourceId: string, url: string) {
     sourceId,
     references.filter((r) => r !== url),
   );
-  revalidatePath(`/products/${link.productId}`);
+  revalidatePath(`/products/${link.productId}`, 'layout');
 }

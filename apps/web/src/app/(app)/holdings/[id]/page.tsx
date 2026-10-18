@@ -260,7 +260,7 @@ export default async function HoldingPage({ params }: Params) {
         )}
         {isBox && <BoxCard db={db} userId={user.id} holdingId={holding.id} />}
         <Link
-          href={`/products/${product.id}#sources`}
+          href={`/products/${product.id}/details#sources`}
           className="flex items-center justify-between rounded-md border px-3 py-2.5 text-sm hover:bg-accent"
         >
           <span>{t('holding.marketData')}</span>

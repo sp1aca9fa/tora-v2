@@ -129,7 +129,7 @@ export default async function ActionsPage() {
       summary: i.candidates.length
         ? t('actions.suggestions', { count: i.candidates.length, source: sourceLabel(i.source) })
         : t('actions.noSuggestion', { source: sourceLabel(i.source) }),
-      href: `/products/${i.product.id}#sources`,
+      href: `/products/${i.product.id}/details#sources`,
       source: i.source,
       sourceLabel: sourceLabel(i.source),
       main: i.main,
@@ -168,7 +168,7 @@ export default async function ActionsPage() {
             {dismissed.map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-3 py-2 pl-4">
                 <Link
-                  href={`/products/${p.id}#sources`}
+                  href={`/products/${p.id}/details#sources`}
                   className="min-w-0 truncate hover:underline"
                 >
                   {p.name}

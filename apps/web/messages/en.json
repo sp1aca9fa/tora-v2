@@ -875,9 +875,23 @@
     "toReview": "to review",
     "cost": "cost",
     "tab": {
-      "overview": "Overview",
       "market": "Market",
-      "sources": "Sources"
+      "buy": "Buy timing",
+      "details": "Lots & details"
+    },
+    "noLots": "No lots registered: you watch this item.",
+    "spentTotal": "Spent in all: {amount}",
+    "details": "Item details",
+    "editOrMerge": "Edit or merge",
+    "market": {
+      "value": "Market value",
+      "sales30": "Sales in 30 days",
+      "change4": "4 weeks",
+      "change12": "12 weeks",
+      "range": "180-day range",
+      "rangeHint": "The middle half of the last 180 days' daily prices (lower to upper quarter).",
+      "condition": "In {condition}.",
+      "historyInfo": "Daily sold medians over the last year, one line per source."
     }
   },
   "merge": {
@@ -1537,7 +1551,9 @@
     "listings": "{count, plural, one {# listing} other {# listings}}",
     "listingsMore": "{count}+ listings",
     "lot": "(each, in a lot of {count})",
-    "lotOnly": "looks like a lot, left out"
+    "lotOnly": "looks like a lot, left out",
+    "inZone": "in the buy zone",
+    "aboveZone": "{pct}% above the buy zone"
   },
   "release": {
     "set": "Released {date}",
@@ -1625,7 +1641,14 @@
       "noPattern": "New-set pattern: not enough similar items with prices at this age yet",
       "noRelease": "New-set pattern: no release date (only the first collected sale)",
       "sep": ", ",
-      "market": "Similar items ({items}{group}): {pct} over 12 weeks"
+      "market": "Similar items ({items}{group}): {pct} over 12 weeks",
+      "noMarket": "Similar items: too few to judge the market (5 needed)",
+      "noAge": "No release date",
+      "age": "Released {days} days ago",
+      "ageFirstSale": "First collected sale {days} days ago (no release date, so no new-release wait)",
+      "lowAge": "Similar items ({items}{group}) usually hit their first-year low around day {age}",
+      "noLowAge": "Too few similar items with a full first year to learn when prices bottom out: day {wait} is used",
+      "pastFirstYear": "Past its first year: no new-release wait or pattern"
     },
     "marketFalling": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. Wait until it flattens.",
     "marketFallingDip": "The market is still falling: similar items ({items}{group}) are {pct} over 12 weeks. It may go lower.",
@@ -1635,6 +1658,20 @@
     "group": {
       "line": ", {line} only",
       "all": ", all lines"
+    },
+    "reasonsTitle": "Why",
+    "groups": {
+      "where": "Where it sits",
+      "trend": "Trend and market",
+      "release": "New release and pattern"
+    },
+    "chart": {
+      "zone": "Buy zone: under {amount}",
+      "range": "Usual range (180 days): {low} - {high}",
+      "ask": "Lowest ask: {amount}",
+      "lowShort": "180d low",
+      "highShort": "180d high",
+      "askShort": "Ask"
     }
   },
   "lines": {

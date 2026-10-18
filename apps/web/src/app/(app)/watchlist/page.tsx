@@ -143,7 +143,7 @@ export default async function WatchlistPage() {
             return (
               <li key={watch.id}>
                 <Link
-                  href={`/products/${product.id}`}
+                  href={`/products/${product.id}/buy${watch.bucket ? `?condition=${encodeURIComponent(watch.bucket)}` : ''}`}
                   className="block px-3 py-3 transition-colors hover:bg-accent/50"
                 >
                   <div className="flex items-center gap-3">

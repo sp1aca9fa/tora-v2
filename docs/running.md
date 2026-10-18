@@ -30,8 +30,8 @@ schedule) is skipped, so two runs never fetch from the same site at once; the sk
 count as the day's run, and the schedule tries again later.
 
 **How items get prices.** Register an item; on the next run each collector searches its site for
-it and stores the best candidates; confirm the right one under **Actions** or the item page's
-**Price sources** (or paste the listing's link); the next runs backfill its history (a page budget
+it and stores the best candidates; confirm the right one under **Actions** or the item's **Lots & details** page
+(Price sources) (or paste the listing's link); the next runs backfill its history (a page budget
 per run, resuming where they stopped), then add new sales. An item can have several listings (e.g.
 a box with and without shrink wrap), each feeding its own condition.
 

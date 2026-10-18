@@ -52,7 +52,7 @@ export async function createWatchAction(_prev: FormState, formData: FormData): P
   await suggestFromKnownProducts(db, result.value.product.id);
   await linkSets(db, [result.value.product.id]);
   revalidatePath('/', 'layout');
-  redirect(`/products/${result.value.product.id}`);
+  redirect(`/products/${result.value.product.id}/buy`);
 }
 
 /** Adds a watch from an item's page, or changes one (`watchId`). */
