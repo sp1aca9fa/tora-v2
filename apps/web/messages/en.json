@@ -861,7 +861,6 @@
         "cancelled_registered": "cancelled per the emails, but registered: check it",
         "not_purchase": "not a purchase",
         "not_collectible": "not a collectible",
-        "free_bonus": "free bonus",
         "corrected": "corrected: {fields}"
       },
       "notImported": "{count, plural, one {# row not imported} other {# rows not imported}}",
