@@ -861,7 +861,6 @@
         "cancelled_registered": "メールではキャンセルですが登録されています。確認してください",
         "not_purchase": "購入ではありません",
         "not_collectible": "コレクション品ではありません",
-        "not_card_product": "カード商品・サプライではありません（必要なら手動で追加）",
         "free_bonus": "無料の特典",
         "corrected": "修正：{fields}"
       },
