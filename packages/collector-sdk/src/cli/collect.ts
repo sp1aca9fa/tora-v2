@@ -18,10 +18,12 @@ import {
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
+  readSetting,
+  saveSetting,
   saveUsage,
   loadTimeZone,
 } from '@tora/db';
-import { INSIGHT_PERIODS } from '@tora/core';
+import { INSIGHT_PERIODS, localDate } from '@tora/core';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -38,6 +40,9 @@ import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
+
+/** The day the closing steps last finished (app setting). */
+const CLOSED_KEY = 'closingStepsDay';
 
 const { values } = parseArgs({
   options: {
@@ -185,56 +190,73 @@ try {
   log(`images: stopped (${errorText(error)})`);
 }
 progress.update('pictures, lot sizes, chart', 0.3);
-// Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
-const lots = await inferLotSizes(db);
-log(
-  `lot sizes: ${lots.checked} estimated trade(s) checked${lots.full ? ' (all)' : ''}, ${lots.updated} updated`,
-);
-// The sales per day that the pages and the steps below read (the days changed by this run and
-// the lot sizes; everything once a week).
-try {
-  const days = await refreshPriceDays(db);
-  log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
-} catch (error) {
-  log(`sales per day: stopped (${errorText(error)})`);
-}
-// Items without a catalog set: linked when sure, suggested on Actions when not (S9).
-const sets = await linkSets(db);
-if (sets.linked || sets.suggested) {
-  log(
-    `sets: ${sets.linked} item(s) linked to the catalog, ${sets.suggested} to confirm on Actions`,
-  );
-}
-progress.update('pictures, lot sizes, chart', 0.5);
-// The quality gate first: a supporting source that disagrees with the reference is not valued.
-// Listing details some sources may keep only for a while (e.g. eBay's listing IDs).
-const pruned = await pruneSourceDetails(db);
-if (pruned) log(`listing details dropped: ${pruned} row(s)`);
-const quality = await checkSourceQuality(db);
-if (quality.length) {
-  log(`source quality changed: ${quality.join(', ')}`);
-  await clearAllBucketValues(db);
-}
-const snap = await runSnapshots(db);
-// Today's value of everything held, read by the pages instead of every sale.
-const saved = await refreshBucketValues(db);
-// The Portfolio's trade counts, saved so its page does not scan the sales on every view.
-try {
-  await refreshTradeCounts(db, INSIGHT_PERIODS);
-} catch (error) {
-  console.log(`trade counts: stopped (${errorText(error)})`);
-}
-// Buy timing numbers for everything held or watched (S9), from the values just saved. A failure
-// here (e.g. the database not migrated yet) never stops the run.
+// The closing steps run once a day on the same data: a later run that day (a retry after a
+// failure) that fetched nothing (every listing already collected today) leaves them as the
+// earlier run left them. A run that fetched anything (sales, asks, recent sales) runs them.
+const added = results.reduce((n, r) => n + r.observations, 0);
+const fetched = results.reduce((n, r) => n + r.requests, 0);
+const closedOn = await readSetting<string>(db, CLOSED_KEY);
+let snap: Awaited<ReturnType<typeof runSnapshots>> | null = null;
+let saved: Awaited<ReturnType<typeof refreshBucketValues>> | null = null;
 let signalsSaved: { saved: number; withPattern: number } | null = null;
-try {
-  signalsSaved = await refreshSignals(db);
-} catch (error) {
-  console.log(`buy timing: stopped (${errorText(error)})`);
+if (!values.refresh && fetched === 0 && closedOn === localDate()) {
+  log('closing steps: already done today and nothing fetched since, left out');
+} else {
+  // Trades whose lot size the source did not report, then the snapshots for the portfolio chart.
+  const lots = await inferLotSizes(db);
+  log(
+    `lot sizes: ${lots.checked} estimated trade(s) checked${lots.full ? ' (all)' : ''}, ${lots.updated} updated`,
+  );
+  // The sales per day that the pages and the steps below read (the days changed by this run and
+  // the lot sizes; everything once a week).
+  try {
+    const days = await refreshPriceDays(db);
+    log(`sales per day: ${days.days} row(s) rebuilt${days.full ? ' (full)' : ''}`);
+  } catch (error) {
+    log(`sales per day: stopped (${errorText(error)})`);
+  }
+  // Items without a catalog set: linked when sure, suggested on Actions when not (S9).
+  const sets = await linkSets(db);
+  if (sets.linked || sets.suggested) {
+    log(
+      `sets: ${sets.linked} item(s) linked to the catalog, ${sets.suggested} to confirm on Actions`,
+    );
+  }
+  progress.update('pictures, lot sizes, chart', 0.5);
+  // The quality gate first: a supporting source that disagrees with the reference is not valued.
+  // Listing details some sources may keep only for a while (e.g. eBay's listing IDs).
+  const pruned = await pruneSourceDetails(db);
+  if (pruned) log(`listing details dropped: ${pruned} row(s)`);
+  const quality = await checkSourceQuality(db);
+  if (quality.length) {
+    log(`source quality changed: ${quality.join(', ')}`);
+    await clearAllBucketValues(db);
+  }
+  snap = await runSnapshots(db);
+  // Today's value of everything held, read by the pages instead of every sale.
+  saved = await refreshBucketValues(db);
+  // The Portfolio's trade counts, saved so its page does not scan the sales on every view.
+  try {
+    await refreshTradeCounts(db, INSIGHT_PERIODS);
+  } catch (error) {
+    console.log(`trade counts: stopped (${errorText(error)})`);
+  }
+  // Buy timing numbers for everything held or watched (S9), from the values just saved. A failure
+  // here (e.g. the database not migrated yet) never stops the run.
+  try {
+    signalsSaved = await refreshSignals(db);
+  } catch (error) {
+    console.log(`buy timing: stopped (${errorText(error)})`);
+  }
+  await saveSetting(db, CLOSED_KEY, localDate());
 }
 progress.done();
-console.log(`snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`);
-console.log(`values: ${saved.values} saved, ${saved.removed} removed`);
+if (snap) {
+  console.log(
+    `snapshots: ${snap.days} day(s), ${snap.rows} row(s) updated, ${snap.removed} removed`,
+  );
+}
+if (saved) console.log(`values: ${saved.values} saved, ${saved.removed} removed`);
 if (signalsSaved) {
   console.log(
     `buy timing: ${signalsSaved.saved} item(s) and condition(s), ${signalsSaved.withPattern} with a new-set pattern`,
@@ -253,8 +275,8 @@ await recordActivity(db, {
     source: values.source ?? null,
     product: values.product ?? null,
     sources: results,
-    observations: results.reduce((n, r) => n + r.observations, 0),
-    values: saved.values,
+    observations: added,
+    values: saved?.values ?? null,
   },
   href: '/settings/collectors',
 });

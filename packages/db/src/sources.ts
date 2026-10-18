@@ -30,7 +30,7 @@ import {
 } from 'drizzle-orm';
 import type { Db } from './client';
 import { daysBack, refreshPriceDays, soldDays } from './price-days';
-import { loadSourceRegistry } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { clearBucketValues } from './valuation';
 import {
   type NewPriceObservation,
@@ -328,6 +328,24 @@ function trackedProduct(db: Db) {
         .where(eq(watches.productId, products.id)),
     ),
   );
+}
+
+/** Products searched on a source today (app setting per source: one day's ids). */
+const searchedKey = (source: string) => `matchSearched:${source}`;
+
+export async function searchedToday(db: Db, source: string, day: string): Promise<Set<string>> {
+  const saved = await readSetting<{ day: string; ids: string[] }>(db, searchedKey(source));
+  return new Set(saved?.day === day ? saved.ids : []);
+}
+
+/** Marks a product searched on a source today (a retry that day leaves it out). */
+export async function markSearched(
+  db: Db,
+  source: string,
+  day: string,
+  ids: Set<string>,
+): Promise<void> {
+  await saveSetting(db, searchedKey(source), { day, ids: [...ids] });
 }
 
 /** Tracked products (owned, opened or watched) without an active listing or pending candidates for this source. */

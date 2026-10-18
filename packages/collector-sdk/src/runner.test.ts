@@ -388,6 +388,21 @@ it('leaves out listings already collected today, on the home PC clock', async ()
   expect(calls).toBe(2);
 });
 
+it('searches an item with no match once a day, a retry leaving it out', async () => {
+  await box();
+  let searches = 0;
+  const collector = fakeCollector({ findCandidates: async () => (searches++, []) });
+  const today = { ...quiet, skipCollectedToday: true };
+  await runCollector(db, collector, today);
+  await runCollector(db, collector, today);
+  expect(searches).toBe(1);
+  // Asked for by hand (no skipping), and on another day.
+  await runCollector(db, collector, quiet);
+  expect(searches).toBe(2);
+  await runCollector(db, collector, { ...today, now: new Date(Date.now() + 86_400_000) });
+  expect(searches).toBe(3);
+});
+
 it('saves what is for sale now, one report per source and day', async () => {
   const { product } = await box();
   await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });

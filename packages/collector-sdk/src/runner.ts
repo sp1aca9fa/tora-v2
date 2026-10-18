@@ -11,6 +11,8 @@ import {
   loadSourceRegistry,
   productSetInfo,
   productsToMatch,
+  markSearched,
+  searchedToday,
   productsWithoutSource,
   QUERY_SOURCE_ID,
   refreshPriceDays,
@@ -171,10 +173,15 @@ export async function runCollector(
     } else if (!options.collectOnly) {
       // Items the source does not handle are left out before the cap: otherwise the oldest of
       // them (e.g. cards, for a shop of games) took every slot and newer items never got searched.
+      // Each item is searched once a day: a retry that day leaves out the ones already searched.
+      const day = localDate(now);
+      const searched = options.skipCollectedToday
+        ? await searchedToday(db, collector.source, day)
+        : new Set<string>();
       const toMatch = (
         await productsToMatch(db, collector.source, { productId: options.productId })
       )
-        .filter((p) => collector.supports(p))
+        .filter((p) => collector.supports(p) && !searched.has(p.id))
         .slice(0, MATCH_PER_RUN);
       total += toMatch.length;
       for (const product of toMatch) {
@@ -197,6 +204,8 @@ export async function runCollector(
           const n = await saveCandidates(db, product.id, collector.source, found);
           summary.candidates += n;
           log(`match "${product.name}": ${found.length} kept, ${n} new`);
+          searched.add(product.id);
+          await markSearched(db, collector.source, day, searched);
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
           fail(`match ${product.name}`, e);
