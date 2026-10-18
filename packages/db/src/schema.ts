@@ -225,7 +225,7 @@ export const productSources = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    index('product_sources_product_idx').on(t.productId),
+    index('product_sources_product_idx').on(t.productId, t.source, t.active),
     index('product_sources_source_idx').on(t.source, t.active),
     uniqueIndex('product_sources_external_uq').on(t.productId, t.source, t.externalId),
   ],
@@ -319,7 +319,7 @@ export const holdings = sqliteTable(
     check('holdings_grader_check', oneOf(t.grader, GRADERS)),
     check('holdings_status_check', oneOf(t.status, HOLDING_STATUSES)),
     index('holdings_user_idx').on(t.userId, t.status),
-    index('holdings_product_idx').on(t.productId),
+    index('holdings_product_idx').on(t.productId, t.status),
     index('holdings_parent_idx').on(t.parentHoldingId),
     index('holdings_status_idx').on(t.status),
     index('holdings_order_idx').on(t.userId, t.orderSource, t.orderId),

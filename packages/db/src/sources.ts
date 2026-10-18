@@ -310,23 +310,27 @@ export async function bucketStats(
  * Products someone owns, has opened (the box view values them "as received") or watches (S9):
  * the ones collectors match and collect.
  */
-function trackedProduct(db: Db) {
-  return or(
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(holdings)
-        .where(
-          and(eq(holdings.productId, products.id), inArray(holdings.status, ['owned', 'consumed'])),
-        ),
-    ),
-    exists(
-      db
-        .select({ one: sql`1` })
-        .from(watches)
-        .where(eq(watches.productId, products.id)),
-    ),
-  );
+async function trackedProductIds(db: Db): Promise<Set<string>> {
+  const held = await db
+    .selectDistinct({ id: holdings.productId })
+    .from(holdings)
+    .where(inArray(holdings.status, ['owned', 'consumed']));
+  const watched = await db.selectDistinct({ id: watches.productId }).from(watches);
+  return new Set([...held, ...watched].map((r) => r.id));
+}
+
+/** These products, oldest first (in chunks: an id list can be long). */
+async function productsByIds(db: Db, ids: string[], limit: number): Promise<Product[]> {
+  const out: Product[] = [];
+  for (let i = 0; i < ids.length; i += 500) {
+    out.push(
+      ...(await db
+        .select()
+        .from(products)
+        .where(inArray(products.id, ids.slice(i, i + 500)))),
+    );
+  }
+  return out.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(0, limit);
 }
 
 /** Products searched on a source today (app setting per source: one day's ids). */
@@ -353,45 +357,21 @@ export async function productsToMatch(
   source: string,
   filter: { productId?: string; limit?: number } = {},
 ): Promise<Product[]> {
-  return db
-    .select()
-    .from(products)
-    .where(
-      and(
-        filter.productId ? eq(products.id, filter.productId) : undefined,
-        trackedProduct(db),
-        not(
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(productSources)
-              .where(
-                and(
-                  eq(productSources.productId, products.id),
-                  eq(productSources.source, source),
-                  eq(productSources.active, true),
-                ),
-              ),
-          ),
-        ),
-        not(
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(sourceCandidates)
-              .where(
-                and(
-                  eq(sourceCandidates.productId, products.id),
-                  eq(sourceCandidates.source, source),
-                  eq(sourceCandidates.status, 'pending'),
-                ),
-              ),
-          ),
-        ),
-      ),
-    )
-    .orderBy(asc(products.createdAt))
-    .limit(filter.limit ?? 10_000);
+  // Set by set on indexes (not a lookup per product): tracked, minus linked or with suggestions.
+  const tracked = await trackedProductIds(db);
+  const linked = await db
+    .selectDistinct({ id: productSources.productId })
+    .from(productSources)
+    .where(and(eq(productSources.source, source), eq(productSources.active, true)));
+  const pending = await db
+    .selectDistinct({ id: sourceCandidates.productId })
+    .from(sourceCandidates)
+    .where(and(eq(sourceCandidates.source, source), eq(sourceCandidates.status, 'pending')));
+  const skip = new Set([...linked, ...pending].map((r) => r.id));
+  const ids = [...tracked].filter(
+    (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
+  );
+  return productsByIds(db, ids, filter.limit ?? 10_000);
 }
 
 export interface CandidateInput {
@@ -781,27 +761,16 @@ export async function productsWithoutSource(
   source: string,
   filter: { productId?: string; limit?: number } = {},
 ): Promise<Product[]> {
-  return db
-    .select()
-    .from(products)
-    .where(
-      and(
-        filter.productId ? eq(products.id, filter.productId) : undefined,
-        trackedProduct(db),
-        not(
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(productSources)
-              .where(
-                and(eq(productSources.productId, products.id), eq(productSources.source, source)),
-              ),
-          ),
-        ),
-      ),
-    )
-    .orderBy(asc(products.createdAt))
-    .limit(filter.limit ?? 500);
+  const tracked = await trackedProductIds(db);
+  const listed = await db
+    .selectDistinct({ id: productSources.productId })
+    .from(productSources)
+    .where(eq(productSources.source, source));
+  const skip = new Set(listed.map((r) => r.id));
+  const ids = [...tracked].filter(
+    (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
+  );
+  return productsByIds(db, ids, filter.limit ?? 500);
 }
 
 /** Starts a product's search-based source with a query (active at once). */

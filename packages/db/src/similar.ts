@@ -4,7 +4,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from './client';
 import { type CandidateInput, saveCandidates } from './sources';
-import { type Product, productSources, products } from './schema';
+import { type Product, type ProductSource, productSources, products } from './schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -78,6 +78,8 @@ export async function suggestFromKnownProducts(
   db: Db,
   productId: string,
   source?: string,
+  /** Listings per kind of item, kept between calls of one run (the same query for each). */
+  cache?: Map<string, { listing: ProductSource; product: Product }[]>,
 ): Promise<number> {
   const [product] = await db.select().from(products).where(eq(products.id, productId));
   if (!product) return 0;
@@ -92,18 +94,22 @@ export async function suggestFromKnownProducts(
       ),
     );
   if (own.length) return 0;
-  const listings = await db
-    .select({ listing: productSources, product: products })
-    .from(productSources)
-    .innerJoin(products, eq(products.id, productSources.productId))
-    .where(
-      and(
-        eq(productSources.active, true),
-        eq(products.category, product.category),
-        eq(products.kind, product.kind),
-        source ? eq(productSources.source, source) : undefined,
-      ),
-    );
+  const key = `${product.category}|${product.kind}|${source ?? ''}`;
+  const listings =
+    cache?.get(key) ??
+    (await db
+      .select({ listing: productSources, product: products })
+      .from(productSources)
+      .innerJoin(products, eq(products.id, productSources.productId))
+      .where(
+        and(
+          eq(productSources.active, true),
+          eq(products.category, product.category),
+          eq(products.kind, product.kind),
+          source ? eq(productSources.source, source) : undefined,
+        ),
+      ));
+  cache?.set(key, listings);
   const bySource = new Map<string, CandidateInput[]>();
   for (const { listing, product: other } of listings) {
     if (!listing.externalId || !looksSame(product, other)) continue;

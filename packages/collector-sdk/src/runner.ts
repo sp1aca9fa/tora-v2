@@ -178,6 +178,7 @@ export async function runCollector(
       const searched = options.skipCollectedToday
         ? await searchedToday(db, collector.source, day)
         : new Set<string>();
+      const lookAlikes = new Map();
       const toMatch = (
         await productsToMatch(db, collector.source, { productId: options.productId })
       )
@@ -189,7 +190,12 @@ export async function runCollector(
         try {
           // A linked look-alike (same card or item) is offered first, without searching the site;
           // the search runs on a later run if the user dismisses it.
-          const known = await suggestFromKnownProducts(db, product.id, collector.source);
+          const known = await suggestFromKnownProducts(
+            db,
+            product.id,
+            collector.source,
+            lookAlikes,
+          );
           if (known > 0) {
             summary.candidates += known;
             log(`match "${product.name}": ${known} suggested from a linked look-alike`);
