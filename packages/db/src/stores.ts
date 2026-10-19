@@ -1,6 +1,7 @@
 // Store notices data (requirements S25): stores from store directory plug-ins, posts pushed by
 // feeds, and the notices they make for the people whose area holds the store.
 import {
+  type CodeMeaning,
   DEFAULT_FEED_PREFS,
   PLACE,
   type StoreEntry,
@@ -10,10 +11,11 @@ import {
   toLocalIso,
   withinHours,
 } from '@tora/core';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { type AlertContext, appUrl, sendToUser, textsFor } from './alerts';
 import type { Db } from './client';
+import { readSetting, saveSetting } from './registry';
 import {
   type BoardState,
   type Store,
@@ -66,6 +68,7 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
     )
       continue;
     written++;
+    forgetStores();
     await db
       .insert(stores)
       .values({ source, sourceKey: key, ...values })
@@ -81,11 +84,29 @@ export async function listStores(db: Pick<Db, 'select'>): Promise<Store[]> {
   return db.select().from(stores).orderBy(stores.chain, stores.region, stores.name);
 }
 
+/**
+ * The stores, kept a few minutes in memory: a feed pushes every minute or so and the list rarely
+ * changes (a hosted database bills every row read). Changes made here clear it.
+ */
+const STORES_CACHE_MS = 5 * 60_000;
+let storesCache = new WeakMap<object, { at: number; list: Store[] }>();
+const forgetStores = () => {
+  storesCache = new WeakMap();
+};
+async function cachedStores(db: Pick<Db, 'select'>, now = Date.now()): Promise<Store[]> {
+  const had = storesCache.get(db);
+  if (had && now - had.at <= STORES_CACHE_MS) return had.list;
+  const list = await listStores(db);
+  storesCache.set(db, { at: now, list });
+  return list;
+}
+
 /** The codes a store is known by: its plug-in's and the admin's. */
 export const storeCodes = (s: Store) => [...s.codes, ...(s.extraCodes ?? [])];
 
 /** Codes the admin adds to a store (posters' nicknames the plug-in does not know). */
 export async function setStoreCodes(db: Db, storeId: string, codes: string[]) {
+  forgetStores();
   const clean = [...new Set(codes.map((c) => c.normalize('NFKC').trim()).filter(Boolean))];
   await db
     .update(stores)
@@ -159,9 +180,9 @@ export interface PushedPost {
 }
 
 export interface Push {
-  /** The feed's key ("gamenv"). */
+  /** The feed's key ("myboard"). */
   source: string;
-  /** The board (page) read, when the feed reads several ("biccamera"). */
+  /** The board (page) read, when the feed reads several ("store-a"). */
   board?: string | null;
   /** All the boards the feed watches, in turn (told to the person when it changes). */
   watching?: string[] | null;
@@ -269,20 +290,23 @@ export async function receivePush(
       ? { source: push.source, boards: watching }
       : null;
   if (!read) return { fresh: [], first: false, resumed, gap: null, boardBack, connected };
+  // Whether the feed, and this board's chain, sent posts before: one row read each, not a count.
   const [known] = await db
-    .select({ n: sql<number>`count(*)` })
+    .select({ one: sql<number>`1` })
     .from(storePosts)
-    .where(eq(storePosts.source, push.source));
+    .where(eq(storePosts.source, push.source))
+    .limit(1);
   const [seenChain] = await db
-    .select({ n: sql<number>`count(*)` })
+    .select({ one: sql<number>`1` })
     .from(storePosts)
     .where(
       and(
         eq(storePosts.source, push.source),
         push.chain ? eq(storePosts.chain, push.chain) : isNull(storePosts.chain),
       ),
-    );
-  const all = await listStores(db);
+    )
+    .limit(1);
+  const all = await cachedStores(db);
   const listed = all.map((s) => ({ ...s, codes: storeCodes(s) }));
   const fresh: StorePost[] = [];
   for (const p of push.posts) {
@@ -308,10 +332,10 @@ export async function receivePush(
   // A page shows a fixed number of posts (one may be pinned): all of them new means the page
   // turned over completely since the last visit.
   const gap =
-    seenChain?.n && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
+    seenChain && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
       ? { chain: push.chain ?? null, posts: fresh.length }
       : null;
-  return { fresh, first: !known?.n, resumed, gap, boardBack, connected };
+  return { fresh, first: !known, resumed, gap, boardBack, connected };
 }
 
 const fill = (text: string, params: Record<string, string | number>) =>
@@ -430,12 +454,32 @@ export async function forgetBoard(db: Db, userId: string, key: string) {
   await db.update(feedTokens).set({ boards: rest }).where(eq(feedTokens.userId, userId));
 }
 
+/** Posts are kept this long (the page shows the latest; a post seen again later is new). */
+const KEEP_POSTS_DAYS = 30;
+const PRUNE_EVERY_MS = 60 * 60_000;
+let prunedAt = 0;
+
+/** Drops posts older than a month. */
+export async function pruneStorePosts(db: Db, now = new Date()): Promise<number> {
+  const gone = await db
+    .delete(storePosts)
+    .where(
+      lt(storePosts.postedAt, toLocalIso(new Date(now.getTime() - KEEP_POSTS_DAYS * 86_400_000))),
+    )
+    .returning({ id: storePosts.id });
+  return gone.length;
+}
+
 export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): Promise<number> {
   const rows = await db
     .select({ token: feedTokens, user: users })
     .from(feedTokens)
     .innerJoin(users, eq(users.id, feedTokens.userId))
     .where(and(isNull(users.disabledAt), isNull(feedTokens.silenceAlertedAt)));
+  if (now.getTime() - prunedAt > PRUNE_EVERY_MS) {
+    prunedAt = now.getTime();
+    await pruneStorePosts(db, now);
+  }
   const time = toLocalIso(now).slice(11, 16);
   let told = 0;
   for (const { token, user } of rows) {
@@ -453,7 +497,7 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
     const base = await appUrl(db);
     const text = fill(
       t.feedSilent ??
-        'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the browser tab.',
+        'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
       {
         source: token.lastSource ?? '-',
         since: token.lastSeenAt.slice(0, 16).replace('T', ' '),
@@ -485,7 +529,7 @@ export async function sendStoreNotices(
   const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
   const posts = received.fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
   if (!posts.length) return 0;
-  const all = await listStores(db);
+  const all = await cachedStores(db);
   const byId = new Map(all.map((s) => [s.id, s]));
   const people = (await db.select().from(users).where(isNull(users.disabledAt))).filter(
     (u) => u.preferences?.storeArea,
@@ -543,6 +587,7 @@ export const ADMIN_STORES = 'admin';
 
 /** A store or place an admin adds by hand (chain `place` for a place). */
 export async function addStore(db: Db, entry: StoreEntry): Promise<Store> {
+  forgetStores();
   const [row] = await db
     .insert(stores)
     .values({
@@ -562,9 +607,54 @@ export async function addStore(db: Db, entry: StoreEntry): Promise<Store> {
 
 /** Removes a store an admin added (plug-in stores come back with their plug-in). */
 export async function removeStore(db: Db, storeId: string): Promise<boolean> {
+  forgetStores();
   const gone = await db
     .delete(stores)
     .where(and(eq(stores.id, storeId), eq(stores.source, ADMIN_STORES)))
     .returning({ id: stores.id });
   return gone.length > 0;
+}
+
+// ---- Codes that are no store ----
+
+/** Each store list plug-in's other codes (by its key), and the ones admins add. */
+const GLOSSARY_KEY = 'storeGlossary';
+const ADMIN_GLOSSARY_KEY = 'storeGlossaryAdmin';
+
+/** Saves a store list plug-in's other codes (only when they changed: it runs with every collect). */
+export async function saveGlossary(db: Db, key: string, entries: CodeMeaning[]): Promise<void> {
+  const all = (await readSetting<Record<string, CodeMeaning[]>>(db, GLOSSARY_KEY)) ?? {};
+  if (JSON.stringify(all[key] ?? []) === JSON.stringify(entries)) return;
+  await saveSetting(db, GLOSSARY_KEY, { ...all, [key]: entries });
+}
+
+/** The other codes: the plug-ins' and the admins' (marked by hand). */
+export async function storeGlossary(
+  db: Pick<Db, 'select'>,
+): Promise<(CodeMeaning & { byHand: boolean })[]> {
+  const [lists, own] = await Promise.all([
+    readSetting<Record<string, CodeMeaning[]>>(db, GLOSSARY_KEY),
+    readSetting<CodeMeaning[]>(db, ADMIN_GLOSSARY_KEY),
+  ]);
+  return [
+    ...Object.values(lists ?? {})
+      .flat()
+      .map((e) => ({ ...e, byHand: false })),
+    ...(own ?? []).map((e) => ({ ...e, byHand: true })),
+  ];
+}
+
+/** An other code an admin adds (a code given again replaces its meaning). */
+export async function addGlossary(db: Db, entry: CodeMeaning): Promise<void> {
+  const own = (await readSetting<CodeMeaning[]>(db, ADMIN_GLOSSARY_KEY)) ?? [];
+  await saveSetting(db, ADMIN_GLOSSARY_KEY, [...own.filter((e) => e.code !== entry.code), entry]);
+}
+
+export async function removeGlossary(db: Db, code: string): Promise<void> {
+  const own = (await readSetting<CodeMeaning[]>(db, ADMIN_GLOSSARY_KEY)) ?? [];
+  await saveSetting(
+    db,
+    ADMIN_GLOSSARY_KEY,
+    own.filter((e) => e.code !== code),
+  );
 }

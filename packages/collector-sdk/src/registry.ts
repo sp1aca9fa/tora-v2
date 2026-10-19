@@ -1,5 +1,5 @@
 import type { SourceInfo } from '@tora/core';
-import { type Db, saveRateSources, saveSourceInfos, saveStores } from '@tora/db';
+import { type Db, saveGlossary, saveRateSources, saveSourceInfos, saveStores } from '@tora/db';
 import { findRepoRoot } from '@tora/db/env';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -68,7 +68,9 @@ export async function loadAndRegister(db: Db, root?: string): Promise<LoadedColl
     db,
     loaded.rates.map(({ key, label, currencies }) => ({ key, label, currencies })),
   );
-  for (const directory of loaded.stores)
+  for (const directory of loaded.stores) {
     await saveStores(db, directory.key, await directory.stores());
+    await saveGlossary(db, directory.key, directory.glossary ?? []);
+  }
   return loaded;
 }

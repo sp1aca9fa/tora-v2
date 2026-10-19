@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeArea,
+  codeIndex,
   distanceKm,
   roundPoint,
   storesInArea,
@@ -92,10 +93,10 @@ describe('store notices: posts', () => {
   });
 
   it('matches emoji codes with or without their variation mark', () => {
-    const kawasaki = { chain: 'yodobashi', name: '川崎', codes: ['\u{1F3CD}\uFE0F'] };
-    expect(storesInPost('\u{1F3CD} 開始', [kawasaki], 'yodobashi')).toEqual([kawasaki]);
+    const sunny = { chain: 'yodobashi', name: 'テスト店', codes: ['\u2600\uFE0F'] };
+    expect(storesInPost('\u2600 開始', [sunny], 'yodobashi')).toEqual([sunny]);
     expect(
-      storesInPost('\u{1F3CD}\uFE0F 開始', [{ ...kawasaki, codes: ['\u{1F3CD}'] }], 'yodobashi'),
+      storesInPost('\u2600\uFE0F 開始', [{ ...sunny, codes: ['\u2600'] }], 'yodobashi'),
     ).toHaveLength(1);
   });
 
@@ -115,13 +116,19 @@ it('tells hours apart, also past midnight', () => {
 });
 
 it("names a place when no store of the board's chain matched", () => {
-  const ikebukuro = { chain: PLACE, name: '池袋', codes: ['🦉'], lat: 35.73, lon: 139.71 };
+  const ikebukuro = { chain: PLACE, name: '池袋', codes: ['⭐'], lat: 35.73, lon: 139.71 };
   const kiba = { chain: PLACE, name: '木場', codes: [], lat: 35.67, lon: 139.81 };
   const list = [...all, ikebukuro, kiba];
   expect(storesInPost('イトヨ木場 カードセット', list)).toEqual([kiba]);
-  // On a board mixing chains, 🦉 is the area, not a chain's store.
-  expect(storesInPost('🦉🦒🍐', [...list, { ...umeda, codes: ['🦉'] }])).toEqual([ikebukuro]);
-  expect(storesInPost('🦉📕 30th', list, 'biccamera')).toEqual([ikebukuro]);
+  // On a board mixing chains, ⭐ is the area, not a chain's store.
+  expect(storesInPost('⭐🎈 販売', [...list, { ...umeda, codes: ['⭐'] }])).toEqual([ikebukuro]);
+  expect(storesInPost('⭐🎈 30th', list, 'biccamera')).toEqual([ikebukuro]);
   // The board's own store wins over the place.
   expect(storesInPost('アキバ 30th', list, 'yodobashi')).toEqual([akiba]);
+});
+
+it('lists the codes that are more than the name, with what they stand for', () => {
+  const index = codeIndex(all);
+  expect(index.map((e) => e.code)).toEqual(['AKB', 'UMD', 'アキバ']);
+  expect(index.find((e) => e.code === 'UMD')!.stores).toEqual([umeda]);
 });

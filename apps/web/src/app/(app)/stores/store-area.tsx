@@ -22,9 +22,11 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
+  addGlossaryAction,
   addStoreAction,
   forgetBoardAction,
   newFeedTokenAction,
+  removeGlossaryAction,
   removeStoreAction,
   saveStoreAreaAction,
   saveStoreFeedAction,
@@ -642,6 +644,64 @@ export function ForgetBoard({ board }: { board: string }) {
       onClick={() => startTransition(() => forgetBoardAction(board))}
     >
       {t('forget')}
+    </button>
+  );
+}
+
+/** Adds a code that is no store or place (admins). */
+export function AddGlossary() {
+  const t = useTranslations('stores');
+  const [code, setCode] = useState('');
+  const [meaning, setMeaning] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        startTransition(async () => {
+          const r = await addGlossaryAction(code, meaning);
+          setError(r.error ? t(`addError.${r.error}`) : null);
+          if (!r.error) {
+            setCode('');
+            setMeaning('');
+          }
+        });
+      }}
+    >
+      <Input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        placeholder={t('code')}
+        className="h-8 w-24"
+      />
+      <Input
+        value={meaning}
+        onChange={(e) => setMeaning(e.target.value)}
+        placeholder={t('meaning')}
+        className="h-8 min-w-48 flex-1"
+      />
+      <Button type="submit" size="sm" disabled={pending}>
+        {t('add')}
+      </Button>
+      {error && <p className="w-full text-xs text-destructive">{error}</p>}
+    </form>
+  );
+}
+
+/** Removes a code an admin added. */
+export function RemoveGlossary({ code }: { code: string }) {
+  const t = useTranslations('stores');
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      className="text-xs text-muted-foreground underline"
+      disabled={pending}
+      onClick={() => startTransition(() => removeGlossaryAction(code))}
+    >
+      {t('remove')}
     </button>
   );
 }

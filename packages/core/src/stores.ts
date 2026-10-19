@@ -81,7 +81,7 @@ export function storesInArea(
   return new Set([...ids, ...(area.added ?? [])].filter((id) => !muted.has(id)));
 }
 
-/** Width, case and emoji variation marks aside (🏍️ and 🏍 alike). */
+/** Width, case and emoji variation marks aside (an emoji with or without U+FE0F alike). */
 const norm = (s: string) =>
   s
     .normalize('NFKC')
@@ -99,7 +99,7 @@ function mentions(text: string, code: string): boolean {
 }
 
 /**
- * The chain of places: an area's name or code with its location ("池袋", "🦉"), matched on every
+ * The chain of places: an area's name or code with its location ("池袋", "⭐"), matched on every
  * board. Posters often name the area, not the store (one emoji per area, whatever the chain), and
  * some boards mix dozens of chains no store list covers.
  */
@@ -153,4 +153,30 @@ export const DEFAULT_FEED_PREFS = { silentMinutes: 10, from: '08:00', to: '23:00
 /** Whether a local time ("21:30") is within hours that may pass midnight ("22:00"-"02:00"). */
 export function withinHours(time: string, from: string, to: string): boolean {
   return from <= to ? time >= from && time < to : time >= from || time < to;
+}
+
+/** A code posters use that is no store or place: a state, a chain's mark, a product. */
+export interface CodeMeaning {
+  code: string;
+  meaning: string;
+}
+
+/**
+ * The codes of the stores and places, each with what it stands for: the ones that are not just
+ * the name or part of it ("UMD" for "マルチメディア梅田", not "梅田"), most used first.
+ */
+export function codeIndex<T extends Pick<StoreEntry, 'name' | 'codes'>>(
+  stores: T[],
+): { code: string; stores: T[] }[] {
+  const by = new Map<string, T[]>();
+  for (const s of stores) {
+    const name = norm(s.name);
+    for (const code of s.codes) {
+      if (!code.trim() || name.includes(norm(code))) continue;
+      by.set(code, [...(by.get(code) ?? []), s]);
+    }
+  }
+  return [...by]
+    .map(([code, list]) => ({ code, stores: list }))
+    .sort((a, b) => b.stores.length - a.stores.length || a.code.localeCompare(b.code));
 }

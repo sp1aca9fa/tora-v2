@@ -6,19 +6,25 @@ import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import {
+  addGlossary,
   addStore,
   checkFeeds,
   feedStatus,
   feedTokenUser,
   listStores,
   newFeedToken,
+  pruneStorePosts,
   readPush,
   receivePush,
+  recentPosts,
+  removeGlossary,
   removeStore,
+  saveGlossary,
   saveStores,
   sendFeedMessages,
   sendStoreNotices,
   setStoreCodes,
+  storeGlossary,
 } from './stores';
 import { createUser, setPreferences } from './users';
 
@@ -234,4 +240,28 @@ it('says when the feed connects, with the boards it tracks, and when the list ch
   expect(sent.at(-1)).toContain('yodobashi, biccamera');
   expect((await push(['yodobashi', 'biccamera'], 1)).connected).toBeNull();
   expect((await push(['yodobashi'], 2)).connected?.boards).toEqual(['yodobashi']);
+});
+
+it("keeps the plug-ins' other codes and the admins' apart", async () => {
+  await saveGlossary(db, 'test', [{ code: '🍐', meaning: 'none' }]);
+  await addGlossary(db, { code: '🎈', meaning: 'a product' });
+  await addGlossary(db, { code: '🎈', meaning: 'another product' });
+  expect(await storeGlossary(db)).toEqual([
+    { code: '🍐', meaning: 'none', byHand: false },
+    { code: '🎈', meaning: 'another product', byHand: true },
+  ]);
+  await removeGlossary(db, '🎈');
+  expect((await storeGlossary(db)).map((e) => e.code)).toEqual(['🍐']);
+});
+
+it('drops posts older than a month', async () => {
+  await newFeedToken(db, uid);
+  await receivePush(
+    db,
+    uid,
+    { source: 'gamenv', posts: [post('old', 'x', 40 * 24 * 60), post('new', 'y')] },
+    now,
+  );
+  expect(await pruneStorePosts(db, now)).toBe(1);
+  expect((await recentPosts(db)).map((p) => p.externalId)).toEqual(['new']);
 });

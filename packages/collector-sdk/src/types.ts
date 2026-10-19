@@ -1,4 +1,4 @@
-import type { SourceInfo } from '@tora/core';
+import type { CodeMeaning, SourceInfo } from '@tora/core';
 import type {
   CandidateInput,
   FoundSetCard,
@@ -268,6 +268,8 @@ export interface StoreDirectory {
   key: string;
   label: string;
   stores(): ListedStore[] | Promise<ListedStore[]>;
+  /** Codes posters use that are no store or place (states, chain marks, products). */
+  glossary?: CodeMeaning[];
 }
 
 export interface CollectorModule {

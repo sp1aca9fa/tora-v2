@@ -1395,7 +1395,7 @@
     "summaryDrops": "Sharp drops (15% or more in a week):",
     "summaryDrop": "{name}: {price}, {pct} in 7 days",
     "storePosts": "Tora: cards on sale in your area",
-    "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the browser tab.",
+    "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).",
     "feedBack": "Tora: the store feed is sending again.",
     "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",
     "storeUnknown": "Tora: posts naming no store or place Tora knows (add the code on the Stores page):",
@@ -1864,7 +1864,7 @@
     "placeOption": "A place (area)",
     "newChain": "Another chain...",
     "name": "Name",
-    "region": "Prefecture",
+    "region": "Region",
     "location": "Location",
     "locationHelp": "Right-click the spot in Google Maps and click the numbers to copy them, then paste here; or use where you are.",
     "codesHelp": "what posters write, separated by commas",
@@ -1875,13 +1875,14 @@
       "admin": "Admins only.",
       "chain": "Chain key: lower-case letters, digits, - or _.",
       "name": "Give it a name.",
-      "location": "Location: two numbers, latitude and longitude."
+      "location": "Location: two numbers, latitude and longitude.",
+      "glossary": "A code and its meaning (code up to 20 characters)."
     },
     "places": "Places (areas)",
     "allChains": "All {n}",
     "onlyOn": "Notified ({n})",
     "showAll": "All",
-    "allRegions": "All prefectures",
+    "allRegions": "All regions",
     "showing": "{n} of {total} shown",
     "board": "Board",
     "lastVisit": "Last visit",
@@ -1889,6 +1890,13 @@
     "ago": "{minutes} min ago",
     "postsRead": "{n} posts",
     "never": "never",
-    "forget": "Forget"
+    "forget": "Forget",
+    "codesTitle": "Codes",
+    "codesInfo": "What the codes posters use stand for, from the store lists (codes that are just the name left out).",
+    "otherCodes": "Other codes (no store or place)",
+    "noOtherCodes": "None yet.",
+    "code": "Code",
+    "meaning": "Meaning",
+    "areaOf": "{name} (area)"
   }
 }

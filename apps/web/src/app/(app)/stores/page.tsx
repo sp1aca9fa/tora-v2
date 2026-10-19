@@ -1,5 +1,13 @@
-import { PLACE, localDate, storesInArea } from '@tora/core';
-import { ADMIN_STORES, channelsOf, feedStatus, listStores, recentPosts } from '@tora/db';
+import { PLACE, codeIndex, localDate, storesInArea } from '@tora/core';
+import {
+  ADMIN_STORES,
+  channelsOf,
+  feedStatus,
+  listStores,
+  recentPosts,
+  storeCodes,
+  storeGlossary,
+} from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -7,10 +15,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
 import {
+  AddGlossary,
   AddStoreForm,
   FeedAlerts,
   FeedToken,
   ForgetBoard,
+  RemoveGlossary,
   type StoreView,
   StoreAreaForm,
 } from './store-area';
@@ -29,13 +39,19 @@ const minutesSince = (at: string) => Math.round((Date.now() - Date.parse(at)) / 
  */
 export default async function StoresPage() {
   const { db, user } = await authed();
-  const [t, all, feed, posts, channels] = await Promise.all([
+  const [t, all, feed, posts, channels, glossary] = await Promise.all([
     getTranslations('stores'),
     listStores(db),
     feedStatus(db, user.id),
     recentPosts(db, 60),
     channelsOf(db, user.id),
+    storeGlossary(db),
   ]);
+  const codes = codeIndex(all.map((s) => ({ ...s, codes: storeCodes(s) })));
+  const label = (s: (typeof all)[number]) =>
+    s.chain === PLACE
+      ? t('areaOf', { name: s.name })
+      : [s.chainLabel, s.name].filter(Boolean).join(' ');
   const area = user.preferences?.storeArea ?? null;
   const today = localDate();
   const inArea = storesInArea(area, all, today);
@@ -204,6 +220,50 @@ export default async function StoresPage() {
                   })}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('codesTitle')}</CardTitle>
+              <CardDescription>{t('codesInfo')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {codes.map((c) => (
+                      <tr key={c.code} className="border-t align-top">
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{c.code}</td>
+                        <td className="py-1.5 text-xs text-muted-foreground">
+                          {c.stores.map(label).join(', ')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium">{t('otherCodes')}</h3>
+                {glossary.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{t('noOtherCodes')}</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <tbody>
+                      {glossary.map((g) => (
+                        <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
+                          <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                          <td className="py-1.5 text-xs text-muted-foreground">{g.meaning}</td>
+                          <td className="py-1.5 text-right">
+                            {user.role === 'admin' && g.byHand && <RemoveGlossary code={g.code} />}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+                {user.role === 'admin' && <AddGlossary />}
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -10,9 +10,11 @@ import {
   roundPoint,
 } from '@tora/core';
 import {
+  addGlossary,
   addStore,
   forgetBoard,
   newFeedToken,
+  removeGlossary,
   removeStore,
   setPreferences,
   setStoreCodes,
@@ -148,5 +150,27 @@ export async function removeStoreAction(storeId: string) {
 export async function forgetBoardAction(key: string) {
   const { db, user } = await authed();
   await forgetBoard(db, user.id, String(key));
+  revalidatePath('/stores');
+}
+
+/** A code that is no store or place, with its meaning (admins). */
+export async function addGlossaryAction(
+  code: string,
+  meaning: string,
+): Promise<{ error?: string }> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return { error: 'admin' };
+  const c = code.normalize('NFKC').trim();
+  const m = meaning.trim();
+  if (!c || !m || c.length > 20 || m.length > 200) return { error: 'glossary' };
+  await addGlossary(db, { code: c, meaning: m });
+  revalidatePath('/stores');
+  return {};
+}
+
+export async function removeGlossaryAction(code: string) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  await removeGlossary(db, String(code));
   revalidatePath('/stores');
 }

@@ -33,6 +33,10 @@ export const stores: StoreDirectory[] = [
 ];
 ```
 
+A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
+"none", a chain's mark, a product), each with its meaning. The Stores page shows every code with
+what it stands for, and admins can add other codes there.
+
 The lists are saved each time the home PC runs a collect or an import (only what changed is
 written). Coordinates are needed for "distance from where I am"; without them a store can still
 be picked by hand. Admins can add codes the list does not know on the Stores page.
@@ -92,6 +96,53 @@ The answer says how many posts were new, matched a store, and how many people we
 
 Notices: only for posts of the last 30 minutes, at most one per store every 30 minutes for each
 person, and none for a feed's very first push (it usually brings a page of old posts).
+
+### A browser feed (userscript) skeleton
+
+For a page that only a real browser can read (a bot check, a login), a userscript (Tampermonkey,
+Violentmonkey) in your own browser can be the feed while the page is open. The reading of the page
+is yours to write; the rest looks like this:
+
+```js
+// ==UserScript==
+// @name     My board feed for Tora
+// @match    https://example.com/board/*
+// @grant    GM_xmlhttpRequest
+// @grant    GM_getValue
+// @connect  *
+// ==/UserScript==
+
+const TORA = GM_getValue('url', 'http://localhost:3000'); // set both once (GM_setValue)
+const TOKEN = GM_getValue('token', '');
+
+/** Yours: the posts on the page, newest first. */
+function readPosts() {
+  return [...document.querySelectorAll('.post')].map((el) => ({
+    id: el.dataset.id,
+    text: el.querySelector('.text').innerText,
+    author: el.querySelector('.author')?.innerText ?? null,
+    postedAt: null, // an ISO time when the page shows one
+    url: location.href,
+  }));
+}
+
+GM_xmlhttpRequest({
+  method: 'POST',
+  url: `${TORA}/api/feed/posts`,
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+  data: JSON.stringify({
+    source: 'myboard',
+    board: 'main',
+    watching: ['main'],
+    posts: readPosts(),
+  }),
+});
+// Read again in a while, at a person's pace (a page every minute or two).
+setTimeout(() => location.reload(), 90_000);
+```
+
+Even when the page shows no post, push (an empty list is the heartbeat), so a page that stops
+giving posts is noticed.
 
 ## No silent failures
 

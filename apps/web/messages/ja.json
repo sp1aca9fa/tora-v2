@@ -1395,7 +1395,7 @@
     "summaryDrops": "急落（1週間で15%以上）:",
     "summaryDrop": "{name}: {price}、7日間で{pct}",
     "storePosts": "Tora:エリア内の店舗で販売情報",
-    "feedSilent": "Tora:店舗フィード({source})が{since}から受信なし({minutes}分):再開するまで店舗通知は届きません。ブラウザのタブを確認してください。",
+    "feedSilent": "Tora:店舗フィード({source})が{since}から受信なし({minutes}分):再開するまで店舗通知は届きません。フィード(ユーザースクリプトならブラウザのタブ)を確認してください。",
     "feedBack": "Tora:店舗フィードが再開しました。",
     "feedGap": "Tora:{chain}掲示板で一度に{posts}件の新着:取りこぼした投稿があるかもしれません。",
     "storeUnknown": "Tora:Toraが知らない店舗・場所の投稿(店舗ページでコードを追加してください):",
@@ -1864,7 +1864,7 @@
     "placeOption": "場所(エリア)",
     "newChain": "他のチェーン...",
     "name": "名前",
-    "region": "都道府県",
+    "region": "地域",
     "location": "位置",
     "locationHelp": "Googleマップで地点を右クリックし、数字をクリックしてコピーして貼り付け。または現在地を使用。",
     "codesHelp": "投稿で使われる書き方(カンマ区切り)",
@@ -1875,13 +1875,14 @@
       "admin": "管理者のみ。",
       "chain": "チェーンのキー:小文字の英字・数字・-・_。",
       "name": "名前を入力してください。",
-      "location": "位置:緯度と経度の2つの数字。"
+      "location": "位置:緯度と経度の2つの数字。",
+      "glossary": "コードと意味を入力(コードは20文字まで)。"
     },
     "places": "場所(エリア)",
     "allChains": "すべて {n}",
     "onlyOn": "通知あり({n})",
     "showAll": "すべて",
-    "allRegions": "すべての都道府県",
+    "allRegions": "すべての地域",
     "showing": "{total}件中{n}件を表示",
     "board": "掲示板",
     "lastVisit": "最終訪問",
@@ -1889,6 +1890,13 @@
     "ago": "{minutes}分前",
     "postsRead": "{n}件",
     "never": "なし",
-    "forget": "削除"
+    "forget": "削除",
+    "codesTitle": "コード",
+    "codesInfo": "投稿で使われるコードの意味(店舗リストより。名前そのものは除く)。",
+    "otherCodes": "その他のコード(店舗・場所以外)",
+    "noOtherCodes": "まだありません。",
+    "code": "コード",
+    "meaning": "意味",
+    "areaOf": "{name}(エリア)"
   }
 }
