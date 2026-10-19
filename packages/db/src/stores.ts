@@ -204,6 +204,8 @@ export interface Push {
   seen?: number | null;
   /** The feed saw a whole page of new posts at once (posts may have been missed). */
   gap?: boolean | null;
+  /** The feed (re)started: a new tab or browser session, or a new version (told "connected"). */
+  hello?: boolean | null;
   /** The board's chain ("yodobashi"), when the whole push is one chain's. */
   chain?: string | null;
   posts: PushedPost[];
@@ -240,6 +242,7 @@ export function readPush(body: unknown): Push | string {
     offered: keys(b.offered),
     seen: typeof b.seen === 'number' && b.seen >= 0 ? Math.round(b.seen) : null,
     gap: typeof b.gap === 'boolean' ? b.gap : null,
+    hello: b.hello === true ? true : null,
     chain: typeof b.chain === 'string' ? b.chain : null,
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
@@ -319,6 +322,7 @@ export async function receivePush(
   const connected =
     !token?.lastSeenAt ||
     resumed ||
+    push.hello ||
     (push.watching && push.watching.join() !== token?.watching?.join())
       ? { source: push.source, boards: watching }
       : null;

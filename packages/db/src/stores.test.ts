@@ -116,6 +116,7 @@ it('checks what a feed pushes', () => {
     offered: null,
     seen: null,
     gap: null,
+    hello: null,
     chain: 'yodobashi',
     posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
   });
@@ -244,6 +245,14 @@ it('says when the feed connects, with the boards it tracks, and when the list ch
   expect(sent.at(-1)).toContain('yodobashi, biccamera');
   expect((await push(['yodobashi', 'biccamera'], 1)).connected).toBeNull();
   expect((await push(['yodobashi'], 2)).connected?.boards).toEqual(['yodobashi']);
+  // The feed (re)started (a new tab, a new version): told again, same boards.
+  const hello = await receivePush(
+    db,
+    uid,
+    { source: 'gamenv', board: 'yodobashi', watching: ['yodobashi'], hello: true, posts: [] },
+    new Date(now.getTime() + 3 * 60_000),
+  );
+  expect(hello.connected?.boards).toEqual(['yodobashi']);
 });
 
 it("keeps the plug-ins' other codes and the admins' apart", async () => {
