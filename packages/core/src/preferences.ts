@@ -1,5 +1,6 @@
 // Per-user display preferences (requirements S8).
 import type { StrategyChoice } from './signals';
+import type { StoreArea } from './stores';
 
 /** Panels of the Portfolio Summary's rotating card, in their default order. */
 export const SUMMARY_PANELS = [
@@ -38,6 +39,8 @@ export interface UserPreferences {
     /** When the person chose (the Watchlist asks until then). */
     chosenAt?: string;
   };
+  /** The stores watched for store notices (S25). */
+  storeArea?: StoreArea;
 }
 
 /** What a person is sent (S17); each kind on unless switched off. */

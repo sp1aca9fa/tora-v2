@@ -9,7 +9,8 @@
     "add": "登録",
     "settings": "設定",
     "imports": "インポート",
-    "watchlist": "ウォッチ"
+    "watchlist": "ウォッチ",
+    "stores": "店舗"
   },
   "common": {
     "save": "保存",
@@ -1392,7 +1393,8 @@
     "buyLimited": "データ不足。",
     "buyTarget": "{name}: {source}に{price}の出品、目標 {target}以下です。",
     "summaryDrops": "急落（1週間で15%以上）:",
-    "summaryDrop": "{name}: {price}、7日間で{pct}"
+    "summaryDrop": "{name}: {price}、7日間で{pct}",
+    "storePosts": "Tora:エリア内の店舗で販売情報"
   },
   "alerts": {
     "title": "アラート",
@@ -1792,6 +1794,48 @@
       "code": "カード名にあるセットコードを入力してください(例:SV2a)。",
       "packs": "1BOXのパック数:1から100の整数。",
       "tiers": "各レアリティに英字(SAR、ARなど)と1BOXに入る数(3、0.2、1/6)が必要です。"
+    }
+  },
+  "stores": {
+    "title": "店舗",
+    "intro": "近くの店舗でカードが販売されたという投稿があると通知します。エリア(選んだ店舗、または現在地からの距離)を決め、店舗ごとにオン・オフ、遠出のときは旅行モードに切り替えられます。",
+    "area": "エリア",
+    "homeOn": "自宅エリアを使用中。",
+    "travelOn": "旅行モード({until}まで)。",
+    "withinKm": "{km}km以内の店舗。",
+    "home": "自宅",
+    "travel": "旅行",
+    "startTravel": "旅行モード",
+    "until": "終了日",
+    "endTravel": "旅行モードを終了",
+    "mode": "エリアの決め方",
+    "modeStores": "店舗を選ぶ",
+    "modeDistance": "現在地からの距離",
+    "distance": "距離",
+    "km": "{km}km",
+    "locate": "現在地を使う",
+    "pointInfo": "保存するのはおおよその地点(約100m)だけで、住所は保存しません。移動したらもう一度押してください。",
+    "filter": "店舗・チェーン・地域・コードで探す",
+    "noStores": "店舗はまだありません:次の収集で店舗リストのプラグインが登録します。",
+    "noticesFor": "{store}の通知",
+    "codes": "コード",
+    "extraCodes": "投稿で使われる他のコード(カンマ区切り)",
+    "feed": "フィード",
+    "feedNever": "フィードからまだ何も届いていません。",
+    "feedAlive": "動作中:最終受信 {minutes}分前({source})。",
+    "feedStopped": "{minutes}分間受信なし({source}):フィードが止まっている間は通知されません。",
+    "tokenNew": "フィード用トークンを作成",
+    "tokenRenew": "新しいフィード用トークンを作成",
+    "tokenOnce": "今コピーしてください:表示は一度だけです。古いトークンは使えなくなります。",
+    "feedHelp": "フィード(例:掲示板ページを開いた自分のブラウザのユーザースクリプト)がこのトークンで新しい投稿を送ります。docs/store-feeds.md を参照。",
+    "posts": "最新の投稿",
+    "postsInfo": "エリア内の店舗の投稿が先頭。",
+    "noPosts": "投稿はまだありません。",
+    "unknownStore": "店舗不明",
+    "error": {
+      "area": "エリアを保存できませんでした。",
+      "travel": "旅行モードにはエリアと終了日が必要です。",
+      "noLocation": "ブラウザが現在地を返しませんでした(ブラウザの設定で許可してください)。"
     }
   }
 }

@@ -1,0 +1,133 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { beforeEach, expect, it } from 'vitest';
+import { type AlertContext, addDiscordChannel } from './alerts';
+import { type Db, createDb } from './client';
+import { migrateDb } from './migrate';
+import {
+  feedStatus,
+  feedTokenUser,
+  listStores,
+  newFeedToken,
+  readPush,
+  receivePush,
+  saveStores,
+  sendStoreNotices,
+  setStoreCodes,
+} from './stores';
+import { createUser, setPreferences } from './users';
+
+const SECRET = 'x'.repeat(32);
+const HOOK = 'https://discord.com/api/webhooks/1/abc';
+let db: Db;
+let uid: string;
+let sent: string[];
+const fakeFetch = (async (_url: string, init?: RequestInit) => {
+  if (init?.body) sent.push(JSON.parse(String(init.body)).content);
+  return new Response('{}', { status: 200 });
+}) as typeof fetch;
+const ctx: AlertContext = {
+  secret: SECRET,
+  texts: () => ({ storePosts: 'on sale' }),
+  fetch: fakeFetch,
+};
+
+beforeEach(async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tora-stores-'));
+  db = createDb({ url: `file:${join(dir, 'test.db')}` });
+  await migrateDb(db);
+  const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
+  uid = (await createUser(db, 'a', creds)).user.id;
+  sent = [];
+  await saveStores(db, 'test', [
+    {
+      key: 'umeda',
+      chain: 'yodobashi',
+      name: 'ヨドバシ梅田',
+      codes: ['UMD'],
+      region: '大阪府',
+      lat: 34.704,
+      lon: 135.496,
+    },
+    {
+      key: 'akiba',
+      chain: 'yodobashi',
+      name: 'ヨドバシAkiba',
+      codes: ['AKB'],
+      region: '東京都',
+      lat: 35.699,
+      lon: 139.774,
+    },
+  ]);
+  return () => rm(dir, { recursive: true, force: true });
+});
+
+const now = new Date('2026-10-19T12:00:00+09:00');
+const post = (id: string, text: string, minutesAgo = 1) => ({
+  id,
+  text,
+  postedAt: new Date(now.getTime() - minutesAgo * 60_000).toISOString(),
+  url: `https://example.com/${id}`,
+});
+
+it('keeps admin codes when the plug-in lists its stores again', async () => {
+  const [umeda] = await listStores(db);
+  await setStoreCodes(db, umeda!.id, [' ｕｍ ', 'um']);
+  await saveStores(db, 'test', [
+    { key: 'umeda', chain: 'yodobashi', name: 'ヨドバシ梅田', codes: ['UMD', '梅田'] },
+  ]);
+  const again = (await listStores(db)).find((s) => s.id === umeda!.id)!;
+  expect([again.codes, again.extraCodes]).toEqual([['UMD', '梅田'], ['um']]);
+});
+
+it('knows a person by their feed token, and only the newest one', async () => {
+  const old = await newFeedToken(db, uid);
+  const token = await newFeedToken(db, uid);
+  expect(await feedTokenUser(db, token)).toBe(uid);
+  expect(await feedTokenUser(db, old)).toBeNull();
+  expect(await feedTokenUser(db, 'nope')).toBeNull();
+});
+
+it('checks what a feed pushes', () => {
+  expect(readPush({ source: 'Bad Key', posts: [] })).toMatch(/source/);
+  expect(readPush({ source: 'gamenv', posts: [{ id: '1' }] })).toMatch(/id and a text/);
+  expect(
+    readPush({
+      source: 'gamenv',
+      chain: 'yodobashi',
+      posts: [{ id: '1', text: 'x', url: 'javascript:1' }],
+    }),
+  ).toEqual({
+    source: 'gamenv',
+    chain: 'yodobashi',
+    posts: [{ id: '1', text: 'x', url: null, postedAt: null, chain: null }],
+  });
+});
+
+it("notifies the people whose area holds a post's store, once per store for a while", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  const push = (posts: ReturnType<typeof post>[]) =>
+    receivePush(db, uid, { source: 'gamenv', chain: 'yodobashi', posts }, now);
+  // The first push only fills the list.
+  expect(await sendStoreNotices(db, await push([post('1', 'AKB 販売中')]), ctx, now)).toBe(0);
+  expect((await feedStatus(db, uid))?.lastSource).toBe('gamenv');
+  // Umeda is out of the area, an old post makes no notice, a post seen before is not new.
+  const r = await push([
+    post('1', 'AKB 販売中'),
+    post('2', 'UMD 販売中'),
+    post('3', 'AKB 整理券', 90),
+    post('4', 'AKB 30th 販売'),
+  ]);
+  expect(r.fresh.map((p) => p.externalId)).toEqual(['2', '3', '4']);
+  expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('ヨドバシAkiba: AKB 30th 販売');
+  expect(sent.at(-1)).not.toContain('UMD');
+  // Another post about the same store soon after: no second notice.
+  const again = await push([post('5', 'AKB まだある')]);
+  expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
+});

@@ -1,0 +1,91 @@
+# Store notices: feeds and store lists
+
+Tora can tell you when people post that cards are on sale in a physical store near you
+(requirements S25). Two kinds of plug-in feed it, and Tora does the rest: it recognises the store
+in each post, keeps the stores of your area (stores you pick, or a distance from where you are,
+with a travel mode) and sends a notice to your Discord or Telegram (Settings > Alerts).
+
+Tora ships neither the store lists nor the readers of any site: like collectors, they are yours
+to write (see [Building a collector](collectors.md) for where plug-ins live).
+
+## Store lists (`StoreDirectory`)
+
+A plug-in package exports its store lists next to its collectors:
+
+```ts
+export const stores: StoreDirectory[] = [
+  {
+    key: 'my-stores',
+    label: 'My stores',
+    stores: () => [
+      {
+        key: 'yodobashi-umeda', // stable within the list
+        chain: 'yodobashi', // posts from a chain's board are matched to its stores only
+        chainLabel: 'ヨドバシカメラ',
+        name: 'マルチメディア梅田',
+        codes: ['梅田', 'UMD'], // what posters write for it
+        region: '大阪府',
+        lat: 34.7041,
+        lon: 135.4963,
+      },
+    ],
+  },
+];
+```
+
+The lists are saved each time the home PC runs a collect or an import (only what changed is
+written). Coordinates are needed for "distance from where I am"; without them a store can still
+be picked by hand. Admins can add codes the list does not know on the Stores page.
+
+How a post is matched: within the post's chain (all chains when it has none), a store whose name
+or one of its codes appears in the text. Codes in Latin letters must stand as whole words ("AKB"
+does not match "AKBX"); other codes match anywhere. When one code contains another that also
+matched ("新宿西口", "新宿"), the longer one wins.
+
+## Feeds: pushing posts
+
+Anything that can send an HTTP request can be a feed: a userscript in your own browser on the
+page people post on, a bot in a chat you are in, a small script. Make a feed token on the Stores
+page (shown once; making a new one stops the old one), then:
+
+```http
+POST /api/feed/posts
+Authorization: Bearer tora_feed_...
+Content-Type: application/json
+
+{
+  "source": "myboard",
+  "chain": "yodobashi",
+  "posts": [
+    {
+      "id": "12345",
+      "text": "UMD 30th 店頭販売開始",
+      "url": "https://example.com/board#12345",
+      "postedAt": "2026-10-19T12:34:00+09:00"
+    }
+  ]
+}
+```
+
+- `source`: a short key for the feed (a-z, 0-9, `-`, `_`).
+- `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
+- `id`: the post's id on its site (or any stable key): a post sent again is ignored, so sending
+  the whole visible page every time is fine. At most 200 posts a push.
+- `postedAt`: when the site shows it; otherwise the time Tora received it.
+- An empty `posts` list is a heartbeat: the Stores page shows when the feed was last heard from,
+  so you know it is still running.
+
+The answer says how many posts were new, matched a store, and how many people were notified:
+
+```json
+{ "received": 1, "new": 1, "matched": 1, "notices": 1 }
+```
+
+Notices: only for posts of the last 30 minutes, at most one per store every 30 minutes for each
+person, and none for a feed's very first push (it usually brings a page of old posts).
+
+## Reading sites politely
+
+Read only what the site lets visitors read, at a person's pace (a reload every minute or two).
+A page that checks for bots is not to be worked around: read it from your own browser while you
+have it open, as a userscript does, or not at all.

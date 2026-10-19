@@ -9,7 +9,8 @@
     "add": "Add",
     "settings": "Settings",
     "imports": "Imports",
-    "watchlist": "Watchlist"
+    "watchlist": "Watchlist",
+    "stores": "Stores"
   },
   "common": {
     "save": "Save",
@@ -1392,7 +1393,8 @@
     "buyLimited": "Limited data.",
     "buyTarget": "{name}: an ask at {price} on {source}, under your target {target}.",
     "summaryDrops": "Sharp drops (15% or more in a week):",
-    "summaryDrop": "{name}: {price}, {pct} in 7 days"
+    "summaryDrop": "{name}: {price}, {pct} in 7 days",
+    "storePosts": "Tora: cards on sale in your area"
   },
   "alerts": {
     "title": "Alerts",
@@ -1792,6 +1794,48 @@
       "code": "Type the set code as card titles show it, e.g. SV2a.",
       "packs": "Packs a box: a whole number from 1 to 100.",
       "tiers": "Each rarity needs letters (SAR, AR...) and how many a box holds: 3, 0.2 or 1/6."
+    }
+  },
+  "stores": {
+    "title": "Stores",
+    "intro": "Notices when people post that cards are on sale in a store near you. Choose your area (stores you pick, or a distance from where you are), switch stores on or off, and go to travel mode when you are away.",
+    "area": "Your area",
+    "homeOn": "Home area in use.",
+    "travelOn": "Travel mode until {until}.",
+    "withinKm": "Stores within {km} km.",
+    "home": "Home",
+    "travel": "Travel",
+    "startTravel": "Travel mode",
+    "until": "Until",
+    "endTravel": "End travel mode",
+    "mode": "How the area is chosen",
+    "modeStores": "Stores I pick",
+    "modeDistance": "Distance from where I am",
+    "distance": "Distance",
+    "km": "{km} km",
+    "locate": "Use where I am now",
+    "pointInfo": "Only a rough point is kept (about 100 m), never an address. Press the button again after moving.",
+    "filter": "Find a store, chain, area or code",
+    "noStores": "No stores yet: a store list plug-in fills them at the next collect.",
+    "noticesFor": "Notices for {store}",
+    "codes": "Codes",
+    "extraCodes": "Other codes posters use, separated by commas",
+    "feed": "Feed",
+    "feedNever": "No feed has sent anything yet.",
+    "feedAlive": "Alive: last heard {minutes} min ago ({source}).",
+    "feedStopped": "Silent for {minutes} min ({source}): notices stop while the feed is off.",
+    "tokenNew": "Make a feed token",
+    "tokenRenew": "Make a new feed token",
+    "tokenOnce": "Copy it now: it is shown only once. The old token stops working.",
+    "feedHelp": "A feed (for example a userscript in your own browser on the board page) sends new posts with this token. See docs/store-feeds.md.",
+    "posts": "Latest posts",
+    "postsInfo": "Posts about your area's stores first.",
+    "noPosts": "No posts yet.",
+    "unknownStore": "store not recognised",
+    "error": {
+      "area": "That area could not be saved.",
+      "travel": "Travel mode needs an area and an end date.",
+      "noLocation": "The browser did not give a location (allow it in the browser's settings)."
     }
   }
 }

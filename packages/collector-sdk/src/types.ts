@@ -2,6 +2,7 @@ import type { SourceInfo } from '@tora/core';
 import type {
   CandidateInput,
   FoundSetCard,
+  ListedStore,
   HoldingInput,
   NewPriceObservation,
   Product,
@@ -258,6 +259,17 @@ export interface SetCardSource {
   ): Promise<{ price: number; sales: number } | null>;
 }
 
+/**
+ * Lists physical stores for store notices (S25): a chain's stores with the codes posters use and
+ * where they are. Saved each time the plug-ins are loaded.
+ */
+export interface StoreDirectory {
+  /** Saved as the stores' source ("japan-stores"). */
+  key: string;
+  label: string;
+  stores(): ListedStore[] | Promise<ListedStore[]>;
+}
+
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
@@ -268,4 +280,5 @@ export interface CollectorModule {
    */
   sources?: SourceInfo[];
   setCards?: SetCardSource[];
+  stores?: StoreDirectory[];
 }

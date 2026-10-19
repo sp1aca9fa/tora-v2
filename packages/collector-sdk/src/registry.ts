@@ -1,5 +1,5 @@
 import type { SourceInfo } from '@tora/core';
-import { type Db, saveRateSources, saveSourceInfos } from '@tora/db';
+import { type Db, saveRateSources, saveSourceInfos, saveStores } from '@tora/db';
 import { findRepoRoot } from '@tora/db/env';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import type {
   PurchaseImporter,
   RateSource,
   SetCardSource,
+  StoreDirectory,
 } from './types';
 
 /**
@@ -27,6 +28,7 @@ export interface LoadedCollectors {
   rates: RateSource[];
   sources: SourceInfo[];
   setCards: SetCardSource[];
+  stores: StoreDirectory[];
   missing: string[];
 }
 
@@ -36,6 +38,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const rates: RateSource[] = [];
   const sources: SourceInfo[] = [];
   const setCards: SetCardSource[] = [];
+  const stores: StoreDirectory[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -49,8 +52,9 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     rates.push(...(mod.rates ?? []));
     sources.push(...(mod.sources ?? []));
     setCards.push(...(mod.setCards ?? []));
+    stores.push(...(mod.stores ?? []));
   }
-  return { collectors, importers, rates, sources, setCards, missing };
+  return { collectors, importers, rates, sources, setCards, stores, missing };
 }
 
 /**
@@ -64,5 +68,7 @@ export async function loadAndRegister(db: Db, root?: string): Promise<LoadedColl
     db,
     loaded.rates.map(({ key, label, currencies }) => ({ key, label, currencies })),
   );
+  for (const directory of loaded.stores)
+    await saveStores(db, directory.key, await directory.stores());
   return loaded;
 }

@@ -1037,6 +1037,83 @@ export const openingCards = sqliteTable(
   ],
 );
 
+/** Physical stores for store notices (S25), shared: filled by store directory plug-ins. */
+export const stores = sqliteTable(
+  'stores',
+  {
+    id: id(),
+    /** The plug-in that lists it ('admin' for one added by hand) and its key there. */
+    source: text('source').notNull(),
+    sourceKey: text('source_key').notNull(),
+    chain: text('chain').notNull(),
+    /** The chain as people read it ("ヨドバシカメラ"). */
+    chainLabel: text('chain_label'),
+    name: text('name').notNull(),
+    /** What posters write for it, from the plug-in. */
+    codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),
+    /** Codes the admin added. */
+    extraCodes: text('extra_codes', { mode: 'json' }).$type<string[]>(),
+    region: text('region'),
+    lat: real('lat'),
+    lon: real('lon'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('stores_source_uq').on(t.source, t.sourceKey),
+    index('stores_chain_idx').on(t.chain),
+  ],
+);
+
+/** Posts about stores pushed by a feed (S25): shared, one per post of a source. */
+export const storePosts = sqliteTable(
+  'store_posts',
+  {
+    id: id(),
+    source: text('source').notNull(),
+    externalId: text('external_id').notNull(),
+    /** The board's chain, when it has one. */
+    chain: text('chain'),
+    text: text('text').notNull(),
+    url: text('url'),
+    /** When it was posted (local time), else when it was received. */
+    postedAt: text('posted_at').notNull(),
+    receivedAt: text('received_at').notNull(),
+    /** The stores it is about (ids). */
+    storeIds: text('store_ids', { mode: 'json' }).notNull().$type<string[]>(),
+    fedBy: text('fed_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    uniqueIndex('store_posts_uq').on(t.source, t.externalId),
+    index('store_posts_posted_idx').on(t.postedAt),
+  ],
+);
+
+/** A person's feed token (S25): the hash only; when and what it last sent. */
+export const feedTokens = sqliteTable('feed_tokens', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  lastSeenAt: text('last_seen_at'),
+  lastSource: text('last_source'),
+  ...timestamps,
+});
+
+/** The last store notice a person was sent per store: posts close together make one notice. */
+export const storeNotices = sqliteTable(
+  'store_notices',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    storeId: text('store_id')
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+    sentAt: text('sent_at').notNull(),
+  },
+  (t) => [uniqueIndex('store_notices_uq').on(t.userId, t.storeId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1063,4 +1140,6 @@ export type Watch = typeof watches.$inferSelect;
 export type Signal = typeof signals.$inferSelect;
 export type Supply = typeof supply.$inferSelect;
 export type OpeningSet = typeof openingSets.$inferSelect;
+export type Store = typeof stores.$inferSelect;
+export type StorePost = typeof storePosts.$inferSelect;
 export type OpeningCardRow = typeof openingCards.$inferSelect;

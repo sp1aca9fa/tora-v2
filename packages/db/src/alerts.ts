@@ -370,7 +370,7 @@ async function localeFor(db: Db, user: User | null): Promise<string> {
 }
 
 /** A person's messages: their chosen language, else the app's primary. */
-async function textsFor(db: Db, user: User | null, ctx: AlertContext): Promise<AlertTexts> {
+export async function textsFor(db: Db, user: User | null, ctx: AlertContext): Promise<AlertTexts> {
   const locale = await localeFor(db, user);
   return { ...(await ctx.texts('en')), ...(await ctx.texts(locale)) };
 }

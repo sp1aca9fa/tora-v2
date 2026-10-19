@@ -20,3 +20,4 @@ export * from './lines';
 export * from './strategy-examples';
 export * from './opening';
 export * from './pull-rates';
+export * from './stores';
