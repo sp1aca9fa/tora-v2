@@ -9,7 +9,14 @@ import {
   STORE_NOTICE_KM,
   roundPoint,
 } from '@tora/core';
-import { addStore, newFeedToken, removeStore, setPreferences, setStoreCodes } from '@tora/db';
+import {
+  addStore,
+  forgetBoard,
+  newFeedToken,
+  removeStore,
+  setPreferences,
+  setStoreCodes,
+} from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
 
@@ -134,5 +141,12 @@ export async function removeStoreAction(storeId: string) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
   await removeStore(db, storeId);
+  revalidatePath('/stores');
+}
+
+/** Forgets a board the feed no longer reads. */
+export async function forgetBoardAction(key: string) {
+  const { db, user } = await authed();
+  await forgetBoard(db, user.id, String(key));
   revalidatePath('/stores');
 }

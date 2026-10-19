@@ -23,6 +23,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
   addStoreAction,
+  forgetBoardAction,
   newFeedTokenAction,
   removeStoreAction,
   saveStoreAreaAction,
@@ -626,5 +627,21 @@ function RemoveStore({ id }: { id: string }) {
     >
       {t('remove')}
     </Button>
+  );
+}
+
+/** Forgets a board the feed no longer reads. */
+export function ForgetBoard({ board }: { board: string }) {
+  const t = useTranslations('stores');
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      className="text-xs text-muted-foreground underline"
+      disabled={pending}
+      onClick={() => startTransition(() => forgetBoardAction(board))}
+    >
+      {t('forget')}
+    </button>
   );
 }

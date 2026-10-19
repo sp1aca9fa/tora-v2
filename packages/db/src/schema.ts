@@ -1090,6 +1090,14 @@ export const storePosts = sqliteTable(
   ],
 );
 
+/** A board's state in a feed (S25). */
+export interface BoardState {
+  at: string;
+  posts: number;
+  readAt: string | null;
+  alertedAt?: string | null;
+}
+
 /** A person's feed token (S25): the hash only; when and what it last sent. */
 export const feedTokens = sqliteTable('feed_tokens', {
   userId: text('user_id')
@@ -1100,6 +1108,14 @@ export const feedTokens = sqliteTable('feed_tokens', {
   lastSource: text('last_source'),
   /** When the person was told the feed went silent (cleared when it speaks again). */
   silenceAlertedAt: text('silence_alerted_at'),
+  /**
+   * Each board the feed reads (key: the board, else its chain, else the feed): its last visit, how
+   * many posts it read then, the last visit that read any, and when its person was told it read
+   * none for too long.
+   */
+  boards: text('boards', { mode: 'json' }).$type<Record<string, BoardState>>(),
+  /** The boards the feed says it watches (told when it connects or the list changes). */
+  watching: text('watching', { mode: 'json' }).$type<string[]>(),
   ...timestamps,
 });
 

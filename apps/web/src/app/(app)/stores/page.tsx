@@ -6,7 +6,14 @@ import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { AddStoreForm, FeedAlerts, FeedToken, type StoreView, StoreAreaForm } from './store-area';
+import {
+  AddStoreForm,
+  FeedAlerts,
+  FeedToken,
+  ForgetBoard,
+  type StoreView,
+  StoreAreaForm,
+} from './store-area';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('stores'))('title') };
@@ -105,6 +112,52 @@ export default async function StoresPage() {
                   {t('alertsLink')}
                 </Link>
               </p>
+              {feed && Object.keys(feed.boards).length > 0 && (
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1 pr-2 font-normal">{t('board')}</th>
+                      <th className="py-1 pr-2 font-normal">{t('lastVisit')}</th>
+                      <th className="py-1 pr-2 font-normal">{t('lastRead')}</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(feed.boards)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([key, b]) => {
+                        const quiet = !b.readAt || minutesSince(b.readAt) > FEED_ALIVE_MINUTES;
+                        return (
+                          <tr key={key} className="border-t">
+                            <td className="py-1.5 pr-2 font-mono text-xs">
+                              {key}
+                              {feed.watching?.includes(key) && (
+                                <span className="ml-1 text-muted-foreground">✓</span>
+                              )}
+                            </td>
+                            <td className="py-1.5 pr-2 text-xs">
+                              {t('ago', { minutes: minutesSince(b.at) })} ·{' '}
+                              {t('postsRead', { n: b.posts })}
+                            </td>
+                            <td
+                              className={cn(
+                                'py-1.5 pr-2 text-xs',
+                                quiet && 'font-semibold text-destructive',
+                              )}
+                            >
+                              {b.readAt
+                                ? t('ago', { minutes: minutesSince(b.readAt) })
+                                : t('never')}
+                            </td>
+                            <td className="py-1.5 text-right">
+                              {!feed.watching?.includes(key) && <ForgetBoard board={key} />}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
               <FeedAlerts prefs={user.preferences?.storeFeed ?? null} />
               <FeedToken hasToken={!!feed} />
             </CardContent>

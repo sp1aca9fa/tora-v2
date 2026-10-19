@@ -1399,7 +1399,10 @@
     "feedBack": "Tora: the store feed is sending again.",
     "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",
     "storeUnknown": "Tora: posts naming no store or place Tora knows (add the code on the Stores page):",
-    "storeArea": "{name} area"
+    "storeArea": "{name} area",
+    "feedConnected": "Tora: connected to the browser feed ({source}), tracking these boards: {boards}",
+    "boardBack": "Tora: the {board} board gives posts again.",
+    "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does."
   },
   "alerts": {
     "title": "Alerts",
@@ -1879,6 +1882,13 @@
     "onlyOn": "Notified ({n})",
     "showAll": "All",
     "allRegions": "All prefectures",
-    "showing": "{n} of {total} shown"
+    "showing": "{n} of {total} shown",
+    "board": "Board",
+    "lastVisit": "Last visit",
+    "lastRead": "Last posts",
+    "ago": "{minutes} min ago",
+    "postsRead": "{n} posts",
+    "never": "never",
+    "forget": "Forget"
   }
 }

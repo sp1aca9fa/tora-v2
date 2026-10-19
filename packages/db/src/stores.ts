@@ -15,6 +15,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { type AlertContext, appUrl, sendToUser, textsFor } from './alerts';
 import type { Db } from './client';
 import {
+  type BoardState,
   type Store,
   type StorePost,
   feedTokens,
@@ -123,10 +124,22 @@ export async function feedTokenUser(db: Db, token: string): Promise<string | nul
 
 export async function feedStatus(db: Db, userId: string) {
   const [row] = await db
-    .select({ lastSeenAt: feedTokens.lastSeenAt, lastSource: feedTokens.lastSource })
+    .select({
+      lastSeenAt: feedTokens.lastSeenAt,
+      lastSource: feedTokens.lastSource,
+      boards: feedTokens.boards,
+      watching: feedTokens.watching,
+    })
     .from(feedTokens)
     .where(eq(feedTokens.userId, userId));
-  return row ? { lastSeenAt: row.lastSeenAt, lastSource: row.lastSource } : null;
+  return row
+    ? {
+        lastSeenAt: row.lastSeenAt,
+        lastSource: row.lastSource,
+        boards: row.boards ?? {},
+        watching: row.watching,
+      }
+    : null;
 }
 
 // ---- Posts ----
@@ -148,6 +161,10 @@ export interface PushedPost {
 export interface Push {
   /** The feed's key ("gamenv"). */
   source: string;
+  /** The board (page) read, when the feed reads several ("biccamera"). */
+  board?: string | null;
+  /** All the boards the feed watches, in turn (told to the person when it changes). */
+  watching?: string[] | null;
   /** The board's chain ("yodobashi"), when the whole push is one chain's. */
   chain?: string | null;
   posts: PushedPost[];
@@ -169,6 +186,10 @@ export function readPush(body: unknown): Push | string {
   }
   return {
     source: b.source,
+    board: typeof b.board === 'string' && /^[a-z0-9_-]{1,40}$/.test(b.board) ? b.board : null,
+    watching: Array.isArray(b.watching)
+      ? b.watching.filter((w) => typeof w === 'string' && /^[a-z0-9_-]{1,40}$/.test(w)).slice(0, 20)
+      : null,
     chain: typeof b.chain === 'string' ? b.chain : null,
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
@@ -193,7 +214,15 @@ export interface Received {
   resumed: boolean;
   /** A whole page of new posts at once on a board seen before: posts may have been missed. */
   gap: { chain: string | null; posts: number } | null;
+  /** The board had been told silent: it gives posts again. */
+  boardBack?: string | null;
+  /** The feed connected (first push, back after a silence, or other boards): what it watches. */
+  connected?: { source: string; boards: string[] } | null;
 }
+
+/** A push's board key: the board, else its chain, else the feed. */
+const boardKey = (push: Pick<Push, 'board' | 'chain' | 'source'>) =>
+  push.board ?? push.chain ?? push.source;
 
 export async function receivePush(
   db: Db,
@@ -203,15 +232,43 @@ export async function receivePush(
 ): Promise<Received> {
   const at = toLocalIso(now);
   const [token] = await db
-    .select({ silenceAlertedAt: feedTokens.silenceAlertedAt })
+    .select({
+      lastSeenAt: feedTokens.lastSeenAt,
+      silenceAlertedAt: feedTokens.silenceAlertedAt,
+      boards: feedTokens.boards,
+      watching: feedTokens.watching,
+    })
     .from(feedTokens)
     .where(eq(feedTokens.userId, userId));
+  const key = boardKey(push);
+  const had = token?.boards?.[key];
+  const read = push.posts.length > 0;
+  const board: BoardState = {
+    at,
+    posts: push.posts.length,
+    readAt: read ? at : (had?.readAt ?? null),
+    alertedAt: read ? null : (had?.alertedAt ?? null),
+  };
   await db
     .update(feedTokens)
-    .set({ lastSeenAt: at, lastSource: push.source, silenceAlertedAt: null })
+    .set({
+      lastSeenAt: at,
+      lastSource: push.source,
+      silenceAlertedAt: null,
+      boards: { ...token?.boards, [key]: board },
+      ...(push.watching ? { watching: push.watching } : {}),
+    })
     .where(eq(feedTokens.userId, userId));
   const resumed = !!token?.silenceAlertedAt;
-  if (!push.posts.length) return { fresh: [], first: false, resumed, gap: null };
+  const boardBack = read && had?.alertedAt ? key : null;
+  const watching = push.watching ?? [key];
+  const connected =
+    !token?.lastSeenAt ||
+    resumed ||
+    (push.watching && push.watching.join() !== token?.watching?.join())
+      ? { source: push.source, boards: watching }
+      : null;
+  if (!read) return { fresh: [], first: false, resumed, gap: null, boardBack, connected };
   const [known] = await db
     .select({ n: sql<number>`count(*)` })
     .from(storePosts)
@@ -254,7 +311,7 @@ export async function receivePush(
     seenChain?.n && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
       ? { chain: push.chain ?? null, posts: fresh.length }
       : null;
-  return { fresh, first: !known?.n, resumed, gap };
+  return { fresh, first: !known?.n, resumed, gap, boardBack, connected };
 }
 
 const fill = (text: string, params: Record<string, string | number>) =>
@@ -282,7 +339,21 @@ export async function sendFeedMessages(
   const t = await textsFor(db, user, ctx);
   const base = await appUrl(db);
   const lines: string[] = [];
-  if (received.resumed) lines.push(t.feedBack ?? 'Tora: the store feed is sending again.');
+  if (received.connected)
+    lines.push(
+      fill(
+        t.feedConnected ??
+          'Tora: connected to the browser feed ({source}), tracking these boards: {boards}',
+        { source: received.connected.source, boards: received.connected.boards.join(', ') },
+      ),
+    );
+  else if (received.resumed) lines.push(t.feedBack ?? 'Tora: the store feed is sending again.');
+  if (received.boardBack)
+    lines.push(
+      fill(t.boardBack ?? 'Tora: the {board} board gives posts again.', {
+        board: received.boardBack,
+      }),
+    );
   if (received.gap)
     lines.push(
       fill(
@@ -313,6 +384,52 @@ export async function sendFeedMessages(
  * The silence check, run every few minutes by the app (no silent failures): each feed quiet for
  * longer than its person's limit, within their hours, is told once; the next push clears it.
  */
+async function checkBoards(
+  db: Db,
+  ctx: AlertContext,
+  user: typeof users.$inferSelect,
+  boards: Record<string, BoardState>,
+  silentMinutes: number,
+  now: Date,
+): Promise<number> {
+  const limit = now.getTime() - silentMinutes * 60_000;
+  const quiet = Object.entries(boards).filter(
+    ([, b]) => !b.alertedAt && Date.parse(b.readAt ?? b.at) < limit,
+  );
+  if (!quiet.length) return 0;
+  const t = await textsFor(db, user, ctx);
+  const base = await appUrl(db);
+  const lines = quiet.map(([key, b]) =>
+    fill(
+      t.boardSilent ??
+        'Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.',
+      {
+        board: key,
+        since: (b.readAt ?? '-').slice(0, 16).replace('T', ' '),
+        at: b.at.slice(0, 16).replace('T', ' '),
+        posts: b.posts,
+      },
+    ),
+  );
+  const at = toLocalIso(now);
+  const next = { ...boards };
+  for (const [key, b] of quiet) next[key] = { ...b, alertedAt: at };
+  await db.update(feedTokens).set({ boards: next }).where(eq(feedTokens.userId, user.id));
+  await sendToUser(db, user.id, `${lines.join('\n')}${base ? `\n${base}/stores` : ''}`, ctx);
+  return quiet.length;
+}
+
+/** Forgets a board the feed no longer reads (its state and its silence alerts). */
+export async function forgetBoard(db: Db, userId: string, key: string) {
+  const [token] = await db
+    .select({ boards: feedTokens.boards })
+    .from(feedTokens)
+    .where(eq(feedTokens.userId, userId));
+  if (!token?.boards?.[key]) return;
+  const { [key]: _, ...rest } = token.boards;
+  await db.update(feedTokens).set({ boards: rest }).where(eq(feedTokens.userId, userId));
+}
+
 export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): Promise<number> {
   const rows = await db
     .select({ token: feedTokens, user: users })
@@ -325,7 +442,13 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
     if (!token.lastSeenAt) continue;
     const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
     const minutes = Math.floor((now.getTime() - Date.parse(token.lastSeenAt)) / 60_000);
-    if (minutes < prefs.silentMinutes || !withinHours(time, prefs.from, prefs.to)) continue;
+    if (!withinHours(time, prefs.from, prefs.to)) continue;
+    if (minutes < prefs.silentMinutes) {
+      // The feed runs, but a board may give nothing (an access check, a changed page) or no
+      // longer be visited: each such board is told once.
+      told += await checkBoards(db, ctx, user, token.boards ?? {}, prefs.silentMinutes, now);
+      continue;
+    }
     const t = await textsFor(db, user, ctx);
     const base = await appUrl(db);
     const text = fill(

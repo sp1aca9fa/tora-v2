@@ -1399,7 +1399,10 @@
     "feedBack": "Tora:店舗フィードが再開しました。",
     "feedGap": "Tora:{chain}掲示板で一度に{posts}件の新着:取りこぼした投稿があるかもしれません。",
     "storeUnknown": "Tora:Toraが知らない店舗・場所の投稿(店舗ページでコードを追加してください):",
-    "storeArea": "{name}エリア"
+    "storeArea": "{name}エリア",
+    "feedConnected": "Tora:ブラウザのフィード({source})に接続しました。追跡中の掲示板:{boards}",
+    "boardBack": "Tora:{board}掲示板から投稿が再び届いています。",
+    "boardSilent": "Tora:{board}掲示板から{since}以降投稿が届いていません(最終訪問 {at}、{posts}件)。フィードは動作中:届くまでこの掲示板の通知はありません。"
   },
   "alerts": {
     "title": "アラート",
@@ -1879,6 +1882,13 @@
     "onlyOn": "通知あり({n})",
     "showAll": "すべて",
     "allRegions": "すべての都道府県",
-    "showing": "{total}件中{n}件を表示"
+    "showing": "{total}件中{n}件を表示",
+    "board": "掲示板",
+    "lastVisit": "最終訪問",
+    "lastRead": "最終取得",
+    "ago": "{minutes}分前",
+    "postsRead": "{n}件",
+    "never": "なし",
+    "forget": "削除"
   }
 }

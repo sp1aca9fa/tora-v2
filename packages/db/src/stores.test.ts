@@ -104,6 +104,8 @@ it('checks what a feed pushes', () => {
     }),
   ).toEqual({
     source: 'gamenv',
+    board: null,
+    watching: null,
     chain: 'yodobashi',
     posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
   });
@@ -186,4 +188,50 @@ it('adds and removes stores by hand, never a plug-in one', async () => {
   const [plugin] = (await listStores(db)).filter((s) => s.source === 'test');
   expect(await removeStore(db, plugin!.id)).toBe(false);
   expect(await removeStore(db, added.id)).toBe(true);
+});
+
+it('keeps each board apart: a board giving no posts while the feed runs is told once', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '00:00', to: '23:59' } });
+  const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  const visit = (board: string, posts: ReturnType<typeof post>[], minutes: number) =>
+    receivePush(db, uid, { source: 'gamenv', board, chain: board, posts }, at(minutes));
+  await visit('yodobashi', [post('y1', 'AKB')], 0);
+  await visit('biccamera', [post('b1', '池袋')], 1);
+  expect(Object.keys((await feedStatus(db, uid))!.boards).sort()).toEqual([
+    'biccamera',
+    'yodobashi',
+  ]);
+  // From then on ビックカメラ reads nothing (an access check page) while ヨドバシ goes on.
+  for (const m of [3, 6, 9, 12]) {
+    await visit('yodobashi', [post('y1', 'AKB')], m);
+    await visit('biccamera', [], m + 1);
+  }
+  sent = [];
+  expect(await checkFeeds(db, ctx, at(13))).toBe(1);
+  expect(sent.at(-1)).toContain('biccamera');
+  expect(await checkFeeds(db, ctx, at(15))).toBe(0);
+  const back = await visit('biccamera', [post('b2', '池袋')], 16);
+  expect(back.boardBack).toBe('biccamera');
+  expect(await sendFeedMessages(db, uid, back, ctx, at(16))).toBe(1);
+});
+
+it('says when the feed connects, with the boards it tracks, and when the list changes', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  const push = (watching: string[], minutes = 0) =>
+    receivePush(
+      db,
+      uid,
+      { source: 'gamenv', board: 'yodobashi', watching, posts: [] },
+      new Date(now.getTime() + minutes * 60_000),
+    );
+  sent = [];
+  const first = await push(['yodobashi', 'biccamera']);
+  expect(first.connected).toEqual({ source: 'gamenv', boards: ['yodobashi', 'biccamera'] });
+  await sendFeedMessages(db, uid, first, ctx, now);
+  expect(sent.at(-1)).toContain('yodobashi, biccamera');
+  expect((await push(['yodobashi', 'biccamera'], 1)).connected).toBeNull();
+  expect((await push(['yodobashi'], 2)).connected?.boards).toEqual(['yodobashi']);
 });

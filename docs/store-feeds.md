@@ -70,6 +70,11 @@ Content-Type: application/json
 ```
 
 - `source`: a short key for the feed (a-z, 0-9, `-`, `_`).
+- `board`: the board (page) read, when the feed reads several: each board's last visit and last
+  posts are shown on the Stores page, and a board giving no posts for too long while the feed runs
+  is told (an access check or a changed page would otherwise go unnoticed).
+- `watching`: every board the feed goes through; its person is told "connected, tracking these
+  boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
 - `id`: the post's id on its site (or any stable key): a post sent again is ignored, so sending
   the whole visible page every time is fine. At most 200 posts a push.
