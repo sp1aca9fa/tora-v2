@@ -1,6 +1,7 @@
 import { localDate, storesInArea } from '@tora/core';
-import { feedStatus, listStores, recentPosts } from '@tora/db';
+import { channelsOf, feedStatus, listStores, recentPosts } from '@tora/db';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
@@ -21,11 +22,12 @@ const minutesSince = (at: string) => Math.round((Date.now() - Date.parse(at)) / 
  */
 export default async function StoresPage() {
   const { db, user } = await authed();
-  const [t, all, feed, posts] = await Promise.all([
+  const [t, all, feed, posts, channels] = await Promise.all([
     getTranslations('stores'),
     listStores(db),
     feedStatus(db, user.id),
     recentPosts(db, 60),
+    channelsOf(db, user.id),
   ]);
   const area = user.preferences?.storeArea ?? null;
   const today = localDate();
@@ -50,13 +52,13 @@ export default async function StoresPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{t('intro')}</p>
       </header>
 
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)]">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
         <StoreAreaForm stores={views} area={area} today={today} admin={user.role === 'admin'} />
 
         <div className="space-y-5">
@@ -72,7 +74,18 @@ export default async function StoresPage() {
                     })}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <p className="text-sm">
+                {channels.length
+                  ? t('noticesTo', {
+                      stores: inArea.size,
+                      channels: channels.map((c) => c.label ?? c.kind).join(', '),
+                    })
+                  : t('noChannel')}{' '}
+                <Link href="/settings/alerts" className="underline">
+                  {t('alertsLink')}
+                </Link>
+              </p>
               <FeedToken hasToken={!!feed} />
             </CardContent>
           </Card>

@@ -32,6 +32,8 @@ export interface StoreArea {
   travel?: StoreAreaChoice & { until: string };
   /** Stores never notified, whatever the area. */
   muted?: string[];
+  /** Stores always notified, outside the area too (added by hand to a distance). */
+  added?: string[];
 }
 
 export const STORE_NOTICE_KM = [1, 2, 5, 10, 20, 30, 50];
@@ -56,7 +58,7 @@ export function activeArea(area: StoreArea, today: string): StoreAreaChoice {
   return area.travel && today <= area.travel.until ? area.travel : area.home;
 }
 
-/** The stores in an area (by id), muted ones left out. */
+/** The stores in an area (by id): the area's and the ones added by hand, muted ones left out. */
 export function storesInArea(
   area: StoreArea | null | undefined,
   stores: (Pick<StoreEntry, 'lat' | 'lon'> & { id: string })[],
@@ -76,7 +78,7 @@ export function storesInArea(
               distanceKm(choice.point, { lat: s.lat, lon: s.lon }) <= choice.km,
           )
           .map((s) => s.id);
-  return new Set(ids.filter((id) => !muted.has(id)));
+  return new Set([...ids, ...(area.added ?? [])].filter((id) => !muted.has(id)));
 }
 
 /** Width, case and emoji variation marks aside (🏍️ and 🏍 alike). */

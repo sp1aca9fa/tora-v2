@@ -31,7 +31,7 @@ export default async function OpeningListPage() {
   const percent = (n: number) => `${Math.round(n * 100)}%`;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-6">
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">
           <Link href="/watchlist" className="hover:underline">

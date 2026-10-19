@@ -110,12 +110,15 @@ export function StoreAreaForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stores, filter, choice]);
 
-  const on = (s: StoreView) => {
-    if (muted.has(s.id)) return false;
+  const added = new Set(area.added ?? []);
+  const within = (s: StoreView) => {
     if (choice.mode === 'stores') return choice.storeIds.includes(s.id);
     const km = distanceOf(s);
     return km !== null && km <= choice.km;
   };
+  const on = (s: StoreView) => !muted.has(s.id) && (within(s) || added.has(s.id));
+  // Picked stores: the box picks. Distance: a store of the area is switched off (muted), another
+  // added by hand (added); unticking undoes either.
   const toggle = (s: StoreView) => {
     if (choice.mode === 'stores') {
       const ids = choice.storeIds.includes(s.id)
@@ -123,8 +126,18 @@ export function StoreAreaForm({
         : [...choice.storeIds, s.id];
       return setChoice({ mode: 'stores', storeIds: ids });
     }
-    const next = muted.has(s.id) ? [...muted].filter((id) => id !== s.id) : [...muted, s.id];
-    save({ ...area, muted: next });
+    const without = (set: Set<string>) => [...set].filter((id) => id !== s.id);
+    if (on(s))
+      return save({
+        ...area,
+        added: without(added),
+        muted: within(s) ? [...muted, s.id] : without(muted),
+      });
+    save({
+      ...area,
+      muted: without(muted),
+      added: within(s) ? without(added) : [...added, s.id],
+    });
   };
 
   return (
@@ -234,23 +247,30 @@ export function StoreAreaForm({
         {stores.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('noStores')}</p>
         ) : (
-          <ul className={cn('divide-y text-sm', pending && 'opacity-70')}>
+          <ul
+            className={cn(
+              'grid grid-cols-1 gap-x-6 text-sm md:grid-cols-2 2xl:grid-cols-3',
+              pending && 'opacity-70',
+            )}
+          >
             {shown.map((s) => {
               const km = distanceOf(s);
-              const outside = choice.mode === 'distance' && (km === null || km > choice.km);
+              const outside = !within(s);
               return (
-                <li key={s.id} className="flex items-start gap-3 py-2">
+                <li key={s.id} className="flex items-start gap-3 border-b py-2">
                   <input
                     type="checkbox"
                     className="mt-1 size-4"
                     checked={on(s)}
-                    disabled={outside}
                     onChange={() => toggle(s)}
                     aria-label={t('noticesFor', { store: s.name })}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className={cn(outside && 'text-muted-foreground')}>
+                    <p className={cn(outside && !on(s) && 'text-muted-foreground')}>
                       {s.name}{' '}
+                      {outside && on(s) && (
+                        <span className="text-xs text-primary">{t('addedByHand')} </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {[s.chain, s.region, km !== null ? t('km', { km: km.toFixed(1) }) : null]
                           .filter(Boolean)

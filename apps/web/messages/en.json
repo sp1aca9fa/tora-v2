@@ -1836,6 +1836,10 @@
       "area": "That area could not be saved.",
       "travel": "Travel mode needs an area and an end date.",
       "noLocation": "The browser did not give a location (allow it in the browser's settings)."
-    }
+    },
+    "addedByHand": "added by hand",
+    "noticesTo": "Notices for {stores, plural, one {# store} other {# stores}} go to {channels}, as soon as a feed brings a new post about one.",
+    "noChannel": "No Discord or Telegram connected yet: notices have nowhere to go.",
+    "alertsLink": "Settings > Alerts"
   }
 }

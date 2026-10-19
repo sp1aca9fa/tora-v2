@@ -35,6 +35,7 @@ export async function saveStoreAreaAction(area: StoreArea): Promise<{ error?: st
       home,
       ...(travel ? { travel } : {}),
       muted: [...new Set((area.muted ?? []).map(String))].slice(0, 500),
+      added: [...new Set((area.added ?? []).map(String))].slice(0, 500),
     },
   });
   revalidatePath('/stores');

@@ -8,13 +8,14 @@ const WIDE = [
   /^\/$/,
   /^\/items$/,
   /^\/actions$/,
-  /^\/products\/[^/]+(\/(buy|details))?$/,
+  /^\/products\/[^/]+(\/(buy|opening|details))?$/,
+  /^\/stores$/,
   /^\/holdings\/(?!grades$)[^/]+$/,
   /^\/imports$/,
 ];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */
-const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist$/];
+const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist(\/opening)?$/];
 
 /** The page area: full width for wide pages, a centred reading column for the rest (S8). */
 export function PageWidth({ children }: { children: React.ReactNode }) {

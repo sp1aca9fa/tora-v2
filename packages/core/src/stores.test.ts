@@ -49,6 +49,15 @@ describe('store notices: areas', () => {
     const home = { mode: 'distance' as const, point: { lat: 35.69, lon: 139.7 }, km: 5 };
     expect([...storesInArea({ home }, all, '2026-10-19')].sort()).toEqual(['b', 's']);
     expect([...storesInArea({ home, muted: ['b'] }, all, '2026-10-19')]).toEqual(['s']);
+    // Added by hand: in, wherever it is; muted wins.
+    expect([...storesInArea({ home, added: ['u'] }, all, '2026-10-19')].sort()).toEqual([
+      'b',
+      's',
+      'u',
+    ]);
+    expect(
+      [...storesInArea({ home, added: ['u'], muted: ['u'] }, all, '2026-10-19')].sort(),
+    ).toEqual(['b', 's']);
     expect([
       ...storesInArea({ home: { mode: 'stores', storeIds: ['u', 'a'] } }, all, '2026-10-19'),
     ]).toEqual(['u', 'a']);
