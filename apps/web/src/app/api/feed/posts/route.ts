@@ -8,6 +8,7 @@ import {
   loadTimeZone,
   readPush,
   receivePush,
+  sendFeedMessages,
   sendStoreNotices,
 } from '@tora/db';
 import { NextResponse } from 'next/server';
@@ -32,10 +33,13 @@ export async function POST(request: Request) {
   const received = await receivePush(db, userId, push);
   const ctx = alertContext();
   const notices = ctx ? await sendStoreNotices(db, received, ctx) : 0;
+  // The feed's own person: posts it could not place, posts maybe missed, back after a silence.
+  if (ctx) await sendFeedMessages(db, userId, received, ctx);
   return NextResponse.json({
     received: push.posts.length,
     new: received.fresh.length,
     matched: received.fresh.filter((p) => p.storeIds.length).length,
     notices,
+    gap: !!received.gap,
   });
 }

@@ -1,6 +1,14 @@
 // Store notices data (requirements S25): stores from store directory plug-ins, posts pushed by
 // feeds, and the notices they make for the people whose area holds the store.
-import { type StoreEntry, localDate, storesInArea, storesInPost, toLocalIso } from '@tora/core';
+import {
+  DEFAULT_FEED_PREFS,
+  type StoreEntry,
+  localDate,
+  storesInArea,
+  storesInPost,
+  toLocalIso,
+  withinHours,
+} from '@tora/core';
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import { type AlertContext, appUrl, sendToUser, textsFor } from './alerts';
@@ -20,6 +28,8 @@ const FRESH_MINUTES = 30;
 /** Posts about one store within this time after a notice make no new one. */
 const QUIET_MINUTES = 30;
 const POSTS_PER_PUSH = 200;
+/** A push this long all new (one pinned post aside) counts as a page turned over. */
+const GAP_MIN_POSTS = 10;
 
 /** A store as a directory plug-in lists it: its key there and what it is. */
 export interface ListedStore extends StoreEntry {
@@ -174,22 +184,46 @@ export function readPush(body: unknown): Push | string {
  * Saves the posts not seen before (any feed may have sent them), each with the stores it names;
  * marks the person's feed as alive. Returns the new posts.
  */
+export interface Received {
+  fresh: StorePost[];
+  /** The feed's very first push (only fills the list). */
+  first: boolean;
+  /** The feed had been told silent: it speaks again. */
+  resumed: boolean;
+  /** A whole page of new posts at once on a board seen before: posts may have been missed. */
+  gap: { chain: string | null; posts: number } | null;
+}
+
 export async function receivePush(
   db: Db,
   userId: string,
   push: Push,
   now = new Date(),
-): Promise<{ fresh: StorePost[]; first: boolean }> {
+): Promise<Received> {
   const at = toLocalIso(now);
+  const [token] = await db
+    .select({ silenceAlertedAt: feedTokens.silenceAlertedAt })
+    .from(feedTokens)
+    .where(eq(feedTokens.userId, userId));
   await db
     .update(feedTokens)
-    .set({ lastSeenAt: at, lastSource: push.source })
+    .set({ lastSeenAt: at, lastSource: push.source, silenceAlertedAt: null })
     .where(eq(feedTokens.userId, userId));
-  if (!push.posts.length) return { fresh: [], first: false };
+  const resumed = !!token?.silenceAlertedAt;
+  if (!push.posts.length) return { fresh: [], first: false, resumed, gap: null };
   const [known] = await db
     .select({ n: sql<number>`count(*)` })
     .from(storePosts)
     .where(eq(storePosts.source, push.source));
+  const [seenChain] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(storePosts)
+    .where(
+      and(
+        eq(storePosts.source, push.source),
+        push.chain ? eq(storePosts.chain, push.chain) : isNull(storePosts.chain),
+      ),
+    );
   const all = await listStores(db);
   const listed = all.map((s) => ({ ...s, codes: storeCodes(s) }));
   const fresh: StorePost[] = [];
@@ -213,7 +247,104 @@ export async function receivePush(
       .returning();
     if (row) fresh.push(row);
   }
-  return { fresh, first: !known?.n };
+  // A page shows a fixed number of posts (one may be pinned): all of them new means the page
+  // turned over completely since the last visit.
+  const gap =
+    seenChain?.n && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
+      ? { chain: push.chain ?? null, posts: fresh.length }
+      : null;
+  return { fresh, first: !known?.n, resumed, gap };
+}
+
+const fill = (text: string, params: Record<string, string | number>) =>
+  text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? ''));
+const short = (text: string) => {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length > 140 ? `${t.slice(0, 140)}…` : t;
+};
+
+/**
+ * What the feed's own person is told about a push (no silent failures): the feed speaks again
+ * after a silence, posts that may have been missed, and recent posts naming no store of a chain
+ * Tora has stores for (unless switched off).
+ */
+export async function sendFeedMessages(
+  db: Db,
+  userId: string,
+  received: Received,
+  ctx: AlertContext,
+  now = new Date(),
+): Promise<number> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user) return 0;
+  const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
+  const t = await textsFor(db, user, ctx);
+  const base = await appUrl(db);
+  const lines: string[] = [];
+  if (received.resumed) lines.push(t.feedBack ?? 'Tora: the store feed is sending again.');
+  if (received.gap)
+    lines.push(
+      fill(
+        t.feedGap ??
+          'Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.',
+        { posts: received.gap.posts, chain: received.gap.chain ?? '-' },
+      ),
+    );
+  if (!received.first && prefs.unknown) {
+    const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
+    const chains = new Set((await listStores(db)).map((st) => st.chain));
+    const unknown = received.fresh.filter(
+      (p) => !p.storeIds.length && p.chain && chains.has(p.chain) && p.postedAt >= since,
+    );
+    if (unknown.length) {
+      lines.push(
+        t.storeUnknown ??
+          'Tora: posts naming no store Tora knows (add the code on the Stores page):',
+      );
+      for (const p of unknown) lines.push(`${short(p.text)}${p.url ? `\n${p.url}` : ''}`);
+    }
+  }
+  if (!lines.length) return 0;
+  const link = base ? `\n${base}/stores` : '';
+  return sendToUser(db, userId, `${lines.join('\n')}${link}`, ctx);
+}
+
+/**
+ * The silence check, run every few minutes by the app (no silent failures): each feed quiet for
+ * longer than its person's limit, within their hours, is told once; the next push clears it.
+ */
+export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): Promise<number> {
+  const rows = await db
+    .select({ token: feedTokens, user: users })
+    .from(feedTokens)
+    .innerJoin(users, eq(users.id, feedTokens.userId))
+    .where(and(isNull(users.disabledAt), isNull(feedTokens.silenceAlertedAt)));
+  const time = toLocalIso(now).slice(11, 16);
+  let told = 0;
+  for (const { token, user } of rows) {
+    if (!token.lastSeenAt) continue;
+    const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
+    const minutes = Math.floor((now.getTime() - Date.parse(token.lastSeenAt)) / 60_000);
+    if (minutes < prefs.silentMinutes || !withinHours(time, prefs.from, prefs.to)) continue;
+    const t = await textsFor(db, user, ctx);
+    const base = await appUrl(db);
+    const text = fill(
+      t.feedSilent ??
+        'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the browser tab.',
+      {
+        source: token.lastSource ?? '-',
+        since: token.lastSeenAt.slice(0, 16).replace('T', ' '),
+        minutes,
+      },
+    );
+    await db
+      .update(feedTokens)
+      .set({ silenceAlertedAt: toLocalIso(now) })
+      .where(eq(feedTokens.userId, user.id));
+    await sendToUser(db, user.id, `${text}${base ? `\n${base}/stores` : ''}`, ctx);
+    told++;
+  }
+  return told;
 }
 
 /**
@@ -223,7 +354,7 @@ export async function receivePush(
  */
 export async function sendStoreNotices(
   db: Db,
-  received: { fresh: StorePost[]; first: boolean },
+  received: Received,
   ctx: AlertContext,
   now = new Date(),
 ): Promise<number> {

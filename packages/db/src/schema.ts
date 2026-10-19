@@ -1098,6 +1098,8 @@ export const feedTokens = sqliteTable('feed_tokens', {
   tokenHash: text('token_hash').notNull(),
   lastSeenAt: text('last_seen_at'),
   lastSource: text('last_source'),
+  /** When the person was told the feed went silent (cleared when it speaks again). */
+  silenceAlertedAt: text('silence_alerted_at'),
   ...timestamps,
 });
 

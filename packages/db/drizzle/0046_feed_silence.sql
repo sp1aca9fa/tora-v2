@@ -1,0 +1,1 @@
+ALTER TABLE `feed_tokens` ADD `silence_alerted_at` text;

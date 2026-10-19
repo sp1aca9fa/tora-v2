@@ -6,7 +6,7 @@ import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { FeedToken, type StoreView, StoreAreaForm } from './store-area';
+import { FeedAlerts, FeedToken, type StoreView, StoreAreaForm } from './store-area';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('stores'))('title') };
@@ -86,6 +86,7 @@ export default async function StoresPage() {
                   {t('alertsLink')}
                 </Link>
               </p>
+              <FeedAlerts prefs={user.preferences?.storeFeed ?? null} />
               <FeedToken hasToken={!!feed} />
             </CardContent>
           </Card>

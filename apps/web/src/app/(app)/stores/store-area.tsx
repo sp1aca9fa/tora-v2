@@ -1,8 +1,11 @@
 'use client';
 
 import {
+  DEFAULT_FEED_PREFS,
+  FEED_SILENT_MINUTES,
   type StoreArea,
   type StoreAreaChoice,
+  type StoreFeedPrefs,
   STORE_NOTICE_KM,
   activeArea,
   distanceKm,
@@ -17,7 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
-import { newFeedTokenAction, saveStoreAreaAction, setStoreCodesAction } from './actions';
+import {
+  newFeedTokenAction,
+  saveStoreAreaAction,
+  saveStoreFeedAction,
+  setStoreCodesAction,
+} from './actions';
 
 export interface StoreView {
   id: string;
@@ -339,6 +347,63 @@ export function FeedToken({ hasToken }: { hasToken: boolean }) {
         </Button>
       )}
       <p className="text-xs text-muted-foreground">{t('feedHelp')}</p>
+    </div>
+  );
+}
+
+/** When the person is told about the feed itself: silence (minutes, hours), unknown stores. */
+export function FeedAlerts({ prefs: saved }: { prefs: StoreFeedPrefs | null }) {
+  const t = useTranslations('stores');
+  const [prefs, setPrefs] = useState({ ...DEFAULT_FEED_PREFS, ...saved });
+  const [pending, startTransition] = useTransition();
+  const save = (part: Partial<typeof prefs>) => {
+    const next = { ...prefs, ...part };
+    setPrefs(next);
+    startTransition(() => saveStoreFeedAction(next));
+  };
+  return (
+    <div className={cn('space-y-2 text-sm', pending && 'opacity-70')}>
+      <div className="flex flex-wrap items-center gap-2">
+        {t('silentAfter')}
+        <NativeSelect
+          value={prefs.silentMinutes}
+          onChange={(e) => save({ silentMinutes: Number(e.target.value) })}
+          className="h-8 w-24"
+          aria-label={t('silentAfter')}
+        >
+          {FEED_SILENT_MINUTES.map((m) => (
+            <option key={m} value={m}>
+              {t('minutes', { m })}
+            </option>
+          ))}
+        </NativeSelect>
+        {t('between')}
+        <Input
+          type="time"
+          value={prefs.from}
+          onChange={(e) => e.target.value && save({ from: e.target.value })}
+          className="h-8 w-28"
+          aria-label={t('from')}
+        />
+        -
+        <Input
+          type="time"
+          value={prefs.to}
+          onChange={(e) => e.target.value && save({ to: e.target.value })}
+          className="h-8 w-28"
+          aria-label={t('to')}
+        />
+      </div>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          className="size-4"
+          checked={prefs.unknown}
+          onChange={(e) => save({ unknown: e.target.checked })}
+        />
+        {t('unknownAlerts')}
+      </label>
+      <p className="text-xs text-muted-foreground">{t('feedAlertsInfo')}</p>
     </div>
   );
 }

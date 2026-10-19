@@ -1394,7 +1394,11 @@
     "buyTarget": "{name}: an ask at {price} on {source}, under your target {target}.",
     "summaryDrops": "Sharp drops (15% or more in a week):",
     "summaryDrop": "{name}: {price}, {pct} in 7 days",
-    "storePosts": "Tora: cards on sale in your area"
+    "storePosts": "Tora: cards on sale in your area",
+    "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the browser tab.",
+    "feedBack": "Tora: the store feed is sending again.",
+    "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",
+    "storeUnknown": "Tora: posts naming no store Tora knows (add the code on the Stores page):"
   },
   "alerts": {
     "title": "Alerts",
@@ -1840,6 +1844,13 @@
     "addedByHand": "added by hand",
     "noticesTo": "Notices for {stores, plural, one {# store} other {# stores}} go to {channels}, as soon as a feed brings a new post about one.",
     "noChannel": "No Discord or Telegram connected yet: notices have nowhere to go.",
-    "alertsLink": "Settings > Alerts"
+    "alertsLink": "Settings > Alerts",
+    "silentAfter": "Tell me when the feed is silent for",
+    "minutes": "{m} min",
+    "between": "between",
+    "from": "From",
+    "to": "To",
+    "unknownAlerts": "Tell me about posts naming no store Tora knows (on boards whose stores Tora has)",
+    "feedAlertsInfo": "No silent failures: the app checks every 2 minutes while it runs on this PC. A whole page of new posts at once (posts maybe missed) is always told."
   }
 }

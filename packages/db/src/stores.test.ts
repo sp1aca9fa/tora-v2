@@ -6,6 +6,7 @@ import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import {
+  checkFeeds,
   feedStatus,
   feedTokenUser,
   listStores,
@@ -13,6 +14,7 @@ import {
   readPush,
   receivePush,
   saveStores,
+  sendFeedMessages,
   sendStoreNotices,
   setStoreCodes,
 } from './stores';
@@ -130,4 +132,42 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   // Another post about the same store soon after: no second notice.
   const again = await push([post('5', 'AKB まだある')]);
   expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
+});
+
+it("tells the feed's person about unknown stores and posts maybe missed", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  const push = (posts: ReturnType<typeof post>[], chain = 'yodobashi') =>
+    receivePush(db, uid, { source: 'gamenv', chain, posts }, now);
+  await push([post('1', 'AKB 販売中')]);
+  sent = [];
+  // A post naming no known ヨドバシ store: told; one on a board without a store list: not.
+  const r = await push([post('2', '🦄 カードセット開始')]);
+  expect(await sendFeedMessages(db, uid, r, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('🦄 カードセット開始');
+  const other = await push([post('3', '🦄 何か')], 'stores');
+  expect(await sendFeedMessages(db, uid, other, ctx, now)).toBe(0);
+  // A whole page new at once (the pinned post known): maybe missed.
+  const page = Array.from({ length: 12 }, (_, i) => post(`p${i}`, 'AKB 何も無し', 2));
+  const turned = await push([post('1', 'AKB 販売中'), ...page]);
+  expect(turned.gap).toEqual({ chain: 'yodobashi', posts: 12 });
+  // Some overlap with the last visit: no gap.
+  expect((await push([post('p0', 'x'), post('p1', 'x'), post('n1', 'AKB')])).gap).toBeNull();
+});
+
+it('tells once when the feed goes silent within the hours, and when it speaks again', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '08:00', to: '23:00' } });
+  await receivePush(db, uid, { source: 'gamenv', posts: [] }, now);
+  const later = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  sent = [];
+  expect(await checkFeeds(db, ctx, later(5))).toBe(0);
+  expect(await checkFeeds(db, ctx, later(11))).toBe(1);
+  expect(await checkFeeds(db, ctx, later(30))).toBe(0);
+  const back = await receivePush(db, uid, { source: 'gamenv', posts: [] }, later(31));
+  expect(back.resumed).toBe(true);
+  expect(await sendFeedMessages(db, uid, back, ctx, later(31))).toBe(1);
+  // Silent outside the hours (12:00 + 11 h = 23:00): not told.
+  expect(await checkFeeds(db, ctx, later(31 + 11 * 60))).toBe(0);
 });

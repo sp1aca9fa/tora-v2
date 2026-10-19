@@ -1,6 +1,6 @@
 // Per-user display preferences (requirements S8).
 import type { StrategyChoice } from './signals';
-import type { StoreArea } from './stores';
+import type { StoreArea, StoreFeedPrefs } from './stores';
 
 /** Panels of the Portfolio Summary's rotating card, in their default order. */
 export const SUMMARY_PANELS = [
@@ -41,6 +41,8 @@ export interface UserPreferences {
   };
   /** The stores watched for store notices (S25). */
   storeArea?: StoreArea;
+  /** Alerts about the store feed itself (S25). */
+  storeFeed?: StoreFeedPrefs;
 }
 
 /** What a person is sent (S17); each kind on unless switched off. */

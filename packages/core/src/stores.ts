@@ -123,3 +123,22 @@ export function storesInPost<T extends Pick<StoreEntry, 'chain' | 'name' | 'code
     )
     .map((h) => h.s);
 }
+
+/** What a person is told about their store feed (S25): no silent failures. */
+export interface StoreFeedPrefs {
+  /** Minutes without a word from the feed before it counts as stopped. */
+  silentMinutes?: number;
+  /** The hours the feed is meant to run ("08:00"-"23:00"); silence outside them is not told. */
+  from?: string;
+  to?: string;
+  /** Posts about a store Tora does not recognise (on unless switched off). */
+  unknown?: boolean;
+}
+
+export const FEED_SILENT_MINUTES = [5, 10, 15, 30, 60];
+export const DEFAULT_FEED_PREFS = { silentMinutes: 10, from: '08:00', to: '23:00', unknown: true };
+
+/** Whether a local time ("21:30") is within hours that may pass midnight ("22:00"-"02:00"). */
+export function withinHours(time: string, from: string, to: string): boolean {
+  return from <= to ? time >= from && time < to : time >= from || time < to;
+}

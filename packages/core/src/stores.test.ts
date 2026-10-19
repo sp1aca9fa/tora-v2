@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { activeArea, distanceKm, roundPoint, storesInArea, storesInPost } from './stores';
+import {
+  activeArea,
+  distanceKm,
+  roundPoint,
+  storesInArea,
+  storesInPost,
+  withinHours,
+} from './stores';
 
 const umeda = {
   id: 'u',
@@ -96,4 +103,11 @@ describe('store notices: posts', () => {
     expect(storesInPost('新宿東口 販売', all, 'biccamera')).toEqual([bicShinjuku]);
     expect(storesInPost('新宿東口 販売', all)).toEqual([bicShinjuku]);
   });
+});
+
+it('tells hours apart, also past midnight', () => {
+  expect(withinHours('21:30', '08:00', '23:00')).toBe(true);
+  expect(withinHours('23:00', '08:00', '23:00')).toBe(false);
+  expect(withinHours('01:00', '22:00', '02:00')).toBe(true);
+  expect(withinHours('12:00', '22:00', '02:00')).toBe(false);
 });

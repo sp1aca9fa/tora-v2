@@ -1,6 +1,14 @@
 'use server';
 
-import { type StoreArea, type StoreAreaChoice, STORE_NOTICE_KM, roundPoint } from '@tora/core';
+import {
+  DEFAULT_FEED_PREFS,
+  FEED_SILENT_MINUTES,
+  type StoreArea,
+  type StoreAreaChoice,
+  type StoreFeedPrefs,
+  STORE_NOTICE_KM,
+  roundPoint,
+} from '@tora/core';
 import { newFeedToken, setPreferences, setStoreCodes } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
@@ -55,5 +63,24 @@ export async function setStoreCodesAction(storeId: string, codes: string[]) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
   await setStoreCodes(db, storeId, codes.map(String).slice(0, 30));
+  revalidatePath('/stores');
+}
+
+/** What the person is told about their store feed: silence, unknown stores (S25). */
+export async function saveStoreFeedAction(prefs: StoreFeedPrefs) {
+  const { db, user } = await authed();
+  const hhmm = (v: unknown) =>
+    typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+  const minutes = FEED_SILENT_MINUTES.includes(prefs.silentMinutes as number)
+    ? prefs.silentMinutes
+    : DEFAULT_FEED_PREFS.silentMinutes;
+  await setPreferences(db, user.id, {
+    storeFeed: {
+      silentMinutes: minutes,
+      from: hhmm(prefs.from) ?? DEFAULT_FEED_PREFS.from,
+      to: hhmm(prefs.to) ?? DEFAULT_FEED_PREFS.to,
+      unknown: prefs.unknown !== false,
+    },
+  });
   revalidatePath('/stores');
 }

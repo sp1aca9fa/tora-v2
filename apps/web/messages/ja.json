@@ -1394,7 +1394,11 @@
     "buyTarget": "{name}: {source}に{price}の出品、目標 {target}以下です。",
     "summaryDrops": "急落（1週間で15%以上）:",
     "summaryDrop": "{name}: {price}、7日間で{pct}",
-    "storePosts": "Tora:エリア内の店舗で販売情報"
+    "storePosts": "Tora:エリア内の店舗で販売情報",
+    "feedSilent": "Tora:店舗フィード({source})が{since}から受信なし({minutes}分):再開するまで店舗通知は届きません。ブラウザのタブを確認してください。",
+    "feedBack": "Tora:店舗フィードが再開しました。",
+    "feedGap": "Tora:{chain}掲示板で一度に{posts}件の新着:取りこぼした投稿があるかもしれません。",
+    "storeUnknown": "Tora:Toraが知らない店舗の投稿(店舗ページでコードを追加してください):"
   },
   "alerts": {
     "title": "アラート",
@@ -1840,6 +1844,13 @@
     "addedByHand": "手動で追加",
     "noticesTo": "{stores}店舗の通知を、フィードが新しい投稿を届けるとすぐに{channels}へ送ります。",
     "noChannel": "DiscordもTelegramもまだ接続されていません:通知の送り先がありません。",
-    "alertsLink": "設定 > アラート"
+    "alertsLink": "設定 > アラート",
+    "silentAfter": "フィードからの受信が途絶えたら通知:",
+    "minutes": "{m}分",
+    "between": "時間帯",
+    "from": "開始",
+    "to": "終了",
+    "unknownAlerts": "Toraが知らない店舗の投稿を通知(店舗リストがある掲示板のみ)",
+    "feedAlertsInfo": "気付かない停止をなくすため、このPCでアプリが動いている間は2分ごとに確認します。1ページ分の新着が一度に来た場合(取りこぼしの可能性)は常に通知します。"
   }
 }

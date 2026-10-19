@@ -1,22 +1,8 @@
 import 'server-only';
-import { type AlertContext, type AlertTexts, setAppUrl, type Db } from '@tora/db';
+import { setAppUrl, type Db } from '@tora/db';
 import { headers } from 'next/headers';
-import { isLocale } from '@/i18n/locale';
 
-/** What sending needs on the app (S17): the secret and the `alertText` messages. */
-export function alertContext(): AlertContext | null {
-  const secret = process.env.AUTH_SECRET?.trim();
-  if (!secret) return null;
-  return {
-    secret,
-    texts: async (locale) =>
-      isLocale(locale)
-        ? (((await import(`../../messages/${locale}.json`)).default as { alertText?: AlertTexts })
-            .alertText ?? {})
-        : {},
-    log: console.log,
-  };
-}
+export { alertContext } from './alert-context';
 
 /** Remembers the app's address for links in messages (the home PC does not know it). */
 export async function rememberAppUrl(db: Db): Promise<void> {

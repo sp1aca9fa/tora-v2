@@ -87,6 +87,22 @@ The answer says how many posts were new, matched a store, and how many people we
 Notices: only for posts of the last 30 minutes, at most one per store every 30 minutes for each
 person, and none for a feed's very first push (it usually brings a page of old posts).
 
+## No silent failures
+
+Besides the notices for your area, the person whose feed sent the posts is told:
+
+- when the feed has been silent longer than they chose (5 to 60 minutes) within their hours (e.g.
+  08:00-23:00), once, and again when it sends again. The app checks every 2 minutes while it runs
+  as a server on your own PC (`pnpm app`); a hosted app has nothing running between requests, so
+  an outside scheduler (cron-job.org, a GitHub Actions schedule) calls
+  `GET /api/feed/check` with `Authorization: Bearer $CRON_SECRET` every few minutes;
+- about recent posts naming no store Tora knows, on boards whose chain has a store list (add the
+  code on the Stores page); this can be switched off;
+- when a push of 10 or more posts is all new (one pinned post aside) on a board seen before: the
+  page turned over completely between two visits, so posts may have been missed.
+
+The settings are on the Stores page, next to the feed's state.
+
 ## Reading sites politely
 
 Read only what the site lets visitors read, at a person's pace (a reload every minute or two).
