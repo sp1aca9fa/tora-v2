@@ -18,3 +18,5 @@ export * from './csv';
 export * from './signals';
 export * from './lines';
 export * from './strategy-examples';
+export * from './opening';
+export * from './pull-rates';

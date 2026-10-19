@@ -364,6 +364,10 @@
       "activity": {
         "title": "Activity",
         "info": "Collects, backups, imports and admin changes, newest first."
+      },
+      "opening": {
+        "title": "Box opening",
+        "info": "Pull rates per set and the selling fee for the box opening value."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -877,7 +881,8 @@
     "tab": {
       "market": "Market",
       "buy": "Buy timing",
-      "details": "Lots & details"
+      "details": "Lots & details",
+      "opening": "Opening"
     },
     "noLots": "No lots registered: you watch this item.",
     "spentTotal": "Spent in all: {amount}",
@@ -1503,7 +1508,9 @@
       "userDevices": "Devices signed out",
       "userDisabled": "Account disabled",
       "userEnabled": "Account enabled",
-      "setLines": "Set lines"
+      "setLines": "Set lines",
+      "openingRates": "Box opening rates",
+      "openingFee": "Box opening fee"
     },
     "role": {
       "admin": "admin",
@@ -1715,5 +1722,76 @@
     "auto": "Automatic: {line}",
     "autoNone": "Automatic: none",
     "hint": "Group studies compare it with items of the same line when there are enough (Settings > Admin preferences > Categories has the list)."
+  },
+  "opening": {
+    "title": "Opening value",
+    "listTitle": "Box opening",
+    "listIntro": "Your booster boxes side by side: today's box price against what opening one returns on average from its hit cards (after the selling fee). Best return first.",
+    "listEmpty": "None of your booster boxes has pull rates yet.",
+    "listWithout": "Without pull rates: {names}.",
+    "box": "Box",
+    "boxPrice": "Box price",
+    "breakEven": "Break-even",
+    "back": "Back on average",
+    "chanceBack": "Boxes paying back",
+    "median": "Median box",
+    "premium": "Sealed premium",
+    "verdictPays": "Opening pays at today's price: a box's hit cards bring {breakEven} on average.",
+    "verdictLoses": "Opening loses at today's price: it pays only below {breakEven}, what a box's hit cards bring on average.",
+    "verdictNoPrice": "A box's hit cards bring {breakEven} on average: opening pays below that box price.",
+    "spread": "One box in ten brings less than {low}, one in ten more than {high}.",
+    "atRetail": "At retail ({retail}) a box returns {back} on average.",
+    "notAdvice": "Pull rates are community estimates, not official; cards below the hit rarities count as nothing. Not advice.",
+    "carry": "Cards carrying the value",
+    "carryInfo": "Each card's price after the fee, how often a box holds it, and its part of a box's average value.",
+    "card": "Card",
+    "price": "Price",
+    "chance": "In a box",
+    "share": "Part",
+    "fromSales": "recent sales ({n})",
+    "fromAsk": "lowest ask",
+    "noCards": "No cards found for these rarities: check the set code and rarities in Settings > Admin > Box opening.",
+    "notRead": "Cards not read yet: the next nightly collect reads them.",
+    "notReadShort": "cards not read yet",
+    "noRates": "No pull rates for this set yet.",
+    "noSet": "This box is not linked to a catalog set, so its pull rates are unknown.",
+    "enterRates": "Enter pull rates",
+    "editRates": "Edit pull rates",
+    "rates": "Pull rates",
+    "ratesSaved": "{set}, entered by an admin. Source: {source}.",
+    "ratesSuggested": "{set}, suggested by Tora. Source: {source}.",
+    "rarity": "Rarity",
+    "perBox": "How often",
+    "average": "Average card",
+    "part": "Part",
+    "matching": "named \"{text}\"",
+    "cardCount": "{count, plural, one {# card} other {# cards}}",
+    "aBox": "{n} a box",
+    "inBoxes": "1 in {n} boxes",
+    "footer": "{packs} packs a box; {fee}% selling fee taken off; cards read {read}.",
+    "settingsTitle": "Box opening",
+    "settingsInfo": "Pull rates per set for the box opening value, the sets of the booster boxes anyone tracks. Rates are not official: Tora suggests community numbers, correct them here. Cards are read again once a week, and at the next collect after a change of code or rarities.",
+    "fee": "Selling fee taken off every card",
+    "noBoxes": "No booster box with a catalog set is tracked yet.",
+    "stateSaved": "Your rates.",
+    "stateSuggested": "Suggested rates (not saved yet).",
+    "stateNone": "No rates yet.",
+    "code": "Set code in card titles",
+    "packs": "Packs a box",
+    "source": "Source of the rates",
+    "perBoxInput": "A box holds",
+    "match": "Only names holding (optional)",
+    "removeTier": "Remove",
+    "addTier": "Add a rarity",
+    "save": "Save",
+    "useSuggested": "Back to suggested",
+    "removeRates": "Remove rates",
+    "cardsRead": "{count, plural, one {# card} other {# cards}} read {date}",
+    "cardsNotRead": "Cards not read yet",
+    "error": {
+      "code": "Type the set code as card titles show it, e.g. SV2a.",
+      "packs": "Packs a box: a whole number from 1 to 100.",
+      "tiers": "Each rarity needs letters (SAR, AR...) and how many a box holds: 3, 0.2 or 1/6."
+    }
   }
 }

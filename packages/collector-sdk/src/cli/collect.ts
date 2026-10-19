@@ -38,6 +38,7 @@ import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
 import { loadAndRegister } from '../registry';
 import { defaultLockDir, lockSource } from '../lock';
+import { readOpeningCards } from '../opening';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
@@ -82,7 +83,7 @@ try {
   // Without it the schedule counts days on the PC's clock.
 }
 // The plug-ins' source descriptions are saved first: the app reads them.
-const { collectors, importers, rates, sources, missing } = await loadAndRegister(db);
+const { collectors, importers, rates, sources, setCards, missing } = await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
 const selected = collectors.filter(
@@ -101,8 +102,13 @@ const results: { source: string; status: string; requests: number; observations:
 const withLinks = !values.product && importers.some((i) => i.readLink);
 // A run per market keeps the rates, purchase links and uploads (each does only what is waiting).
 const withRates = !values.product && !values.source && rates.length > 0;
-// Steps: exchange rates, purchase links, each collector, then pictures + lot sizes + snapshots.
-const progress = new Progress((withRates ? 1 : 0) + (withLinks ? 1 : 0) + selected.length + 1);
+// The box opening value's cards (S20): each set once a week, in any full or per-market run.
+const withOpening = !values.product && !values.source && setCards.length > 0;
+// Steps: exchange rates, purchase links, each collector, box opening cards, then pictures + lot
+// sizes + snapshots.
+const progress = new Progress(
+  (withRates ? 1 : 0) + (withLinks ? 1 : 0) + selected.length + (withOpening ? 1 : 0) + 1,
+);
 const log = progress.log;
 // Exchange rates first: foreign prices collected in this run are converted with today's rate.
 if (withRates) {
@@ -181,6 +187,28 @@ for (const collector of selected) {
     requests: s.requests,
     observations: s.observationsAdded,
   });
+}
+if (withOpening) {
+  progress.next('box opening cards');
+  const locks = setCards.map((s) => lockSource(s.source));
+  try {
+    if (locks.some((l) => 'heldBy' in l)) {
+      log('box opening cards: skipped, another collect is reading the same site');
+    } else {
+      const read = await readOpeningCards(db, setCards, new PoliteHttp({ maxRequests: 400 }), {
+        log: (m) => log(`[box opening] ${m}`),
+      });
+      if (read.sets || read.failed) {
+        log(
+          `box opening cards: ${read.sets} set(s) read, ${read.cards} card(s), ${read.failed} failed`,
+        );
+      }
+    }
+  } catch (error) {
+    log(`box opening cards: stopped (${errorText(error)})`);
+  } finally {
+    for (const l of locks) if (!('heldBy' in l)) l.release();
+  }
 }
 // Product pictures not stored yet (separate polite client: the collectors' cap is spent).
 progress.next('pictures, lot sizes, chart');

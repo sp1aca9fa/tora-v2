@@ -1,6 +1,7 @@
 import type { SourceInfo } from '@tora/core';
 import type {
   CandidateInput,
+  FoundSetCard,
   HoldingInput,
   NewPriceObservation,
   Product,
@@ -240,6 +241,23 @@ export interface RateSource {
 }
 
 /** Shape every collectors package (public or private) exports from its entry point. */
+/**
+ * Lists a set's cards of one rarity with their prices, for the box opening value (S20). Run once a
+ * week per set by the nightly collect.
+ */
+export interface SetCardSource {
+  source: string;
+  cards(
+    set: { code: string; name: string; rarity: string },
+    ctx: Pick<CollectorContext, 'http' | 'now' | 'log'>,
+  ): Promise<FoundSetCard[]>;
+  /** What a card sells for now: the median of its recent single raw sales, or null. */
+  sold?(
+    externalId: string,
+    ctx: Pick<CollectorContext, 'http' | 'now' | 'log'>,
+  ): Promise<{ price: number; sales: number } | null>;
+}
+
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
@@ -249,4 +267,5 @@ export interface CollectorModule {
    * links, aliases...; requirements S8, sources with roles). Saved to the database on each run.
    */
   sources?: SourceInfo[];
+  setCards?: SetCardSource[];
 }

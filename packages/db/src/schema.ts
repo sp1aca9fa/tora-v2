@@ -20,6 +20,7 @@ import {
   type AlertState,
   type NoticeLevels,
   type ProductClass,
+  type PullTier,
   type SignalStats,
   type SourceInfo,
   type SourceRole,
@@ -990,6 +991,52 @@ export const alertChannels = sqliteTable(
   ],
 );
 
+/**
+ * A set's pull rates for the box opening value (S20), entered by the admin (shared). A set
+ * without a row uses the suggested rates shipped with Tora, if any.
+ */
+export const openingSets = sqliteTable('opening_sets', {
+  setId: text('set_id')
+    .primaryKey()
+    .references(() => tcgSets.id, { onDelete: 'cascade' }),
+  /** The set code the shops use in card titles ("SV2a"). */
+  code: text('code').notNull(),
+  packsPerBox: integer('packs_per_box').notNull(),
+  tiers: text('tiers', { mode: 'json' }).notNull().$type<PullTier[]>(),
+  source: text('source'),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  ...timestamps,
+});
+
+/** A set's hit cards and their prices, read once a week by the home PC (S20). */
+export const openingCards = sqliteTable(
+  'opening_cards',
+  {
+    id: id(),
+    setId: text('set_id')
+      .notNull()
+      .references(() => tcgSets.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    externalId: text('external_id').notNull(),
+    name: text('name').notNull(),
+    number: text('number'),
+    rarity: text('rarity').notNull(),
+    currency: text('currency').notNull(),
+    /** Lowest ask, in the currency's smallest unit. */
+    ask: integer('ask'),
+    /** Median of the recent single raw sales (read for the cards carrying most of the value). */
+    sold: integer('sold'),
+    sales: integer('sales'),
+    url: text('url'),
+    /** When the cards were read (local time). */
+    readAt: text('read_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('opening_cards_uq').on(t.setId, t.source, t.externalId),
+    index('opening_cards_set_idx').on(t.setId, t.rarity),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1015,3 +1062,5 @@ export type AlertChannel = typeof alertChannels.$inferSelect;
 export type Watch = typeof watches.$inferSelect;
 export type Signal = typeof signals.$inferSelect;
 export type Supply = typeof supply.$inferSelect;
+export type OpeningSet = typeof openingSets.$inferSelect;
+export type OpeningCardRow = typeof openingCards.$inferSelect;

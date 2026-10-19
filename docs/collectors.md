@@ -82,6 +82,7 @@ export const collectors: Collector[] = [myShop]; // price sources
 export const importers: PurchaseImporter[] = []; // optional: purchases from order emails or links
 export const rates: RateSource[] = []; // optional: exchange rates (see markets.md)
 export const sources: SourceInfo[] = [/* one per collector, and per shop purchases come from */];
+export const setCards: SetCardSource[] = []; // optional: a set's hit cards for the box opening value
 ```
 
 ## Describing a source (`SourceInfo`)
@@ -245,6 +246,16 @@ Each item of a several-item order gets its own key (`<order>#2`); items left out
 `{ kind: 'skip', title, reason }`. `productFor` makes a new item from a receipt (an existing item
 of the same name, spaces, 「」 and ボックス/BOX aside, is reused) and `holdingFor` reads the lot's
 condition. Amounts are in the shop's currency's smallest unit. See [Running collectors](running.md#imports) for how imports run.
+
+## Set card sources
+
+A `SetCardSource` lists a TCG set's cards of one rarity with their lowest asks
+(`cards({ code, name, rarity }, ctx)`, e.g. searches for "ポケモンカード151 SAR" and "SV2a SAR"), for the box opening value: what a
+booster box's hit cards bring on average against its price. Its `sold(externalId, ctx)` gives a
+card's recent selling price (the median of its recent single raw sales), read only for the ten
+cards carrying most of a set's value. The nightly collect reads each set once a week, and again
+after an admin changes its code or rarities in Settings > Admin > Box opening. Prices are in the
+card's currency's smallest unit; graded copies and error prints are left out.
 
 ## Checklist before turning a source on
 

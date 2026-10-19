@@ -4,7 +4,13 @@ import { findRepoRoot } from '@tora/db/env';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Collector, CollectorModule, PurchaseImporter, RateSource } from './types';
+import type {
+  Collector,
+  CollectorModule,
+  PurchaseImporter,
+  RateSource,
+  SetCardSource,
+} from './types';
 
 /**
  * Collector packages, loaded by path so the public repo works without the private
@@ -20,6 +26,7 @@ export interface LoadedCollectors {
   importers: PurchaseImporter[];
   rates: RateSource[];
   sources: SourceInfo[];
+  setCards: SetCardSource[];
   missing: string[];
 }
 
@@ -28,6 +35,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const importers: PurchaseImporter[] = [];
   const rates: RateSource[] = [];
   const sources: SourceInfo[] = [];
+  const setCards: SetCardSource[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -40,8 +48,9 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     importers.push(...(mod.importers ?? []));
     rates.push(...(mod.rates ?? []));
     sources.push(...(mod.sources ?? []));
+    setCards.push(...(mod.setCards ?? []));
   }
-  return { collectors, importers, rates, sources, missing };
+  return { collectors, importers, rates, sources, setCards, missing };
 }
 
 /**

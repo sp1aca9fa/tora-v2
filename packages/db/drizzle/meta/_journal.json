@@ -302,6 +302,13 @@
       "when": 1792321378348,
       "tag": "0042_watch_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1792405766757,
+      "tag": "0043_opening",
+      "breakpoints": true
     }
   ]
 }

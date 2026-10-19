@@ -8,7 +8,7 @@ import {
   lowestAsk,
   savedBucketValues,
 } from '@tora/db';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, Plus, PackageOpen } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -95,11 +95,18 @@ export default async function WatchlistPage() {
           </div>
           <p className="text-sm text-muted-foreground">{t('watchlist.intro')}</p>
         </div>
-        <Button asChild>
-          <Link href="/watchlist/add">
-            <Plus /> {t('watchlist.add')}
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/watchlist/opening">
+              <PackageOpen /> {t('opening.listTitle')}
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/watchlist/add">
+              <Plus /> {t('watchlist.add')}
+            </Link>
+          </Button>
+        </div>
       </header>
       {items.length > 0 &&
         (chosen ? (

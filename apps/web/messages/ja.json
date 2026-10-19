@@ -364,6 +364,10 @@
       "activity": {
         "title": "アクティビティ",
         "info": "収集、バックアップ、インポート、管理者の変更を新しい順に。"
+      },
+      "opening": {
+        "title": "BOX開封",
+        "info": "BOX開封の期待値に使うセットごとの封入率と販売手数料。"
       }
     },
     "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。",
@@ -877,7 +881,8 @@
     "tab": {
       "market": "相場",
       "buy": "買い時",
-      "details": "取引と詳細"
+      "details": "取引と詳細",
+      "opening": "開封"
     },
     "noLots": "登録した取引はありません（ウォッチ中）。",
     "spentTotal": "合計の取得額: {amount}",
@@ -1503,7 +1508,9 @@
       "userDevices": "端末をサインアウト",
       "userDisabled": "アカウント無効化",
       "userEnabled": "アカウント有効化",
-      "setLines": "セットの種類"
+      "setLines": "セットの種類",
+      "openingRates": "BOX開封の封入率",
+      "openingFee": "BOX開封の手数料"
     },
     "role": {
       "admin": "管理者",
@@ -1715,5 +1722,76 @@
     "auto": "自動: {line}",
     "autoNone": "自動: なし",
     "hint": "グループの分析では、同じ種類の商品が十分あればそれらと比べます（一覧は 設定 > 管理者設定 > カテゴリー）。"
+  },
+  "opening": {
+    "title": "開封の期待値",
+    "listTitle": "BOX開封",
+    "listIntro": "あなたのBOXを並べて比較:今日のBOX価格と、当たりカードから開封で平均いくら戻るか(販売手数料を引いた額)。戻りの大きい順。",
+    "listEmpty": "封入率が登録されたBOXはまだありません。",
+    "listWithout": "封入率なし:{names}。",
+    "box": "BOX",
+    "boxPrice": "BOX価格",
+    "breakEven": "損益分岐",
+    "back": "平均の戻り",
+    "chanceBack": "元が取れるBOX",
+    "median": "中央値のBOX",
+    "premium": "未開封プレミアム",
+    "verdictPays": "今日の価格なら開封が得:1BOXの当たりカードは平均{breakEven}。",
+    "verdictLoses": "今日の価格では開封は損:得になるのは{breakEven}(1BOXの当たりカードの平均)未満のときだけ。",
+    "verdictNoPrice": "1BOXの当たりカードは平均{breakEven}:これより安いBOXなら開封が得。",
+    "spread": "10BOXに1つは{low}未満、10BOXに1つは{high}超。",
+    "atRetail": "定価({retail})なら平均{back}が戻ります。",
+    "notAdvice": "封入率は非公式の推定値です。当たり以外のカードは0円として計算。投資助言ではありません。",
+    "carry": "価値を占めるカード",
+    "carryInfo": "手数料を引いた価格、1BOXに入る頻度、BOXの平均価値に占める割合。",
+    "card": "カード",
+    "price": "価格",
+    "chance": "1BOXに",
+    "share": "割合",
+    "fromSales": "最近の取引({n})",
+    "fromAsk": "最安出品",
+    "noCards": "このレアリティのカードが見つかりません:設定 > 管理 > BOX開封 でセットコードとレアリティを確認してください。",
+    "notRead": "カードはまだ読み込まれていません:次の夜間収集で読み込みます。",
+    "notReadShort": "カード未読込",
+    "noRates": "このセットの封入率はまだありません。",
+    "noSet": "このBOXはカタログのセットに紐付いていないため、封入率が分かりません。",
+    "enterRates": "封入率を入力",
+    "editRates": "封入率を編集",
+    "rates": "封入率",
+    "ratesSaved": "{set}、管理者が入力。出典:{source}。",
+    "ratesSuggested": "{set}、Toraの提案値。出典:{source}。",
+    "rarity": "レアリティ",
+    "perBox": "頻度",
+    "average": "平均価格",
+    "part": "割合",
+    "matching": "名前に「{text}」",
+    "cardCount": "{count}種",
+    "aBox": "1BOXに{n}枚",
+    "inBoxes": "{n}BOXに1枚",
+    "footer": "1BOX {packs}パック。販売手数料{fee}%を差し引き。カード読込 {read}。",
+    "settingsTitle": "BOX開封",
+    "settingsInfo": "BOX開封の期待値に使うセットごとの封入率(誰かが登録しているBOXのセット)。封入率は非公式:Toraがコミュニティの数値を提案し、ここで修正できます。カードは週1回、コードやレアリティを変えた後は次の収集で読み直します。",
+    "fee": "各カードから引く販売手数料",
+    "noBoxes": "カタログのセットに紐付いたBOXはまだ登録されていません。",
+    "stateSaved": "入力済みの封入率。",
+    "stateSuggested": "提案値(未保存)。",
+    "stateNone": "封入率なし。",
+    "code": "カード名のセットコード",
+    "packs": "1BOXのパック数",
+    "source": "封入率の出典",
+    "perBoxInput": "1BOXに",
+    "match": "名前に含む文字(任意)",
+    "removeTier": "削除",
+    "addTier": "レアリティを追加",
+    "save": "保存",
+    "useSuggested": "提案値に戻す",
+    "removeRates": "封入率を削除",
+    "cardsRead": "{count}枚 読込 {date}",
+    "cardsNotRead": "カード未読込",
+    "error": {
+      "code": "カード名にあるセットコードを入力してください(例:SV2a)。",
+      "packs": "1BOXのパック数:1から100の整数。",
+      "tiers": "各レアリティに英字(SAR、ARなど)と1BOXに入る数(3、0.2、1/6)が必要です。"
+    }
   }
 }

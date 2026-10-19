@@ -84,7 +84,7 @@ export default async function ItemLayout({ params, children }: Params & { childr
           ))}
         </dl>
       </header>
-      <ItemNav productId={product.id} />
+      <ItemNav productId={product.id} opening={product.kind === 'booster_box'} />
       {children}
     </div>
   );

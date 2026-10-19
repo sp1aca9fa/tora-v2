@@ -8,16 +8,20 @@ import { cn } from '@/lib/utils';
 const TABS = [
   ['market', ''],
   ['buy', '/buy'],
+  ['opening', '/opening'],
   ['details', '/details'],
 ] as const;
 
-/** The item's sub pages (S22): Market, Buy timing, Lots & details, each its own address. */
-export function ItemNav({ productId }: { productId: string }) {
+/**
+ * The item's sub pages (S22): Market, Buy timing, Lots & details, each its own address; booster
+ * boxes also Opening (S20).
+ */
+export function ItemNav({ productId, opening }: { productId: string; opening: boolean }) {
   const t = useTranslations('product.tab');
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto border-b">
-      {TABS.map(([name, path]) => {
+      {TABS.filter(([name]) => opening || name !== 'opening').map(([name, path]) => {
         const href = `/products/${productId}${path}`;
         const current = pathname === href;
         return (

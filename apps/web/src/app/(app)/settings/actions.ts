@@ -43,6 +43,9 @@ import {
   setSourceOrder,
   setSourceRoles,
   recordAdminChange,
+  saveOpeningRates,
+  clearOpeningRates,
+  setOpeningFee,
   saveSetLineList,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
@@ -424,4 +427,81 @@ export async function changeTimeZoneAction(name: string): Promise<FormState> {
   });
   revalidatePath('/', 'layout');
   return {};
+}
+
+/** "1/6", "0.2" or "3" as a number of hits a box; null when not one. */
+function perBox(text: string): number | null {
+  const t = text.normalize('NFKC').trim();
+  const frac = t.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  const n = frac ? Number(frac[1]) / Number(frac[2]) : Number(t);
+  return t && Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
+}
+
+/** A set's pull rates for the box opening value (admins, S20). */
+export async function saveOpeningRatesAction(
+  setId: string,
+  input: {
+    code: string;
+    packsPerBox: string;
+    tiers: { rarity: string; perBox: string; match: string }[];
+    source: string;
+  },
+): Promise<{ error: 'code' | 'packs' | 'tiers' } | undefined> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const code = input.code.normalize('NFKC').trim();
+  if (!/^[A-Za-z0-9-]{1,12}$/.test(code)) return { error: 'code' };
+  const packs = Number(input.packsPerBox);
+  if (!Number.isInteger(packs) || packs < 1 || packs > 100) return { error: 'packs' };
+  const tiers = input.tiers
+    .filter((t) => t.rarity.trim() || t.perBox.trim())
+    .map((t) => ({
+      rarity: t.rarity.normalize('NFKC').trim().toUpperCase(),
+      perBox: perBox(t.perBox),
+      match: t.match.normalize('NFKC').trim() || null,
+    }));
+  if (!tiers.length || tiers.some((t) => !/^[A-Z+]{1,6}$/.test(t.rarity) || t.perBox === null)) {
+    return { error: 'tiers' };
+  }
+  await saveOpeningRates(
+    db,
+    setId,
+    {
+      code,
+      packsPerBox: packs,
+      tiers: tiers.map((t) => ({
+        rarity: t.rarity,
+        perBox: t.perBox!,
+        ...(t.match ? { match: t.match } : {}),
+      })),
+      source: input.source.trim() || null,
+    },
+    user.id,
+  );
+  await recordAdminChange(db, user.id, 'openingRates', { set: setId }, '/settings/admin/opening');
+  revalidatePath('/settings/admin/opening');
+}
+
+/** Back to the suggested rates, or none (admins, S20). */
+export async function clearOpeningRatesAction(setId: string) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  await clearOpeningRates(db, setId);
+  await recordAdminChange(
+    db,
+    user.id,
+    'openingRates',
+    { set: setId, to: null },
+    '/settings/admin/opening',
+  );
+  revalidatePath('/settings/admin/opening');
+}
+
+/** The selling fee taken off every card's price (admins, S20), in percent. */
+export async function setOpeningFeeAction(percent: number) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || !Number.isInteger(percent) || percent < 0 || percent > 50) return;
+  await setOpeningFee(db, percent / 100);
+  await recordAdminChange(db, user.id, 'openingFee', { to: percent }, '/settings/admin/opening');
+  revalidatePath('/settings/admin/opening');
 }
