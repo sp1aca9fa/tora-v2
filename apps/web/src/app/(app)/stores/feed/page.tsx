@@ -1,5 +1,5 @@
 import { localDate, storesInArea } from '@tora/core';
-import { channelsOf, feedStatus, listStores } from '@tora/db';
+import { cachedStores, channelsOf, feedStatus } from '@tora/db';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ export default async function StoreFeedPage() {
   const { db, user } = await authed();
   const [t, all, feed, channels] = await Promise.all([
     getTranslations('stores'),
-    listStores(db),
+    cachedStores(db),
     feedStatus(db, user.id),
     channelsOf(db, user.id),
   ]);
@@ -32,7 +32,7 @@ export default async function StoreFeedPage() {
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
-      <AutoRefresh />
+      <AutoRefresh on="feed" />
       <Card>
         <CardHeader>
           <CardTitle>{t('feed')}</CardTitle>

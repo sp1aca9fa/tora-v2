@@ -79,6 +79,10 @@ Content-Type: application/json
   is told (an access check or a changed page would otherwise go unnoticed).
 - `offered`: every board the feed can read; the person can then choose in the app which ones it
   watches, and the answer to each push carries that choice as `watch` (null when the feed decides).
+- `seen` and `gap` (optional, to send less): a feed may send only the posts it did not send
+  before; it then says how many posts the page showed (`seen`, so a board showing none for too
+  long is told) and whether the page turned over since its last visit (`gap`). Without them Tora
+  works it out from the posts sent, which costs a few more rows read per push.
 - `watching`: every board the feed goes through; its person is told "connected, tracking these
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.

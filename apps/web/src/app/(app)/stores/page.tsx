@@ -1,5 +1,5 @@
 import { PLACE, codeIndex, localDate, storesInArea } from '@tora/core';
-import { listStores, recentPosts, storeCodes, storeGlossary } from '@tora/db';
+import { cachedStores, recentPosts, storeCodes, storeGlossary } from '@tora/db';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -19,7 +19,7 @@ export default async function StorePostsPage() {
   if (!area) redirect('/stores/area');
   const [t, all, posts, glossary] = await Promise.all([
     getTranslations('stores'),
-    listStores(db),
+    cachedStores(db),
     recentPosts(db, 60),
     storeGlossary(db),
   ]);
@@ -38,7 +38,7 @@ export default async function StorePostsPage() {
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
-      <AutoRefresh />
+      <AutoRefresh on="post" />
       <Card>
         <CardHeader>
           <CardTitle>{t('posts')}</CardTitle>

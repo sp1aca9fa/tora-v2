@@ -80,8 +80,15 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
   return written;
 }
 
+/** Sorted here, not by the database (which would count every row twice for the sort). */
 export async function listStores(db: Pick<Db, 'select'>): Promise<Store[]> {
-  return db.select().from(stores).orderBy(stores.chain, stores.region, stores.name);
+  const list = await db.select().from(stores);
+  return list.sort(
+    (a, b) =>
+      a.chain.localeCompare(b.chain) ||
+      (a.region ?? '').localeCompare(b.region ?? '') ||
+      a.name.localeCompare(b.name),
+  );
 }
 
 /**
@@ -93,7 +100,7 @@ let storesCache = new WeakMap<object, { at: number; list: Store[] }>();
 const forgetStores = () => {
   storesCache = new WeakMap();
 };
-async function cachedStores(db: Pick<Db, 'select'>, now = Date.now()): Promise<Store[]> {
+export async function cachedStores(db: Pick<Db, 'select'>, now = Date.now()): Promise<Store[]> {
   const had = storesCache.get(db);
   if (had && now - had.at <= STORES_CACHE_MS) return had.list;
   const list = await listStores(db);
@@ -190,6 +197,13 @@ export interface Push {
   watching?: string[] | null;
   /** Every board the feed can read (chosen from in the app). */
   offered?: string[] | null;
+  /**
+   * Posts on the page read (the feed may send only the ones it did not send before); a board
+   * whose page shows none for too long is told.
+   */
+  seen?: number | null;
+  /** The feed saw a whole page of new posts at once (posts may have been missed). */
+  gap?: boolean | null;
   /** The board's chain ("yodobashi"), when the whole push is one chain's. */
   chain?: string | null;
   posts: PushedPost[];
@@ -224,6 +238,8 @@ export function readPush(body: unknown): Push | string {
       ? b.watching.filter((w) => typeof w === 'string' && /^[a-z0-9_-]{1,40}$/.test(w)).slice(0, 20)
       : null,
     offered: keys(b.offered),
+    seen: typeof b.seen === 'number' && b.seen >= 0 ? Math.round(b.seen) : null,
+    gap: typeof b.gap === 'boolean' ? b.gap : null,
     chain: typeof b.chain === 'string' ? b.chain : null,
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
@@ -252,6 +268,10 @@ export interface Received {
   boardBack?: string | null;
   /** The feed connected (first push, back after a silence, or other boards): what it watches. */
   connected?: { source: string; boards: string[] } | null;
+  /** The boards chosen in the app for the feed to watch (null: the feed decides). */
+  watch?: string[] | null;
+  /** The feed's person, as read with the push (spares reading them again). */
+  user?: typeof users.$inferSelect | null;
 }
 
 /** A push's board key: the board, else its chain, else the feed. */
@@ -265,21 +285,20 @@ export async function receivePush(
   now = new Date(),
 ): Promise<Received> {
   const at = toLocalIso(now);
-  const [token] = await db
-    .select({
-      lastSeenAt: feedTokens.lastSeenAt,
-      silenceAlertedAt: feedTokens.silenceAlertedAt,
-      boards: feedTokens.boards,
-      watching: feedTokens.watching,
-    })
+  // The person and their feed in one read: the push's answer and messages need both.
+  const [row] = await db
+    .select({ user: users, token: feedTokens })
     .from(feedTokens)
+    .innerJoin(users, eq(users.id, feedTokens.userId))
     .where(eq(feedTokens.userId, userId));
+  const token = row?.token;
   const key = boardKey(push);
   const had = token?.boards?.[key];
-  const read = push.posts.length > 0;
+  const seen = push.seen ?? push.posts.length;
+  const read = seen > 0;
   const board: BoardState = {
     at,
-    posts: push.posts.length,
+    posts: seen,
     readAt: read ? at : (had?.readAt ?? null),
     alertedAt: read ? null : (had?.alertedAt ?? null),
   };
@@ -303,23 +322,33 @@ export async function receivePush(
     (push.watching && push.watching.join() !== token?.watching?.join())
       ? { source: push.source, boards: watching }
       : null;
-  if (!read) return { fresh: [], first: false, resumed, gap: null, boardBack, connected };
+  const offered = push.offered ?? token?.offered ?? null;
+  const chosen = row?.user.preferences?.storeFeed?.boards?.filter(
+    (b) => !offered || offered.includes(b),
+  );
+  const watch = chosen?.length ? chosen : null;
+  const base = { resumed, boardBack, connected, watch, user: row?.user ?? null };
+  if (!push.posts.length) return { fresh: [], first: false, gap: null, ...base };
   // Whether the feed, and this board's chain, sent posts before: one row read each, not a count.
   const [known] = await db
     .select({ one: sql<number>`1` })
     .from(storePosts)
     .where(eq(storePosts.source, push.source))
     .limit(1);
-  const [seenChain] = await db
-    .select({ one: sql<number>`1` })
-    .from(storePosts)
-    .where(
-      and(
-        eq(storePosts.source, push.source),
-        push.chain ? eq(storePosts.chain, push.chain) : isNull(storePosts.chain),
-      ),
-    )
-    .limit(1);
+  // A feed that tells whether it saw a whole new page spares this read.
+  const [seenChain] =
+    push.gap != null
+      ? []
+      : await db
+          .select({ one: sql<number>`1` })
+          .from(storePosts)
+          .where(
+            and(
+              eq(storePosts.source, push.source),
+              push.chain ? eq(storePosts.chain, push.chain) : isNull(storePosts.chain),
+            ),
+          )
+          .limit(1);
   const all = await cachedStores(db);
   const listed = all.map((s) => ({ ...s, codes: storeCodes(s) }));
   const fresh: StorePost[] = [];
@@ -345,11 +374,14 @@ export async function receivePush(
   }
   // A page shows a fixed number of posts (one may be pinned): all of them new means the page
   // turned over completely since the last visit.
-  const gap =
-    seenChain && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
-      ? { chain: push.chain ?? null, posts: fresh.length }
-      : null;
-  return { fresh, first: !known, resumed, gap, boardBack, connected };
+  const gap = (
+    push.gap != null
+      ? push.gap
+      : !!seenChain && push.posts.length >= GAP_MIN_POSTS && fresh.length >= push.posts.length - 1
+  )
+    ? { chain: push.chain ?? null, posts: fresh.length }
+    : null;
+  return { fresh, first: !known, gap, ...base };
 }
 
 const fill = (text: string, params: Record<string, string | number>) =>
@@ -371,7 +403,21 @@ export async function sendFeedMessages(
   ctx: AlertContext,
   now = new Date(),
 ): Promise<number> {
-  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
+  const unknownPosts = received.first
+    ? []
+    : received.fresh.filter((p) => !p.storeIds.length && p.postedAt >= since);
+  // Most pushes have nothing to say: nothing else is read then.
+  if (
+    !received.connected &&
+    !received.resumed &&
+    !received.boardBack &&
+    !received.gap &&
+    !unknownPosts.length
+  )
+    return 0;
+  const user =
+    received.user ?? (await db.select().from(users).where(eq(users.id, userId)))[0] ?? null;
   if (!user) return 0;
   const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
   const t = await textsFor(db, user, ctx);
@@ -400,11 +446,10 @@ export async function sendFeedMessages(
         { posts: received.gap.posts, chain: received.gap.chain ?? '-' },
       ),
     );
-  if (!received.first && prefs.unknown) {
-    const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
-    // Any board: with places, every post naming an area is placed; the rest may be a code
-    // Tora does not know yet (or no sighting at all: questions, chat).
-    const unknown = received.fresh.filter((p) => !p.storeIds.length && p.postedAt >= since);
+  // Any board: with places, every post naming an area is placed; the rest may be a code Tora
+  // does not know yet (or no sighting at all: questions, chat).
+  if (prefs.unknown) {
+    const unknown = unknownPosts;
     if (unknown.length) {
       lines.push(
         t.storeUnknown ??
@@ -688,4 +733,20 @@ export async function boardsToWatch(db: Db, userId: string): Promise<string[] | 
   const offered = row?.offered;
   const boards = offered ? chosen.filter((b) => offered.includes(b)) : chosen;
   return boards.length ? boards : null;
+}
+
+/**
+ * What changes the Stores pages (S25): the newest post and the person's feed's last push, two
+ * rows read, so an open page asks this and reloads only when something changed.
+ */
+export async function storesState(db: Db, userId: string) {
+  const [[post], [token]] = await Promise.all([
+    db
+      .select({ at: storePosts.postedAt })
+      .from(storePosts)
+      .orderBy(desc(storePosts.postedAt))
+      .limit(1),
+    db.select({ at: feedTokens.lastSeenAt }).from(feedTokens).where(eq(feedTokens.userId, userId)),
+  ]);
+  return { post: post?.at ?? null, feed: token?.at ?? null };
 }

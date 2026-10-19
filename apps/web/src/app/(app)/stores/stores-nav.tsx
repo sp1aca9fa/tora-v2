@@ -37,14 +37,30 @@ export function StoresNav() {
   );
 }
 
-/** Reloads the page's data every so often: the feed keeps changing while the page is open. */
-export function AutoRefresh({ seconds = 30 }: { seconds?: number }) {
+/**
+ * Reloads the page when what it shows changed: asks every 20 s for the newest post (`post`) or
+ * the feed's last push (`feed`), a few rows read, and refreshes only on a change.
+ */
+export function AutoRefresh({ on }: { on: 'post' | 'feed' }) {
   const router = useRouter();
   useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') router.refresh();
-    }, seconds * 1000);
+    let last: string | null | undefined;
+    const check = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const state = (await (await fetch('/api/stores/state')).json()) as Record<
+          string,
+          string | null
+        >;
+        if (last !== undefined && state[on] !== last) router.refresh();
+        last = state[on];
+      } catch {
+        // Offline for a moment: the next check tries again.
+      }
+    };
+    void check();
+    const timer = setInterval(check, 20_000);
     return () => clearInterval(timer);
-  }, [router, seconds]);
+  }, [router, on]);
   return null;
 }

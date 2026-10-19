@@ -1099,27 +1099,31 @@ export interface BoardState {
 }
 
 /** A person's feed token (S25): the hash only; when and what it last sent. */
-export const feedTokens = sqliteTable('feed_tokens', {
-  userId: text('user_id')
-    .primaryKey()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  tokenHash: text('token_hash').notNull(),
-  lastSeenAt: text('last_seen_at'),
-  lastSource: text('last_source'),
-  /** When the person was told the feed went silent (cleared when it speaks again). */
-  silenceAlertedAt: text('silence_alerted_at'),
-  /**
-   * Each board the feed reads (key: the board, else its chain, else the feed): its last visit, how
-   * many posts it read then, the last visit that read any, and when its person was told it read
-   * none for too long.
-   */
-  boards: text('boards', { mode: 'json' }).$type<Record<string, BoardState>>(),
-  /** The boards the feed says it watches (told when it connects or the list changes). */
-  watching: text('watching', { mode: 'json' }).$type<string[]>(),
-  /** The boards the feed can read (to choose from in the app). */
-  offered: text('offered', { mode: 'json' }).$type<string[]>(),
-  ...timestamps,
-});
+export const feedTokens = sqliteTable(
+  'feed_tokens',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    lastSeenAt: text('last_seen_at'),
+    lastSource: text('last_source'),
+    /** When the person was told the feed went silent (cleared when it speaks again). */
+    silenceAlertedAt: text('silence_alerted_at'),
+    /**
+     * Each board the feed reads (key: the board, else its chain, else the feed): its last visit, how
+     * many posts it read then, the last visit that read any, and when its person was told it read
+     * none for too long.
+     */
+    boards: text('boards', { mode: 'json' }).$type<Record<string, BoardState>>(),
+    /** The boards the feed says it watches (told when it connects or the list changes). */
+    watching: text('watching', { mode: 'json' }).$type<string[]>(),
+    /** The boards the feed can read (to choose from in the app). */
+    offered: text('offered', { mode: 'json' }).$type<string[]>(),
+    ...timestamps,
+  },
+  (t) => [index('feed_tokens_hash_idx').on(t.tokenHash)],
+);
 
 /** The last store notice a person was sent per store: posts close together make one notice. */
 export const storeNotices = sqliteTable(

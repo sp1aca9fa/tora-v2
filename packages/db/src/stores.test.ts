@@ -114,6 +114,8 @@ it('checks what a feed pushes', () => {
     board: null,
     watching: null,
     offered: null,
+    seen: null,
+    gap: null,
     chain: 'yodobashi',
     posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
   });
@@ -279,4 +281,36 @@ it('sends back the boards chosen in the app, among those the feed can read', asy
   );
   await setPreferences(db, uid, { storeFeed: { boards: ['b', 'z'] } });
   expect(await boardsToWatch(db, uid)).toEqual(['b']);
+});
+
+it('takes what the feed says it saw: posts on the page and a page turned over', async () => {
+  await newFeedToken(db, uid);
+  await receivePush(
+    db,
+    uid,
+    { source: 'gamenv', board: 'b', chain: 'yodobashi', posts: [post('1', 'x')] },
+    now,
+  );
+  // Only new posts sent (none), but the page showed 20: the board gave posts.
+  await receivePush(
+    db,
+    uid,
+    { source: 'gamenv', board: 'b', chain: 'yodobashi', seen: 20, posts: [] },
+    now,
+  );
+  expect((await feedStatus(db, uid))!.boards.b).toMatchObject({ posts: 20 });
+  const turned = await receivePush(
+    db,
+    uid,
+    {
+      source: 'gamenv',
+      board: 'b',
+      chain: 'yodobashi',
+      seen: 20,
+      gap: true,
+      posts: [post('2', 'y')],
+    },
+    now,
+  );
+  expect(turned.gap).toEqual({ chain: 'yodobashi', posts: 1 });
 });

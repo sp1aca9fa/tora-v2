@@ -1,0 +1,1 @@
+CREATE INDEX `feed_tokens_hash_idx` ON `feed_tokens` (`token_hash`);
