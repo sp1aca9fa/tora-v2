@@ -93,7 +93,8 @@ export default async function StoresPage() {
                     return (
                       <li key={p.id} className={cn('space-y-0.5 py-2', !mine && 'opacity-70')}>
                         <p className="text-xs text-muted-foreground">
-                          {p.postedAt.slice(5, 16).replace('T', ' ')} ·{' '}
+                          {p.postedAt.slice(5, 16).replace('T', ' ')}
+                          {p.author ? ` · ${p.author}` : ''} ·{' '}
                           <span className={cn(mine && 'font-semibold text-foreground')}>
                             {names.length ? names.join(', ') : t('unknownStore')}
                           </span>

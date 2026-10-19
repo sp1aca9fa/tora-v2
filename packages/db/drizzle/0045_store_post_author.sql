@@ -1,0 +1,1 @@
+ALTER TABLE `store_posts` ADD `author` text;

@@ -79,7 +79,12 @@ export function storesInArea(
   return new Set(ids.filter((id) => !muted.has(id)));
 }
 
-const norm = (s: string) => s.normalize('NFKC').toLowerCase();
+/** Width, case and emoji variation marks aside (🏍️ and 🏍 alike). */
+const norm = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\uFE0E\uFE0F]/g, '');
 const ascii = /^[\x20-\x7e]+$/;
 
 /** Whether a code is in a post: Latin codes as whole words ("AKB" not in "AKBX"), others anywhere. */

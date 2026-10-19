@@ -60,6 +60,7 @@ Content-Type: application/json
     {
       "id": "12345",
       "text": "UMD 30th 店頭販売開始",
+      "author": "梅田の人",
       "url": "https://example.com/board#12345",
       "postedAt": "2026-10-19T12:34:00+09:00"
     }
@@ -71,6 +72,8 @@ Content-Type: application/json
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
 - `id`: the post's id on its site (or any stable key): a post sent again is ignored, so sending
   the whole visible page every time is fine. At most 200 posts a push.
+- `author`: the poster's name, when the site shows one; stores are looked for in it too (some
+  posters name their store in it).
 - `postedAt`: when the site shows it; otherwise the time Tora received it.
 - An empty `posts` list is a heartbeat: the Stores page shows when the feed was last heard from,
   so you know it is still running.

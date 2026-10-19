@@ -101,7 +101,7 @@ it('checks what a feed pushes', () => {
   ).toEqual({
     source: 'gamenv',
     chain: 'yodobashi',
-    posts: [{ id: '1', text: 'x', url: null, postedAt: null, chain: null }],
+    posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
   });
 });
 

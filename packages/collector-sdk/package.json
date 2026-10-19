@@ -15,7 +15,8 @@
     "review": "tsx src/cli/review.ts",
     "demo": "tsx src/cli/demo.ts",
     "import-ai": "tsx src/cli/import-ai.ts",
-    "import-uploads": "tsx src/cli/import-uploads.ts"
+    "import-uploads": "tsx src/cli/import-uploads.ts",
+    "plugins": "tsx src/cli/plugins.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

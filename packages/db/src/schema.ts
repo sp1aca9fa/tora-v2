@@ -1074,6 +1074,8 @@ export const storePosts = sqliteTable(
     /** The board's chain, when it has one. */
     chain: text('chain'),
     text: text('text').notNull(),
+    /** The poster's name (some name their store in it). */
+    author: text('author'),
     url: text('url'),
     /** When it was posted (local time), else when it was received. */
     postedAt: text('posted_at').notNull(),

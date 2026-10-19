@@ -74,6 +74,14 @@ describe('store notices: posts', () => {
     expect(storesInPost('アキバと梅田で販売中', all, 'yodobashi')).toEqual([umeda, akiba]);
   });
 
+  it('matches emoji codes with or without their variation mark', () => {
+    const kawasaki = { chain: 'yodobashi', name: '川崎', codes: ['\u{1F3CD}\uFE0F'] };
+    expect(storesInPost('\u{1F3CD} 開始', [kawasaki])).toEqual([kawasaki]);
+    expect(
+      storesInPost('\u{1F3CD}\uFE0F 開始', [{ ...kawasaki, codes: ['\u{1F3CD}'] }]),
+    ).toHaveLength(1);
+  });
+
   it('prefers the longer code, and keeps to the board chain', () => {
     expect(storesInPost('新宿西口 整理券配布', all, 'yodobashi')).toEqual([shinjuku]);
     expect(storesInPost('新宿東口 販売', all, 'biccamera')).toEqual([bicShinjuku]);

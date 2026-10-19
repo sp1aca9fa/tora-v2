@@ -125,6 +125,8 @@ export interface PushedPost {
   /** The post's id on its site (or any stable key). */
   id: string;
   text: string;
+  /** The poster's name: some name their store in it. */
+  author?: string | null;
   url?: string | null;
   /** ISO time, when the site shows one. */
   postedAt?: string | null;
@@ -160,6 +162,7 @@ export function readPush(body: unknown): Push | string {
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
       text: p.text.slice(0, 2000),
+      author: typeof p.author === 'string' ? p.author.slice(0, 100) : null,
       url: typeof p.url === 'string' && /^https?:\/\//.test(p.url) ? p.url.slice(0, 500) : null,
       postedAt: p.postedAt ?? null,
       chain: typeof p.chain === 'string' ? p.chain : null,
@@ -199,10 +202,11 @@ export async function receivePush(
         externalId: p.id,
         chain,
         text: p.text,
+        author: p.author ?? null,
         url: p.url ?? null,
         postedAt: p.postedAt ? toLocalIso(new Date(p.postedAt)) : at,
         receivedAt: at,
-        storeIds: storesInPost(p.text, listed, chain).map((s) => s.id),
+        storeIds: storesInPost(`${p.author ?? ''}\n${p.text}`, listed, chain).map((s) => s.id),
         fedBy: userId,
       })
       .onConflictDoNothing()

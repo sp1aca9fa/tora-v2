@@ -35,7 +35,8 @@
     "backup": "pnpm --silent --filter @tora/db backup",
     "restore": "pnpm --silent --filter @tora/db restore",
     "demo": "pnpm --silent --filter @tora/collector-sdk demo",
-    "mcp": "pnpm --silent --filter @tora/mcp start"
+    "mcp": "pnpm --silent --filter @tora/mcp start",
+    "plugins": "pnpm --silent --filter @tora/collector-sdk plugins"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
