@@ -1,12 +1,12 @@
 import { localDate, storesInArea } from '@tora/core';
-import { channelsOf, feedStatus, listStores, recentPosts } from '@tora/db';
+import { ADMIN_STORES, channelsOf, feedStatus, listStores, recentPosts } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { FeedAlerts, FeedToken, type StoreView, StoreAreaForm } from './store-area';
+import { AddStoreForm, FeedAlerts, FeedToken, type StoreView, StoreAreaForm } from './store-area';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('stores'))('title') };
@@ -39,6 +39,7 @@ export default async function StoresPage() {
     name: s.name,
     codes: s.codes,
     extra: s.extraCodes ?? [],
+    byHand: s.source === ADMIN_STORES,
     region: s.region,
     lat: s.lat,
     lon: s.lon,
@@ -59,7 +60,24 @@ export default async function StoresPage() {
       </header>
 
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
-        <StoreAreaForm stores={views} area={area} today={today} admin={user.role === 'admin'} />
+        <div className="space-y-5">
+          <StoreAreaForm stores={views} area={area} today={today} admin={user.role === 'admin'} />
+          {user.role === 'admin' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('addTitle')}</CardTitle>
+                <CardDescription>{t('addInfo')}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AddStoreForm
+                  chains={[
+                    ...new Map(all.map((s) => [s.chain, s.chainLabel ?? s.chain])).entries(),
+                  ].map(([chain, label]) => ({ chain, label }))}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         <div className="space-y-5">
           <Card>

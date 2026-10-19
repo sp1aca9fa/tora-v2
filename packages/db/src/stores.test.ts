@@ -6,6 +6,7 @@ import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import {
+  addStore,
   checkFeeds,
   feedStatus,
   feedTokenUser,
@@ -13,6 +14,7 @@ import {
   newFeedToken,
   readPush,
   receivePush,
+  removeStore,
   saveStores,
   sendFeedMessages,
   sendStoreNotices,
@@ -141,12 +143,12 @@ it("tells the feed's person about unknown stores and posts maybe missed", async 
     receivePush(db, uid, { source: 'gamenv', chain, posts }, now);
   await push([post('1', 'AKB 販売中')]);
   sent = [];
-  // A post naming no known ヨドバシ store: told; one on a board without a store list: not.
+  // A post naming no store or place Tora knows: told, on any board; one it places: not.
   const r = await push([post('2', '🦄 カードセット開始')]);
   expect(await sendFeedMessages(db, uid, r, ctx, now)).toBe(1);
   expect(sent.at(-1)).toContain('🦄 カードセット開始');
-  const other = await push([post('3', '🦄 何か')], 'stores');
-  expect(await sendFeedMessages(db, uid, other, ctx, now)).toBe(0);
+  const placed = await push([post('3', 'UMD 何か')]);
+  expect(await sendFeedMessages(db, uid, placed, ctx, now)).toBe(0);
   // A whole page new at once (the pinned post known): maybe missed.
   const page = Array.from({ length: 12 }, (_, i) => post(`p${i}`, 'AKB 何も無し', 2));
   const turned = await push([post('1', 'AKB 販売中'), ...page]);
@@ -170,4 +172,18 @@ it('tells once when the feed goes silent within the hours, and when it speaks ag
   expect(await sendFeedMessages(db, uid, back, ctx, later(31))).toBe(1);
   // Silent outside the hours (12:00 + 11 h = 23:00): not told.
   expect(await checkFeeds(db, ctx, later(31 + 11 * 60))).toBe(0);
+});
+
+it('adds and removes stores by hand, never a plug-in one', async () => {
+  const added = await addStore(db, {
+    chain: 'place',
+    name: '木場',
+    codes: [],
+    lat: 35.67,
+    lon: 139.81,
+  });
+  expect((await listStores(db)).some((s) => s.id === added.id)).toBe(true);
+  const [plugin] = (await listStores(db)).filter((s) => s.source === 'test');
+  expect(await removeStore(db, plugin!.id)).toBe(false);
+  expect(await removeStore(db, added.id)).toBe(true);
 });

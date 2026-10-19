@@ -4,6 +4,7 @@ import {
   distanceKm,
   roundPoint,
   storesInArea,
+  PLACE,
   storesInPost,
   withinHours,
 } from './stores';
@@ -92,16 +93,17 @@ describe('store notices: posts', () => {
 
   it('matches emoji codes with or without their variation mark', () => {
     const kawasaki = { chain: 'yodobashi', name: '川崎', codes: ['\u{1F3CD}\uFE0F'] };
-    expect(storesInPost('\u{1F3CD} 開始', [kawasaki])).toEqual([kawasaki]);
+    expect(storesInPost('\u{1F3CD} 開始', [kawasaki], 'yodobashi')).toEqual([kawasaki]);
     expect(
-      storesInPost('\u{1F3CD}\uFE0F 開始', [{ ...kawasaki, codes: ['\u{1F3CD}'] }]),
+      storesInPost('\u{1F3CD}\uFE0F 開始', [{ ...kawasaki, codes: ['\u{1F3CD}'] }], 'yodobashi'),
     ).toHaveLength(1);
   });
 
   it('prefers the longer code, and keeps to the board chain', () => {
     expect(storesInPost('新宿西口 整理券配布', all, 'yodobashi')).toEqual([shinjuku]);
     expect(storesInPost('新宿東口 販売', all, 'biccamera')).toEqual([bicShinjuku]);
-    expect(storesInPost('新宿東口 販売', all)).toEqual([bicShinjuku]);
+    // A board mixing chains: places only, never a chain's codes.
+    expect(storesInPost('新宿東口 販売', all)).toEqual([]);
   });
 });
 
@@ -110,4 +112,16 @@ it('tells hours apart, also past midnight', () => {
   expect(withinHours('23:00', '08:00', '23:00')).toBe(false);
   expect(withinHours('01:00', '22:00', '02:00')).toBe(true);
   expect(withinHours('12:00', '22:00', '02:00')).toBe(false);
+});
+
+it("names a place when no store of the board's chain matched", () => {
+  const ikebukuro = { chain: PLACE, name: '池袋', codes: ['🦉'], lat: 35.73, lon: 139.71 };
+  const kiba = { chain: PLACE, name: '木場', codes: [], lat: 35.67, lon: 139.81 };
+  const list = [...all, ikebukuro, kiba];
+  expect(storesInPost('イトヨ木場 カードセット', list)).toEqual([kiba]);
+  // On a board mixing chains, 🦉 is the area, not a chain's store.
+  expect(storesInPost('🦉🦒🍐', [...list, { ...umeda, codes: ['🦉'] }])).toEqual([ikebukuro]);
+  expect(storesInPost('🦉📕 30th', list, 'biccamera')).toEqual([ikebukuro]);
+  // The board's own store wins over the place.
+  expect(storesInPost('アキバ 30th', list, 'yodobashi')).toEqual([akiba]);
 });

@@ -37,8 +37,9 @@ The lists are saved each time the home PC runs a collect or an import (only what
 written). Coordinates are needed for "distance from where I am"; without them a store can still
 be picked by hand. Admins can add codes the list does not know on the Stores page.
 
-How a post is matched: within the post's chain (all chains when it has none), a store whose name
-or one of its codes appears in the text. Codes in Latin letters must stand as whole words ("AKB"
+How a post is matched: within the post's chain, a store whose name or one of its codes appears in
+the text (a chain's codes count on its own board only); when none matches, or the board mixes
+chains, a place (chain `place`: an area's name or code with its location) the text names. Codes in Latin letters must stand as whole words ("AKB"
 does not match "AKBX"); other codes match anywhere. When one code contains another that also
 matched ("新宿西口", "新宿"), the longer one wins.
 
@@ -96,8 +97,8 @@ Besides the notices for your area, the person whose feed sent the posts is told:
   as a server on your own PC (`pnpm app`); a hosted app has nothing running between requests, so
   an outside scheduler (cron-job.org, a GitHub Actions schedule) calls
   `GET /api/feed/check` with `Authorization: Bearer $CRON_SECRET` every few minutes;
-- about recent posts naming no store Tora knows, on boards whose chain has a store list (add the
-  code on the Stores page); this can be switched off;
+- about recent posts naming no store or place Tora knows (add the code on the Stores page; posts
+  that are no sighting, questions or chat, come too); this can be switched off;
 - when a push of 10 or more posts is all new (one pinned post aside) on a board seen before: the
   page turned over completely between two visits, so posts may have been missed.
 

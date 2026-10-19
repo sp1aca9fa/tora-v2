@@ -99,9 +99,16 @@ function mentions(text: string, code: string): boolean {
 }
 
 /**
- * The stores a post is about: those of its chain (all chains when the board has none) whose name
- * or a code it mentions. A code inside a longer code that also matched counts once ("新宿西口"
- * wins over "新宿").
+ * The chain of places: an area's name or code with its location ("池袋", "🦉"), matched on every
+ * board. Posters often name the area, not the store (one emoji per area, whatever the chain), and
+ * some boards mix dozens of chains no store list covers.
+ */
+export const PLACE = 'place';
+
+/**
+ * The stores a post is about: those of its board's chain whose name or a code it mentions; when
+ * none (or the board mixes chains), the places it names. A code inside a longer code that also
+ * matched counts once ("新宿西口" wins over "新宿").
  */
 export function storesInPost<T extends Pick<StoreEntry, 'chain' | 'name' | 'codes'>>(
   text: string,
@@ -109,19 +116,24 @@ export function storesInPost<T extends Pick<StoreEntry, 'chain' | 'name' | 'code
   chain?: string | null,
 ): T[] {
   const t = norm(text);
-  const hits = stores.flatMap((s) => {
-    if (chain && s.chain !== chain) return [];
-    const found = [s.name, ...s.codes].filter((c) => mentions(t, c)).map(norm);
-    return found.length ? [{ s, longest: found.sort((a, b) => b.length - a.length)[0]! }] : [];
-  });
-  return hits
-    .filter(
-      (h) =>
-        !hits.some(
-          (o) => o !== h && o.longest.length > h.longest.length && o.longest.includes(h.longest),
-        ),
-    )
-    .map((h) => h.s);
+  const find = (list: T[]) => {
+    const hits = list.flatMap((s) => {
+      const found = [s.name, ...s.codes].filter((c) => mentions(t, c)).map(norm);
+      return found.length ? [{ s, longest: found.sort((a, b) => b.length - a.length)[0]! }] : [];
+    });
+    return hits
+      .filter(
+        (h) =>
+          !hits.some(
+            (o) => o !== h && o.longest.length > h.longest.length && o.longest.includes(h.longest),
+          ),
+      )
+      .map((h) => h.s);
+  };
+  // A chain's codes are its board's own (the same emoji means an area on other boards): a board
+  // mixing chains is matched to places only.
+  const own = chain ? find(stores.filter((s) => s.chain === chain)) : [];
+  return own.length ? own : find(stores.filter((s) => s.chain === PLACE));
 }
 
 /** What a person is told about their store feed (S25): no silent failures. */

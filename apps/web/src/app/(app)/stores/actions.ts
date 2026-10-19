@@ -9,7 +9,7 @@ import {
   STORE_NOTICE_KM,
   roundPoint,
 } from '@tora/core';
-import { newFeedToken, setPreferences, setStoreCodes } from '@tora/db';
+import { addStore, newFeedToken, removeStore, setPreferences, setStoreCodes } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
 
@@ -82,5 +82,57 @@ export async function saveStoreFeedAction(prefs: StoreFeedPrefs) {
       unknown: prefs.unknown !== false,
     },
   });
+  revalidatePath('/stores');
+}
+
+/** A store or place an admin adds by hand (S25): anyone can add stores without code. */
+export async function addStoreAction(input: {
+  chain: string;
+  chainLabel: string;
+  name: string;
+  region: string;
+  codes: string;
+  /** "35.6987, 139.7746" as Google Maps copies it, or empty. */
+  location: string;
+}): Promise<{ error?: string }> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return { error: 'admin' };
+  const chain = input.chain.trim().toLowerCase();
+  const name = input.name.normalize('NFKC').trim();
+  if (!/^[a-z0-9_-]{1,40}$/.test(chain)) return { error: 'chain' };
+  if (!name) return { error: 'name' };
+  let lat: number | null = null;
+  let lon: number | null = null;
+  if (input.location.trim()) {
+    const m = input.location.match(/(-?\d+(?:\.\d+)?)\s*[,、\s]\s*(-?\d+(?:\.\d+)?)/);
+    lat = m ? Number(m[1]) : NaN;
+    lon = m ? Number(m[2]) : NaN;
+    if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return { error: 'location' };
+  }
+  await addStore(db, {
+    chain,
+    chainLabel: input.chainLabel.trim() || null,
+    name,
+    region: input.region.trim() || null,
+    codes: [
+      ...new Set(
+        input.codes
+          .split(/[,、]/)
+          .map((c) => c.normalize('NFKC').trim())
+          .filter(Boolean),
+      ),
+    ],
+    lat,
+    lon,
+  });
+  revalidatePath('/stores');
+  return {};
+}
+
+/** Removes a store an admin added. */
+export async function removeStoreAction(storeId: string) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  await removeStore(db, storeId);
   revalidatePath('/stores');
 }

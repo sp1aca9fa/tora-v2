@@ -3,6 +3,7 @@
 import {
   DEFAULT_FEED_PREFS,
   FEED_SILENT_MINUTES,
+  PLACE,
   type StoreArea,
   type StoreAreaChoice,
   type StoreFeedPrefs,
@@ -21,7 +22,9 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
 import {
+  addStoreAction,
   newFeedTokenAction,
+  removeStoreAction,
   saveStoreAreaAction,
   saveStoreFeedAction,
   setStoreCodesAction,
@@ -34,6 +37,8 @@ export interface StoreView {
   codes: string[];
   /** Codes an admin added. */
   extra: string[];
+  /** Added by an admin (can be removed). */
+  byHand: boolean;
   region: string | null;
   lat: number | null;
   lon: number | null;
@@ -289,6 +294,7 @@ export function StoreAreaForm({
                       {t('codes')}: {[...s.codes, ...s.extra].join(', ') || '-'}
                     </p>
                     {admin && <ExtraCodes store={s} />}
+                    {admin && s.byHand && <RemoveStore id={s.id} />}
                   </div>
                 </li>
               );
@@ -405,5 +411,148 @@ export function FeedAlerts({ prefs: saved }: { prefs: StoreFeedPrefs | null }) {
       </label>
       <p className="text-xs text-muted-foreground">{t('feedAlertsInfo')}</p>
     </div>
+  );
+}
+
+/** Adds a store or a place by hand (admins): no code needed for a new chain or area. */
+export function AddStoreForm({ chains }: { chains: { chain: string; label: string }[] }) {
+  const t = useTranslations('stores');
+  const empty = { chain: PLACE, chainLabel: '', name: '', region: '', codes: '', location: '' };
+  const [form, setForm] = useState(empty);
+  const [newChain, setNewChain] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const set = (part: Partial<typeof form>) => setForm({ ...form, ...part });
+  const locate = () =>
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        const p = roundPoint({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        set({ location: `${p.lat}, ${p.lon}` });
+      },
+      () => setError(t('error.noLocation')),
+    );
+  return (
+    <form
+      className="space-y-3 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        startTransition(async () => {
+          const r = await addStoreAction(form);
+          setError(r.error ? t(`addError.${r.error}`) : null);
+          if (!r.error) {
+            setForm({ ...empty, chain: form.chain, chainLabel: form.chainLabel });
+            setDone(true);
+          }
+        });
+      }}
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">{t('chain')}</span>
+          {newChain ? (
+            <div className="flex gap-2">
+              <Input
+                value={form.chain}
+                onChange={(e) => set({ chain: e.target.value })}
+                placeholder={t('chainKey')}
+                className="h-9 font-mono"
+              />
+              <Input
+                value={form.chainLabel}
+                onChange={(e) => set({ chainLabel: e.target.value })}
+                placeholder={t('chainLabel')}
+                className="h-9"
+              />
+            </div>
+          ) : (
+            <NativeSelect
+              value={form.chain}
+              onChange={(e) => {
+                if (e.target.value === '') return setNewChain(true);
+                const c = chains.find((x) => x.chain === e.target.value);
+                set({ chain: e.target.value, chainLabel: c?.label ?? '' });
+              }}
+              className="h-9"
+            >
+              <option value={PLACE}>{t('placeOption')}</option>
+              {chains
+                .filter((c) => c.chain !== PLACE)
+                .map((c) => (
+                  <option key={c.chain} value={c.chain}>
+                    {c.label}
+                  </option>
+                ))}
+              <option value="">{t('newChain')}</option>
+            </NativeSelect>
+          )}
+        </label>
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">{t('name')}</span>
+          <Input
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+            className="h-9"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">{t('codes')}</span>
+          <Input
+            value={form.codes}
+            onChange={(e) => set({ codes: e.target.value })}
+            placeholder={t('codesHelp')}
+            className="h-9"
+          />
+        </label>
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">{t('region')}</span>
+          <Input
+            value={form.region}
+            onChange={(e) => set({ region: e.target.value })}
+            className="h-9"
+          />
+        </label>
+        <label className="space-y-1 sm:col-span-2">
+          <span className="block text-xs text-muted-foreground">{t('location')}</span>
+          <div className="flex gap-2">
+            <Input
+              value={form.location}
+              onChange={(e) => set({ location: e.target.value })}
+              placeholder="35.6987, 139.7746"
+              className="h-9"
+            />
+            <Button type="button" variant="outline" size="sm" className="h-9" onClick={locate}>
+              <LocateFixed /> {t('locate')}
+            </Button>
+          </div>
+          <span className="block text-xs text-muted-foreground">{t('locationHelp')}</span>
+        </label>
+      </div>
+      {error && <p className="text-destructive">{error}</p>}
+      <div className="flex items-center gap-3">
+        <Button type="submit" size="sm" disabled={pending}>
+          {t('add')}
+        </Button>
+        {done && !error && <span className="text-xs text-muted-foreground">{t('added')}</span>}
+      </div>
+    </form>
+  );
+}
+
+/** Removes a store an admin added. */
+function RemoveStore({ id }: { id: string }) {
+  const t = useTranslations('stores');
+  const [pending, startTransition] = useTransition();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="mt-1 h-7 px-2 text-xs"
+      disabled={pending}
+      onClick={() => startTransition(() => removeStoreAction(id))}
+    >
+      {t('remove')}
+    </Button>
   );
 }

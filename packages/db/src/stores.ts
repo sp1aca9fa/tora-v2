@@ -2,6 +2,7 @@
 // feeds, and the notices they make for the people whose area holds the store.
 import {
   DEFAULT_FEED_PREFS,
+  PLACE,
   type StoreEntry,
   localDate,
   storesInArea,
@@ -265,8 +266,8 @@ const short = (text: string) => {
 
 /**
  * What the feed's own person is told about a push (no silent failures): the feed speaks again
- * after a silence, posts that may have been missed, and recent posts naming no store of a chain
- * Tora has stores for (unless switched off).
+ * after a silence, posts that may have been missed, and recent posts naming no store or place
+ * Tora knows (unless switched off).
  */
 export async function sendFeedMessages(
   db: Db,
@@ -292,10 +293,9 @@ export async function sendFeedMessages(
     );
   if (!received.first && prefs.unknown) {
     const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
-    const chains = new Set((await listStores(db)).map((st) => st.chain));
-    const unknown = received.fresh.filter(
-      (p) => !p.storeIds.length && p.chain && chains.has(p.chain) && p.postedAt >= since,
-    );
+    // Any board: with places, every post naming an area is placed; the rest may be a code
+    // Tora does not know yet (or no sighting at all: questions, chat).
+    const unknown = received.fresh.filter((p) => !p.storeIds.length && p.postedAt >= since);
     if (unknown.length) {
       lines.push(
         t.storeUnknown ??
@@ -389,10 +389,11 @@ export async function sendStoreNotices(
       if ((last.get(id) ?? '') > quiet) continue;
       const store = byId.get(id)!;
       const post = posts.filter((p) => p.storeIds.includes(id)).at(-1)!;
-      const text = post.text.replace(/\s+/g, ' ').trim();
-      lines.push(
-        `${store.name}: ${text.length > 140 ? `${text.slice(0, 140)}…` : text}${post.url ? `\n${post.url}` : ''}`,
-      );
+      const name =
+        store.chain === PLACE
+          ? fill(t.storeArea ?? '{name} area', { name: store.name })
+          : [store.chainLabel, store.name].filter(Boolean).join(' ');
+      lines.push(`${name}: ${short(post.text)}${post.url ? `\n${post.url}` : ''}`);
       await db
         .insert(storeNotices)
         .values({ userId: user.id, storeId: id, sentAt: toLocalIso(now) })
@@ -412,4 +413,35 @@ export async function sendStoreNotices(
 /** The latest posts, newest first. */
 export async function recentPosts(db: Db, limit = 50): Promise<StorePost[]> {
   return db.select().from(storePosts).orderBy(desc(storePosts.postedAt)).limit(limit);
+}
+
+/** The source of stores and places an admin adds by hand. */
+export const ADMIN_STORES = 'admin';
+
+/** A store or place an admin adds by hand (chain `place` for a place). */
+export async function addStore(db: Db, entry: StoreEntry): Promise<Store> {
+  const [row] = await db
+    .insert(stores)
+    .values({
+      source: ADMIN_STORES,
+      sourceKey: randomBytes(8).toString('hex'),
+      chain: entry.chain,
+      chainLabel: entry.chainLabel ?? null,
+      name: entry.name,
+      codes: entry.codes,
+      region: entry.region ?? null,
+      lat: entry.lat ?? null,
+      lon: entry.lon ?? null,
+    })
+    .returning();
+  return row!;
+}
+
+/** Removes a store an admin added (plug-in stores come back with their plug-in). */
+export async function removeStore(db: Db, storeId: string): Promise<boolean> {
+  const gone = await db
+    .delete(stores)
+    .where(and(eq(stores.id, storeId), eq(stores.source, ADMIN_STORES)))
+    .returning({ id: stores.id });
+  return gone.length > 0;
 }
