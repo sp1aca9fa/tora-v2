@@ -14,7 +14,7 @@ import {
 } from '@tora/core';
 import { LocateFixed } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { CopyButton } from '../settings/admin/commands/copy-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,9 @@ import {
 
 export interface StoreView {
   id: string;
+  /** The chain's key ("yodobashi", "place"). */
+  chainKey: string;
+  /** The chain as people read it. */
   chain: string;
   name: string;
   codes: string[];
@@ -63,6 +66,8 @@ export function StoreAreaForm({
   const travelling = !!area.travel && today <= area.travel.until;
   const [editing, setEditing] = useState<'home' | 'travel'>(travelling ? 'travel' : 'home');
   const [filter, setFilter] = useState('');
+  const [chainFilter, setChainFilter] = useState<string | null>(null);
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const choice: StoreAreaChoice = editing === 'travel' && area.travel ? area.travel : area.home;
@@ -105,24 +110,6 @@ export function StoreAreaForm({
     choice.mode === 'distance' && s.lat != null && s.lon != null
       ? distanceKm(choice.point, { lat: s.lat, lon: s.lon })
       : null;
-  const shown = useMemo(() => {
-    const q = filter.normalize('NFKC').toLowerCase().trim();
-    const list = stores.filter(
-      (s) =>
-        !q ||
-        [s.name, s.chain, s.region ?? '', ...s.codes, ...s.extra].some((x) =>
-          x.normalize('NFKC').toLowerCase().includes(q),
-        ),
-    );
-    return choice.mode === 'distance'
-      ? list
-          .map((s) => ({ s, km: distanceOf(s) }))
-          .sort((a, b) => (a.km ?? Infinity) - (b.km ?? Infinity))
-          .map((x) => x.s)
-      : list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stores, filter, choice]);
-
   const added = new Set(area.added ?? []);
   const within = (s: StoreView) => {
     if (choice.mode === 'stores') return choice.storeIds.includes(s.id);
@@ -130,6 +117,38 @@ export function StoreAreaForm({
     return km !== null && km <= choice.km;
   };
   const on = (s: StoreView) => !muted.has(s.id) && (within(s) || added.has(s.id));
+  // Filters from what the store lists hold: their chains, then the prefectures of the chain.
+  const [onlyOn, setOnlyOn] = useState(() => stores.some(on));
+  const count = <K extends string>(keys: K[]) =>
+    [...keys.reduce((m, k) => m.set(k, (m.get(k) ?? 0) + 1), new Map<K, number>())].sort(
+      (a, b) => b[1] - a[1],
+    );
+  const chains = count(stores.map((s) => s.chainKey)).map(([key, n]) => ({
+    key,
+    n,
+    label: stores.find((s) => s.chainKey === key)!.chain,
+  }));
+  const inChain = stores.filter((s) => !chainFilter || s.chainKey === chainFilter);
+  const regions = count(inChain.flatMap((s) => (s.region ? [s.region] : [])));
+  const q = filter.normalize('NFKC').toLowerCase().trim();
+  const shown = inChain
+    .filter((s) => !regionFilter || s.region === regionFilter)
+    .filter((s) => !onlyOn || on(s))
+    .filter(
+      (s) =>
+        !q ||
+        [s.name, s.chain, s.region ?? '', ...s.codes, ...s.extra].some((x) =>
+          x.normalize('NFKC').toLowerCase().includes(q),
+        ),
+    )
+    .map((s) => ({ s, km: distanceOf(s) }))
+    .sort((a, b) => (choice.mode === 'distance' ? (a.km ?? Infinity) - (b.km ?? Infinity) : 0))
+    .map((x) => x.s);
+  const chip = (active: boolean) =>
+    cn(
+      'rounded-full border px-2.5 py-1 text-xs',
+      active ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground',
+    );
   // Picked stores: the box picks. Distance: a store of the area is switched off (muted), another
   // added by hand (added); unticking undoes either.
   const toggle = (s: StoreView) => {
@@ -251,12 +270,65 @@ export function StoreAreaForm({
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <Input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder={t('filter')}
-          className="h-9"
-        />
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t('chain')}>
+            <button
+              type="button"
+              className={chip(!chainFilter)}
+              onClick={() => {
+                setChainFilter(null);
+                setRegionFilter(null);
+              }}
+            >
+              {t('allChains', { n: stores.length })}
+            </button>
+            {chains.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                className={chip(chainFilter === c.key)}
+                onClick={() => {
+                  setChainFilter(c.key);
+                  setRegionFilter(null);
+                }}
+              >
+                {c.label} {c.n}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className={chip(onlyOn)} onClick={() => setOnlyOn(true)}>
+              {t('onlyOn', { n: stores.filter(on).length })}
+            </button>
+            <button type="button" className={chip(!onlyOn)} onClick={() => setOnlyOn(false)}>
+              {t('showAll')}
+            </button>
+            {regions.length > 1 && (
+              <NativeSelect
+                value={regionFilter ?? ''}
+                onChange={(e) => setRegionFilter(e.target.value || null)}
+                className="h-8 w-40"
+                aria-label={t('region')}
+              >
+                <option value="">{t('allRegions')}</option>
+                {regions.map(([r, n]) => (
+                  <option key={r} value={r}>
+                    {r} ({n})
+                  </option>
+                ))}
+              </NativeSelect>
+            )}
+            <Input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder={t('filter')}
+              className="h-8 min-w-48 flex-1"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t('showing', { n: shown.length, total: stores.length })}
+          </p>
+        </div>
         {stores.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('noStores')}</p>
         ) : (

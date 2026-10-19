@@ -1873,6 +1873,12 @@
       "chain": "Chain key: lower-case letters, digits, - or _.",
       "name": "Give it a name.",
       "location": "Location: two numbers, latitude and longitude."
-    }
+    },
+    "places": "Places (areas)",
+    "allChains": "All {n}",
+    "onlyOn": "Notified ({n})",
+    "showAll": "All",
+    "allRegions": "All prefectures",
+    "showing": "{n} of {total} shown"
   }
 }

@@ -1,4 +1,4 @@
-import { localDate, storesInArea } from '@tora/core';
+import { PLACE, localDate, storesInArea } from '@tora/core';
 import { ADMIN_STORES, channelsOf, feedStatus, listStores, recentPosts } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -35,7 +35,8 @@ export default async function StoresPage() {
   const byId = new Map(all.map((s) => [s.id, s]));
   const views: StoreView[] = all.map((s) => ({
     id: s.id,
-    chain: s.chainLabel ?? s.chain,
+    chainKey: s.chain,
+    chain: s.chain === PLACE ? t('places') : (s.chainLabel ?? s.chain),
     name: s.name,
     codes: s.codes,
     extra: s.extraCodes ?? [],
