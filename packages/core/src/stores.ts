@@ -145,6 +145,11 @@ export interface StoreFeedPrefs {
   to?: string;
   /** Posts about a store Tora does not recognise (on unless switched off). */
   unknown?: boolean;
+  /**
+   * The boards the feed should watch, chosen in the app (the feed follows at its next push);
+   * unset, the feed's own choice stands.
+   */
+  boards?: string[];
 }
 
 export const FEED_SILENT_MINUTES = [5, 10, 15, 30, 60];

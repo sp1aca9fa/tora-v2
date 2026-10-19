@@ -1116,6 +1116,8 @@ export const feedTokens = sqliteTable('feed_tokens', {
   boards: text('boards', { mode: 'json' }).$type<Record<string, BoardState>>(),
   /** The boards the feed says it watches (told when it connects or the list changes). */
   watching: text('watching', { mode: 'json' }).$type<string[]>(),
+  /** The boards the feed can read (to choose from in the app). */
+  offered: text('offered', { mode: 'json' }).$type<string[]>(),
   ...timestamps,
 });
 

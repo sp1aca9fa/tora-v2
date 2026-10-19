@@ -1,75 +1,35 @@
 import { PLACE, codeIndex, localDate, storesInArea } from '@tora/core';
-import {
-  ADMIN_STORES,
-  channelsOf,
-  feedStatus,
-  listStores,
-  recentPosts,
-  storeCodes,
-  storeGlossary,
-} from '@tora/db';
-import type { Metadata } from 'next';
+import { listStores, recentPosts, storeCodes, storeGlossary } from '@tora/db';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import {
-  AddGlossary,
-  AddStoreForm,
-  FeedAlerts,
-  FeedToken,
-  ForgetBoard,
-  RemoveGlossary,
-  type StoreView,
-  StoreAreaForm,
-} from './store-area';
-
-export async function generateMetadata(): Promise<Metadata> {
-  return { title: (await getTranslations('stores'))('title') };
-}
-
-/** Minutes after which a silent feed shows as stopped. */
-const FEED_ALIVE_MINUTES = 10;
-const minutesSince = (at: string) => Math.round((Date.now() - Date.parse(at)) / 60_000);
+import { AddGlossary, RemoveGlossary } from './store-area';
+import { AutoRefresh } from './stores-nav';
 
 /**
- * Store notices (S25): the person's area (picked stores or a distance, travel mode), each store
- * on or off, the feed's state, and the latest posts, the area's first.
+ * Store notices, the main sub page (S25): the latest posts, the area's first, and what the codes
+ * posters use stand for. Before an area is set, the Area page comes first.
  */
-export default async function StoresPage() {
+export default async function StorePostsPage() {
   const { db, user } = await authed();
-  const [t, all, feed, posts, channels, glossary] = await Promise.all([
+  const area = user.preferences?.storeArea ?? null;
+  if (!area) redirect('/stores/area');
+  const [t, all, posts, glossary] = await Promise.all([
     getTranslations('stores'),
     listStores(db),
-    feedStatus(db, user.id),
     recentPosts(db, 60),
-    channelsOf(db, user.id),
     storeGlossary(db),
   ]);
+  const inArea = storesInArea(area, all, localDate());
+  const byId = new Map(all.map((s) => [s.id, s]));
   const codes = codeIndex(all.map((s) => ({ ...s, codes: storeCodes(s) })));
   const label = (s: (typeof all)[number]) =>
     s.chain === PLACE
       ? t('areaOf', { name: s.name })
       : [s.chainLabel, s.name].filter(Boolean).join(' ');
-  const area = user.preferences?.storeArea ?? null;
-  const today = localDate();
-  const inArea = storesInArea(area, all, today);
-  const byId = new Map(all.map((s) => [s.id, s]));
-  const views: StoreView[] = all.map((s) => ({
-    id: s.id,
-    chainKey: s.chain,
-    chain: s.chain === PLACE ? t('places') : (s.chainLabel ?? s.chain),
-    name: s.name,
-    codes: s.codes,
-    extra: s.extraCodes ?? [],
-    byHand: s.source === ADMIN_STORES,
-    region: s.region,
-    lat: s.lat,
-    lon: s.lon,
-  }));
-  const minutesAgo = feed?.lastSeenAt ? minutesSince(feed.lastSeenAt) : null;
-  const alive = minutesAgo !== null && minutesAgo <= FEED_ALIVE_MINUTES;
   const sorted = [...posts].sort(
     (a, b) =>
       Number(b.storeIds.some((id) => inArea.has(id))) -
@@ -77,197 +37,103 @@ export default async function StoresPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">{t('intro')}</p>
-      </header>
-
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
-        <div className="space-y-5">
-          <StoreAreaForm stores={views} area={area} today={today} admin={user.role === 'admin'} />
-          {user.role === 'admin' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('addTitle')}</CardTitle>
-                <CardDescription>{t('addInfo')}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AddStoreForm
-                  chains={[
-                    ...new Map(all.map((s) => [s.chain, s.chainLabel ?? s.chain])).entries(),
-                  ].map(([chain, label]) => ({ chain, label }))}
-                />
-              </CardContent>
-            </Card>
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
+      <AutoRefresh />
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('posts')}</CardTitle>
+          <CardDescription>
+            {t('postsInfo')}{' '}
+            <Link href="/stores/area" className="underline">
+              {t('inYourArea', { n: inArea.size })}
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sorted.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('noPosts')}</p>
+          ) : (
+            <ul className="divide-y text-sm">
+              {sorted.slice(0, 40).map((p) => {
+                const mine = p.storeIds.some((id) => inArea.has(id));
+                const names = p.storeIds
+                  .map((id) => byId.get(id))
+                  .filter((s) => !!s)
+                  .map(label);
+                return (
+                  <li key={p.id} className={cn('space-y-0.5 py-2', !mine && 'opacity-70')}>
+                    <p className="text-xs text-muted-foreground">
+                      {p.postedAt.slice(5, 16).replace('T', ' ')}
+                      {p.author ? ` · ${p.author}` : ''} ·{' '}
+                      <span className={cn(mine && 'font-semibold text-foreground')}>
+                        {names.length ? names.join(', ') : t('unknownStore')}
+                      </span>
+                    </p>
+                    <p className="break-words">
+                      {p.url ? (
+                        <a
+                          href={p.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:underline"
+                        >
+                          {p.text}
+                        </a>
+                      ) : (
+                        p.text
+                      )}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
           )}
-        </div>
+        </CardContent>
+      </Card>
 
-        <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('feed')}</CardTitle>
-              <CardDescription>
-                {minutesAgo === null
-                  ? t('feedNever')
-                  : t(alive ? 'feedAlive' : 'feedStopped', {
-                      minutes: minutesAgo,
-                      source: feed?.lastSource ?? '-',
-                    })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm">
-                {channels.length
-                  ? t('noticesTo', {
-                      stores: inArea.size,
-                      channels: channels.map((c) => c.label ?? c.kind).join(', '),
-                    })
-                  : t('noChannel')}{' '}
-                <Link href="/settings/alerts" className="underline">
-                  {t('alertsLink')}
-                </Link>
-              </p>
-              {feed && Object.keys(feed.boards).length > 0 && (
-                <table className="w-full text-sm">
-                  <thead className="text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th className="py-1 pr-2 font-normal">{t('board')}</th>
-                      <th className="py-1 pr-2 font-normal">{t('lastVisit')}</th>
-                      <th className="py-1 pr-2 font-normal">{t('lastRead')}</th>
-                      <th />
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('codesTitle')}</CardTitle>
+          <CardDescription>{t('codesInfo')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="max-h-[32rem] overflow-y-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {codes.map((c) => (
+                  <tr key={c.code} className="border-t align-top">
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{c.code}</td>
+                    <td className="py-1.5 text-xs text-muted-foreground">
+                      {c.stores.map(label).join(', ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">{t('otherCodes')}</h3>
+            {glossary.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t('noOtherCodes')}</p>
+            ) : (
+              <table className="w-full text-sm">
+                <tbody>
+                  {glossary.map((g) => (
+                    <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
+                      <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                      <td className="py-1.5 text-xs text-muted-foreground">{g.meaning}</td>
+                      <td className="py-1.5 text-right">
+                        {user.role === 'admin' && g.byHand && <RemoveGlossary code={g.code} />}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(feed.boards)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([key, b]) => {
-                        const quiet = !b.readAt || minutesSince(b.readAt) > FEED_ALIVE_MINUTES;
-                        return (
-                          <tr key={key} className="border-t">
-                            <td className="py-1.5 pr-2 font-mono text-xs">
-                              {key}
-                              {feed.watching?.includes(key) && (
-                                <span className="ml-1 text-muted-foreground">✓</span>
-                              )}
-                            </td>
-                            <td className="py-1.5 pr-2 text-xs">
-                              {t('ago', { minutes: minutesSince(b.at) })} ·{' '}
-                              {t('postsRead', { n: b.posts })}
-                            </td>
-                            <td
-                              className={cn(
-                                'py-1.5 pr-2 text-xs',
-                                quiet && 'font-semibold text-destructive',
-                              )}
-                            >
-                              {b.readAt
-                                ? t('ago', { minutes: minutesSince(b.readAt) })
-                                : t('never')}
-                            </td>
-                            <td className="py-1.5 text-right">
-                              {!feed.watching?.includes(key) && <ForgetBoard board={key} />}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              )}
-              <FeedAlerts prefs={user.preferences?.storeFeed ?? null} />
-              <FeedToken hasToken={!!feed} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('posts')}</CardTitle>
-              <CardDescription>{t('postsInfo')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {sorted.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('noPosts')}</p>
-              ) : (
-                <ul className="divide-y text-sm">
-                  {sorted.slice(0, 40).map((p) => {
-                    const mine = p.storeIds.some((id) => inArea.has(id));
-                    const names = p.storeIds.map((id) => byId.get(id)?.name).filter(Boolean);
-                    return (
-                      <li key={p.id} className={cn('space-y-0.5 py-2', !mine && 'opacity-70')}>
-                        <p className="text-xs text-muted-foreground">
-                          {p.postedAt.slice(5, 16).replace('T', ' ')}
-                          {p.author ? ` · ${p.author}` : ''} ·{' '}
-                          <span className={cn(mine && 'font-semibold text-foreground')}>
-                            {names.length ? names.join(', ') : t('unknownStore')}
-                          </span>
-                        </p>
-                        <p className="break-words">
-                          {p.url ? (
-                            <a
-                              href={p.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline"
-                            >
-                              {p.text}
-                            </a>
-                          ) : (
-                            p.text
-                          )}
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('codesTitle')}</CardTitle>
-              <CardDescription>{t('codesInfo')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="max-h-96 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <tbody>
-                    {codes.map((c) => (
-                      <tr key={c.code} className="border-t align-top">
-                        <td className="py-1.5 pr-3 whitespace-nowrap">{c.code}</td>
-                        <td className="py-1.5 text-xs text-muted-foreground">
-                          {c.stores.map(label).join(', ')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium">{t('otherCodes')}</h3>
-                {glossary.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">{t('noOtherCodes')}</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {glossary.map((g) => (
-                        <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
-                          <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
-                          <td className="py-1.5 text-xs text-muted-foreground">{g.meaning}</td>
-                          <td className="py-1.5 text-right">
-                            {user.role === 'admin' && g.byHand && <RemoveGlossary code={g.code} />}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-                {user.role === 'admin' && <AddGlossary />}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {user.role === 'admin' && <AddGlossary />}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

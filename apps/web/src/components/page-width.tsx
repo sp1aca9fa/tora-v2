@@ -9,7 +9,7 @@ const WIDE = [
   /^\/items$/,
   /^\/actions$/,
   /^\/products\/[^/]+(\/(buy|opening|details))?$/,
-  /^\/stores$/,
+  /^\/stores(\/(feed|area))?$/,
   /^\/holdings\/(?!grades$)[^/]+$/,
   /^\/imports$/,
 ];

@@ -150,6 +150,7 @@ export async function feedStatus(db: Db, userId: string) {
       lastSource: feedTokens.lastSource,
       boards: feedTokens.boards,
       watching: feedTokens.watching,
+      offered: feedTokens.offered,
     })
     .from(feedTokens)
     .where(eq(feedTokens.userId, userId));
@@ -159,6 +160,7 @@ export async function feedStatus(db: Db, userId: string) {
         lastSource: row.lastSource,
         boards: row.boards ?? {},
         watching: row.watching,
+        offered: row.offered,
       }
     : null;
 }
@@ -186,10 +188,20 @@ export interface Push {
   board?: string | null;
   /** All the boards the feed watches, in turn (told to the person when it changes). */
   watching?: string[] | null;
+  /** Every board the feed can read (chosen from in the app). */
+  offered?: string[] | null;
   /** The board's chain ("yodobashi"), when the whole push is one chain's. */
   chain?: string | null;
   posts: PushedPost[];
 }
+
+/** A list of board keys, or null. */
+const keys = (v: unknown) =>
+  Array.isArray(v)
+    ? v
+        .filter((w): w is string => typeof w === 'string' && /^[a-z0-9_-]{1,40}$/.test(w))
+        .slice(0, 20)
+    : null;
 
 /** Checks a pushed body: the push, or what is wrong with it. */
 export function readPush(body: unknown): Push | string {
@@ -211,6 +223,7 @@ export function readPush(body: unknown): Push | string {
     watching: Array.isArray(b.watching)
       ? b.watching.filter((w) => typeof w === 'string' && /^[a-z0-9_-]{1,40}$/.test(w)).slice(0, 20)
       : null,
+    offered: keys(b.offered),
     chain: typeof b.chain === 'string' ? b.chain : null,
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
@@ -278,6 +291,7 @@ export async function receivePush(
       silenceAlertedAt: null,
       boards: { ...token?.boards, [key]: board },
       ...(push.watching ? { watching: push.watching } : {}),
+      ...(push.offered ? { offered: push.offered } : {}),
     })
     .where(eq(feedTokens.userId, userId));
   const resumed = !!token?.silenceAlertedAt;
@@ -657,4 +671,21 @@ export async function removeGlossary(db: Db, code: string): Promise<void> {
     ADMIN_GLOSSARY_KEY,
     own.filter((e) => e.code !== code),
   );
+}
+
+/**
+ * The boards the person chose in the app for their feed to watch (those it can read), sent back in
+ * the answer to every push so the feed follows; null when the feed decides.
+ */
+export async function boardsToWatch(db: Db, userId: string): Promise<string[] | null> {
+  const [row] = await db
+    .select({ preferences: users.preferences, offered: feedTokens.offered })
+    .from(users)
+    .leftJoin(feedTokens, eq(feedTokens.userId, users.id))
+    .where(eq(users.id, userId));
+  const chosen = row?.preferences?.storeFeed?.boards;
+  if (!chosen?.length) return null;
+  const offered = row?.offered;
+  const boards = offered ? chosen.filter((b) => offered.includes(b)) : chosen;
+  return boards.length ? boards : null;
 }

@@ -1897,6 +1897,18 @@
     "noOtherCodes": "まだありません。",
     "code": "コード",
     "meaning": "意味",
-    "areaOf": "{name}(エリア)"
+    "areaOf": "{name}(エリア)",
+    "tab": {
+      "posts": "投稿",
+      "feed": "フィード",
+      "area": "エリア"
+    },
+    "inYourArea": "エリア内の店舗・場所:{n}件。",
+    "feedSettings": "通知とトークン",
+    "boardsToWatch": "監視する掲示板",
+    "watchAll": "すべて",
+    "feedDecides": "フィードに任せる",
+    "boardsChosen": "ここで選択:フィードは次の訪問で従い、追跡中の掲示板を通知します。",
+    "boardsByFeed": "チェック:フィードが現在監視中の掲示板(フィードのメニューで設定)。ここで変更するとToraの選択が優先されます。"
   }
 }

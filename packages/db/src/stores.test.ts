@@ -7,6 +7,7 @@ import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import {
   addGlossary,
+  boardsToWatch,
   addStore,
   checkFeeds,
   feedStatus,
@@ -112,6 +113,7 @@ it('checks what a feed pushes', () => {
     source: 'gamenv',
     board: null,
     watching: null,
+    offered: null,
     chain: 'yodobashi',
     posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
   });
@@ -264,4 +266,17 @@ it('drops posts older than a month', async () => {
   );
   expect(await pruneStorePosts(db, now)).toBe(1);
   expect((await recentPosts(db)).map((p) => p.externalId)).toEqual(['new']);
+});
+
+it('sends back the boards chosen in the app, among those the feed can read', async () => {
+  await newFeedToken(db, uid);
+  expect(await boardsToWatch(db, uid)).toBeNull();
+  await receivePush(
+    db,
+    uid,
+    { source: 'gamenv', board: 'a', offered: ['a', 'b', 'c'], posts: [] },
+    now,
+  );
+  await setPreferences(db, uid, { storeFeed: { boards: ['b', 'z'] } });
+  expect(await boardsToWatch(db, uid)).toEqual(['b']);
 });

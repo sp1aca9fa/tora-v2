@@ -85,6 +85,7 @@ export async function saveStoreFeedAction(prefs: StoreFeedPrefs) {
     : DEFAULT_FEED_PREFS.silentMinutes;
   await setPreferences(db, user.id, {
     storeFeed: {
+      ...user.preferences?.storeFeed,
       silentMinutes: minutes,
       from: hhmm(prefs.from) ?? DEFAULT_FEED_PREFS.from,
       to: hhmm(prefs.to) ?? DEFAULT_FEED_PREFS.to,
@@ -173,4 +174,17 @@ export async function removeGlossaryAction(code: string) {
   if (user.role !== 'admin') return;
   await removeGlossary(db, String(code));
   revalidatePath('/stores');
+}
+
+/** The boards the feed should watch, chosen here (null: the feed decides). */
+export async function saveFeedBoardsAction(boards: string[] | null) {
+  const { db, user } = await authed();
+  const { boards: _, ...rest } = user.preferences?.storeFeed ?? {};
+  const clean = boards
+    ? [...new Set(boards.map(String).filter((b) => /^[a-z0-9_-]{1,40}$/.test(b)))].slice(0, 20)
+    : [];
+  await setPreferences(db, user.id, {
+    storeFeed: clean.length ? { ...rest, boards: clean } : rest,
+  });
+  revalidatePath('/stores/feed');
 }

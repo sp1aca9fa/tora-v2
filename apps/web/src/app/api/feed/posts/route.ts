@@ -3,6 +3,7 @@
 // made on the Stores page). New posts naming a store make notices at once. An empty `posts` list
 // is a heartbeat: the Stores page shows whether the feed is alive. Format: docs/store-feeds.md.
 import {
+  boardsToWatch,
   feedTokenUser,
   getDb,
   loadTimeZone,
@@ -41,5 +42,7 @@ export async function POST(request: Request) {
     matched: received.fresh.filter((p) => p.storeIds.length).length,
     notices,
     gap: !!received.gap,
+    // The boards chosen in the app: the feed follows them (null: its own choice).
+    watch: await boardsToWatch(db, userId),
   });
 }

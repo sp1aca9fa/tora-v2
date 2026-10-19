@@ -28,6 +28,7 @@ import {
   newFeedTokenAction,
   removeGlossaryAction,
   removeStoreAction,
+  saveFeedBoardsAction,
   saveStoreAreaAction,
   saveStoreFeedAction,
   setStoreCodesAction,
@@ -703,5 +704,53 @@ export function RemoveGlossary({ code }: { code: string }) {
     >
       {t('remove')}
     </button>
+  );
+}
+
+/**
+ * Which boards the feed watches, chosen here: the feed follows at its next push (within a minute
+ * or so) and says "tracking these boards". Unset, the feed's own choice stands.
+ */
+export function BoardsToWatch({
+  known,
+  chosen,
+  watching,
+}: {
+  known: string[];
+  chosen: string[] | null;
+  watching: string[];
+}) {
+  const t = useTranslations('stores');
+  const [pending, startTransition] = useTransition();
+  const current = chosen ?? watching;
+  const save = (boards: string[] | null) => startTransition(() => saveFeedBoardsAction(boards));
+  const toggle = (board: string) =>
+    save(current.includes(board) ? current.filter((b) => b !== board) : [...current, board]);
+  return (
+    <div className={cn('space-y-2 text-sm', pending && 'opacity-70')}>
+      <h3 className="font-medium">{t('boardsToWatch')}</h3>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {known.map((b) => (
+          <label key={b} className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              className="size-4"
+              checked={current.includes(b)}
+              onChange={() => toggle(b)}
+            />
+            <span className="font-mono text-xs">{b}</span>
+          </label>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={() => save(known)}>
+          {t('watchAll')}
+        </Button>
+        {chosen && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => save(null)}>
+            {t('feedDecides')}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">{t(chosen ? 'boardsChosen' : 'boardsByFeed')}</p>
+    </div>
   );
 }

@@ -77,6 +77,8 @@ Content-Type: application/json
 - `board`: the board (page) read, when the feed reads several: each board's last visit and last
   posts are shown on the Stores page, and a board giving no posts for too long while the feed runs
   is told (an access check or a changed page would otherwise go unnoticed).
+- `offered`: every board the feed can read; the person can then choose in the app which ones it
+  watches, and the answer to each push carries that choice as `watch` (null when the feed decides).
 - `watching`: every board the feed goes through; its person is told "connected, tracking these
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
@@ -91,7 +93,7 @@ Content-Type: application/json
 The answer says how many posts were new, matched a store, and how many people were notified:
 
 ```json
-{ "received": 1, "new": 1, "matched": 1, "notices": 1 }
+{ "received": 1, "new": 1, "matched": 1, "notices": 1, "gap": false, "watch": null }
 ```
 
 Notices: only for posts of the last 30 minutes, at most one per store every 30 minutes for each

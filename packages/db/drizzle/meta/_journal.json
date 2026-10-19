@@ -337,6 +337,13 @@
       "when": 1792423070774,
       "tag": "0047_feed_boards",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1792424969563,
+      "tag": "0048_feed_offered",
+      "breakpoints": true
     }
   ]
 }

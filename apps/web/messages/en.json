@@ -1897,6 +1897,18 @@
     "noOtherCodes": "None yet.",
     "code": "Code",
     "meaning": "Meaning",
-    "areaOf": "{name} (area)"
+    "areaOf": "{name} (area)",
+    "tab": {
+      "posts": "Posts",
+      "feed": "Feed",
+      "area": "Area"
+    },
+    "inYourArea": "{n, plural, one {# store or place} other {# stores and places}} in your area.",
+    "feedSettings": "Alerts and token",
+    "boardsToWatch": "Boards to watch",
+    "watchAll": "All",
+    "feedDecides": "Let the feed decide",
+    "boardsChosen": "Chosen here: the feed follows at its next visit and says which boards it tracks.",
+    "boardsByFeed": "Ticked: what the feed watches now (set in its menu). Changing it here makes Tora's choice win."
   }
 }
