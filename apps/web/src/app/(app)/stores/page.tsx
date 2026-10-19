@@ -1,5 +1,5 @@
 import { PLACE, codeIndex, localDate, storesInArea } from '@tora/core';
-import { cachedStores, recentPosts, storeCodes, storeGlossary } from '@tora/db';
+import { cachedStores, storeCodes, storeGlossary } from '@tora/db';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -7,34 +7,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
 import { AddGlossary, RemoveGlossary } from './store-area';
+import { postViews } from './post-views';
+import { PostsList } from './posts-list';
 import { AutoRefresh } from './stores-nav';
 
 /**
  * Store notices, the main sub page (S25): the latest posts, the area's first, and what the codes
  * posters use stand for. Before an area is set, the Area page comes first.
  */
-export default async function StorePostsPage() {
+export default async function StorePostsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ show?: string }>;
+}) {
   const { db, user } = await authed();
   const area = user.preferences?.storeArea ?? null;
   if (!area) redirect('/stores/area');
-  const [t, all, posts, glossary] = await Promise.all([
+  const { show } = await searchParams;
+  const onlyArea = show === 'area';
+  const [t, all, glossary, first] = await Promise.all([
     getTranslations('stores'),
     cachedStores(db),
-    recentPosts(db, 60),
     storeGlossary(db),
+    postViews(db, area, { offset: 0, onlyArea }),
   ]);
   const inArea = storesInArea(area, all, localDate());
-  const byId = new Map(all.map((s) => [s.id, s]));
   const codes = codeIndex(all.map((s) => ({ ...s, codes: storeCodes(s) })));
   const label = (s: (typeof all)[number]) =>
     s.chain === PLACE
       ? t('areaOf', { name: s.name })
       : [s.chainLabel, s.name].filter(Boolean).join(' ');
-  const sorted = [...posts].sort(
-    (a, b) =>
-      Number(b.storeIds.some((id) => inArea.has(id))) -
-        Number(a.storeIds.some((id) => inArea.has(id))) || b.postedAt.localeCompare(a.postedAt),
-  );
+  const chip = (active: boolean) =>
+    cn(
+      'rounded-full border px-2.5 py-1 text-xs',
+      active ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground',
+    );
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] 2xl:grid-cols-[minmax(0,1fr)_minmax(26rem,36rem)]">
@@ -43,51 +50,27 @@ export default async function StorePostsPage() {
         <CardHeader>
           <CardTitle>{t('posts')}</CardTitle>
           <CardDescription>
-            {t('postsInfo')}{' '}
+            {t('postsInfoPaged')}{' '}
             <Link href="/stores/area" className="underline">
               {t('inYourArea', { n: inArea.size })}
             </Link>
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('noPosts')}</p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {sorted.slice(0, 40).map((p) => {
-                const mine = p.storeIds.some((id) => inArea.has(id));
-                const names = p.storeIds
-                  .map((id) => byId.get(id))
-                  .filter((s) => !!s)
-                  .map(label);
-                return (
-                  <li key={p.id} className={cn('space-y-0.5 py-2', !mine && 'opacity-70')}>
-                    <p className="text-xs text-muted-foreground">
-                      {p.postedAt.slice(5, 16).replace('T', ' ')}
-                      {p.author ? ` · ${p.author}` : ''} ·{' '}
-                      <span className={cn(mine && 'font-semibold text-foreground')}>
-                        {names.length ? names.join(', ') : t('unknownStore')}
-                      </span>
-                    </p>
-                    <p className="break-words">
-                      {p.url ? (
-                        <a
-                          href={p.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="hover:underline"
-                        >
-                          {p.text}
-                        </a>
-                      ) : (
-                        p.text
-                      )}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        <CardContent className="space-y-3">
+          <div className="flex gap-1.5">
+            <Link href="/stores" className={chip(!onlyArea)}>
+              {t('allPosts')}
+            </Link>
+            <Link href="/stores?show=area" className={chip(onlyArea)}>
+              {t('areaPosts')}
+            </Link>
+          </div>
+          <PostsList
+            key={`${onlyArea}|${first.posts[0]?.id ?? ''}`}
+            initial={first.posts}
+            more={first.more}
+            onlyArea={onlyArea}
+          />
         </CardContent>
       </Card>
 

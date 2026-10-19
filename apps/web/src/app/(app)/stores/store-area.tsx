@@ -14,7 +14,7 @@ import {
 } from '@tora/core';
 import { LocateFixed } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { CopyButton } from '../settings/admin/commands/copy-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +52,8 @@ export interface StoreView {
 }
 
 const EMPTY: StoreArea = { home: { mode: 'stores', storeIds: [] } };
+/** Stores shown at a time; more as the list is scrolled. */
+const STORES_BATCH = 20;
 
 /** The person's store area and each store's switch (S25); every change is saved at once. */
 export function StoreAreaForm({
@@ -148,6 +150,11 @@ export function StoreAreaForm({
     .map((s) => ({ s, km: distanceOf(s) }))
     .sort((a, b) => (choice.mode === 'distance' ? (a.km ?? Infinity) - (b.km ?? Infinity) : 0))
     .map((x) => x.s);
+  // A batch at a time, more as the end comes into view; back to one batch when filters change.
+  const filters = [chainFilter, regionFilter, onlyOn, filter].join('|');
+  const [shownBy, setShownBy] = useState({ filters, limit: STORES_BATCH });
+  const limit = shownBy.filters === filters ? shownBy.limit : STORES_BATCH;
+  const setLimit = (n: number) => setShownBy({ filters, limit: n });
   const chip = (active: boolean) =>
     cn(
       'rounded-full border px-2.5 py-1 text-xs',
@@ -336,46 +343,49 @@ export function StoreAreaForm({
         {stores.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('noStores')}</p>
         ) : (
-          <ul
-            className={cn(
-              'grid grid-cols-1 gap-x-6 text-sm md:grid-cols-2 2xl:grid-cols-3',
-              pending && 'opacity-70',
-            )}
-          >
-            {shown.map((s) => {
-              const km = distanceOf(s);
-              const outside = !within(s);
-              return (
-                <li key={s.id} className="flex items-start gap-3 border-b py-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1 size-4"
-                    checked={on(s)}
-                    onChange={() => toggle(s)}
-                    aria-label={t('noticesFor', { store: s.name })}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className={cn(outside && !on(s) && 'text-muted-foreground')}>
-                      {s.name}{' '}
-                      {outside && on(s) && (
-                        <span className="text-xs text-primary">{t('addedByHand')} </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {[s.chain, s.region, km !== null ? t('km', { km: km.toFixed(1) }) : null]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t('codes')}: {[...s.codes, ...s.extra].join(', ') || '-'}
-                    </p>
-                    {admin && <ExtraCodes store={s} />}
-                    {admin && s.byHand && <RemoveStore id={s.id} />}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <ul
+              className={cn(
+                'grid grid-cols-1 gap-x-6 text-sm md:grid-cols-2 2xl:grid-cols-3',
+                pending && 'opacity-70',
+              )}
+            >
+              {shown.slice(0, limit).map((s) => {
+                const km = distanceOf(s);
+                const outside = !within(s);
+                return (
+                  <li key={s.id} className="flex items-start gap-3 border-b py-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4"
+                      checked={on(s)}
+                      onChange={() => toggle(s)}
+                      aria-label={t('noticesFor', { store: s.name })}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className={cn(outside && !on(s) && 'text-muted-foreground')}>
+                        {s.name}{' '}
+                        {outside && on(s) && (
+                          <span className="text-xs text-primary">{t('addedByHand')} </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {[s.chain, s.region, km !== null ? t('km', { km: km.toFixed(1) }) : null]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('codes')}: {[...s.codes, ...s.extra].join(', ') || '-'}
+                      </p>
+                      {admin && <ExtraCodes store={s} />}
+                      {admin && s.byHand && <RemoveStore id={s.id} />}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            {limit < shown.length && <ShowMore onShow={() => setLimit(limit + STORES_BATCH)} />}
+          </>
         )}
       </CardContent>
     </Card>
@@ -752,5 +762,30 @@ export function BoardsToWatch({
       </div>
       <p className="text-xs text-muted-foreground">{t(chosen ? 'boardsChosen' : 'boardsByFeed')}</p>
     </div>
+  );
+}
+
+/** Shows the next batch when it comes into view (or when clicked). */
+function ShowMore({ onShow }: { onShow: () => void }) {
+  const t = useTranslations('stores');
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([e]) => e?.isIntersecting && onShow(), {
+      rootMargin: '200px',
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onShow]);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className="w-full py-2 text-xs text-muted-foreground"
+      onClick={onShow}
+    >
+      {t('showMore')}
+    </button>
   );
 }

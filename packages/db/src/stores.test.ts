@@ -14,6 +14,7 @@ import {
   feedTokenUser,
   listStores,
   newFeedToken,
+  postsPage,
   pruneStorePosts,
   readPush,
   receivePush,
@@ -322,4 +323,19 @@ it('takes what the feed says it saw: posts on the page and a page turned over', 
     now,
   );
   expect(turned.gap).toEqual({ chain: 'yodobashi', posts: 1 });
+});
+
+it('pages the posts, newest first, all or those of some stores', async () => {
+  await newFeedToken(db, uid);
+  const [umeda] = await listStores(db);
+  const posts = Array.from({ length: 5 }, (_, i) =>
+    post(`p${i}`, i % 2 ? 'UMD 販売' : '何も', 10 - i),
+  );
+  await receivePush(db, uid, { source: 'gamenv', chain: 'yodobashi', posts }, now);
+  const first = await postsPage(db, { offset: 0, limit: 2 });
+  expect([first.posts.map((p) => p.externalId), first.more]).toEqual([['p4', 'p3'], true]);
+  const last = await postsPage(db, { offset: 4, limit: 2 });
+  expect([last.posts.map((p) => p.externalId), last.more]).toEqual([['p0'], false]);
+  const mine = await postsPage(db, { offset: 0, limit: 10, storeIds: [umeda!.id] });
+  expect(mine.posts.map((p) => p.externalId)).toEqual(['p3', 'p1']);
 });

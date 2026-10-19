@@ -754,3 +754,30 @@ export async function storesState(db: Db, userId: string) {
   ]);
   return { post: post?.at ?? null, feed: token?.at ?? null };
 }
+
+/**
+ * A page of posts, newest first: only those naming one of `storeIds` when given. One more than
+ * asked is read, to know whether an older page follows (no count of every post).
+ */
+export async function postsPage(
+  db: Db,
+  opts: { offset: number; limit: number; storeIds?: string[] },
+): Promise<{ posts: StorePost[]; more: boolean }> {
+  const ids = opts.storeIds;
+  if (ids && !ids.length) return { posts: [], more: false };
+  const rows = await db
+    .select()
+    .from(storePosts)
+    .where(
+      ids
+        ? sql`exists (select 1 from json_each(${storePosts.storeIds}) where value in (${sql.join(
+            ids.map((id) => sql`${id}`),
+            sql`, `,
+          )}))`
+        : undefined,
+    )
+    .orderBy(desc(storePosts.postedAt))
+    .limit(opts.limit + 1)
+    .offset(opts.offset);
+  return { posts: rows.slice(0, opts.limit), more: rows.length > opts.limit };
+}

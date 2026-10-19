@@ -1909,6 +1909,12 @@
     "watchAll": "All",
     "feedDecides": "Let the feed decide",
     "boardsChosen": "Chosen here: the feed follows at its next visit and says which boards it tracks.",
-    "boardsByFeed": "Ticked: what the feed watches now (set in its menu). Changing it here makes Tora's choice win."
+    "boardsByFeed": "Ticked: what the feed watches now (set in its menu). Changing it here makes Tora's choice win.",
+    "allPosts": "All posts",
+    "areaPosts": "Your area",
+    "loading": "Loading...",
+    "noMore": "No older posts.",
+    "showMore": "Show more",
+    "postsInfoPaged": "Newest first; more load as you scroll."
   }
 }

@@ -21,6 +21,7 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
+import { postViews } from './post-views';
 
 function cleanChoice(c: unknown): StoreAreaChoice | null {
   const v = c as Partial<StoreAreaChoice> | null;
@@ -187,4 +188,13 @@ export async function saveFeedBoardsAction(boards: string[] | null) {
     storeFeed: clean.length ? { ...rest, boards: clean } : rest,
   });
   revalidatePath('/stores/feed');
+}
+
+/** The next posts as the list is scrolled (S25). */
+export async function morePostsAction(offset: number, onlyArea: boolean) {
+  const { db, user } = await authed();
+  return postViews(db, user.preferences?.storeArea ?? null, {
+    offset: Math.max(0, Math.floor(offset) || 0),
+    onlyArea: !!onlyArea,
+  });
 }
