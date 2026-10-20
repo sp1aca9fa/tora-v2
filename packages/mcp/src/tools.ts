@@ -29,6 +29,7 @@ import {
   productLines,
   releaseDates,
   latestSignals,
+  loadOpportunities,
   getUserById,
   similarKey,
   similarProducts,
@@ -799,4 +800,63 @@ export async function watchlist(db: Db, userId: string) {
         : null,
     };
   });
+}
+
+/**
+ * Opportunities (S13): items worth a look within their group of similar items, best first, from
+ * the signals worked out after the last collect. Items priced from a source Claude may not read
+ * are left out, as are such asks and shop buy prices.
+ */
+export async function opportunities(db: Db, filter: { itemType?: string; limit?: number } = {}) {
+  const saved = await loadOpportunities(db);
+  if (!saved) return { day: null, items: [] };
+  const noAi = noAiSources(await loadSourceRegistry(db));
+  const list = saved.items
+    .filter((o) => !noAi.includes(o.source) && (!filter.itemType || o.itemType === filter.itemType))
+    .slice(0, Math.min(Math.max(1, filter.limit ?? 30), 200));
+  const names = new Map<string, Product>();
+  for (const o of list) {
+    const p = await getProduct(db, o.productId);
+    if (p) names.set(o.productId, p);
+  }
+  const record = (o: (typeof list)[number], key: string) => {
+    const t = o.tests?.signals[key as keyof NonNullable<typeof o.tests>['signals']];
+    return t ? { checked: t.checked, higher90d: t.higher, medianChange90d: t.change } : null;
+  };
+  return {
+    day: saved.day,
+    items: list.map((o) => ({
+      productId: o.productId,
+      name: names.get(o.productId)?.name ?? null,
+      kind: names.get(o.productId)?.kind ?? null,
+      itemType: o.itemType,
+      bucket: o.bucket || null,
+      priceSource: o.source,
+      // Signals proven on the group's past prices rank items; warnings count against; the rest
+      // are on but not proven (too few checks, or no better than buying on any day).
+      signals: o.proven,
+      warnings: o.warnings,
+      notProven: o.unproven,
+      score: Math.round(o.score * 100) / 100,
+      // Each signal's record: past signals checked 90 days later, how many were higher then.
+      records: Object.fromEntries(
+        [...o.proven, ...o.warnings, ...o.unproven].map((k) => [k, record(o, k)]),
+      ),
+      anyDay: o.tests
+        ? {
+            checked: o.tests.any.checked,
+            higher90d: o.tests.any.higher,
+            medianChange90d: o.tests.any.change,
+          }
+        : null,
+      // Fractions, not percents: price is the last 30 days' typical sale on the price source.
+      numbers: o.numbers,
+      lowestAsk:
+        o.ask && !noAi.includes(o.ask.source) ? { ...o.ask, underRecentPrice: o.askUnder } : null,
+      shopBuyPrice:
+        o.buylist && !noAi.includes(o.buylist.source)
+          ? { ...o.buylist, nearRecentPrice: o.buylistNear }
+          : null,
+    })),
+  };
 }

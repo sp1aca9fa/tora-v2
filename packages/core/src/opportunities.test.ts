@@ -1,0 +1,151 @@
+import { describe, expect, it } from 'vitest';
+import {
+  type OpportunityNumbers,
+  type OpportunityTests,
+  OpportunityGroup,
+  provenEdge,
+  rankOpportunity,
+  signalsOn,
+} from './opportunities';
+import type { DayPrice } from './signals';
+
+/** Daily prices from `start` for `n` days, by a function of the day index. */
+function days(start: string, n: number, price: (i: number) => number, count = 2): DayPrice[] {
+  const t0 = Date.parse(`${start}T00:00:00Z`);
+  return Array.from({ length: n }, (_, i) => ({
+    day: new Date(t0 + i * 86_400_000).toISOString().slice(0, 10),
+    price: price(i),
+    count,
+  }));
+}
+
+const numbers = (over: Partial<OpportunityNumbers>): OpportunityNumbers => ({
+  price: 10000,
+  own84: 0,
+  line84: { change: 0, items: 6, line: null },
+  sales30: 5,
+  salesBefore: 5,
+  age: null,
+  ...over,
+});
+
+describe('signalsOn', () => {
+  it('reads the line, the item against it, sales and age', () => {
+    expect(signalsOn(numbers({}))).toEqual([]);
+    expect(
+      signalsOn(numbers({ line84: { change: 0.12, items: 6, line: null }, own84: 0.3 })),
+    ).toEqual(['line_rising', 'leader']);
+    expect(
+      signalsOn(numbers({ line84: { change: 0.12, items: 6, line: null }, own84: -0.05 })),
+    ).toEqual(['line_rising', 'laggard']);
+    // A laggard needs a rising line.
+    expect(signalsOn(numbers({ own84: -0.3 }))).toEqual([]);
+    expect(signalsOn(numbers({ line84: { change: -0.1, items: 6, line: null } }))).toEqual([
+      'line_falling',
+    ]);
+    expect(signalsOn(numbers({ sales30: 15, salesBefore: 10 }))).toEqual(['sales_up']);
+    expect(signalsOn(numbers({ sales30: 9, salesBefore: 4 }))).toEqual([]);
+    expect(signalsOn(numbers({ sales30: 6, salesBefore: 10 }))).toEqual(['sales_down']);
+    expect(
+      signalsOn(numbers({ age: { days: 200, change: 0.3, typical: 0.05, items: 3 } })),
+    ).toEqual(['strong_for_age']);
+    expect(
+      signalsOn(numbers({ age: { days: 200, change: -0.2, typical: 0.05, items: 3 } })),
+    ).toEqual(['weak_for_age']);
+  });
+});
+
+describe('OpportunityGroup', () => {
+  // Five items rising 2 % a week, one flat: the flat one lags a rising line.
+  const rising = (i: number) => 10000 * Math.exp((0.02 / 7) * i);
+  const members = [
+    ...[1, 2, 3, 4, 5].map((n) => ({
+      id: `r${n}`,
+      line: null,
+      release: null,
+      series: days('2025-01-01', 400, (i) => rising(i) * (1 + n / 100)),
+    })),
+    { id: 'flat', line: null, release: null, series: days('2025-01-01', 400, () => 10000) },
+  ];
+  const group = new OpportunityGroup(members);
+
+  it('works out an item against its line', () => {
+    const n = group.numbers('flat', '2025-12-01')!;
+    expect(n.price).toBe(10000);
+    expect(n.own84).toBeCloseTo(0, 5);
+    expect(n.line84!.items).toBe(6);
+    expect(n.line84!.change).toBeGreaterThan(0.1);
+    expect(n.sales30).toBe(60);
+    expect(signalsOn(n)).toEqual(['line_rising', 'laggard']);
+    expect(group.numbers('missing', '2025-12-01')).toBeNull();
+  });
+
+  it('tests each signal against buying on any day', () => {
+    const t = group.tests('2026-02-04');
+    expect(t.items).toBe(6);
+    expect(t.any.checked).toBeGreaterThan(100);
+    // The rising items stay rising: the line's signal is followed by higher prices; the flat
+    // laggard stays flat (never higher).
+    expect(t.signals.line_rising!.signals).toBe(6);
+    expect(t.signals.line_rising!.higher).toBe(5);
+    expect(t.signals.laggard!.signals).toBe(1);
+    expect(t.signals.laggard!.higher).toBe(0);
+  });
+
+  it('compares an item with similar items at the same age', () => {
+    const young = new OpportunityGroup([
+      ...[1, 2, 3].map((n) => ({
+        id: `o${n}`,
+        line: null,
+        release: '2023-01-01',
+        series: days('2023-01-01', 500, () => 10000 + n),
+      })),
+      {
+        id: 'new',
+        line: null,
+        release: '2025-01-01',
+        series: days('2025-01-01', 200, (i) => (i < 100 ? 10000 : 14000)),
+      },
+    ]);
+    const n = young.numbers('new', '2025-07-01')!;
+    expect(n.age).toMatchObject({ days: 181, items: 3, typical: 0 });
+    expect(n.age!.change).toBeCloseTo(0.4, 5);
+    expect(signalsOn(n)).toContain('strong_for_age');
+  });
+});
+
+describe('provenEdge and rankOpportunity', () => {
+  const tests: OpportunityTests = {
+    day: '2026-10-21',
+    items: 20,
+    any: { signals: 1000, checked: 1000, higher: 600, change: 0.09 },
+    signals: {
+      line_rising: { signals: 96, checked: 96, higher: 78, change: 0.33 },
+      leader: { signals: 115, checked: 115, higher: 72, change: 0.21 },
+      sales_up: { signals: 9, checked: 9, higher: 9, change: 0.3 },
+      sales_down: { signals: 117, checked: 117, higher: 44, change: -0.07 },
+      line_falling: { signals: 97, checked: 97, higher: 60, change: 0 },
+    },
+  };
+
+  it('proves a signal only with enough checks and a clear edge', () => {
+    expect(provenEdge(tests, 'line_rising')).toBeCloseTo(78 / 96 - 0.6, 5);
+    // 63 % against 60 %: under 5 points.
+    expect(provenEdge(tests, 'leader')).toBeNull();
+    // 9 checks.
+    expect(provenEdge(tests, 'sales_up')).toBeNull();
+    expect(provenEdge(tests, 'laggard')).toBeNull();
+    // A warning is proven when it did worse.
+    expect(provenEdge(tests, 'sales_down')).toBeCloseTo(44 / 117 - 0.6, 5);
+    expect(provenEdge(tests, 'line_falling')).toBeNull();
+    expect(provenEdge(undefined, 'line_rising')).toBeNull();
+  });
+
+  it('ranks by proven signals, warnings counting against', () => {
+    const r = rankOpportunity(['line_rising', 'leader', 'sales_down'], tests);
+    expect(r.proven).toEqual(['line_rising']);
+    expect(r.warnings).toEqual(['sales_down']);
+    expect(r.unproven).toEqual(['leader']);
+    expect(r.score).toBeCloseTo(78 / 96 - 0.6 + (44 / 117 - 0.6), 5);
+  });
+});

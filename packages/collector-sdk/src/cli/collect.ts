@@ -17,6 +17,7 @@ import {
   checkItemSales,
   getProduct,
   refreshItemSales,
+  refreshOpportunities,
   refreshRuleTests,
   refreshSignals,
   refreshTradeCounts,
@@ -233,6 +234,7 @@ let snap: Awaited<ReturnType<typeof runSnapshots>> | null = null;
 let saved: Awaited<ReturnType<typeof refreshBucketValues>> | null = null;
 let signalsSaved: { saved: number; withPattern: number; lineSuggestions: number } | null = null;
 let ruleGroups = 0;
+let opportunities: Awaited<ReturnType<typeof refreshOpportunities>> | null = null;
 if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   log('closing steps: already done today and nothing fetched since, left out');
 } else {
@@ -312,6 +314,12 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   } catch (error) {
     console.log(`rule tests: stopped (${errorText(error)})`);
   }
+  // Opportunities (S13): every item's signals and their tests on each group's history.
+  try {
+    opportunities = await refreshOpportunities(db);
+  } catch (error) {
+    console.log(`opportunities: stopped (${errorText(error)})`);
+  }
   await saveSetting(db, CLOSED_KEY, localDate());
 }
 progress.done();
@@ -330,6 +338,11 @@ if (signalsSaved) {
   }
 }
 if (ruleGroups) console.log(`rule tests: ${ruleGroups} group(s) of similar items`);
+if (opportunities) {
+  console.log(
+    `opportunities: ${opportunities.items.length} item(s), ${Object.keys(opportunities.tests).length} group(s) tested`,
+  );
+}
 if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }

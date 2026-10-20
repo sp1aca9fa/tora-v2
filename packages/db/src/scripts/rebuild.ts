@@ -10,6 +10,7 @@ import { inferLotSizes } from '../lot-sizes';
 import { exitIfUnmigrated } from '../migrate';
 import { checkSourceQuality, loadTimeZone } from '../registry';
 import { portfolioCharts } from '../schema';
+import { refreshOpportunities } from '../opportunities';
 import { refreshSignals } from '../signals';
 import {
   clearAllBucketValues,
@@ -40,4 +41,6 @@ console.log(`values: ${values.values} saved`);
 await refreshTradeCounts(db, INSIGHT_PERIODS);
 const signals = await refreshSignals(db);
 console.log(`buy timing: ${signals.saved} item(s) and condition(s)`);
+const opportunities = await refreshOpportunities(db);
+console.log(`opportunities: ${opportunities.items.length} item(s)`);
 console.log('Done.');

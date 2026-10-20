@@ -18,6 +18,7 @@ import {
   collectorStatus,
   dataChecks,
   listProducts,
+  opportunities,
   portfolioSummary,
   priceHistoryOf,
   productDetail,
@@ -153,6 +154,20 @@ server.registerTool(
     inputSchema: {},
   },
   async () => json(await watchlist(db, user.id)),
+);
+
+server.registerTool(
+  'opportunities',
+  {
+    title: 'Opportunities',
+    description:
+      "Items worth a look to buy, within their group of similar items (any person's items), best first: the signals on today (line_rising: the set line's 12-week change is +10 % or more; leader / laggard: the item 15 points above / under its rising line; sales_up: sales in 30 days 1.5x the 90 days before; strong_for_age / weak_for_age: the last 90 days against similar items at the same age), warnings (line_falling, sales_down), and each one's record on the group's past prices (checked 90 days later, how many higher, against buying on any day). Only signals proven (10+ checks, 5+ points better than any day) rank items. Also the lowest ask on the price source and a shop buy price. From past prices only, never a sure thing.",
+    inputSchema: {
+      itemType: z.string().optional().describe('e.g. sealed, card, game'),
+      limit: z.number().int().min(1).max(200).optional().describe('default 30'),
+    },
+  },
+  async (filter) => json(await opportunities(db, filter)),
 );
 
 server.registerTool(
