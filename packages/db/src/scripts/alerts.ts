@@ -3,6 +3,8 @@
 //       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
 //       stopped before it could record itself and sends failures to admins at once, then the
 //       watched items' buy zone and target alerts (S9 part 5; from today's numbers only).
+//   update --from <rev> --to <rev> [--failed <step>]
+//       Run by scripts/update-server.sh --auto: logs a home server's update, a failure to admins.
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
 //       each person at most once in 20 hours).
 import { localDate, toLocalIso } from '@tora/core';
@@ -14,6 +16,7 @@ import {
   type AlertContext,
   type AlertTexts,
   alertFailures,
+  alertServerUpdate,
   checkMissedRuns,
   sendSummaries,
   sendWatchAlerts,
@@ -36,6 +39,9 @@ const { values, positionals } = parseArgs({
     'collect-exit': { type: 'string' },
     'backup-exit': { type: 'string' },
     log: { type: 'string' },
+    from: { type: 'string' },
+    to: { type: 'string' },
+    failed: { type: 'string' },
   },
 });
 const db = createDb(dbConfigFromEnv());
@@ -86,6 +92,16 @@ if (command === 'after-run') {
   console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
   const buy = await sendWatchAlerts(db, ctx);
   console.log(`alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`);
+} else if (command === 'update') {
+  // Run by scripts/update-server.sh --auto after an update (or a failed one, rolled back).
+  const sent = await alertServerUpdate(db, ctx, {
+    from: values.from ?? '?',
+    to: values.to ?? '?',
+    failed: values.failed ?? null,
+  });
+  console.log(
+    `alerts: server update ${values.failed ? 'failed' : 'done'}, ${sent} message(s) sent`,
+  );
 } else if (command === 'check') {
   const missed = await checkMissedRuns(db, ctx);
   const summaries = await sendSummaries(db, ctx);
@@ -94,7 +110,7 @@ if (command === 'after-run') {
   );
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step>]',
   );
   process.exit(1);
 }

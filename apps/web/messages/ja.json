@@ -1406,7 +1406,8 @@
     "storeArea": "{name}エリア",
     "feedConnected": "Tora:ブラウザのフィード({source})に接続しました。追跡中の掲示板:{boards}",
     "boardBack": "Tora:{board}掲示板から投稿が再び届いています。",
-    "boardSilent": "Tora:{board}掲示板から{since}以降投稿が届いていません(最終訪問 {at}、{posts}件)。フィードは動作中:届くまでこの掲示板の通知はありません。"
+    "boardSilent": "Tora:{board}掲示板から{since}以降投稿が届いていません(最終訪問 {at}、{posts}件)。フィードは動作中:届くまでこの掲示板の通知はありません。",
+    "updateFailed": "Tora: サーバーを{to}に更新できませんでした（段階: {step}）。{from}に戻して動作を続けています。サーバーのログ: ~/.local/state/tora/update.log"
   },
   "alerts": {
     "title": "アラート",
@@ -1528,7 +1529,9 @@
       "userSetupLink": "設定リンクを発行",
       "userSetupCancel": "設定リンクを停止",
       "userSetupDone": "設定完了",
-      "collectRequested": "収集をリクエスト"
+      "collectRequested": "収集をリクエスト",
+      "serverUpdate": "サーバーを更新",
+      "serverUpdateFailed": "サーバーの更新に失敗（元に戻しました）"
     },
     "role": {
       "admin": "管理者",

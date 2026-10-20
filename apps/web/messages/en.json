@@ -1406,7 +1406,8 @@
     "storeArea": "{name} area",
     "feedConnected": "Tora: connected to the browser feed ({source}), tracking these boards: {boards}",
     "boardBack": "Tora: the {board} board gives posts again.",
-    "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does."
+    "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.",
+    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log"
   },
   "alerts": {
     "title": "Alerts",
@@ -1528,7 +1529,9 @@
       "userSetupLink": "Setup link made",
       "userSetupCancel": "Setup link stopped",
       "userSetupDone": "Setup done",
-      "collectRequested": "Collect requested"
+      "collectRequested": "Collect requested",
+      "serverUpdate": "Server updated",
+      "serverUpdateFailed": "Server update failed (went back)"
     },
     "role": {
       "admin": "admin",

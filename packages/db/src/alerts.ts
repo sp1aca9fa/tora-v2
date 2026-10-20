@@ -501,6 +501,32 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
   return sent;
 }
 
+/**
+ * A home server's automatic update (docs/home-server.md, `scripts/update-server.sh --auto`): in the
+ * activity log; a failure (the server went back to the version before) goes to admins at once.
+ */
+export async function alertServerUpdate(
+  db: Db,
+  ctx: AlertContext,
+  update: { from: string; to: string; failed: string | null },
+): Promise<number> {
+  const { from, to, failed } = update;
+  await recordActivity(db, {
+    kind: 'admin',
+    action: failed ? 'serverUpdateFailed' : 'serverUpdate',
+    level: failed ? 'failed' : 'ok',
+    detail: { ...(failed ? { step: failed } : {}), from, to },
+    href: '/settings/activity',
+  });
+  if (!failed) return 0;
+  let sent = 0;
+  for (const admin of await adminsToAlert(db)) {
+    const t = await textsFor(db, admin, ctx);
+    sent += await sendToUser(db, admin.id, fill(t.updateFailed!, { step: failed, from, to }), ctx);
+  }
+  return sent;
+}
+
 /** Hours without a run before the daily check says so. */
 const MISSED_HOURS = 26;
 

@@ -126,11 +126,25 @@ copy, and remove its own collect task.
 
 ## 7. Updates
 
-Push from your PC, then:
+The server updates itself: every 5 minutes it checks GitHub, and when there are new commits it
+pulls both repos, installs, migrates, saves the plug-ins' data, builds, restarts the app and checks
+it answers (`scripts/update-server.sh --auto`). Never while a collect runs (it waits for the next
+check). When a step fails, it goes back to the version before, keeps that running, tells admins
+(Discord, Telegram) and does not try that version again until a newer push. Every update is in
+Settings > Activity; the log is `~/.local/state/tora/update.log`. While the app builds (a minute
+or two), pages may fail to load.
+
+The restart needs root: a sudoers rule allows that one command without a password, and the timer
+runs the script:
 
 ```bash
-ssh -t <server> code/tora-v2/scripts/update-server.sh
+echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart tora-app" | sudo tee /etc/sudoers.d/tora-update
+sudo chmod 440 /etc/sudoers.d/tora-update && sudo visudo -c
 ```
 
-It pulls both repos, installs, migrates, saves the plug-ins' data, builds and restarts the app,
-then checks it answers. Logs: `journalctl -u tora-app`, `~/.local/state/tora/collect.log`.
+`tora-update.service` (`Type=oneshot`, `User=<user>`, the same `PATH` as the collect,
+`ExecStart=/home/<user>/code/tora-v2/scripts/update-server.sh --auto`) and `tora-update.timer`
+(`OnCalendar=*:0/5`), enabled like the others. By hand, any time:
+`ssh -t <server> code/tora-v2/scripts/update-server.sh`.
+
+Logs: `journalctl -u tora-app`, `~/.local/state/tora/collect.log`, `~/.local/state/tora/update.log`.
