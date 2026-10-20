@@ -16,6 +16,7 @@ this order the first time.
 | [A home server](home-server.md)       | All of Tora on one always-on box at home, reached through a Tailscale Funnel address |
 | [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
 | [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
+| [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

@@ -4,6 +4,7 @@ import {
   Binoculars,
   Inbox,
   LayoutGrid,
+  Lightbulb,
   ListChecks,
   LogOut,
   PlusCircle,
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
 const ITEMS = [
   { href: '/', key: 'portfolio', icon: LayoutGrid },
   { href: '/watchlist', key: 'watchlist', icon: Binoculars },
+  { href: '/opportunities', key: 'opportunities', icon: Lightbulb },
   { href: '/stores', key: 'stores', icon: Store },
   { href: '/actions', key: 'actions', icon: ListChecks },
   { href: '/add', key: 'add', icon: PlusCircle },
@@ -126,14 +128,14 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
       </header>
 
       <nav className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-8">
           {ITEMS.map(({ href, key, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               aria-current={isActive(pathname, href) ? 'page' : undefined}
               className={cn(
-                'flex flex-col items-center gap-1 py-2.5 text-xs text-muted-foreground',
+                'flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground',
                 isActive(pathname, href) && 'font-medium text-foreground',
               )}
             >
@@ -143,7 +145,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
                   <Badge counts={badges} item={key} />
                 </span>
               </span>
-              {t(`nav.${key}`)}
+              {t(key === 'opportunities' ? 'nav.opportunitiesShort' : `nav.${key}`)}
             </Link>
           ))}
         </div>

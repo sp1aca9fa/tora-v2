@@ -16,12 +16,12 @@ import {
   signalsOn,
   toLocalIso,
 } from '@tora/core';
-import { and, eq, gte } from 'drizzle-orm';
+import { and, eq, gte, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { refreshItemSales } from './item-sales';
 import { readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
-import { priceObservations, products } from './schema';
+import { type Product, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, pickSeries } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
@@ -227,4 +227,44 @@ export async function loadOpportunities(
       a.productId.localeCompare(b.productId),
   );
   return { day: saved.day, items };
+}
+
+/** The Opportunities page: the saved opportunities with each item and whether the person owns or watches it. */
+export async function opportunitiesFor(
+  db: Db,
+  userId: string,
+): Promise<{
+  day: string;
+  items: (Opportunity & { product: Product; owned: boolean; watching: boolean })[];
+} | null> {
+  const saved = await loadOpportunities(db);
+  if (!saved) return null;
+  const ids = saved.items.map((o) => o.productId);
+  const byId = new Map<string, Product>();
+  for (let i = 0; i < ids.length; i += 500) {
+    for (const p of await db
+      .select()
+      .from(products)
+      .where(inArray(products.id, ids.slice(i, i + 500)))) {
+      byId.set(p.id, p);
+    }
+  }
+  const [owned, watched] = await Promise.all([
+    db
+      .selectDistinct({ id: holdings.productId })
+      .from(holdings)
+      .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned'))),
+    db.selectDistinct({ id: watches.productId }).from(watches).where(eq(watches.userId, userId)),
+  ]);
+  const own = new Set(owned.map((r) => r.id));
+  const watching = new Set(watched.map((r) => r.id));
+  return {
+    day: saved.day,
+    items: saved.items.flatMap((o) => {
+      const product = byId.get(o.productId);
+      return product
+        ? [{ ...o, product, owned: own.has(o.productId), watching: watching.has(o.productId) }]
+        : [];
+    }),
+  };
 }

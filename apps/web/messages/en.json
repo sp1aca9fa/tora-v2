@@ -10,7 +10,9 @@
     "settings": "Settings",
     "imports": "Imports",
     "watchlist": "Watchlist",
-    "stores": "Stores"
+    "opportunities": "Opportunities",
+    "stores": "Stores",
+    "opportunitiesShort": "Ideas"
   },
   "common": {
     "save": "Save",
@@ -1580,6 +1582,54 @@
     "zoneShort": "good under <n>{amount}</n>",
     "limited": "limited data",
     "alertLimited": "Alert on Good price even with limited data"
+  },
+  "opportunities": {
+    "title": "Opportunities",
+    "intro": "Items worth a look within their group of similar items, from the prices Tora collects. Only signals that worked on past prices rank items: each shows how often the price was higher 90 days later. Never a sure thing.",
+    "updated": "Worked out after the collect of {day}.",
+    "none": "Nothing yet: the opportunities are worked out after the next collect.",
+    "noneProven": "No item of this type has a proven signal today.",
+    "worthALook": "Worth a look",
+    "alsoOn": "{count, plural, one {# more item has} other {# more items have}} signals on today that are not proven.",
+    "owned": "Owned",
+    "watching": "Watching",
+    "watch": "Watch",
+    "recent": "Recent price",
+    "askUnder": "Listed {amount} ({pct} under)",
+    "buylistNear": "A shop buys at {amount}",
+    "notProven": "not proven",
+    "record": "Higher 90 days later {higher} of {checked} times ({pct}; any day {any}).",
+    "recordFew": "Too few past signals to judge ({checked}).",
+    "recordsTitle": "Signals and their record",
+    "recordsIntro": "Each signal tested on the group's past prices: every week, the first day of each stretch it was on, checked 90 days later. Proven: 10 or more checks and 5 points or more better than buying on any day (a warning: worse). Most of this history is a rising market, which flatters signals that follow a rise; they are tested again after every collect.",
+    "anyDay": "Any day",
+    "colSignal": "Signal",
+    "colChecked": "Checked",
+    "colHigher": "Higher 90 days later",
+    "colChange": "Typical change",
+    "proven": "Proven",
+    "warning": "Warning",
+    "group": "{items} items",
+    "signal": {
+      "line_rising": "Line rising",
+      "line_falling": "Line falling",
+      "leader": "Leads its line",
+      "laggard": "Lags a rising line",
+      "sales_up": "Sales picking up",
+      "sales_down": "Sales slowing",
+      "strong_for_age": "Strong for its age",
+      "weak_for_age": "Weak for its age"
+    },
+    "why": {
+      "line_rising": "Its line: {line} over 12 weeks ({items} items).",
+      "line_falling": "Its line: {line} over 12 weeks ({items} items).",
+      "leader": "Its 12 weeks: {own}, its line's {line}.",
+      "laggard": "Its 12 weeks: {own}, its line's {line}.",
+      "sales_up": "{sales30} sales in 30 days, {before} a month before.",
+      "sales_down": "{sales30} sales in 30 days, {before} a month before.",
+      "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
+      "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items)."
+    }
   },
   "forSale": {
     "title": "For sale now",

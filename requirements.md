@@ -40,7 +40,7 @@
 | S25 | Store notices: posts about cards on sale in physical stores (first: the gamenv.net boards, fed by the user's own browser), store codes mapped to stores, notices for the stores in the person's area (picked stores or a distance from where they are, travel mode), each store on or off; a new Stores page | built 2026-10-19 (ヨドバシ first), awaiting migrations 0043-0045, the userscript set up and the user's check; other chains' store lists later; then S20 part 2 |
 | S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | built 2026-10-20 (no migration; suggestions appear after the next collect or `pnpm plugins`) |
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
-| S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | part 1 built 2026-10-21 (signals and their tests, MCP); part 2 (the page) next |
+| S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | parts 1-2 built 2026-10-21 (signals and their tests, MCP, the Opportunities page), awaiting the user's check; part 3 (ranking plug-ins and candidates) next |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | todo (user, 2026-10-14; infinite scroll added 2026-10-20) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
@@ -963,6 +963,11 @@ Built, part 1 (2026-10-21, no migration):
 - MCP tool `opportunities` (item type, limit; items priced from a source Claude may not read left out).
 - On the real data (read only): 119 items, 18 with a proven signal. Boxes: leader 96 % of 26, line rising 95 % of 62, sales up 98 % of 41, weak for its age 92 % of 13, laggard 85 % of 20 (any day 80 %); sales down 63 % of 40 (a warning); the main line is falling 27 % over 12 weeks now (5 past checks, not proven). Singles (any day 60 %): line rising 78 % of 125, sales up 72 % of 147, laggard 70 % of 84; leader 62 % (not proven); warnings sales down 42 %, line falling 43 %.
 - Noted for S10: Buy timing's "a listing in the zone" uses the cheapest ask of any site, so Mercari's mismatched listings reach it.
+
+Built, part 2 (2026-10-21, no migration):
+- Opportunities page (`/opportunities`, menu after Watchlist; "Ideas" / 狙い目 in the phone bar): tabs per item type (the type with the most items worth a look first). "Worth a look": items with a proven signal, ranked; each with its condition, Owned / Watching, the recent price, a same-site listing 15-50 % under it, a shop buy price at 80 % or more, every signal on today (proven, warning, not proven) with why it is on (the numbers) and its record (higher 90 days later X of Y, any day Z), Watch (the watch steps with the item picked). A line counts the items with only unproven signals or warnings. "Signals and their record" per group of the type: any day and each signal (checked, higher 90 days later, typical change), proven and warnings marked, with the caveat on a rising market. Rows open the item page in the studied condition.
+- Guide docs/opportunities.md.
+- Not seen in a browser: the sandbox cannot build the app (SWC cache check); typecheck only.
 
 ## S14: Speed at any size
 

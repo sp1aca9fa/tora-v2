@@ -10,7 +10,9 @@
     "settings": "設定",
     "imports": "インポート",
     "watchlist": "ウォッチ",
-    "stores": "店舗"
+    "opportunities": "狙い目",
+    "stores": "店舗",
+    "opportunitiesShort": "狙い目"
   },
   "common": {
     "save": "保存",
@@ -1580,6 +1582,54 @@
     "zoneShort": "<n>{amount}</n>以下で買い時",
     "limited": "データ不足",
     "alertLimited": "データ不足でも買い時を通知する"
+  },
+  "opportunities": {
+    "title": "狙い目",
+    "intro": "Toraが集めた価格から、似た商品のグループの中で注目に値する商品を探します。過去の価格で効果があったシグナルだけが順位に影響し、それぞれ90日後に価格が上がっていた割合を示します。確実なものではありません。",
+    "updated": "{day}の収集後に算出。",
+    "none": "まだありません。次の収集後に算出されます。",
+    "noneProven": "今日、この種類で実証されたシグナルのある商品はありません。",
+    "worthALook": "注目",
+    "alsoOn": "ほかに{count}件の商品に、実証されていないシグナルが出ています。",
+    "owned": "所有",
+    "watching": "ウォッチ中",
+    "watch": "ウォッチ",
+    "recent": "最近の価格",
+    "askUnder": "出品 {amount}({pct}安い)",
+    "buylistNear": "買取 {amount}",
+    "notProven": "未実証",
+    "record": "90日後に上がっていたのは{checked}回中{higher}回({pct}、任意の日は{any})。",
+    "recordFew": "過去のシグナルが少なすぎて判断できません({checked}回)。",
+    "recordsTitle": "シグナルと過去の実績",
+    "recordsIntro": "各シグナルをグループの過去の価格で検証:毎週、シグナルが出始めた日を90日後と比較。実証済み:10回以上の検証で、任意の日に買うより5ポイント以上良い(警告は悪い)。この履歴の大半は上昇相場で、上昇に乗るシグナルが良く見えやすいため、収集のたびに検証し直します。",
+    "anyDay": "任意の日",
+    "colSignal": "シグナル",
+    "colChecked": "検証数",
+    "colHigher": "90日後に上昇",
+    "colChange": "典型的な変化",
+    "proven": "実証済み",
+    "warning": "警告",
+    "group": "{items}商品",
+    "signal": {
+      "line_rising": "シリーズ上昇中",
+      "line_falling": "シリーズ下落中",
+      "leader": "シリーズを先導",
+      "laggard": "上昇シリーズで出遅れ",
+      "sales_up": "取引が増加",
+      "sales_down": "取引が減少",
+      "strong_for_age": "発売からの時期の割に強い",
+      "weak_for_age": "発売からの時期の割に弱い"
+    },
+    "why": {
+      "line_rising": "シリーズ:12週間で{line}({items}商品)。",
+      "line_falling": "シリーズ:12週間で{line}({items}商品)。",
+      "leader": "この商品の12週間:{own}、シリーズ:{line}。",
+      "laggard": "この商品の12週間:{own}、シリーズ:{line}。",
+      "sales_up": "直近30日で{sales30}件、その前は月{before}件。",
+      "sales_down": "直近30日で{sales30}件、その前は月{before}件。",
+      "strong_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。",
+      "weak_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。"
+    }
   },
   "forSale": {
     "title": "現在の出品",
