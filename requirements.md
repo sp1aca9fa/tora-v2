@@ -38,7 +38,7 @@
 | S24 | Japanese TCG shops as sources: 遊々亭, 晴れる屋2, magi first (asks, stock, 買取); more later | built 2026-10-19, awaiting the first collect and the user's check |
 | S20 | Box opening value: at what box price opening is worth it (pull rates, hit card prices) | built 2026-10-19, awaiting migration 0043, the first nightly reads and the user's check |
 | S25 | Store notices: posts about cards on sale in physical stores (first: the gamenv.net boards, fed by the user's own browser), store codes mapped to stores, notices for the stores in the person's area (picked stores or a distance from where they are, travel mode), each store on or off; a new Stores page | built 2026-10-19 (ヨドバシ first), awaiting migrations 0043-0045, the userscript set up and the user's check; other chains' store lists later; then S20 part 2 |
-| S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | todo, after S25 (user, 2026-10-19) |
+| S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | built 2026-10-20 (no migration; suggestions appear after the next collect or `pnpm plugins`) |
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | todo, after S20 (user, 2026-10-17) |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | idea; after S21 (user, 2026-10-18) |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
@@ -1091,6 +1091,10 @@ Added at the user's request (2026-10-17), after S9 part 5. At what box price ope
 - The value (`openingValue` in core): the average of a box's hits (rate x the rarity's average card value after the fee) is the break-even box price; the spread from 20,000 simulated boxes (each pack has a hit of a rarity with the same chance, any card of it alike, seeded so every view agrees): the share of boxes paying back the box price, the median box, one box in ten below and above. Box price: the shrink-wrapped box's market value, else its lowest ask. Sealed premium: box price / break-even.
 - Item page > Opening (booster boxes): the verdict at today's price, the numbers, the return at retail, the cards carrying the value (price from sales or ask, how often a box holds one, part of the value) and the rates used with their source. Watchlist > Box opening: the person's boxes, best average return first.
 - Dry run (2026-10-19, a copy of the local database, all 20 sets, 0 failures): average return at today's prices from 25 % (ポケモンカード151, box ¥44,000, hits ¥10,900) to 82 % (未来の一閃); no box pays at today's price; boxes paying back from 2 % to 27 %. A few cards carry a set (ルギアV SA ¥125,000: 73 % of パラダイムトリガー; ブラッキーex SAR 31 % of テラスタルフェスex). Cards never traded keep their lowest ask, which can be high (メテノ AR ¥19,999 in レイジングサーフ).
+
+### Built, part 2 (2026-10-20)
+
+- Pull rates are a plug-in kind, `PullRateSource` (docs/collectors.md): a plug-in package exports `pullRates`, each giving `SuggestedRates` (franchise, region, a text of the set's name, code, packs a box, rarities, source). They are saved with the other plug-in data each time the plug-ins load (a collect, an import, `pnpm plugins`; written only when they changed, one settings row) and read from there by the app. The 20 Japanese Pokemon sets moved from Tora's core to the public plug-in package (`collectors-public/src/pull-rates.ts`); core keeps only the type and the matching. Checked on a copy of the local database: the same 20 of 21 box sets get suggested rates.
 
 ## S25: Store notices
 

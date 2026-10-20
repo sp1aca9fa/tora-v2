@@ -1,6 +1,12 @@
 // Box opening value data (requirements S20): each set's pull rates (the admin's, else the
 // suggested ones) and its hit cards with their prices, read once a week by the home PC.
-import { type PullRates, localDate, suggestedRates, toLocalIso } from '@tora/core';
+import {
+  type PullRates,
+  type SuggestedRates,
+  localDate,
+  suggestedRates,
+  toLocalIso,
+} from '@tora/core';
 import { and, eq, inArray, notInArray, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { readSetting, saveSetting } from './registry';
@@ -23,6 +29,19 @@ export const DEFAULT_OPENING_FEE = 0.1;
 const READ_KEY = 'openingCardsRead';
 const READ_EVERY_DAYS = 7;
 
+/** The pull rates the plug-ins suggest (saved by the home PC with the other plug-in data). */
+const SUGGESTED_KEY = 'suggestedPullRates';
+
+/** Saves the plug-ins' suggested rates (written only when they changed). */
+export async function saveSuggestedRates(db: Db, list: SuggestedRates[]): Promise<void> {
+  if (JSON.stringify(await readSetting(db, SUGGESTED_KEY)) !== JSON.stringify(list))
+    await saveSetting(db, SUGGESTED_KEY, list);
+}
+
+export async function suggestedRateList(db: Pick<Db, 'select'>): Promise<SuggestedRates[]> {
+  return (await readSetting<SuggestedRates[]>(db, SUGGESTED_KEY)) ?? [];
+}
+
 export interface SetRates {
   set: TcgSet;
   rates: PullRates;
@@ -35,16 +54,17 @@ export interface SetRates {
 export async function openingRates(db: Db, setIds: string[]): Promise<Map<string, SetRates>> {
   const out = new Map<string, SetRates>();
   if (!setIds.length) return out;
-  const [sets, saved] = await Promise.all([
+  const [sets, saved, suggested] = await Promise.all([
     db.select().from(tcgSets).where(inArray(tcgSets.id, setIds)),
     db.select().from(openingSets).where(inArray(openingSets.setId, setIds)),
+    suggestedRateList(db),
   ]);
   const own = new Map(saved.map((r) => [r.setId, r]));
   for (const set of sets) {
     const row = own.get(set.id);
     const rates: PullRates | null = row
       ? { code: row.code, packsPerBox: row.packsPerBox, tiers: row.tiers, source: row.source }
-      : suggestedRates(set);
+      : suggestedRates(set, suggested);
     if (rates) out.set(set.id, { set, rates, saved: !!row, updatedAt: row?.updatedAt ?? null });
   }
   return out;

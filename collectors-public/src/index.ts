@@ -1,7 +1,8 @@
 import type { SourceInfo } from '@tora/core';
-import type { Collector, RateSource } from '@tora/collector-sdk';
+import type { Collector, PullRateSource, RateSource } from '@tora/collector-sdk';
 import { ebay } from './ebay';
 import { frankfurter } from './fx';
+import { pullRateSuggestions } from './pull-rates';
 import { tcgcsv } from './tcgcsv';
 
 // Collectors safe to publish: public APIs only. eBay needs a keyset (EBAY_CLIENT_ID / _SECRET).
@@ -10,6 +11,8 @@ export const collectors: Collector[] = [
   ...(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET ? [ebay] : []),
 ];
 export const rates: RateSource[] = [frankfurter];
+// Community pull rates for the box opening value (S20).
+export const pullRates: PullRateSource[] = [pullRateSuggestions];
 
 /**
  * How the app should use these (requirements S8, sources with roles; part of the "Japan

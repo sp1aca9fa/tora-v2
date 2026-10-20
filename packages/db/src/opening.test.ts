@@ -13,6 +13,8 @@ import {
   saveCardSales,
   saveOpeningCards,
   saveOpeningRates,
+  saveSuggestedRates,
+  suggestedRateList,
   trackedBoxes,
 } from './opening';
 import { tcgSets } from './schema';
@@ -30,6 +32,18 @@ beforeEach(async () => {
   const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
   uid = (await createUser(db, 'a', creds)).user.id;
   other = (await createUser(db, 'b', creds)).user.id;
+  // What a pull rate plug-in suggests (saved when the plug-ins load).
+  await saveSuggestedRates(db, [
+    {
+      franchise: 'pokemon',
+      region: 'jp',
+      name: 'ポケモンカード151',
+      code: 'SV2a',
+      packsPerBox: 20,
+      tiers: [{ rarity: 'SAR', perBox: 0.25 }],
+      source: 'test',
+    },
+  ]);
   return () => rm(dir, { recursive: true, force: true });
 });
 
@@ -89,6 +103,14 @@ it("uses the admin's rates, else the suggested ones, else none", async () => {
     saved: true,
     rates: { tiers: [{ rarity: 'SAR', perBox: 0.2 }] },
   });
+});
+
+it('saves the suggested rates only when they change', async () => {
+  const list = await suggestedRateList(db);
+  expect(list.map((s) => s.code)).toEqual(['SV2a']);
+  await saveSuggestedRates(db, list);
+  await saveSuggestedRates(db, []);
+  expect(await suggestedRateList(db)).toEqual([]);
 });
 
 it('reads cards once a week, and again when the code or rarities change', async () => {

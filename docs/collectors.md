@@ -83,6 +83,7 @@ export const importers: PurchaseImporter[] = []; // optional: purchases from ord
 export const rates: RateSource[] = []; // optional: exchange rates (see markets.md)
 export const sources: SourceInfo[] = [/* one per collector, and per shop purchases come from */];
 export const setCards: SetCardSource[] = []; // optional: a set's hit cards for the box opening value
+export const pullRates: PullRateSource[] = []; // optional: suggested pull rates per set
 ```
 
 ## Describing a source (`SourceInfo`)
@@ -256,6 +257,40 @@ card's recent selling price (the median of its recent single raw sales), read on
 cards carrying most of a set's value. The nightly collect reads each set once a week, and again
 after an admin changes its code or rarities in Settings > Admin > Box opening. Prices are in the
 card's currency's smallest unit; graded copies and error prints are left out.
+
+## Pull rate sources
+
+A `PullRateSource` suggests pull rates: per set, how many cards of each rarity a box holds on
+average (`SuggestedRates` in `packages/core/src/pull-rates.ts`: franchise, region, a text the
+catalog set's name holds, the set code as card listings title it, packs a box, and per rarity
+`perBox`, optionally only cards whose name holds a `match`), and where the numbers come from
+(`source`). Rates are rarely official: name the site or simulator they come from. They are saved
+each time the plug-ins are loaded (a collect, an import or `pnpm plugins`); the admin corrects
+them per set in Settings > Admin > Box opening, and a set's own rates always win. The public
+package ships community rates for Japanese Pokemon sets (`collectors-public/src/pull-rates.ts`).
+
+```ts
+export const pullRates: PullRateSource[] = [
+  {
+    key: 'my-rates',
+    label: 'My pull rates',
+    rates: () => [
+      {
+        franchise: 'pokemon',
+        region: 'jp',
+        name: 'ポケモンカード151',
+        code: 'SV2a',
+        packsPerBox: 20,
+        tiers: [
+          { rarity: 'SAR', perBox: 0.25 },
+          { rarity: 'SR', perBox: 0.75 },
+        ],
+        source: 'example.com simulator (2026-10)',
+      },
+    ],
+  },
+];
+```
 
 ## Checklist before turning a source on
 

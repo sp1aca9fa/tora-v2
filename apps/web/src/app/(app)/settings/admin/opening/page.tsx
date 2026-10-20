@@ -1,5 +1,5 @@
 import { suggestedRates } from '@tora/core';
-import { boxSets, openingCardsOf, openingFee, openingRates } from '@tora/db';
+import { boxSets, openingCardsOf, openingFee, openingRates, suggestedRateList } from '@tora/db';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,17 +20,18 @@ function perBoxInput(perBox: number): string {
 
 /**
  * Pull rates per set for the box opening value (S20): one form per set of a tracked booster box,
- * starting from the suggested rates where Tora has some; and the selling fee.
+ * starting from the rates a plug-in suggests where there are some; and the selling fee.
  */
 export default async function OpeningSettingsPage() {
   const { db } = await adminOnly();
   const sets = await boxSets(db);
   const ids = sets.map((s) => s.id);
-  const [t, rates, cards, fee] = await Promise.all([
+  const [t, rates, cards, fee, suggested] = await Promise.all([
     getTranslations('opening'),
     openingRates(db, ids),
     openingCardsOf(db, ids),
     openingFee(db),
+    suggestedRateList(db),
   ]);
   const views: OpeningRatesView[] = sets.map((set) => {
     const r = rates.get(set.id);
@@ -47,7 +48,7 @@ export default async function OpeningSettingsPage() {
       })),
       source: r?.rates.source ?? '',
       saved: !!r?.saved,
-      suggested: !!suggestedRates(set),
+      suggested: !!suggestedRates(set, suggested),
       cards: read.length,
       readAt: read.reduce<string | null>((a, c) => (a && a > c.readAt ? a : c.readAt), null),
     };

@@ -1,4 +1,4 @@
-import type { CodeMeaning, SourceInfo } from '@tora/core';
+import type { CodeMeaning, SourceInfo, SuggestedRates } from '@tora/core';
 import type {
   CandidateInput,
   FoundSetCard,
@@ -272,6 +272,17 @@ export interface StoreDirectory {
   glossary?: CodeMeaning[];
 }
 
+/**
+ * Suggests pull rates for the box opening value (S20): per set, how many cards of each rarity a
+ * box holds on average, naming where the numbers come from. Saved each time the plug-ins are
+ * loaded; the admin corrects them in Settings > Admin > Box opening.
+ */
+export interface PullRateSource {
+  key: string;
+  label: string;
+  rates(): SuggestedRates[] | Promise<SuggestedRates[]>;
+}
+
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
@@ -282,5 +293,6 @@ export interface CollectorModule {
    */
   sources?: SourceInfo[];
   setCards?: SetCardSource[];
+  pullRates?: PullRateSource[];
   stores?: StoreDirectory[];
 }
