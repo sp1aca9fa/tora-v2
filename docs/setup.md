@@ -96,7 +96,14 @@ plug-ins, it reads what they saved in the database.
 
 ## 4. Accounts
 
-There is no sign-up page. Accounts are managed from the home PC (with `.env` pointing at Turso):
+There is no sign-up page. The first account is made from the home PC (with `.env` pointing at
+Turso); after that an admin manages accounts in **Settings > Admin > Accounts**: a new account or
+a reset gives a one-time setup link (24 hours) to send to the person, who chooses their own
+password and adds Tora to their authenticator app on their own device. A new password asks for
+their authenticator code, a new authenticator for their password (a full reset asks for neither:
+for a person who lost both). Creating, resetting and disabling ask for the admin's own
+authenticator code; signing devices out only for a confirmation. Every task is in Settings >
+Activity. The terminal commands still work:
 
 ```bash
 pnpm user create <username>        # password, scan the QR code, confirm one code, keep the 8 backup codes

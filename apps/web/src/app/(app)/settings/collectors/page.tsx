@@ -1,4 +1,10 @@
-import { collectorHealth, collectorTimes, lastBackup, listRecentCollectorRuns } from '@tora/db';
+import {
+  collectRequest,
+  collectorHealth,
+  collectorTimes,
+  lastBackup,
+  listRecentCollectorRuns,
+} from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import { getFormatter, getTranslations } from 'next-intl/server';
@@ -6,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { sourceLabels } from '@/lib/sources';
 import { getMoney } from '@/lib/money-server';
+import { ConfirmButton } from '../admin/accounts/account-forms';
 import { CollectWindowForm } from '../collect-window-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,12 +25,14 @@ const backupStale = (at: string) => Date.now() - Date.parse(at) > 2 * 86_400_000
 export default async function CollectorSettingsPage() {
   const money = await getMoney();
   const { db, user } = await authed();
-  const [sourceLabel, runs, health, times, backup, t, format] = await Promise.all([
+  const admin = user.role === 'admin';
+  const [sourceLabel, runs, health, times, backup, request, t, format] = await Promise.all([
     sourceLabels(),
     listRecentCollectorRuns(db, 10),
     collectorHealth(db),
     collectorTimes(db),
-    user.role === 'admin' ? lastBackup(db) : null,
+    admin ? lastBackup(db) : null,
+    admin ? collectRequest(db) : null,
     getTranslations(),
     getFormatter(),
   ]);
@@ -58,7 +67,26 @@ export default async function CollectorSettingsPage() {
               {user.role === 'admin' && <CollectWindowForm hours={times.windowHours} />}
             </div>
           )}
-          {user.role === 'admin' && (
+          {admin && (
+            // "Collect now" (S21): the home PC takes it within the hour.
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2.5 text-sm">
+              <p>
+                {!request
+                  ? t('accounts.collectInfo')
+                  : request.takenAt
+                    ? t('accounts.collectTaken', { at: dateTime(request.takenAt) })
+                    : t('accounts.collectWaiting', { at: dateTime(request.requestedAt) })}
+              </p>
+              {!(request && !request.takenAt) && (
+                <ConfirmButton
+                  label={t('accounts.collectNow')}
+                  confirm={t('accounts.collectConfirm')}
+                  task={{ kind: 'collect' }}
+                />
+              )}
+            </div>
+          )}
+          {admin && (
             // The home PC's daily database copy (S6): stale after two days.
             <p
               className={

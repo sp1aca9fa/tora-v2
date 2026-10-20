@@ -37,8 +37,8 @@
       "invalid": "一致しません。もう一度お試しください。",
       "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
       "notConfigured": "ログインが未設定です（AUTH_SECRET がありません。README参照）。",
-      "deviceLimit": "このアカウントはすでに2台の端末でログインしています。別の端末の設定からログアウトまたは端末を解除してください（自宅PCで `pnpm user revoke` も可）。",
-      "notEnrolled": "このアカウントには認証アプリが未登録です。自宅PCで `pnpm user reset-2fa` を実行してください。",
+      "deviceLimit": "このアカウントはすでに2台の端末でログインしています。別の端末の設定でログアウトするか、管理者に頼んでください（設定 > 管理 > アカウント）。",
+      "notEnrolled": "このアカウントには認証アプリがまだありません。管理者に設定リンクを頼んでください（設定 > 管理 > アカウント）。",
       "expired": "時間切れです。最初からやり直してください。"
     }
   },
@@ -369,6 +369,10 @@
       "opening": {
         "title": "BOX開封",
         "info": "BOX開封の期待値に使うセットごとの封入率と販売手数料。"
+      },
+      "accounts": {
+        "title": "アカウント",
+        "info": "アカウントの作成、パスワードと認証アプリのリセット、端末。"
       }
     },
     "adminInfo": "これらの設定は管理者にのみ表示され、このアプリの全アカウントに適用されます。",
@@ -1520,13 +1524,22 @@
       "userEnabled": "アカウント有効化",
       "setLines": "セットの種類",
       "openingRates": "BOX開封の封入率",
-      "openingFee": "BOX開封の手数料"
+      "openingFee": "BOX開封の手数料",
+      "userSetupLink": "設定リンクを発行",
+      "userSetupCancel": "設定リンクを停止",
+      "userSetupDone": "設定完了",
+      "collectRequested": "収集をリクエスト"
     },
     "role": {
       "admin": "管理者",
       "member": "メンバー"
     },
-    "reason": "理由: {reason}"
+    "reason": "理由: {reason}",
+    "setup": {
+      "both": "パスワードと認証アプリ",
+      "password": "パスワード",
+      "2fa": "認証アプリ"
+    }
   },
   "watchlist": {
     "intro": "買いたい商品を、欲しい状態で、今日の相場とともに一覧に。目標価格以下のものが先頭に来ます。",
@@ -1916,5 +1929,83 @@
     "noMore": "これより古い投稿はありません。",
     "showMore": "さらに表示",
     "postsInfoPaged": "新しい順。スクロールすると続きを読み込みます。"
+  },
+  "accounts": {
+    "newTitle": "新しいアカウント",
+    "newInfo": "アカウントと1回限りの設定リンク（24時間有効）を作ります。リンクを本人に送ると、本人の端末でパスワードを決め、認証アプリにToraを追加します。パスワードは管理者にも見えません。",
+    "username": "ユーザー名",
+    "usernameRule": "3〜32文字：a-z, 0-9, . _ -",
+    "asAdmin": "管理者",
+    "create": "作成",
+    "yourCode": "あなたの6桁コード",
+    "cancel": "キャンセル",
+    "linkReady": "設定リンク（一度だけ表示、本人に送ってください）：",
+    "linkInfo": "{until}まで1回だけ使えます。新しいリンクを作るとこれは無効になります。",
+    "kind": {
+      "password": "新しいパスワードのリンク",
+      "2fa": "新しい認証アプリのリンク",
+      "both": "全部リセットのリンク",
+      "again": "新しい設定リンク"
+    },
+    "enable": "有効にする",
+    "disable": "無効にする",
+    "admin": "管理者",
+    "you": "あなた",
+    "disabled": "無効",
+    "notSetUp": "未設定",
+    "waiting": "待機中：{kind}、{until}まで。",
+    "stopLink": "リンクを停止",
+    "stopLinkConfirm": "{name}の設定リンクを停止しますか？",
+    "devices": "端末 （{count}/{max}）",
+    "noDevices": "どこにもログインしていません。",
+    "thisDevice": "この端末",
+    "deviceDates": "{since}から、最終利用 {seen}",
+    "signOut": "ログアウト",
+    "signOutConfirm": "{name}を{device}からログアウトしますか？",
+    "error": {
+      "invalid": "コードが一致しません（各コードは1回だけ：次のコードを待ってください）。",
+      "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
+      "notConfigured": "ログインが設定されていません（AUTH_SECRETがありません）。",
+      "username": "ユーザー名：3〜32文字、a-z 0-9 . _ -",
+      "taken": "このユーザー名は使われています。",
+      "self": "自分のアカウントはできません。",
+      "missing": "アカウントがありません。"
+    },
+    "collectInfo": "自宅PCは毎晩1回収集し、1時間ごとにリクエストを確認します。",
+    "collectNow": "今すぐ収集",
+    "collectConfirm": "自宅PCに今すぐ収集を頼みますか？ PCが起動していれば1時間以内に始まります。",
+    "collectWaiting": "{at}に収集をリクエスト：自宅PCを待っています（1時間ごとに確認）。",
+    "collectTaken": "収集リクエスト：自宅PCが{at}に開始しました。"
+  },
+  "setup": {
+    "title": "アカウントの設定",
+    "info": {
+      "both": "{username}のパスワードを決め、認証アプリにToraを追加してください。",
+      "password": "{username}の新しいパスワードを決めてください。",
+      "2fa": "新しい認証アプリにToraを追加してください（{username}）。"
+    },
+    "newPassword": "新しいパスワード",
+    "passwordRule": "12文字以上。",
+    "repeat": "もう一度",
+    "currentCode": "認証アプリのコード",
+    "currentCodeHint": "なくした場合はバックアップコードも使えます。",
+    "currentPassword": "今のパスワード",
+    "scanTitle": "認証アプリ",
+    "scanInfo": "認証アプリ（Google Authenticator、1Passwordなど）で読み取るか、下のキーを入力し、表示されたコードを入れてください。",
+    "newCode": "6桁のコード",
+    "save": "保存",
+    "done": "完了しました。すべての端末がログアウトされました。もう一度ログインしてください。",
+    "backupTitle": "バックアップコード",
+    "backupInfo": "認証アプリをなくしたときに各1回使えます。今しか表示されないので、オフラインで保管してください。",
+    "toLogin": "ログイン",
+    "error": {
+      "expired": "このリンクは使えません（使用済み、期限切れ、または置き換え済み）。管理者に新しいリンクを頼んでください。",
+      "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
+      "notConfigured": "ログインが設定されていません（AUTH_SECRETがありません）。",
+      "short": "パスワードは12文字以上必要です。",
+      "mismatch": "パスワードが一致しません。",
+      "invalid": "一致しません。もう一度お試しください。",
+      "newCode": "認証アプリのコードが一致しません（スマホの時刻が自動設定か確認してください）。"
+    }
   }
 }

@@ -58,8 +58,8 @@ Settings > Activity lists, newest first, each linked to its page:
 - imports (what happened to their rows; members see their own);
 - the morning check's "nothing ran";
 - admin changes: markets, sources and roles, identity pages, categories, languages, time zone,
-  currency and rates, the night window, the Telegram bot, and accounts changed with `pnpm user`
-  (shown as done from the terminal).
+  currency and rates, the night window, the Telegram bot, accounts (Settings > Admin > Accounts, or `pnpm user`:
+  shown as done from the terminal), setup links used, and collects requested.
 
 Admins see everything; others see their own imports.
 

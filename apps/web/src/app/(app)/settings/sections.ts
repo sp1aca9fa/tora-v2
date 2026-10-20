@@ -16,6 +16,7 @@ import {
   Store,
   Terminal,
   User,
+  Users,
 } from 'lucide-react';
 
 export interface SettingsEntry {
@@ -42,6 +43,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
     icon: ShieldCheck,
     admin: true,
     children: [
+      { key: 'accounts', href: '/settings/admin/accounts', icon: Users, admin: true },
       { key: 'markets', href: '/settings/admin/markets', icon: Globe, admin: true },
       { key: 'sources', href: '/settings/admin/sources', icon: Store, admin: true },
       { key: 'identity', href: '/settings/admin/identity', icon: Fingerprint, admin: true },

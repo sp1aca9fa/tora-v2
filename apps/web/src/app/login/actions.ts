@@ -23,6 +23,7 @@ import {
 } from '@tora/db';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { clientIp } from '@/lib/auth/admin-code';
 import { isLockedOut, recordAttempt } from '@/lib/auth/lockout';
 import {
   MFA_COOKIE,
@@ -41,12 +42,6 @@ import {
 export type LoginState = {
   error?: 'invalid' | 'locked' | 'notConfigured' | 'deviceLimit' | 'notEnrolled' | 'expired';
 };
-
-async function clientIp(): Promise<string> {
-  const h = await headers();
-  // On Vercel, x-real-ip / x-forwarded-for are set by the platform edge.
-  return h.get('x-real-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-}
 
 /** Verifying a fixed hash for unknown usernames keeps the response time the same. */
 let dummyHash: Promise<string> | undefined;

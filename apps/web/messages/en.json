@@ -37,8 +37,8 @@
       "invalid": "That did not match. Try again.",
       "locked": "Too many attempts. Try again later.",
       "notConfigured": "Login is not configured (AUTH_SECRET missing, see README).",
-      "deviceLimit": "This account is already signed in on 2 devices. Sign out or revoke one in Settings on another device (or run `pnpm user revoke` on the home PC).",
-      "notEnrolled": "This account has no authenticator yet. Run `pnpm user reset-2fa` on the home PC.",
+      "deviceLimit": "This account is already signed in on 2 devices. Sign out of one in Settings on another device, or ask the admin (Settings > Admin > Accounts).",
+      "notEnrolled": "This account has no authenticator yet. Ask the admin for a setup link (Settings > Admin > Accounts).",
       "expired": "The sign-in took too long. Start over."
     }
   },
@@ -369,6 +369,10 @@
       "opening": {
         "title": "Box opening",
         "info": "Pull rates per set and the selling fee for the box opening value."
+      },
+      "accounts": {
+        "title": "Accounts",
+        "info": "New accounts, password and authenticator resets, devices."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -1520,13 +1524,22 @@
       "userEnabled": "Account enabled",
       "setLines": "Set lines",
       "openingRates": "Box opening rates",
-      "openingFee": "Box opening fee"
+      "openingFee": "Box opening fee",
+      "userSetupLink": "Setup link made",
+      "userSetupCancel": "Setup link stopped",
+      "userSetupDone": "Setup done",
+      "collectRequested": "Collect requested"
     },
     "role": {
       "admin": "admin",
       "member": "member"
     },
-    "reason": "Reason: {reason}"
+    "reason": "Reason: {reason}",
+    "setup": {
+      "both": "password and authenticator",
+      "password": "password",
+      "2fa": "authenticator"
+    }
   },
   "watchlist": {
     "intro": "Items you want to buy, in the condition you want, with today's market price. Items at or under your target come first.",
@@ -1916,5 +1929,83 @@
     "noMore": "No older posts.",
     "showMore": "Show more",
     "postsInfoPaged": "Newest first; more load as you scroll."
+  },
+  "accounts": {
+    "newTitle": "New account",
+    "newInfo": "Makes the account and a one-time setup link (24 hours). Send the link to the person: they choose their own password and add Tora to their authenticator app on their own device. You never see their password.",
+    "username": "Username",
+    "usernameRule": "3 to 32 characters: a-z, 0-9, . _ -",
+    "asAdmin": "Admin",
+    "create": "Create",
+    "yourCode": "Your 6-digit code",
+    "cancel": "Cancel",
+    "linkReady": "Setup link (shown once, send it to the person):",
+    "linkInfo": "Works once, until {until}. A new link stops this one.",
+    "kind": {
+      "password": "New password link",
+      "2fa": "New authenticator link",
+      "both": "Full reset link",
+      "again": "New setup link"
+    },
+    "enable": "Enable",
+    "disable": "Disable",
+    "admin": "admin",
+    "you": "you",
+    "disabled": "disabled",
+    "notSetUp": "not set up",
+    "waiting": "Waiting: {kind}, until {until}.",
+    "stopLink": "Stop link",
+    "stopLinkConfirm": "Stop the setup link of {name}?",
+    "devices": "Devices ({count}/{max})",
+    "noDevices": "Signed in nowhere.",
+    "thisDevice": "this device",
+    "deviceDates": "Since {since}, last seen {seen}",
+    "signOut": "Sign out",
+    "signOutConfirm": "Sign {name} out of {device}?",
+    "error": {
+      "invalid": "That code did not match (each code works once: wait for the next one).",
+      "locked": "Too many attempts. Try again later.",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing).",
+      "username": "Usernames: 3 to 32 characters, a-z 0-9 . _ -",
+      "taken": "That username is taken.",
+      "self": "Not your own account.",
+      "missing": "No such account."
+    },
+    "collectInfo": "The home PC collects once a night; it checks for a request every hour.",
+    "collectNow": "Collect now",
+    "collectConfirm": "Ask the home PC to collect now? It starts within the hour, if it is on.",
+    "collectWaiting": "Collect requested at {at}: waiting for the home PC (it checks every hour).",
+    "collectTaken": "Collect requested: the home PC started it at {at}."
+  },
+  "setup": {
+    "title": "Set up your account",
+    "info": {
+      "both": "Choose a password for {username} and add Tora to your authenticator app.",
+      "password": "Choose a new password for {username}.",
+      "2fa": "Add Tora to your new authenticator app ({username})."
+    },
+    "newPassword": "New password",
+    "passwordRule": "At least 12 characters.",
+    "repeat": "Repeat it",
+    "currentCode": "Code from your authenticator app",
+    "currentCodeHint": "Lost it? One of your backup codes works too.",
+    "currentPassword": "Your password",
+    "scanTitle": "Authenticator",
+    "scanInfo": "Scan with your authenticator app (Google Authenticator, 1Password...), or type the key below, then enter the code it shows.",
+    "newCode": "6-digit code",
+    "save": "Save",
+    "done": "Done. Every device was signed out: sign in again.",
+    "backupTitle": "Backup codes",
+    "backupInfo": "Each works once if you lose the authenticator. Keep them offline: they are shown only now.",
+    "toLogin": "Sign in",
+    "error": {
+      "expired": "This link no longer works (used, expired or replaced). Ask the admin for a new one.",
+      "locked": "Too many attempts. Try again later.",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing).",
+      "short": "The password needs at least 12 characters.",
+      "mismatch": "The passwords do not match.",
+      "invalid": "That did not match. Try again.",
+      "newCode": "The authenticator's code did not match (check the phone's clock is automatic)."
+    }
   }
 }

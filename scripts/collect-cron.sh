@@ -2,7 +2,9 @@
 # Daily collector run for Windows Task Scheduler (at logon + daily) or cron, then the day's
 # database backup (`pnpm backup`), then alerts (`pnpm alerts after-run`: failures to admins at
 # once, the daily summaries; requirements S17). Runs at most once per day: it exits early when today's run
-# already succeeded, so it is safe to trigger often.
+# already succeeded, so it is safe to trigger often. After that, a "collect now" left in the app
+# (Settings > Collectors, requirements S21) runs it again; only the task without arguments takes
+# those requests.
 # Logs to ~/.local/state/tora/collect.log.
 #
 # Arguments go to `pnpm collect` (e.g. `collect-cron.sh --market us`), to spread markets or
@@ -26,8 +28,10 @@ mkdir -p "$STATE_DIR"
 # writes down; before the first one, the PC's own.
 APP_TZ="$(cat "$STATE_DIR/time-zone" 2>/dev/null || true)"
 today="$(${APP_TZ:+env TZ="$APP_TZ"} date +%F)"
+done_today=0
 if [ "${FORCE:-0}" != "1" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$today" ]; then
-  exit 0
+  done_today=1
+  [ -z "$SUFFIX" ] || exit 0
 fi
 
 # One run at a time (logon and daily triggers can overlap).
@@ -39,11 +43,19 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # shellcheck disable=SC1091
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null
 
+cd "$REPO_DIR"
+
+# A "collect now" from the app: taken (so the app shows it started) and run without waiting.
+# A normal run takes a waiting request too, as it does the same.
+if [ -z "$SUFFIX" ] && pnpm --silent collect:request >>"$LOG" 2>/dev/null; then
+  MAX_JITTER_SECONDS=0
+elif [ "$done_today" = 1 ]; then
+  exit 0
+fi
+
 if [ "$MAX_JITTER_SECONDS" -gt 0 ]; then
   sleep $((RANDOM % (MAX_JITTER_SECONDS + 1)))
 fi
-
-cd "$REPO_DIR"
 started="$(date -Iseconds)"
 echo "=== $started $* ===" >>"$LOG"
 ok=1

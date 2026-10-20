@@ -119,6 +119,37 @@ export const userDevices = sqliteTable(
   (t) => [index('user_devices_user_idx').on(t.userId, t.revokedAt)],
 );
 
+export const ACCOUNT_SETUP_KINDS = ['both', 'password', '2fa'] as const;
+export type AccountSetupKind = (typeof ACCOUNT_SETUP_KINDS)[number];
+
+/**
+ * One-time setup links an admin makes (S21): the person sets their own password and/or
+ * authenticator. Only the token's hash is kept; a new link for a person replaces the old one.
+ */
+export const accountSetups = sqliteTable(
+  'account_setups',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    /** both: a new account or a full reset; password: keeps the authenticator; 2fa: keeps the password. */
+    kind: text('kind', { enum: ACCOUNT_SETUP_KINDS }).notNull(),
+    tokenHash: text('token_hash').notNull(),
+    /** The authenticator secret offered on the page (encrypted), kept so a reload shows the same QR. */
+    totpSecretEnc: text('totp_secret_enc'),
+    createdBy: text('created_by').references(() => users.id),
+    expiresAt: text('expires_at').notNull(),
+    usedAt: text('used_at'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('account_setups_token_uq').on(t.tokenHash),
+    index('account_setups_user_idx').on(t.userId),
+    check('account_setups_kind_check', oneOf(t.kind, ACCOUNT_SETUP_KINDS)),
+  ],
+);
+
 /** Pre-registered TCG sets (shared catalog). */
 export const tcgSets = sqliteTable(
   'tcg_sets',
@@ -1147,6 +1178,7 @@ export type ImportRow = typeof importRows.$inferSelect;
 export type NewImportRow = typeof importRows.$inferInsert;
 export type Suggestion = typeof suggestions.$inferSelect;
 export type UserDevice = typeof userDevices.$inferSelect;
+export type AccountSetup = typeof accountSetups.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;
 export type NewTcgSet = typeof tcgSets.$inferInsert;
 export type Product = typeof products.$inferSelect;

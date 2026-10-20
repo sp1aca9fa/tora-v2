@@ -154,6 +154,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
           if (k === 'language') return nativeName(key);
           if (k === 'source' || k === 'other') return sourceLabel(key);
           if (k === 'market') return marketLabel(key);
+          if (k === 'setup' && t.has(`activity.setup.${key}`)) return t(`activity.setup.${key}`);
           if (k === 'role' && t.has(`activity.role.${key}`))
             return `(${t(`activity.role.${key}`)})`;
           if (k === 'cls') {

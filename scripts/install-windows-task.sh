@@ -2,8 +2,9 @@
 # Registers a Windows Task Scheduler task that runs scripts/collect-cron.sh in this WSL distro:
 #   - 5 minutes after you log on to Windows
 #   - daily at 12:00, and as soon as possible if the PC was off then
-#   - then every hour until midnight, so a run cut short (PC turned off or asleep) is retried
-# collect-cron.sh itself runs at most once per day, so extra triggers are harmless.
+#   - then every hour around the clock, so a run cut short (PC turned off or asleep) is retried
+#     and a "collect now" left in the app (Settings > Collectors) starts within the hour
+# collect-cron.sh itself runs at most once per day otherwise, so extra triggers are harmless.
 #
 # Many markets or collectors (requirements S16): one task per market at its own time, e.g.
 #   AT=01:00 scripts/install-windows-task.sh --market jp    # task tora-collect-market-jp
@@ -26,7 +27,7 @@ powershell.exe -NoProfile -Command "
 \$logon = New-ScheduledTaskTrigger -AtLogOn -User \$env:USERNAME
 \$logon.Delay = 'PT5M'
 \$daily = New-ScheduledTaskTrigger -Daily -At $AT
-\$daily.Repetition = (New-ScheduledTaskTrigger -Once -At $AT -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Hours 12)).Repetition
+\$daily.Repetition = (New-ScheduledTaskTrigger -Once -At $AT -RepetitionInterval (New-TimeSpan -Hours 1) -RepetitionDuration (New-TimeSpan -Hours 24)).Repetition
 \$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 3) -MultipleInstances IgnoreNew
 \$principal = New-ScheduledTaskPrincipal -UserId \$env:USERNAME -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName '$TASK' -Description 'Tora price collectors (WSL), once per day' -Action \$action -Trigger \$logon,\$daily -Settings \$settings -Principal \$principal -Force | Out-Null

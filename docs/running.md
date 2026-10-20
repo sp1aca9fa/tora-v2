@@ -56,8 +56,11 @@ not run yet) and records it on Settings > Activity; the schedule tries again the
 ```
 
 This registers the `tora-collect` task: 5 minutes after you log on, plus daily at 12:00 (or as soon
-as possible if the PC was off), then every hour until midnight. A run cut short by turning the PC
-off is retried; a finished day is skipped. It starts WSL by itself. Leave the PC on until a run is
+as possible if the PC was off), then every hour around the clock. A run cut short by turning the PC
+off is retried; a finished day is skipped, unless an admin pressed **Collect now** in Settings >
+Collectors: the next hourly check (`pnpm collect:request`) takes the request and runs a collect at
+once (re-run the install script once to get the hourly check around the clock). Only the task
+without arguments takes requests. It starts WSL by itself. Leave the PC on until a run is
 done (Settings > Collectors shows how long one takes). Remove it with
 `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"`.
 
