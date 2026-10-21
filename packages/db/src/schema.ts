@@ -1111,8 +1111,11 @@ export const storePosts = sqliteTable(
     /** When it was posted (local time), else when it was received. */
     postedAt: text('posted_at').notNull(),
     receivedAt: text('received_at').notNull(),
-    /** The stores it is about (ids). */
+    /** The stores it is about (ids); a reply naming none takes its thread's. */
     storeIds: text('store_ids', { mode: 'json' }).notNull().$type<string[]>(),
+    /** A reply: the post it answers, and its thread's first post (external ids). */
+    replyTo: text('reply_to'),
+    thread: text('thread'),
     fedBy: text('fed_by').references(() => users.id, { onDelete: 'set null' }),
   },
   (t) => [

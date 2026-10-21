@@ -25,12 +25,17 @@ export default async function StorePostsPage({
   if (!area) redirect('/stores/area');
   const { show } = await searchParams;
   const onlyArea = show === 'area';
-  const [t, all, glossary, first] = await Promise.all([
+  const [t, all, codesList, first] = await Promise.all([
     getTranslations('stores'),
     cachedStores(db),
     storeGlossary(db),
     postViews(db, area, { offset: 0, onlyArea }),
   ]);
+  // The admins' product codes first (they win over the board's list's).
+  const products = codesList
+    .filter((g) => g.product)
+    .sort((a, b) => Number(b.byHand) - Number(a.byHand));
+  const glossary = codesList.filter((g) => !g.product);
   const inArea = storesInArea(area, all, localDate());
   const codes = codeIndex(all.map((s) => ({ ...s, codes: storeCodes(s) })));
   const label = (s: (typeof all)[number]) =>
@@ -93,6 +98,32 @@ export default async function StorePostsPage({
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">{t('productCodes')}</h3>
+            <p className="text-xs text-muted-foreground">{t('productCodesInfo')}</p>
+            {products.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t('noProductCodes')}</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {products.map((g) => (
+                      <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                        <td className="py-1.5 text-xs text-muted-foreground">
+                          {g.meaning}
+                          {!g.byHand && ` · ${t('fromFeed')}`}
+                        </td>
+                        <td className="py-1.5 text-right">
+                          {user.role === 'admin' && g.byHand && <RemoveGlossary code={g.code} />}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <h3 className="text-sm font-medium">{t('otherCodes')}</h3>

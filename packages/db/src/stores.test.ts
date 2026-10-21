@@ -119,7 +119,10 @@ it('checks what a feed pushes', () => {
     gap: null,
     hello: null,
     chain: 'yodobashi',
-    posts: [{ id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null }],
+    products: null,
+    posts: [
+      { id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null, replyTo: null },
+    ],
   });
 });
 
@@ -143,11 +146,51 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   ]);
   expect(r.fresh.map((p) => p.externalId)).toEqual(['2', '3', '4']);
   expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
-  expect(sent.at(-1)).toContain('ヨドバシAkiba: AKB 30th 販売');
+  expect(sent.at(-1)).toContain('**ヨドバシAkiba**');
+  expect(sent.at(-1)).toContain('> AKB 30th 販売');
   expect(sent.at(-1)).not.toContain('UMD');
   // Another post about the same store soon after: no second notice.
   const again = await push([post('5', 'AKB まだある')]);
   expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
+});
+
+it('sends replies at once as comments to their post, with the products its codes name', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  const push = (
+    posts: (ReturnType<typeof post> & { replyTo?: string })[],
+    products?: { code: string; meaning: string }[],
+  ) => receivePush(db, uid, { source: 'gamenv', chain: 'yodobashi', posts, products }, now);
+  await push([post('1', 'AKB 販売中')]);
+  // The feed's product list is saved as product codes.
+  const r = await push(
+    [post('10', 'AKB 雪(1)'), { ...post('11', 'まだ列あり *長い*'), replyTo: '10' }],
+    [{ code: '雪', meaning: 'Snow set' }],
+  );
+  expect((await storeGlossary(db)).find((g) => g.code === '雪')).toMatchObject({
+    meaning: 'Snow set',
+    product: true,
+  });
+  const reply = r.fresh.find((p) => p.externalId === '11')!;
+  expect(reply).toMatchObject({ replyTo: '10', thread: '10' });
+  expect(reply.storeIds).toEqual(r.fresh.find((p) => p.externalId === '10')!.storeIds);
+  expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
+  const text = sent.at(-1)!;
+  expect(text).toContain('**ヨドバシAkiba** · Snow set');
+  expect(text).toContain('**Comment to ヨドバシAkiba** · Snow set');
+  // The post's own text shows as written.
+  expect(text).toContain('> まだ列あり \\*長い\\*');
+  // Later replies come at once, also within the store's quiet time; a reply to a reply keeps the
+  // thread.
+  const more = await push([{ ...post('12', '完売'), replyTo: '11' }]);
+  expect(more.fresh[0]).toMatchObject({ replyTo: '11', thread: '10' });
+  expect(await sendStoreNotices(db, more, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('**Comment to ヨドバシAkiba** · Snow set');
+  // Replies naming no store are no "unknown store" post.
+  expect(await sendFeedMessages(db, uid, more, ctx, now)).toBe(0);
 });
 
 it("tells the feed's person about unknown stores and posts maybe missed", async () => {

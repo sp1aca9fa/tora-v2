@@ -284,36 +284,81 @@ export async function connectTelegram(
 
 // ---- Sending ----
 
+/**
+ * A message with some formatting: lines of parts, some bold, some lines quoted (a post's own
+ * text). Each channel gets its own markup, the data's text escaped so it shows as written.
+ */
+export interface RichMessage {
+  lines: { parts: { text: string; bold?: boolean }[]; quote?: boolean; link?: boolean }[];
+}
+
+/** Discord's Markdown: data text escaped (a "*" in a post stays a "*"). */
+export function discordText(m: RichMessage): string {
+  const esc = (s: string) => s.replace(/([\\*_~`|<>#[\]()-])/g, '\\$1');
+  return m.lines
+    .flatMap((l) => {
+      const text = l.parts
+        .map((p) => (l.link ? p.text : p.bold ? `**${esc(p.text)}**` : esc(p.text)))
+        .join('');
+      return l.quote ? text.split('\n').map((s) => `> ${s}`) : [text];
+    })
+    .join('\n');
+}
+
+/** Telegram's HTML: bold parts, quoted lines in one block each. */
+export function telegramHtml(m: RichMessage): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return m.lines
+    .map((l) => {
+      const text = l.parts.map((p) => (p.bold ? `<b>${esc(p.text)}</b>` : esc(p.text))).join('');
+      return l.quote ? `<blockquote>${text}</blockquote>` : text;
+    })
+    .join('\n');
+}
+
+const plainText = (m: RichMessage) =>
+  m.lines.map((l) => l.parts.map((p) => p.text).join('')).join('\n');
+
 async function deliver(
   channel: AlertChannel,
-  text: string,
+  message: string | RichMessage,
   ctx: AlertContext,
   token: string | null,
 ): Promise<void> {
   const fetchFn = ctx.fetch ?? fetch;
   const target = decryptSecret(channel.targetEnc, ctx.secret);
+  const rich = typeof message === 'string' ? null : message;
   if (channel.kind === 'discord') {
+    const content = rich ? discordText(rich) : (message as string);
     const res = await fetchFn(target, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       // No @everyone or role pings from text that came from data.
-      body: JSON.stringify({ content: text.slice(0, 2000), allowed_mentions: { parse: [] } }),
+      body: JSON.stringify({ content: content.slice(0, 2000), allowed_mentions: { parse: [] } }),
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`Discord answered ${res.status}`);
     return;
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
+  // Cut HTML can be broken: a long message goes as plain text instead.
+  const html = rich ? telegramHtml(rich) : null;
+  const send = html && html.length <= 4096 ? html : rich ? plainText(rich) : (message as string);
   await telegram(
     token,
     'sendMessage',
-    { chat_id: target, text: text.slice(0, 4096), link_preview_options: { is_disabled: true } },
+    {
+      chat_id: target,
+      text: send.slice(0, 4096),
+      ...(send === html ? { parse_mode: 'HTML' } : {}),
+      link_preview_options: { is_disabled: true },
+    },
     fetchFn,
   );
 }
 
 /** Sends to one channel; remembers when it worked or why it failed. */
-async function deliverTo(db: Db, channelId: string, text: string, ctx: AlertContext) {
+async function deliverTo(db: Db, channelId: string, text: string | RichMessage, ctx: AlertContext) {
   const [channel] = await db.select().from(alertChannels).where(eq(alertChannels.id, channelId));
   if (!channel) return false;
   const token = channel.kind === 'telegram' ? await telegramToken(db, ctx.secret) : null;
@@ -339,7 +384,7 @@ async function deliverTo(db: Db, channelId: string, text: string, ctx: AlertCont
 export async function sendToUser(
   db: Db,
   userId: string,
-  text: string,
+  text: string | RichMessage,
   ctx: AlertContext,
 ): Promise<number> {
   let sent = 0;

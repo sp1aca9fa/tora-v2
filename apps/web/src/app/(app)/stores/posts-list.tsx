@@ -51,10 +51,13 @@ export function PostsList({
           <li key={p.id} className={cn('space-y-0.5 py-2', !p.mine && 'opacity-70')}>
             <p className="text-xs text-muted-foreground">
               {p.at}
-              {p.author ? ` · ${p.author}` : ''} ·{' '}
+              {p.author ? ` · ${p.author}` : ''} · {p.reply && `${t('comment')} · `}
               <span className={cn(p.mine && 'font-semibold text-foreground')}>
                 {p.names.length ? p.names.join(', ') : t('unknownStore')}
               </span>
+              {p.products.length > 0 && (
+                <span className="text-foreground"> · {p.products.join(', ')}</span>
+              )}
             </p>
             <p className="break-words">
               {p.url ? (

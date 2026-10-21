@@ -6,6 +6,7 @@ import {
   PLACE,
   type StoreEntry,
   localDate,
+  productsInPost,
   storesInArea,
   storesInPost,
   toLocalIso,
@@ -13,7 +14,14 @@ import {
 } from '@tora/core';
 import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
-import { type AlertContext, appUrl, sendToUser, textsFor } from './alerts';
+import {
+  type AlertContext,
+  type AlertTexts,
+  type RichMessage,
+  appUrl,
+  sendToUser,
+  textsFor,
+} from './alerts';
 import type { Db } from './client';
 import { readSetting, saveSetting } from './registry';
 import {
@@ -186,6 +194,8 @@ export interface PushedPost {
   postedAt?: string | null;
   /** The board's chain, when it differs from the push's. */
   chain?: string | null;
+  /** A reply (comment): the id of the post it answers. */
+  replyTo?: string | null;
 }
 
 export interface Push {
@@ -208,6 +218,11 @@ export interface Push {
   hello?: boolean | null;
   /** The board's chain ("yodobashi"), when the whole push is one chain's. */
   chain?: string | null;
+  /**
+   * The feed's own product codes (a board's list of what its codes stand for), named in notices
+   * next to the store; saved when they change.
+   */
+  products?: { code: string; meaning: string }[] | null;
   posts: PushedPost[];
 }
 
@@ -244,6 +259,20 @@ export function readPush(body: unknown): Push | string {
     gap: typeof b.gap === 'boolean' ? b.gap : null,
     hello: b.hello === true ? true : null,
     chain: typeof b.chain === 'string' ? b.chain : null,
+    products: Array.isArray(b.products)
+      ? b.products
+          .filter(
+            (e) =>
+              e &&
+              typeof e.code === 'string' &&
+              typeof e.meaning === 'string' &&
+              e.code.trim() &&
+              e.code.length <= 20 &&
+              e.meaning.length <= 200,
+          )
+          .slice(0, 500)
+          .map((e) => ({ code: e.code.trim(), meaning: e.meaning.trim() }))
+      : null,
     posts: b.posts.map((p) => ({
       id: p.id.slice(0, 200),
       text: p.text.slice(0, 2000),
@@ -251,6 +280,7 @@ export function readPush(body: unknown): Push | string {
       url: typeof p.url === 'string' && /^https?:\/\//.test(p.url) ? p.url.slice(0, 500) : null,
       postedAt: p.postedAt ?? null,
       chain: typeof p.chain === 'string' ? p.chain : null,
+      replyTo: typeof p.replyTo === 'string' && p.replyTo ? p.replyTo.slice(0, 200) : null,
     })),
   };
 }
@@ -332,6 +362,13 @@ export async function receivePush(
   );
   const watch = chosen?.length ? chosen : null;
   const base = { resumed, boardBack, connected, watch, user: row?.user ?? null };
+  if (push.products?.length) {
+    await saveGlossary(
+      db,
+      `feed:${push.source}`,
+      push.products.map((e) => ({ ...e, product: true })),
+    );
+  }
   if (!push.posts.length) return { fresh: [], first: false, gap: null, ...base };
   // Whether the feed, and this board's chain, sent posts before: one row read each, not a count.
   const [known] = await db
@@ -356,8 +393,23 @@ export async function receivePush(
   const all = await cachedStores(db);
   const listed = all.map((s) => ({ ...s, codes: storeCodes(s) }));
   const fresh: StorePost[] = [];
-  for (const p of push.posts) {
+  // Replies take their thread and, naming no store, the stores of the post they answer: the
+  // posts answered are read once (those of this push are saved first).
+  const answered = [...new Set(push.posts.flatMap((p) => (p.replyTo ? [p.replyTo] : [])))];
+  const parents = new Map(
+    (answered.length
+      ? await db
+          .select()
+          .from(storePosts)
+          .where(and(eq(storePosts.source, push.source), inArray(storePosts.externalId, answered)))
+      : []
+    ).map((r) => [r.externalId, r]),
+  );
+  const ordered = [...push.posts.filter((p) => !p.replyTo), ...push.posts.filter((p) => p.replyTo)];
+  for (const p of ordered) {
     const chain = p.chain ?? push.chain ?? null;
+    const parent = p.replyTo ? parents.get(p.replyTo) : undefined;
+    const own = storesInPost(`${p.author ?? ''}\n${p.text}`, listed, chain).map((s) => s.id);
     const [row] = await db
       .insert(storePosts)
       .values({
@@ -369,12 +421,16 @@ export async function receivePush(
         url: p.url ?? null,
         postedAt: p.postedAt ? toLocalIso(new Date(p.postedAt)) : at,
         receivedAt: at,
-        storeIds: storesInPost(`${p.author ?? ''}\n${p.text}`, listed, chain).map((s) => s.id),
+        storeIds: own.length ? own : (parent?.storeIds ?? []),
+        replyTo: p.replyTo ?? null,
+        thread: p.replyTo ? (parent?.thread ?? p.replyTo) : null,
         fedBy: userId,
       })
       .onConflictDoNothing()
       .returning();
     if (row) fresh.push(row);
+    // A post may be answered within the same push.
+    if (row) parents.set(p.id, row);
   }
   // A page shows a fixed number of posts (one may be pinned): all of them new means the page
   // turned over completely since the last visit.
@@ -410,7 +466,7 @@ export async function sendFeedMessages(
   const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
   const unknownPosts = received.first
     ? []
-    : received.fresh.filter((p) => !p.storeIds.length && p.postedAt >= since);
+    : received.fresh.filter((p) => !p.storeIds.length && !p.replyTo && p.postedAt >= since);
   // Most pushes have nothing to say: nothing else is read then.
   if (
     !received.connected &&
@@ -577,10 +633,18 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
   return told;
 }
 
+/** The store as people read it in a notice: "ヨドバシカメラ 上野", "池袋 area". */
+function storeLabel(store: Store, t: AlertTexts): string {
+  return store.chain === PLACE
+    ? fill(t.storeArea ?? '{name} area', { name: store.name })
+    : [store.chainLabel, store.name].filter(Boolean).join(' ');
+}
+
 /**
- * Sends the notices new posts make: to each person whose area holds a post's store (muted stores
- * aside), when the post is recent, and not again for a store within a while of the last notice.
- * A feed's first push only fills the list.
+ * Notices of new posts and replies naming a store of a person's area (posts of the last 30 minutes,
+ * none for a feed's first push). A post: one per store every 30 minutes. A reply (a comment on a
+ * post, e.g. "still a line", "sold out"): every one at once, marked as a comment to its post. Each
+ * names the time, the store and the products its codes stand for, then the post as written.
  */
 export async function sendStoreNotices(
   db: Db,
@@ -600,30 +664,85 @@ export async function sendStoreNotices(
   const today = localDate(now);
   const quiet = toLocalIso(new Date(now.getTime() - QUIET_MINUTES * 60_000));
   const base = await appUrl(db);
+  // Products by their codes; other codes (stores, states) only help read the runs around them.
+  const glossary = await storeGlossary(db);
+  const others = [
+    ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
+    ...glossary.filter((g) => !g.product).map((g) => g.code),
+  ];
+  const named = (text: string) => productsInPost(text, glossary, others).map((g) => g.meaning);
+  // A reply naming no product takes its thread's (the first post's).
+  const threads = [...new Set(posts.flatMap((p) => (p.thread ? [p.thread] : [])))];
+  const firsts = new Map(
+    (threads.length
+      ? await db
+          .select({ id: storePosts.externalId, text: storePosts.text })
+          .from(storePosts)
+          .where(
+            and(eq(storePosts.source, posts[0]!.source), inArray(storePosts.externalId, threads)),
+          )
+      : []
+    ).map((r) => [r.id, r.text]),
+  );
   let sent = 0;
   for (const user of people) {
     const area = storesInArea(user.preferences!.storeArea, all, today);
-    const storeIds = [...new Set(posts.flatMap((p) => p.storeIds))].filter((id) => area.has(id));
-    if (!storeIds.length) continue;
+    const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
+    if (!mine.length) continue;
+    const storeIds = [...new Set(mine.filter((p) => !p.replyTo).flatMap((p) => p.storeIds))].filter(
+      (id) => area.has(id),
+    );
     const last = new Map(
-      (
-        await db
-          .select()
-          .from(storeNotices)
-          .where(and(eq(storeNotices.userId, user.id), inArray(storeNotices.storeId, storeIds)))
+      (storeIds.length
+        ? await db
+            .select()
+            .from(storeNotices)
+            .where(and(eq(storeNotices.userId, user.id), inArray(storeNotices.storeId, storeIds)))
+        : []
       ).map((n) => [n.storeId, n.sentAt]),
     );
     const t = await textsFor(db, user, ctx);
-    const lines: string[] = [];
+    // New posts: the latest per store not told within the quiet time; replies: all of them.
+    const told = new Set<string>();
+    const chosen: StorePost[] = [];
     for (const id of storeIds) {
       if ((last.get(id) ?? '') > quiet) continue;
-      const store = byId.get(id)!;
-      const post = posts.filter((p) => p.storeIds.includes(id)).at(-1)!;
-      const name =
-        store.chain === PLACE
-          ? fill(t.storeArea ?? '{name} area', { name: store.name })
-          : [store.chainLabel, store.name].filter(Boolean).join(' ');
-      lines.push(`${name}: ${short(post.text)}${post.url ? `\n${post.url}` : ''}`);
+      const post = mine.filter((p) => !p.replyTo && p.storeIds.includes(id)).at(-1)!;
+      told.add(id);
+      if (!chosen.includes(post)) chosen.push(post);
+    }
+    chosen.push(...mine.filter((p) => p.replyTo));
+    if (!chosen.length) continue;
+    chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
+    const message: RichMessage = {
+      lines: [
+        { parts: [{ text: t.storePosts ?? 'Tora: cards on sale in your area', bold: true }] },
+      ],
+    };
+    for (const p of chosen) {
+      const where = p.storeIds
+        .filter((id) => area.has(id))
+        .map((id) => storeLabel(byId.get(id)!, t))
+        .join(', ');
+      let products = named(p.text);
+      if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
+      const head = p.replyTo
+        ? fill(t.storeComment ?? 'Comment to {store}', { store: where })
+        : where;
+      message.lines.push(
+        {
+          parts: [
+            { text: `${p.postedAt.slice(11, 16)} · ` },
+            { text: head, bold: true },
+            ...(products.length ? [{ text: ` · ${products.join(', ')}` }] : []),
+          ],
+        },
+        { parts: [{ text: p.text }], quote: true },
+        ...(p.url ? [{ parts: [{ text: p.url }], link: true }] : []),
+      );
+    }
+    if (base) message.lines.push({ parts: [{ text: `${base}/stores` }], link: true });
+    for (const id of told) {
       await db
         .insert(storeNotices)
         .values({ userId: user.id, storeId: id, sentAt: toLocalIso(now) })
@@ -632,10 +751,7 @@ export async function sendStoreNotices(
           set: { sentAt: toLocalIso(now) },
         });
     }
-    if (!lines.length) continue;
-    const head = t.storePosts ?? 'Tora: cards on sale in your area';
-    const link = base ? `\n${base}/stores` : '';
-    if (await sendToUser(db, user.id, `${head}\n${lines.join('\n')}${link}`, ctx)) sent++;
+    if (await sendToUser(db, user.id, message, ctx)) sent++;
   }
   return sent;
 }

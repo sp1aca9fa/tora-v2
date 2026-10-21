@@ -159,13 +159,14 @@ export async function forgetBoardAction(key: string) {
 export async function addGlossaryAction(
   code: string,
   meaning: string,
+  product = false,
 ): Promise<{ error?: string }> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return { error: 'admin' };
   const c = code.normalize('NFKC').trim();
   const m = meaning.trim();
   if (!c || !m || c.length > 20 || m.length > 200) return { error: 'glossary' };
-  await addGlossary(db, { code: c, meaning: m });
+  await addGlossary(db, { code: c, meaning: m, ...(product === true ? { product: true } : {}) });
   revalidatePath('/stores');
   return {};
 }

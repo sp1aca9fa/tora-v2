@@ -9,6 +9,8 @@ import { listActivity, recordActivity } from './activity';
 import {
   type AlertContext,
   addDiscordChannel,
+  discordText,
+  telegramHtml,
   alertFailures,
   channelsOf,
   checkMissedRuns,
@@ -296,4 +298,20 @@ it('reads why a run stopped from the collect log, without the pnpm noise', () =>
     'Database is missing migration(s): 0030_signals. Run `pnpm db:migrate` first.',
   );
   expect(stoppedReason('=== 2026-10-17 ===\n$ tsx x\n')).toBeNull();
+});
+
+it('writes formatted messages for each channel, the data text as written', () => {
+  const m = {
+    lines: [
+      { parts: [{ text: '18:12 · ' }, { text: 'Store <A>', bold: true }] },
+      { parts: [{ text: 'a *b*\nline 2' }], quote: true },
+      { parts: [{ text: 'https://x.test/a_b-c' }], link: true },
+    ],
+  };
+  expect(discordText(m)).toBe(
+    '18:12 · **Store \\<A\\>**\n> a \\*b\\*\n> line 2\nhttps://x.test/a_b-c',
+  );
+  expect(telegramHtml(m)).toBe(
+    '18:12 · <b>Store &lt;A&gt;</b>\n<blockquote>a *b*\nline 2</blockquote>\nhttps://x.test/a_b-c',
+  );
 });

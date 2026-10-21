@@ -34,8 +34,15 @@ export const stores: StoreDirectory[] = [
 ```
 
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
-"none", a chain's mark, a product), each with its meaning. The Stores page shows every code with
-what it stands for, and admins can add other codes there.
+"none", a chain's mark, a product), each with its meaning; `product: true` marks a product. The
+Stores page shows every code with what it stands for, and admins can add other codes there,
+products ticked as such.
+
+Product codes are named in notices next to the store ("ヨドバシカメラ 上野 · ストームエメラルダ"),
+then the post as written. An admin's codes and emoji codes count anywhere in a post (Latin ones as
+whole words), as do codes of three characters or more; a feed's shorter ones ("X", "b") only in a
+run of the post (between spaces and punctuation) made entirely of codes, numbers and common words,
+so a one-letter code inside an ordinary word is not taken for a product.
 
 The lists are saved each time the home PC runs a collect or an import (only what changed is
 written). Coordinates are needed for "distance from where I am"; without them a store can still
@@ -88,6 +95,13 @@ Content-Type: application/json
 - `watching`: every board the feed goes through; its person is told "connected, tracking these
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
+- `products` (optional): the board's own list of product codes (`[{ "code": "X1", "meaning":
+"ストームエメラルダ" }]`), saved when it changes; send it when it changes (and with `hello`).
+- `replyTo` (per post): the id of the post it answers, for replies (comments) such as "still a
+  line" or "sold out". A reply naming no store takes the stores of the post it answers; replies
+  are sent to the people whose area holds the store at once, marked as a comment to their post,
+  even within the store's quiet time (a new post about a store makes at most one notice every 30
+  minutes).
 - `id`: the post's id on its site (or any stable key): a post sent again is ignored, so sending
   the whole visible page every time is fine. At most 200 posts a push.
 - `author`: the poster's name, when the site shows one; stores are looked for in it too (some

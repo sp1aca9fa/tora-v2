@@ -164,6 +164,8 @@ export function withinHours(time: string, from: string, to: string): boolean {
 export interface CodeMeaning {
   code: string;
   meaning: string;
+  /** A product ("X1": Expansion X1), named in notices next to the store. */
+  product?: boolean;
 }
 
 /**
@@ -184,4 +186,106 @@ export function codeIndex<T extends Pick<StoreEntry, 'name' | 'codes'>>(
   return [...by]
     .map(([code, list]) => ({ code, stores: list }))
     .sort((a, b) => b.stores.length - a.stores.length || a.code.localeCompare(b.code));
+}
+
+/** Width and emoji variation marks aside, case kept (product codes "b" and "B" differ). */
+const plain = (s: string) => s.normalize('NFKC').replace(/[︎️]/g, '');
+/** What separates the runs of a post (spaces, brackets, punctuation; not the long vowel mark). */
+const RUN_BREAK = /[\s()[\]{}「」『』【】〈〉《》・、。,.!?:;/~〜|'"`+=*#@&%$^<>-]+/;
+/** Words around codes in posts: they neither name a product nor make a run unreadable. */
+const FILLERS = [
+  'あり',
+  'なし',
+  '有り',
+  '無し',
+  '有',
+  '無',
+  '在庫',
+  '販売',
+  '抽選',
+  '整理券',
+  '完売',
+  '終了',
+  '入荷',
+  '開始',
+  '品切れ',
+  '少量',
+  '多数',
+  '再販',
+  '予定',
+  '本日',
+  '今日',
+  '明日',
+  '列',
+  '並び',
+  'box',
+  'BOX',
+  'パック',
+  '個',
+  '箱',
+  '人',
+  '枚',
+  '種',
+  'の',
+  'と',
+  'も',
+  'は',
+  'が',
+  'で',
+  'に',
+];
+const isAlnum = (c: string | undefined) => !!c && /[A-Za-z0-9]/.test(c);
+
+/**
+ * The products a post names by their codes, in the order found. A post is read in runs (between
+ * spaces and punctuation). Codes count anywhere (Latin ones as whole words) when an admin added
+ * them (`byHand`), when they are emoji or symbols, or when three characters or longer. A feed's
+ * shorter ones ("X", "b") count only in a run made entirely of codes, numbers ("(1)", "5P",
+ * "16:00"), other known codes (`others`: stores, emoji states) and common words, so a one-letter
+ * code inside an ordinary word is not taken for a product. An admin's code wins over a feed's.
+ */
+export function productsInPost(
+  text: string,
+  products: (CodeMeaning & { byHand?: boolean })[],
+  others: string[] = [],
+): CodeMeaning[] {
+  const codes = products
+    .filter((p) => p.product)
+    .map((p) => {
+      const key = plain(p.code).trim();
+      return { entry: p, key, strong: !!p.byHand || key.length >= 3 || !/[\p{L}\p{N}]/u.test(key) };
+    })
+    .filter((c) => c.key)
+    .sort((a, b) => Number(!!b.entry.byHand) - Number(!!a.entry.byHand));
+  const fillers = [...others.map((o) => plain(o).trim()), ...FILLERS].filter(Boolean);
+  const found: CodeMeaning[] = [];
+  for (const run of plain(text).split(RUN_BREAK).filter(Boolean)) {
+    const hits: { entry: CodeMeaning; key: string; strong: boolean }[] = [];
+    let covered = true;
+    let i = 0;
+    // A word starting and ending here, not inside a longer Latin word or number.
+    const fits = (key: string) =>
+      run.startsWith(key, i) &&
+      !(isAlnum(key[0]) && isAlnum(run[i - 1])) &&
+      !(isAlnum(key.at(-1)) && isAlnum(run[i + key.length]));
+    while (i < run.length) {
+      const code = codes.filter((c) => fits(c.key)).sort((a, b) => b.key.length - a.key.length)[0];
+      const filler = fillers.filter(fits).sort((a, b) => b.length - a.length)[0];
+      const number = run.slice(i).match(/^\d+[A-Za-z]?/)?.[0];
+      if (code && code.key.length >= (filler?.length ?? 0)) {
+        hits.push(code);
+        i += code.key.length;
+      } else if (filler) i += filler.length;
+      else if (number && !isAlnum(run[i - 1])) i += number.length;
+      else {
+        covered = false;
+        i++;
+      }
+    }
+    for (const h of hits) {
+      if ((covered || h.strong) && !found.some((f) => f.meaning === h.entry.meaning))
+        found.push(h.entry);
+    }
+  }
+  return found;
 }

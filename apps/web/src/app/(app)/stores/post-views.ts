@@ -1,6 +1,6 @@
 import 'server-only';
-import { PLACE, type StoreArea, localDate, storesInArea } from '@tora/core';
-import { type Db, cachedStores, postsPage } from '@tora/db';
+import { PLACE, type StoreArea, localDate, productsInPost, storesInArea } from '@tora/core';
+import { type Db, cachedStores, postsPage, storeCodes, storeGlossary } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 
 /** Posts loaded at a time; more as the list is scrolled. */
@@ -15,6 +15,10 @@ export interface PostView {
   names: string[];
   /** It names a store of the person's area. */
   mine: boolean;
+  /** The products its codes name. */
+  products: string[];
+  /** A reply (comment) to a post: its stores are the post's when it names none. */
+  reply: boolean;
   text: string;
   url: string | null;
 }
@@ -25,7 +29,15 @@ export async function postViews(
   area: StoreArea | null,
   opts: { offset: number; onlyArea: boolean },
 ): Promise<{ posts: PostView[]; more: boolean }> {
-  const [t, all] = await Promise.all([getTranslations('stores'), cachedStores(db)]);
+  const [t, all, glossary] = await Promise.all([
+    getTranslations('stores'),
+    cachedStores(db),
+    storeGlossary(db),
+  ]);
+  const others = [
+    ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
+    ...glossary.filter((g) => !g.product).map((g) => g.code),
+  ];
   const inArea = storesInArea(area, all, localDate());
   const { posts, more } = await postsPage(db, {
     offset: opts.offset,
@@ -49,6 +61,8 @@ export async function postViews(
         ];
       }),
       mine: p.storeIds.some((id) => inArea.has(id)),
+      products: productsInPost(p.text, glossary, others).map((g) => g.meaning),
+      reply: !!p.replyTo,
       text: p.text,
       url: p.url,
     })),

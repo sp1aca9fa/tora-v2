@@ -6,6 +6,7 @@ import {
   roundPoint,
   storesInArea,
   PLACE,
+  productsInPost,
   storesInPost,
   withinHours,
 } from './stores';
@@ -131,4 +132,46 @@ it('lists the codes that are more than the name, with what they stand for', () =
   const index = codeIndex(all);
   expect(index.map((e) => e.code)).toEqual(['AKB', 'UMD', 'アキバ']);
   expect(index.find((e) => e.code === 'UMD')!.stores).toEqual([umeda]);
+});
+
+describe('store notices: products in a post', () => {
+  const products = [
+    { code: '雪', meaning: 'Snow set', product: true },
+    { code: 'b', meaning: 'Black', product: true },
+    { code: 'B', meaning: 'Battle', product: true },
+    { code: '9種', meaning: '9 card sets', product: true },
+    { code: 'XYZ', meaning: 'Expansion XYZ', product: true },
+    { code: '🐞', meaning: 'there is some' },
+  ];
+  const names = (text: string) =>
+    productsInPost(text, products, ['🐝', '上野']).map((p) => p.meaning);
+
+  it('reads short codes in runs of codes, numbers and common words', () => {
+    expect(names('雪(1) 16:00-')).toEqual(['Snow set']);
+    expect(names('上野 9種🐝')).toEqual(['9 card sets']);
+    expect(names('雪あり b(5P)')).toEqual(['Snow set', 'Black']);
+    // Case matters: b and B are different products.
+    expect(names('B 10P')).toEqual(['Battle']);
+    // A one-character code inside an ordinary word is no product.
+    expect(names('雪だるまを見た')).toEqual([]);
+    expect(names('bonus')).toEqual([]);
+    // Codes of 3+ characters count anywhere, as whole words.
+    expect(names('今日はXYZがあった')).toEqual(['Expansion XYZ']);
+    expect(names('XYZW')).toEqual([]);
+    // Codes that are no product (emoji states) are never named.
+    expect(names('🐞')).toEqual([]);
+    expect(names('雪 雪')).toEqual(['Snow set']);
+  });
+
+  it("counts an admin's codes and emoji codes anywhere, an admin's first", () => {
+    const list = [
+      ...products,
+      { code: '🌀', meaning: 'Swirl box', product: true },
+      { code: '種', meaning: 'feed meaning', product: true },
+      { code: '種', meaning: 'Seeds', product: true, byHand: true },
+    ];
+    const read = (text: string) => productsInPost(text, list).map((p) => p.meaning);
+    expect(read('上野🌀継続中')).toEqual(['Swirl box']);
+    expect(read('ゼルビア種あり')).toEqual(['Seeds']);
+  });
 });

@@ -659,11 +659,12 @@ export function ForgetBoard({ board }: { board: string }) {
   );
 }
 
-/** Adds a code that is no store or place (admins). */
+/** Adds a code that is no store or place, a product or not (admins). */
 export function AddGlossary() {
   const t = useTranslations('stores');
   const [code, setCode] = useState('');
   const [meaning, setMeaning] = useState('');
+  const [product, setProduct] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return (
@@ -672,7 +673,7 @@ export function AddGlossary() {
       onSubmit={(e) => {
         e.preventDefault();
         startTransition(async () => {
-          const r = await addGlossaryAction(code, meaning);
+          const r = await addGlossaryAction(code, meaning, product);
           setError(r.error ? t(`addError.${r.error}`) : null);
           if (!r.error) {
             setCode('');
@@ -693,6 +694,15 @@ export function AddGlossary() {
         placeholder={t('meaning')}
         className="h-8 min-w-48 flex-1"
       />
+      <label className="flex items-center gap-1.5 text-xs">
+        <input
+          type="checkbox"
+          checked={product}
+          onChange={(e) => setProduct(e.target.checked)}
+          className="size-4"
+        />
+        {t('isProduct')}
+      </label>
       <Button type="submit" size="sm" disabled={pending}>
         {t('add')}
       </Button>
