@@ -40,7 +40,7 @@
 | S25 | Store notices: posts about cards on sale in physical stores (first: the gamenv.net boards, fed by the user's own browser), store codes mapped to stores, notices for the stores in the person's area (picked stores or a distance from where they are, travel mode), each store on or off; a new Stores page | built 2026-10-19 (ヨドバシ first), awaiting migrations 0043-0045, the userscript set up and the user's check; other chains' store lists later; then S20 part 2 |
 | S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | built 2026-10-20 (no migration; suggestions appear after the next collect or `pnpm plugins`) |
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
-| S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | parts 1-3 built 2026-10-21 (signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates), awaiting the user's check; part 4 (budget and date) next |
+| S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (e.g. France + China) | todo (after S13, before S14; user, 2026-10-14) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | todo (user, 2026-10-14; infinite scroll added 2026-10-20) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
@@ -975,6 +975,12 @@ Built, part 3 (2026-10-21, migration 0053):
 - SNKRDUNK popular Pokemon boxes (private): the Pokemon sealed category's search sorted by popularity (the page's own 人気ランキング), three pages a day, boxes only (no variants, packs, decks, sets in 「」), with the site rank, listings and favorites from the page's own data. Live read 2026-10-21: 34 boxes, 14 known (one by name: VSTARユニバース), 17 new candidates, no duplicates of known items.
 - Opportunities page: per ranking a "Popular now" table in its item type's tab (rank, change in a week, price, listings, favorites, owned / watching / candidate), a ranked item's rank on its row, candidates marked. MCP `opportunities` adds ranks and candidates.
 - Not yet: rank changes as signals (tested once enough days are saved).
+
+Built, part 4 (2026-10-21, no migration):
+- @tora/core `plan.ts`: `planStep` (from an item's saved buy timing numbers and the person's strategy: buy now at a good price, the zone's listing when cheaper; from a day for a new release, the release plus the usual low age; under a price when falling, its market falling or above the zone, the zone's top; none without a price) and `checkPlan` (the ticked items' total against the budget, those after the date, those waiting for a price).
+- Buy timing numbers are saved each night also for items with a proven opportunity signal, ranked candidates and items in anyone's plan (`refreshSignals`).
+- Opportunities page, top: "Budget and date" (budget, date, the items offered: proven opportunities, the person's watches, the plan's items, each with when, the price and why; ticks; the total and what is left, late or waiting), saved in preferences `buyPlan`. docs/opportunities.md.
+- On the real data (copy): 19 items offered, none a good price today (9 wait for their market's fall, 9 above their zone, 1 new release until 2027-02-18), consistent with the main line's 27 % fall.
 
 ## S14: Speed at any size
 

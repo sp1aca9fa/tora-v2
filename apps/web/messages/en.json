@@ -1645,7 +1645,40 @@
     "colPrice": "Price",
     "colListings": "Listings",
     "colFavorites": "Favorites",
-    "candidate": "Candidate"
+    "candidate": "Candidate",
+    "plan": {
+      "title": "Budget and date",
+      "intro": "Set a budget and a date, then tick what to buy. Each item says when (now at a good price, from a day for a new release, or once it comes under a price) and what it would cost, from its buy timing and your strategy. Never a sure thing.",
+      "budget": "Budget ({symbol})",
+      "until": "By",
+      "save": "Save",
+      "saved": "Saved.",
+      "empty": "Nothing to plan yet: items with a proven signal and your watches show here.",
+      "now": "Buy now",
+      "from": "From {day}",
+      "under": "Under {price}",
+      "none": "No price yet",
+      "reason": {
+        "good": "good price",
+        "new_release": "new release: wait",
+        "falling": "falling: wait",
+        "market_falling": "its market is falling",
+        "above_zone": "above its buy zone",
+        "no_price": "no price yet"
+      },
+      "fromKind": {
+        "opportunity": "opportunity",
+        "watch": "watched",
+        "plan": "in your plan"
+      },
+      "total": "{count, plural, one {# item} other {# items}}: {total}, {left} {over, select, over {over budget} other {left}}.",
+      "late": "{count, plural, one {# comes} other {# come}} after your date.",
+      "undated": "{count, plural, one {# waits} other {# wait}} for a price (no day).",
+      "error": {
+        "budget": "Type a budget.",
+        "until": "Pick a date."
+      }
+    }
   },
   "forSale": {
     "title": "For sale now",

@@ -17,6 +17,7 @@ import {
   median,
   newSetPattern,
   productClass,
+  rankOpportunity,
   ruleTests,
   seriesStats,
   strategyKey,
@@ -27,6 +28,8 @@ import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { refreshItemSales, soldDays } from './item-sales';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
+import type { SavedOpportunities } from './opportunities';
+import { rankedProductIds } from './rankings';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, holdings, products, signals, users, watches } from './schema';
 import { fileSuggestion } from './suggestions';
@@ -116,6 +119,46 @@ async function valuedPairs(db: Db): Promise<{ product: Product; bucket: string |
 }
 
 /**
+ * Items and conditions worth buy timing numbers besides those held or watched (S13): the ones
+ * with a proven opportunity signal (last saved opportunities), ranked candidates, and the ones in
+ * someone's budget plan.
+ */
+async function plannedPairs(
+  db: Db,
+  had: { product: Product; bucket: string | null }[],
+): Promise<{ product: Product; bucket: string | null }[]> {
+  const known = new Set(had.map((p) => `${p.product.id}|${p.bucket ?? ''}`));
+  const wanted = new Map<string, { productId: string; bucket: string }>();
+  const add = (productId: string, bucket: string) => {
+    const key = `${productId}|${bucket}`;
+    if (!known.has(key)) wanted.set(key, { productId, bucket });
+  };
+  const saved = await readSetting<SavedOpportunities>(db, 'opportunities');
+  const ranked = new Set(await rankedProductIds(db));
+  for (const o of saved?.items ?? []) {
+    const proven = rankOpportunity(o.on, saved!.tests[o.group]).proven.length > 0;
+    if (proven || ranked.has(o.productId)) add(o.productId, o.bucket);
+  }
+  for (const u of await db.select({ preferences: users.preferences }).from(users)) {
+    for (const i of u.preferences?.buyPlan?.items ?? []) add(i.productId, i.bucket);
+  }
+  const ids = [...new Set([...wanted.values()].map((w) => w.productId))];
+  const byId = new Map<string, Product>();
+  for (let i = 0; i < ids.length; i += 500) {
+    for (const p of await db
+      .select()
+      .from(products)
+      .where(inArray(products.id, ids.slice(i, i + 500)))) {
+      byId.set(p.id, p);
+    }
+  }
+  return [...wanted.values()].flatMap((w) => {
+    const product = byId.get(w.productId);
+    return product ? [{ product, bucket: w.bucket || null }] : [];
+  });
+}
+
+/**
  * Today's numbers for every item and condition held or watched, saved (one row per day; a second
  * collect the same day replaces it). Then set lines are suggested for items unlike their group.
  */
@@ -131,7 +174,9 @@ export async function refreshSignals(
   lineSuggestions: number;
   rows: { productId: string; bucket: string; source: string | null; stats: SignalStats }[];
 }> {
-  const pairs = await valuedPairs(db);
+  const held = await valuedPairs(db);
+  // Also the items an opportunity, a ranking or a budget plan brings (S13).
+  const pairs = [...held, ...(await plannedPairs(db, held))];
   if (pairs.length === 0) return { saved: 0, withPattern: 0, lineSuggestions: 0, rows: [] };
   // The daily prices come from the packed item sales: any days still marked are updated first.
   await refreshItemSales(db, { marksOnly: true });

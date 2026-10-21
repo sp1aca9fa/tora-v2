@@ -43,6 +43,8 @@ export interface UserPreferences {
   storeArea?: StoreArea;
   /** Alerts about the store feed itself (S25). */
   storeFeed?: StoreFeedPrefs;
+  /** A budget and a date for buying (S13): the items ticked, each item and condition. */
+  buyPlan?: { budget: number; until: string; items: { productId: string; bucket: string }[] };
 }
 
 /** What a person is sent (S17); each kind on unless switched off. */

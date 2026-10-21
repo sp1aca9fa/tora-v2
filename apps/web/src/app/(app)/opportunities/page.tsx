@@ -3,12 +3,14 @@ import {
   type OpportunityTests,
   OPPORTUNITY_WARNINGS,
   PROVEN_MIN_CHECKS,
+  localDate,
   provenEdge,
 } from '@tora/core';
 import {
   type Opportunity,
   type Product,
   type RankingBoard,
+  buyPlanFor,
   imageVersions,
   opportunitiesFor,
   rankingBoards,
@@ -24,6 +26,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
 import { franchiseLabel } from '@/lib/product-display';
+import { PlanCard } from './plan-card';
 import { cn } from '@/lib/utils';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,9 +51,10 @@ const CHIP = {
  */
 export default async function OpportunitiesPage() {
   const { db, user } = await authed();
-  const [data, boards, t, money] = await Promise.all([
+  const [data, boards, plan, t, money] = await Promise.all([
     opportunitiesFor(db, user.id),
     rankingBoards(db, user.id),
+    buyPlanFor(db, user),
     getTranslations(),
     getMoney(),
   ]);
@@ -411,6 +415,19 @@ export default async function OpportunitiesPage() {
           </p>
         )}
       </header>
+      <PlanCard
+        rows={plan.map((p) => ({
+          productId: p.productId,
+          bucket: p.bucket,
+          name: p.product.name,
+          step: p.step,
+          from: p.from,
+          ticked: p.ticked,
+        }))}
+        budget={user.preferences?.buyPlan?.budget ?? null}
+        until={user.preferences?.buyPlan?.until ?? null}
+        today={localDate()}
+      />
       {panels.length ? (
         <Tabs tabs={panels} initial={initial} />
       ) : (

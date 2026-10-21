@@ -13,6 +13,18 @@ past prices only and is never a sure thing.
   each group's signals and their record against buying on any day.
 - **MCP** (`opportunities`): the same list for a Claude chat.
 
+## Budget and date
+
+At the top of the Opportunities page: a budget and a date, and the items to choose from (those
+with a proven signal, the person's watches, and what their plan already holds). Each says when to
+buy and at what price, from its buy timing ([Buy timing](buy-timing.md)) and the person's
+strategy for its type: buy now (a good price; a listing in the zone when cheaper), from a day (a
+new release waits until similar items' usual first-year low), or once under a price (falling,
+its market falling, or above its buy zone: the zone's top). The person ticks items; the card adds
+their prices and says what is left of the budget, which come after the date and which wait for a
+price (no day). Saved in the person's preferences (`buyPlan`). Buy timing numbers are saved each
+night for these items too (besides those owned or watched), and for ranked candidates.
+
 ## Rankings
 
 Ranking plug-ins ([Collectors](collectors.md#ranking-sources)) read a site's popularity ranking
