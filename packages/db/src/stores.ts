@@ -19,6 +19,7 @@ import {
   type AlertTexts,
   type RichMessage,
   appUrl,
+  localeFor,
   sendToUser,
   textsFor,
 } from './alerts';
@@ -62,6 +63,7 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
       chain: s.chain,
       chainLabel: s.chainLabel ?? null,
       name: s.name,
+      labelEn: s.labelEn ?? null,
       codes: s.codes,
       region: s.region ?? null,
       lat: s.lat ?? null,
@@ -633,11 +635,15 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
   return told;
 }
 
-/** The store as people read it in a notice: "ヨドバシカメラ 上野", "池袋 area". */
-function storeLabel(store: Store, t: AlertTexts): string {
+/**
+ * The store as people read it in a notice: its English label for people reading another language
+ * than Japanese ("Yodobashi Ikebukuro"), else the chain and name as written; a place: "池袋 area".
+ */
+function storeLabel(store: Store, t: AlertTexts, locale: string): string {
+  const en = locale !== 'ja' ? store.labelEn : null;
   return store.chain === PLACE
-    ? fill(t.storeArea ?? '{name} area', { name: store.name })
-    : [store.chainLabel, store.name].filter(Boolean).join(' ');
+    ? fill(t.storeArea ?? '{name} area', { name: en ?? store.name })
+    : (en ?? [store.chainLabel, store.name].filter(Boolean).join(' '));
 }
 
 /**
@@ -701,7 +707,7 @@ export async function sendStoreNotices(
         : []
       ).map((n) => [n.storeId, n.sentAt]),
     );
-    const t = await textsFor(db, user, ctx);
+    const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
     // New posts: the latest per store not told within the quiet time; replies: all of them.
     const told = new Set<string>();
     const chosen: StorePost[] = [];
@@ -715,33 +721,28 @@ export async function sendStoreNotices(
     if (!chosen.length) continue;
     chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
     const message: RichMessage = {
-      lines: [
-        { parts: [{ text: t.storePosts ?? 'Tora: cards on sale in your area', bold: true }] },
-      ],
+      head: t.storePosts ?? 'Tora: cards on sale in your area',
+      link: base ? `${base}/stores` : null,
+      linkText: t.storeLink ?? 'Store notices in Tora',
+      urlText: t.storeOpen ?? 'post',
+      cards: chosen.map((p) => {
+        const where = p.storeIds
+          .filter((id) => area.has(id))
+          .map((id) => storeLabel(byId.get(id)!, t, locale))
+          .join(', ');
+        let products = named(p.text);
+        if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
+        return {
+          title: p.replyTo ? fill(t.storeComment ?? 'Comment to {store}', { store: where }) : where,
+          sub: products.length ? products.join(', ') : null,
+          quote: p.text,
+          // "10-21 18:00", as the Stores page shows it.
+          when: p.postedAt.slice(5, 16).replace('T', ' '),
+          url: p.url,
+          color: p.replyTo ? ('blue' as const) : ('orange' as const),
+        };
+      }),
     };
-    for (const p of chosen) {
-      const where = p.storeIds
-        .filter((id) => area.has(id))
-        .map((id) => storeLabel(byId.get(id)!, t))
-        .join(', ');
-      let products = named(p.text);
-      if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
-      const head = p.replyTo
-        ? fill(t.storeComment ?? 'Comment to {store}', { store: where })
-        : where;
-      message.lines.push(
-        {
-          parts: [
-            { text: `${p.postedAt.slice(11, 16)} · ` },
-            { text: head, bold: true },
-            ...(products.length ? [{ text: ` · ${products.join(', ')}` }] : []),
-          ],
-        },
-        { parts: [{ text: p.text }], quote: true },
-        ...(p.url ? [{ parts: [{ text: p.url }], link: true }] : []),
-      );
-    }
-    if (base) message.lines.push({ parts: [{ text: `${base}/stores` }], link: true });
     for (const id of told) {
       await db
         .insert(storeNotices)

@@ -33,6 +33,10 @@ export const stores: StoreDirectory[] = [
 ];
 ```
 
+A store can carry `labelEn`, a short label in English ("Yodobashi Ikebukuro"; a place:
+"Ikebukuro"), used in notices and on the Stores page for people reading another language than
+Japanese; without one, the chain and name as written.
+
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
 "none", a chain's mark, a product), each with its meaning; `product: true` marks a product. The
 Stores page shows every code with what it stands for, and admins can add other codes there,

@@ -8,6 +8,11 @@ export interface StoreEntry {
   /** The chain as people read it ("ヨドバシカメラ"). */
   chainLabel?: string | null;
   name: string;
+  /**
+   * A short label in English for people reading notices in English ("Yodobashi Ikebukuro"; a
+   * place: "Ikebukuro"); without one, the chain and name as written.
+   */
+  labelEn?: string | null;
   /** What posters write for it: codes, short names ("梅田", "AKIBA"). */
   codes: string[];
   /** Prefecture or region, for picking stores by hand. */

@@ -1,7 +1,7 @@
 import 'server-only';
 import { PLACE, type StoreArea, localDate, productsInPost, storesInArea } from '@tora/core';
 import { type Db, cachedStores, postsPage, storeCodes, storeGlossary } from '@tora/db';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 
 /** Posts loaded at a time; more as the list is scrolled. */
 export const POSTS_BATCH = 20;
@@ -29,8 +29,9 @@ export async function postViews(
   area: StoreArea | null,
   opts: { offset: number; onlyArea: boolean },
 ): Promise<{ posts: PostView[]; more: boolean }> {
-  const [t, all, glossary] = await Promise.all([
+  const [t, locale, all, glossary] = await Promise.all([
     getTranslations('stores'),
+    getLocale(),
     cachedStores(db),
     storeGlossary(db),
   ]);
@@ -54,10 +55,12 @@ export async function postViews(
       names: p.storeIds.flatMap((id) => {
         const s = byId.get(id);
         if (!s) return [];
+        // English labels for people reading another language than Japanese.
+        const en = locale !== 'ja' ? s.labelEn : null;
         return [
           s.chain === PLACE
-            ? t('areaOf', { name: s.name })
-            : [s.chainLabel, s.name].filter(Boolean).join(' '),
+            ? t('areaOf', { name: en ?? s.name })
+            : (en ?? [s.chainLabel, s.name].filter(Boolean).join(' ')),
         ];
       }),
       mine: p.storeIds.some((id) => inArea.has(id)),

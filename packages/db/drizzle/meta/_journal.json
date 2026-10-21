@@ -365,6 +365,13 @@
       "when": 1792581241511,
       "tag": "0051_store_post_replies",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1792583951814,
+      "tag": "0052_store_label_en",
+      "breakpoints": true
     }
   ]
 }

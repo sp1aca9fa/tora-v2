@@ -1402,6 +1402,8 @@
     "summaryDrop": "{name}: {price}, {pct} in 7 days",
     "storePosts": "Tora: cards on sale in your area",
     "storeComment": "Comment to {store}",
+    "storeLink": "Store notices in Tora",
+    "storeOpen": "post",
     "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).",
     "feedBack": "Tora: the store feed is sending again.",
     "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",

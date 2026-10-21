@@ -96,19 +96,28 @@ sudo install -d -m 0755 /etc/apt/keyrings
 wget -q https://packages.mozilla.org/apt/repo-signing-key.gpg -O- | sudo tee /etc/apt/keyrings/packages.mozilla.org.asc >/dev/null
 echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" | sudo tee /etc/apt/sources.list.d/mozilla.list >/dev/null
 printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' | sudo tee /etc/apt/preferences.d/mozilla >/dev/null
-sudo apt update && sudo apt install -y firefox xvfb x11vnc fonts-noto-cjk xclip
+sudo apt update && sudo apt install -y firefox tigervnc-standalone-server tigervnc-tools openbox fonts-noto-cjk xclip
 ```
 
-Three services, all with `User=<user>`: `tora-display` (`/usr/bin/Xvfb :1 -screen 0 1400x1000x24
--nolisten tcp`), `tora-browser` (`Environment=DISPLAY=:1`, `/usr/bin/firefox --profile
-/home/<user>/.tora-firefox --no-remote <board address>`, `Restart=always`, after and requiring
-`tora-display`) and `tora-vnc` (`/usr/bin/x11vnc -display :1 -localhost -forever -shared -nopw
--quiet`: only reachable from the box itself).
+Four services, all with `User=<user>`:
+
+- `tora-display`: the virtual screen and its VNC server in one (TigerVNC's Xvnc, whose clipboard
+  carries Japanese text; x11vnc's does not): `/usr/bin/Xvnc :1 -geometry 1400x1000 -depth 24
+-localhost -rfbport 5900 -SecurityTypes None -AlwaysShared -nolisten tcp` (only reachable from
+  the box itself).
+- `tora-wm`: a window manager (`Environment=DISPLAY=:1`, `/usr/bin/openbox`, after and requiring
+  `tora-display`, before `tora-browser`). Without one, Firefox's menus open but take no clicks.
+- `tora-clip`: keeps the clipboard in step (`Environment=DISPLAY=:1`, `/usr/bin/vncconfig -nowin`,
+  after and requiring `tora-display`).
+- `tora-browser`: `Environment=DISPLAY=:1`, `/usr/bin/firefox --profile /home/<user>/.tora-firefox
+--no-remote <board address>`, `Restart=always`, after and requiring `tora-display`.
 
 To see the screen, from your PC: `ssh -L 5900:localhost:5900 <server>` and a VNC viewer (e.g.
-TigerVNC) on `localhost:5900`. Install your userscript manager and feed there; the feed's address
-is `http://localhost:3000`. The PC's clipboard may not reach the virtual screen: put text on its
-clipboard from ssh (`printf %s '<text>' | DISPLAY=:1 xclip -selection clipboard`), then Ctrl+V.
+TigerVNC) on `localhost:5900`; copy and paste work both ways (the viewer's Options > Input >
+clipboard boxes ticked). Install your userscript manager and feed there; the feed's address is
+`http://localhost:3000`. To install or update a userscript without its menus, serve its folder for
+a while (`timeout 600 python3 -m http.server 8765 --bind 127.0.0.1` in it) and open
+`http://127.0.0.1:8765/<name>.user.js` in that Firefox: the manager offers to install it.
 
 ## 6. Backups off the box
 

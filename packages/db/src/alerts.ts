@@ -285,39 +285,104 @@ export async function connectTelegram(
 // ---- Sending ----
 
 /**
- * A message with some formatting: lines of parts, some bold, some lines quoted (a post's own
- * text). Each channel gets its own markup, the data's text escaped so it shows as written.
+ * A message of cards (store notices): a small heading, then one card per item with a title line,
+ * a line under it, a quoted text as written, when, and a link. Each channel gets its own markup:
+ * Discord embeds with a colored edge, Telegram HTML; the data's text escaped so it shows as written.
  */
 export interface RichMessage {
-  lines: { parts: { text: string; bold?: boolean }[]; quote?: boolean; link?: boolean }[];
+  head: string;
+  cards: {
+    title: string;
+    /** Under the title, in italics (e.g. the products). */
+    sub?: string | null;
+    /** Text as written, quoted. */
+    quote?: string | null;
+    /** When, as people read it ("10-21 18:00"). */
+    when?: string | null;
+    url?: string | null;
+    /** The card's edge on Discord. */
+    color?: 'orange' | 'blue';
+  }[];
+  /** A link under everything (the app's page). */
+  link?: string | null;
+  /** The link's text, and a card's link's (Telegram). */
+  linkText?: string;
+  urlText?: string;
 }
 
-/** Discord's Markdown: data text escaped (a "*" in a post stays a "*"). */
-export function discordText(m: RichMessage): string {
-  const esc = (s: string) => s.replace(/([\\*_~`|<>#[\]()-])/g, '\\$1');
-  return m.lines
-    .flatMap((l) => {
-      const text = l.parts
-        .map((p) => (l.link ? p.text : p.bold ? `**${esc(p.text)}**` : esc(p.text)))
-        .join('');
-      return l.quote ? text.split('\n').map((s) => `> ${s}`) : [text];
-    })
-    .join('\n');
+const COLORS = { orange: 0xf59e0b, blue: 0x3b82f6 };
+/** Discord Markdown escaped: a "*" in a post stays a "*". */
+const mdEscape = (s: string) => s.replace(/([\\*_~`|<>[\]])/g, '\\$1').replace(/^([#-])/gm, '\\$1');
+/** Embeds per Discord message. */
+const EMBEDS_PER_MESSAGE = 10;
+
+/** Discord: the heading as small text, each card an embed (title linked, colored edge). */
+export function discordPayloads(m: RichMessage): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; i < Math.max(1, m.cards.length); i += EMBEDS_PER_MESSAGE) {
+    out.push({
+      ...(i === 0 ? { content: `-# ${mdEscape(m.head)}${m.link ? ` · <${m.link}>` : ''}` } : {}),
+      embeds: m.cards.slice(i, i + EMBEDS_PER_MESSAGE).map((c) => ({
+        title: c.title.slice(0, 256),
+        ...(c.url ? { url: c.url } : {}),
+        description: [
+          c.sub ? `*${mdEscape(c.sub)}*` : null,
+          c.quote
+            ? c.quote
+                .split('\n')
+                .map((l) => `> ${mdEscape(l)}`)
+                .join('\n')
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+          .slice(0, 4000),
+        ...(c.when ? { footer: { text: c.when } } : {}),
+        color: COLORS[c.color ?? 'orange'],
+      })),
+      allowed_mentions: { parse: [] },
+    });
+  }
+  return out;
 }
 
-/** Telegram's HTML: bold parts, quoted lines in one block each. */
+/** Telegram's HTML: the title bold, the line under it in italics, the text quoted. */
 export function telegramHtml(m: RichMessage): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return m.lines
-    .map((l) => {
-      const text = l.parts.map((p) => (p.bold ? `<b>${esc(p.text)}</b>` : esc(p.text))).join('');
-      return l.quote ? `<blockquote>${text}</blockquote>` : text;
-    })
-    .join('\n');
+  const cards = m.cards.map((c) =>
+    [
+      `<b>${esc(c.title)}</b>`,
+      c.sub ? `<i>${esc(c.sub)}</i>` : null,
+      c.quote ? `<blockquote>${esc(c.quote)}</blockquote>` : null,
+      [
+        c.when ? `<code>${esc(c.when)}</code>` : null,
+        c.url ? `<a href="${esc(c.url)}">${esc(m.urlText ?? 'post')}</a>` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || null,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+  return [
+    `<i>${esc(m.head)}</i>`,
+    ...cards,
+    ...(m.link ? [`<a href="${esc(m.link)}">${esc(m.linkText ?? m.link)}</a>`] : []),
+  ].join('\n\n');
 }
 
-const plainText = (m: RichMessage) =>
-  m.lines.map((l) => l.parts.map((p) => p.text).join('')).join('\n');
+/** Plain text, when formatting cannot be used. */
+export function plainText(m: RichMessage): string {
+  return [
+    m.head,
+    ...m.cards.map((c) =>
+      [c.title, c.sub, c.quote, [c.when, c.url].filter(Boolean).join(' ')]
+        .filter(Boolean)
+        .join('\n'),
+    ),
+    ...(m.link ? [m.link] : []),
+  ].join('\n\n');
+}
 
 async function deliver(
   channel: AlertChannel,
@@ -329,15 +394,19 @@ async function deliver(
   const target = decryptSecret(channel.targetEnc, ctx.secret);
   const rich = typeof message === 'string' ? null : message;
   if (channel.kind === 'discord') {
-    const content = rich ? discordText(rich) : (message as string);
-    const res = await fetchFn(target, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      // No @everyone or role pings from text that came from data.
-      body: JSON.stringify({ content: content.slice(0, 2000), allowed_mentions: { parse: [] } }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+    // No @everyone or role pings from text that came from data.
+    const bodies = rich
+      ? discordPayloads(rich)
+      : [{ content: (message as string).slice(0, 2000), allowed_mentions: { parse: [] } }];
+    for (const body of bodies) {
+      const res = await fetchFn(target, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+    }
     return;
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
@@ -406,7 +475,7 @@ export async function sendTest(db: Db, user: User, channelId: string, ctx: Alert
 }
 
 /** A person's messages' language: their choice, else the app's primary. */
-async function localeFor(db: Db, user: User | null): Promise<string> {
+export async function localeFor(db: Db, user: User | null): Promise<string> {
   const languages = (await loadSourceRegistry(db)).languages;
   const chosen = alertPrefs(user?.preferences).language;
   return chosen && (chosen === languages?.primary || chosen === languages?.secondary)

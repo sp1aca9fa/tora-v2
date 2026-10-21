@@ -1080,6 +1080,8 @@ export const stores = sqliteTable(
     /** The chain as people read it ("ヨドバシカメラ"). */
     chainLabel: text('chain_label'),
     name: text('name').notNull(),
+    /** A short label in English for notices ("Yodobashi Ikebukuro"; a place: "Ikebukuro"). */
+    labelEn: text('label_en'),
     /** What posters write for it, from the plug-in. */
     codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),
     /** Codes the admin added. */
