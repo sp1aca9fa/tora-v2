@@ -1,6 +1,7 @@
 import {
   Bell,
   BellRing,
+  CalendarClock,
   History,
   Clock,
   Database,
@@ -10,6 +11,7 @@ import {
   Globe,
   Languages,
   PackageOpen,
+  Palette,
   Shapes,
   Plug,
   ShieldCheck,
@@ -33,9 +35,19 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
   { key: 'account', href: '/settings/account', icon: User },
   { key: 'display', href: '/settings/display', icon: Eye },
   { key: 'notices', href: '/settings/notices', icon: Bell },
-  { key: 'alerts', href: '/settings/alerts', icon: BellRing },
+  {
+    key: 'alerts',
+    href: '/settings/alerts',
+    icon: BellRing,
+    children: [{ key: 'alertStyle', href: '/settings/alerts/style', icon: Palette }],
+  },
   { key: 'activity', href: '/settings/activity', icon: History },
-  { key: 'collectors', href: '/settings/collectors', icon: Plug },
+  {
+    key: 'collectors',
+    href: '/settings/collectors',
+    icon: Plug,
+    children: [{ key: 'schedule', href: '/settings/collectors/schedule', icon: CalendarClock }],
+  },
   { key: 'data', href: '/settings/data', icon: Download },
   {
     key: 'admin',

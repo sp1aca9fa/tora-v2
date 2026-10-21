@@ -197,7 +197,7 @@ export default async function OpportunitiesPage() {
     ];
     const href = `/products/${o.productId}${o.bucket ? `?condition=${encodeURIComponent(o.bucket)}` : ''}`;
     return (
-      <li key={o.productId} className="px-3 py-3">
+      <li key={o.productId} className="rounded-xl border bg-card px-3 py-3">
         <Link href={href} className="flex items-center gap-3 rounded-md hover:bg-accent/50">
           <ProductImage
             product={o.product}
@@ -369,7 +369,9 @@ export default async function OpportunitiesPage() {
           <section className="space-y-2">
             <h2 className="font-semibold">{t('opportunities.worthALook')}</h2>
             {list.length ? (
-              <ul className="divide-y rounded-xl border bg-card">{list.map(row)}</ul>
+              <ul className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                {list.map(row)}
+              </ul>
             ) : (
               <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
                 {t('opportunities.noneProven')}
@@ -389,7 +391,7 @@ export default async function OpportunitiesPage() {
                 {t('opportunities.recordsIntro')}
               </p>
             </div>
-            {records(type)}
+            <div className="grid items-start gap-4 xl:grid-cols-2">{records(type)}</div>
           </section>
         </div>
       ),

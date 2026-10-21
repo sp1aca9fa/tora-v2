@@ -1,4 +1,5 @@
 // Per-user display preferences (requirements S8).
+import type { NoticePrefs } from './alert-notices';
 import type { StrategyChoice } from './signals';
 import type { StoreArea, StoreFeedPrefs } from './stores';
 
@@ -43,6 +44,8 @@ export interface UserPreferences {
   storeArea?: StoreArea;
   /** Alerts about the store feed itself (S25). */
   storeFeed?: StoreFeedPrefs;
+  /** How the person's notices look and read (Settings > Alerts > Customize notices). */
+  notices?: NoticePrefs;
   /** A budget and a date for buying (S13): the items ticked, each item and condition. */
   buyPlan?: { budget: number; until: string; items: { productId: string; bucket: string }[] };
 }

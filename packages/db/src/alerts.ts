@@ -9,6 +9,16 @@ import { decryptSecret, encryptSecret, keyedHash } from '@tora/auth';
 import {
   ALERT_QUIET_DAYS,
   type AlertState,
+  type BuyAlertData,
+  type Notice,
+  type NoticeKind,
+  type NoticeRole,
+  type NoticeStyle,
+  buyNotice,
+  discordPayloads,
+  linesNotice,
+  plainText,
+  telegramHtml,
   SHARP_DROP_7D,
   type SignalStats,
   alertPrefs,
@@ -278,125 +288,34 @@ export async function connectTelegram(
   const id = await addChannel(db, userId, 'telegram', String(chat.id), label, ctx.secret);
   const user = await db.select().from(users).where(eq(users.id, userId));
   const texts = await textsFor(db, user[0] ?? null, ctx);
-  await deliverTo(db, id, texts.connected ?? 'Tora: alerts will arrive in this chat.', ctx);
+  await deliverTo(
+    db,
+    id,
+    lines('test', null, [
+      { text: texts.connected ?? 'Tora: alerts will arrive in this chat.', role: 'info' },
+    ]),
+    ctx,
+    user[0]?.preferences?.notices?.styles?.test,
+  );
   return { id, label };
 }
 
 // ---- Sending ----
 
-/**
- * A message of cards (store notices): a small heading, then one card per item with a title line,
- * a line under it, a quoted text as written, when, and a link. Each channel gets its own markup:
- * Discord embeds with a colored edge, Telegram HTML; the data's text escaped so it shows as written.
- */
-export interface RichMessage {
-  head: string;
-  cards: {
-    title: string;
-    /** Under the title, in italics (e.g. the products). */
-    sub?: string | null;
-    /** Text as written, quoted. */
-    quote?: string | null;
-    /** When, as people read it ("10-21 18:00"). */
-    when?: string | null;
-    url?: string | null;
-    /** The card's edge on Discord. */
-    color?: 'orange' | 'blue';
-  }[];
-  /** A link under everything (the app's page). */
-  link?: string | null;
-  /** The link's text, and a card's link's (Telegram). */
-  linkText?: string;
-  urlText?: string;
-}
-
-const COLORS = { orange: 0xf59e0b, blue: 0x3b82f6 };
-/** Discord Markdown escaped: a "*" in a post stays a "*". */
-const mdEscape = (s: string) => s.replace(/([\\*_~`|<>[\]])/g, '\\$1').replace(/^([#-])/gm, '\\$1');
-/** Embeds per Discord message. */
-const EMBEDS_PER_MESSAGE = 10;
-
-/** Discord: the heading as small text, each card an embed (title linked, colored edge). */
-export function discordPayloads(m: RichMessage): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
-  for (let i = 0; i < Math.max(1, m.cards.length); i += EMBEDS_PER_MESSAGE) {
-    out.push({
-      ...(i === 0 ? { content: `-# ${mdEscape(m.head)}${m.link ? ` · <${m.link}>` : ''}` } : {}),
-      embeds: m.cards.slice(i, i + EMBEDS_PER_MESSAGE).map((c) => ({
-        title: c.title.slice(0, 256),
-        ...(c.url ? { url: c.url } : {}),
-        description: [
-          c.sub ? `*${mdEscape(c.sub)}*` : null,
-          c.quote
-            ? c.quote
-                .split('\n')
-                .map((l) => `> ${mdEscape(l)}`)
-                .join('\n')
-            : null,
-        ]
-          .filter(Boolean)
-          .join('\n')
-          .slice(0, 4000),
-        ...(c.when ? { footer: { text: c.when } } : {}),
-        color: COLORS[c.color ?? 'orange'],
-      })),
-      allowed_mentions: { parse: [] },
-    });
-  }
-  return out;
-}
-
-/** Telegram's HTML: the title bold, the line under it in italics, the text quoted. */
-export function telegramHtml(m: RichMessage): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const cards = m.cards.map((c) =>
-    [
-      `<b>${esc(c.title)}</b>`,
-      c.sub ? `<i>${esc(c.sub)}</i>` : null,
-      c.quote ? `<blockquote>${esc(c.quote)}</blockquote>` : null,
-      [
-        c.when ? `<code>${esc(c.when)}</code>` : null,
-        c.url ? `<a href="${esc(c.url)}">${esc(m.urlText ?? 'post')}</a>` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ') || null,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  );
-  return [
-    `<i>${esc(m.head)}</i>`,
-    ...cards,
-    ...(m.link ? [`<a href="${esc(m.link)}">${esc(m.linkText ?? m.link)}</a>`] : []),
-  ].join('\n\n');
-}
-
-/** Plain text, when formatting cannot be used. */
-export function plainText(m: RichMessage): string {
-  return [
-    m.head,
-    ...m.cards.map((c) =>
-      [c.title, c.sub, c.quote, [c.when, c.url].filter(Boolean).join(' ')]
-        .filter(Boolean)
-        .join('\n'),
-    ),
-    ...(m.link ? [m.link] : []),
-  ].join('\n\n');
-}
-
 async function deliver(
   channel: AlertChannel,
-  message: string | RichMessage,
+  message: string | Notice,
   ctx: AlertContext,
   token: string | null,
+  style?: NoticeStyle,
 ): Promise<void> {
   const fetchFn = ctx.fetch ?? fetch;
   const target = decryptSecret(channel.targetEnc, ctx.secret);
-  const rich = typeof message === 'string' ? null : message;
+  const notice = typeof message === 'string' ? null : message;
   if (channel.kind === 'discord') {
     // No @everyone or role pings from text that came from data.
-    const bodies = rich
-      ? discordPayloads(rich)
+    const bodies = notice
+      ? discordPayloads(notice, style)
       : [{ content: (message as string).slice(0, 2000), allowed_mentions: { parse: [] } }];
     for (const body of bodies) {
       const res = await fetchFn(target, {
@@ -411,8 +330,9 @@ async function deliver(
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
   // Cut HTML can be broken: a long message goes as plain text instead.
-  const html = rich ? telegramHtml(rich) : null;
-  const send = html && html.length <= 4096 ? html : rich ? plainText(rich) : (message as string);
+  const html = notice && style?.format !== 'plain' ? telegramHtml(notice, style) : null;
+  const send =
+    html && html.length <= 4096 ? html : notice ? plainText(notice, style) : (message as string);
   await telegram(
     token,
     'sendMessage',
@@ -427,13 +347,19 @@ async function deliver(
 }
 
 /** Sends to one channel; remembers when it worked or why it failed. */
-async function deliverTo(db: Db, channelId: string, text: string | RichMessage, ctx: AlertContext) {
+async function deliverTo(
+  db: Db,
+  channelId: string,
+  text: string | Notice,
+  ctx: AlertContext,
+  style?: NoticeStyle,
+) {
   const [channel] = await db.select().from(alertChannels).where(eq(alertChannels.id, channelId));
   if (!channel) return false;
   const token = channel.kind === 'telegram' ? await telegramToken(db, ctx.secret) : null;
   const now = toLocalIso();
   try {
-    await deliver(channel, text, ctx, token);
+    await deliver(channel, text, ctx, token, style);
     await db
       .update(alertChannels)
       .set({ lastSentAt: now, lastError: null, updatedAt: now })
@@ -449,19 +375,41 @@ async function deliverTo(db: Db, channelId: string, text: string | RichMessage, 
   }
 }
 
-/** Sends `text` to every channel of a person; how many it reached. */
+/** A person's style for a kind of notice (Settings > Alerts > Customize notices). */
+async function styleFor(
+  db: Db,
+  userId: string,
+  kind: NoticeKind,
+): Promise<NoticeStyle | undefined> {
+  const [row] = await db
+    .select({ preferences: users.preferences })
+    .from(users)
+    .where(eq(users.id, userId));
+  return row?.preferences?.notices?.styles?.[kind];
+}
+
+/** Sends a notice to every channel of a person, in their style; how many it reached. */
 export async function sendToUser(
   db: Db,
   userId: string,
-  text: string | RichMessage,
+  notice: Notice,
   ctx: AlertContext,
 ): Promise<number> {
+  const style = await styleFor(db, userId, notice.kind);
   let sent = 0;
   for (const c of await channelsOf(db, userId)) {
-    if (await deliverTo(db, c.id, text, ctx)) sent++;
+    if (await deliverTo(db, c.id, notice, ctx, style)) sent++;
   }
   return sent;
 }
+
+/** A notice of plain lines of one kind (a card each). */
+const lines = (
+  kind: NoticeKind,
+  head: string | null,
+  items: { text: string; role?: NoticeRole; url?: string | null; title?: string | null }[],
+  link: string | null = null,
+) => linesNotice(kind, head, items, link);
 
 /** "Send a test" for one channel. */
 export async function sendTest(db: Db, user: User, channelId: string, ctx: AlertContext) {
@@ -471,7 +419,13 @@ export async function sendTest(db: Db, user: User, channelId: string, ctx: Alert
     .where(and(eq(alertChannels.id, channelId), eq(alertChannels.userId, user.id)));
   if (!channel) return false;
   const texts = await textsFor(db, user, ctx);
-  return deliverTo(db, channel.id, texts.test ?? 'Tora: test message.', ctx);
+  return deliverTo(
+    db,
+    channel.id,
+    lines('test', null, [{ text: texts.test ?? 'Tora: test message.', role: 'info' }]),
+    ctx,
+    user.preferences?.notices?.styles?.test,
+  );
 }
 
 /** A person's messages' language: their choice, else the app's primary. */
@@ -486,11 +440,13 @@ export async function localeFor(db: Db, user: User | null): Promise<string> {
 /** A person's messages: their chosen language, else the app's primary. */
 export async function textsFor(db: Db, user: User | null, ctx: AlertContext): Promise<AlertTexts> {
   const locale = await localeFor(db, user);
-  return { ...(await ctx.texts('en')), ...(await ctx.texts(locale)) };
+  // The person's own wording (Customize notices) over the app's.
+  const own = user?.preferences?.notices?.texts?.[locale] ?? {};
+  return { ...(await ctx.texts('en')), ...(await ctx.texts(locale)), ...own };
 }
 
 /** Amounts in the base currency, in a person's language. */
-async function moneyFor(db: Db, user: User): Promise<(minor: number) => string> {
+export async function moneyFor(db: Db, user: User): Promise<(minor: number) => string> {
   const [locale, registry] = await Promise.all([localeFor(db, user), loadSourceRegistry(db)]);
   const base = baseCurrency(registry);
   const format = new Intl.NumberFormat(locale, { style: 'currency', currency: base });
@@ -510,8 +466,8 @@ async function adminsToAlert(db: Db): Promise<User[]> {
   return admins.filter((a) => alertPrefs(a.preferences).failures);
 }
 
-const linkLine = (t: AlertTexts, base: string | null, href: string | null) =>
-  base && href ? `\n${base.replace(/\/$/, '')}${href}` : '';
+const linkUrl = (base: string | null, href: string | null) =>
+  base && href ? `${base.replace(/\/$/, '')}${href}` : null;
 
 /** Lines of a run's log that are only noise for a person (pnpm's wrapper, progress bars). */
 const LOG_NOISE =
@@ -532,8 +488,12 @@ export function stoppedReason(log: string): string | null {
   return reason ? reason.slice(0, 300) : null;
 }
 
-/** The message about a failed (or missed) run, in one person's language. */
-function failureText(t: AlertTexts, entry: Activity, base: string | null): string {
+/** The card about a failed (or missed) run, in one person's language. */
+function failureCard(
+  t: AlertTexts,
+  entry: Activity,
+  base: string | null,
+): { text: string; role: NoticeRole; url: string | null } {
   const d = entry.detail as Record<string, unknown>;
   const lines: string[] = [];
   if (entry.kind === 'collect') {
@@ -574,7 +534,11 @@ function failureText(t: AlertTexts, entry: Activity, base: string | null): strin
       lines.push(fill(entry.action === 'no_backup' ? t.noBackup! : t.noCollect!, params));
     }
   }
-  return lines.join('\n') + linkLine(t, base, entry.href);
+  return {
+    text: lines.join('\n'),
+    role: entry.kind === 'check' && entry.action !== 'self_check' ? 'warning' : 'bad',
+    url: linkUrl(base, entry.href),
+  };
 }
 
 /**
@@ -602,8 +566,16 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     const base = await appUrl(db);
     for (const admin of await adminsToAlert(db)) {
       const t = await textsFor(db, admin, ctx);
-      const text = toSend.map((e) => failureText(t, e, base)).join('\n\n');
-      sent += await sendToUser(db, admin.id, text, ctx);
+      sent += await sendToUser(
+        db,
+        admin.id,
+        lines(
+          'admin',
+          null,
+          toSend.map((e) => failureCard(t, e, base)),
+        ),
+        ctx,
+      );
     }
     for (const e of toSend) sentToday[e.action ? `${e.kind}:${e.action}` : e.kind] = today;
     await saveSetting(db, 'alertsSentToday', sentToday);
@@ -636,7 +608,14 @@ export async function alertServerUpdate(
   let sent = 0;
   for (const admin of await adminsToAlert(db)) {
     const t = await textsFor(db, admin, ctx);
-    sent += await sendToUser(db, admin.id, fill(t.updateFailed!, { step: failed, from, to }), ctx);
+    sent += await sendToUser(
+      db,
+      admin.id,
+      lines('admin', null, [
+        { text: fill(t.updateFailed!, { step: failed, from, to }), role: 'bad' },
+      ]),
+      ctx,
+    );
   }
   return sent;
 }
@@ -678,6 +657,25 @@ export async function checkMissedRuns(
   return missed;
 }
 
+/** The morning check's hour on a long-lived server (app time). */
+export const MORNING_CHECK_HOUR = 8;
+
+/**
+ * The morning check on a long-lived server (the home server; a hosted app has its cron job):
+ * once a day from 08:00 app time, the "nothing ran" checks and the daily summaries. True when it
+ * ran now.
+ */
+export async function morningCheck(db: Db, ctx: AlertContext, now = new Date()): Promise<boolean> {
+  const local = toLocalIso(now);
+  if (Number(local.slice(11, 13)) < MORNING_CHECK_HOUR) return false;
+  const day = local.slice(0, 10);
+  if ((await readSetting<string>(db, 'morningCheckDay')) === day) return false;
+  await saveSetting(db, 'morningCheckDay', day);
+  await checkMissedRuns(db, ctx, now);
+  await sendSummaries(db, ctx, now);
+  return true;
+}
+
 /** Hours between two summaries of one person (the PC and the app's check may both try). */
 const SUMMARY_GAP_HOURS = 20;
 
@@ -710,7 +708,8 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
     if (last && now.getTime() - Date.parse(last) < SUMMARY_GAP_HOURS * 3_600_000) continue;
     const prefs = alertPrefs(user.preferences);
     const t = await textsFor(db, user, ctx);
-    const lines: string[] = [];
+    const cards: { text: string; role?: NoticeRole; url?: string | null; title?: string | null }[] =
+      [];
     const imports: Activity[] = [];
     if (prefs.imports) {
       const since = last ?? toLocalIso(new Date(now.getTime() - 86_400_000));
@@ -729,12 +728,14 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         imports.push(e);
         const n = notAdded(e);
         if (n.existing + n.skipped + n.problem === 0) continue;
-        lines.push(
-          fill(t.summaryImport!, {
+        cards.push({
+          text: fill(t.summaryImport!, {
             method: t[`method_${e.action}`] ?? e.action ?? '',
             ...n,
-          }) + linkLine(t, base, e.href),
-        );
+          }),
+          role: 'info',
+          url: linkUrl(base, e.href),
+        });
       }
     }
     if (prefs.actions) {
@@ -742,27 +743,34 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         admin: user.role === 'admin',
       });
       const count = actionTotal(items);
-      if (count) lines.push(fill(t.summaryActions!, { count }) + linkLine(t, base, '/actions'));
+      if (count) {
+        cards.push({
+          text: fill(t.summaryActions!, { count }),
+          role: 'info',
+          url: linkUrl(base, '/actions'),
+        });
+      }
     }
     const drops = prefs.drops ? await sharpDrops(db, user.id, dropsShown[user.id] ?? {}, now) : [];
     if (drops.length) {
       const money = await moneyFor(db, user);
-      lines.push(
-        [
-          t.summaryDrops ?? 'Sharp drops (15% or more in a week):',
-          ...drops.map(
+      cards.push({
+        title: t.summaryDrops ?? 'Sharp drops (15% or more in a week):',
+        text: drops
+          .map(
             (d) =>
               fill(t.summaryDrop ?? '{name}: {price}, {pct} in 7 days', {
                 name: d.product.name + (d.bucket ? ` (${conditionWords(d.bucket)})` : ''),
                 price: money(d.fair),
                 pct: `${Math.round(d.change * 100)}%`,
-              }) + linkLine(t, base, `/products/${d.product.id}`),
-          ),
-        ].join('\n'),
-      );
+              }) + (base ? `\n${linkUrl(base, `/products/${d.product.id}`)}` : ''),
+          )
+          .join('\n'),
+        role: 'warning',
+      });
     }
-    if (lines.length === 0) continue;
-    const delivered = await sendToUser(db, user.id, [t.summaryTitle!, ...lines].join('\n\n'), ctx);
+    if (cards.length === 0) continue;
+    const delivered = await sendToUser(db, user.id, lines('summary', t.summaryTitle!, cards), ctx);
     if (delivered === 0) continue;
     sent += delivered;
     state[user.id] = toLocalIso(now);
@@ -820,13 +828,13 @@ export async function sendWatchAlerts(
   const sourceLabel = new Map(
     (await loadSourceRegistry(db)).sources.map((s) => [s.key, s.label] as const),
   );
-  const byUser = new Map<string, { user: User; lines: string[] }>();
+  const byUser = new Map<string, { user: User; items: BuyAlertData[] }>();
   let alerts = 0;
   for (const { watch, product, user } of rows) {
     const state: WatchAlertState = { ...(watch.alertState ?? {}) };
     const signal = stats.get(`${product.id}|${watch.bucket}`);
     const fresh = signal?.day === today ? (signal.stats as SignalStats) : null;
-    const lines: string[] = [];
+    const items: BuyAlertData[] = [];
     const t = await textsFor(db, user, ctx);
     const money = await moneyFor(db, user);
     const name =
@@ -842,15 +850,15 @@ export async function sendWatchAlerts(
       const step = stepAlert(state.zone, good, today);
       state.zone = step.state;
       if (step.send && fresh.fair !== null && j.zone.top !== null) {
-        lines.push(
-          fill(t.buyZone ?? '{name}: good price, {price} (buy zone under {zone}).', {
-            name,
+        items.push({
+          name,
+          zone: {
             price: money(fresh.fair),
             zone: money(j.zone.top),
-          }) +
-            (j.limited.length ? ` ${t.buyLimited ?? ''}` : '') +
-            linkLine(t, base, href),
-        );
+            limited: j.limited.length > 0,
+          },
+          url: linkUrl(base, href),
+        });
       }
     }
     // Today's asks only: a source that read nothing tonight says nothing.
@@ -863,36 +871,30 @@ export async function sendWatchAlerts(
       const step = stepAlert(state.target, under, today);
       state.target = step.state;
       if (step.send) {
-        lines.push(
-          fill(t.buyTarget ?? '{name}: an ask at {price} ({source}), under your target {target}.', {
-            name,
+        items.push({
+          name,
+          target: {
             price: money(ask.lowestAskBase!),
             source: sourceLabel.get(ask.source) ?? ask.source,
             target: money(watch.targetPriceBase),
-          }) +
-            linkLine(t, base, ask.url ? null : href) +
-            (ask.url ? `\n${ask.url}` : ''),
-        );
+          },
+          url: ask.url ?? linkUrl(base, href),
+        });
       }
     }
     if (JSON.stringify(state) !== JSON.stringify(watch.alertState ?? {})) {
       await db.update(watches).set({ alertState: state }).where(eq(watches.id, watch.id));
     }
-    if (lines.length === 0 || !alertPrefs(user.preferences).buy) continue;
-    alerts += lines.length;
-    const entry = byUser.get(user.id) ?? { user, lines: [] };
-    entry.lines.push(...lines);
+    if (items.length === 0 || !alertPrefs(user.preferences).buy) continue;
+    alerts += items.length;
+    const entry = byUser.get(user.id) ?? { user, items: [] };
+    entry.items.push(...items);
     byUser.set(user.id, entry);
   }
   let sent = 0;
-  for (const { user, lines } of byUser.values()) {
+  for (const { user, items } of byUser.values()) {
     const t = await textsFor(db, user, ctx);
-    sent += await sendToUser(
-      db,
-      user.id,
-      [t.buyTitle ?? 'Tora: buy timing', ...lines].join('\n\n'),
-      ctx,
-    );
+    sent += await sendToUser(db, user.id, buyNotice(t, items), ctx);
   }
   return { sent, alerts };
 }

@@ -8,15 +8,28 @@ happened (Settings > Activity).
 | Message                                                                   | To          | When                                                                         | Sent by                         |
 | ------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------- | ------------------------------- |
 | The collect or the backup failed                                          | Admins      | Right after the run (at most once a day per kind)                            | The home PC (`collect-cron.sh`) |
-| No collect or no backup for over 26 hours (the PC is off)                 | Admins      | The morning check                                                            | The app (Vercel cron)           |
-| Imports that did not add every row (already in Tora, left out, a problem) | Each person | The morning summary (at most one a day, only when there is something to say) | The app (Vercel cron)           |
-| How many things wait on Actions                                           | Each person | The morning summary                                                          | The app (Vercel cron)           |
+| No collect or no backup for over 26 hours (the PC is off)                 | Admins      | The morning check                                                            | The app's morning check         |
+| Imports that did not add every row (already in Tora, left out, a problem) | Each person | The morning summary (at most one a day, only when there is something to say) | The app's morning check         |
+| How many things wait on Actions                                           | Each person | The morning summary                                                          | The app's morning check         |
 | A watched item turned Good price, or its lowest ask went under the target | Each person | Right after the nightly collect (again only after 14 days out)               | The home PC (`collect-cron.sh`) |
-| Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app (Vercel cron)           |
+| Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app's morning check         |
 
 Each person picks their channels, switches each kind on or off and chooses the language of the
 messages in **Settings > Alerts**. A failure at night arrives at night; Telegram and Discord can
 mute a chat.
+
+The morning check runs from 08:00 (app time): on the home server inside the app itself (every
+2 minutes it checks whether today's ran), on a hosted app from its cron job (`/api/cron/daily`).
+
+### How messages look (Settings > Alerts > Message style)
+
+Every message is a small heading, cards and a link: on Discord each card is an embed with a
+colored edge, on Telegram the same in bold, italics and quotes (no colors). Each person can see
+every kind (store posts and comments, unknown stores, store feed, buy timing, daily summary,
+admin alerts, test) with example data as both apps show it, and change, per kind: cards or plain
+text, the Discord colors, which parts show (heading, date and time, products, the post as written,
+links), and the wording (each text with its {placeholders}, in their message language). The
+previews follow every change; "Send this example" sends it to their own channels.
 
 Buy alerts follow each person's buy strategy (see [Buy timing](buy-timing.md)) and use only that
 night's numbers, so a failed collect sends none. A Good price with little data is sent unless the

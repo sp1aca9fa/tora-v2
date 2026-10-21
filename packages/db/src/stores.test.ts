@@ -300,7 +300,8 @@ it('keeps each board apart: a board giving no posts while the feed runs is told 
   expect(await checkFeeds(db, ctx, at(15))).toBe(0);
   const back = await visit('biccamera', [post('b2', '池袋')], 16);
   expect(back.boardBack).toBe('biccamera');
-  expect(await sendFeedMessages(db, uid, back, ctx, at(16))).toBe(1);
+  // The board back (feed status) and its post naming no store Tora knows: two kinds, two notices.
+  expect(await sendFeedMessages(db, uid, back, ctx, at(16))).toBe(2);
 });
 
 it('says when the feed connects, with the boards it tracks, and when the list changes', async () => {

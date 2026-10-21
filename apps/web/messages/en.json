@@ -375,6 +375,14 @@
       "accounts": {
         "title": "Accounts",
         "info": "New accounts, password and authenticator resets, devices."
+      },
+      "alertStyle": {
+        "title": "Message style",
+        "info": "How each kind of message looks on Discord and Telegram, and its wording."
+      },
+      "schedule": {
+        "title": "Schedule",
+        "info": "When the collectors and the other timers run."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -1461,7 +1469,126 @@
       "no_secret": "AUTH_SECRET is not set on the server."
     },
     "buy": "Watched items: Good price, or an ask under your target (at once, after the nightly collect)",
-    "drops": "Sharp drops of owned and watched items, 15% or more in a week (morning summary)"
+    "drops": "Sharp drops of owned and watched items, 15% or more in a week (morning summary)",
+    "styleLink": "Message style",
+    "styleInfo": "See every kind of message with examples, and change how it looks and reads."
+  },
+  "alertStyle": {
+    "title": "Message style",
+    "info": "Every kind of message Tora sends, with example data, as Discord and Telegram show it. Change its look and wording; the previews follow. Saved per kind, for your messages only.",
+    "kind": {
+      "store": "Store posts",
+      "storeUnknown": "Unknown stores",
+      "feed": "Store feed",
+      "buy": "Buy timing",
+      "summary": "Daily summary",
+      "admin": "Admin alerts",
+      "test": "Test"
+    },
+    "kindInfo": {
+      "store": "Posts and comments about cards on sale at a store in your area (Stores).",
+      "storeUnknown": "Recent posts naming no store or place Tora knows (add the code on the Stores page).",
+      "feed": "Your store feed: connected, silent, a board back, posts maybe missed.",
+      "buy": "A watched item at a good price, or an ask under your target (right after the nightly collect).",
+      "summary": "The morning summary: imports that did not add every row, what waits on Actions, sharp drops.",
+      "admin": "Admins: a failed collect or backup, nothing ran, the database budget, a failed server update.",
+      "test": "Sent when a channel is added or tested."
+    },
+    "noColors": "no colors on Telegram",
+    "look": "Look",
+    "format": {
+      "cards": "Cards",
+      "plain": "Plain text"
+    },
+    "colors": "Colors (Discord)",
+    "role": {
+      "post": "Post",
+      "comment": "Comment",
+      "unknown": "Unknown store",
+      "info": "Information",
+      "good": "Good news",
+      "warning": "Warning",
+      "bad": "Problem"
+    },
+    "parts": "Show",
+    "part": {
+      "head": "Heading line",
+      "when": "Date and time",
+      "sub": "Products line",
+      "quote": "The post as written",
+      "url": "Link to the post or page",
+      "link": "Link to Tora"
+    },
+    "wording": "Wording",
+    "wordingInfo": "In your message language. Words in braces, like '{'store'}', are filled in: leave them as they are.",
+    "default": "Use default",
+    "placeholders": "Filled in: {list}",
+    "save": "Save",
+    "saved": "Saved: your next messages of this kind look like this.",
+    "reset": "Back to defaults",
+    "resetHint": "Defaults shown: Save to keep them.",
+    "sendExample": "Send this example to my channels",
+    "sent": "Sent to {count, plural, one {# channel} other {# channels}} (as saved).",
+    "noChannels": "No channel to send to (Alerts).",
+    "error": "Could not do that."
+  },
+  "schedule": {
+    "title": "Schedule",
+    "info": "When things run on the home server. Its hourly check is heard from here; each collector's time is last night's, moved to the next collect.",
+    "noChecks": "No check heard from the home server yet (it is recorded from the next update on).",
+    "stale": "No check heard from the home server since {last}: is it on? (sudo systemctl status tora-collect.timer)",
+    "checks": "The home server checks every {every} min: last {last}, next {next}.",
+    "nextCollect": "Next daily collect: {at}",
+    "nextCollectUnknown": "Next daily collect: at the first check after midnight.",
+    "doneToday": "Today's collect ran ({at}, {level}).",
+    "notToday": "Today's collect has not run yet (last: {at}, {level}): it runs at the next check.",
+    "requested": "A \"collect now\" waits for the next check ({at}).",
+    "level": {
+      "ok": "fine",
+      "problem": "with problems",
+      "failed": "failed"
+    },
+    "inOrder": "The daily collect, in order",
+    "step": {
+      "before": "Exchange rates, purchase links, uploads",
+      "rankings": "Rankings",
+      "collectors": "Collectors",
+      "opening": "Box opening cards",
+      "closing": "Closing steps",
+      "backup": "Backup",
+      "alerts": "Alerts"
+    },
+    "stepInfo": {
+      "before": "(when there is anything to do)",
+      "rankings": "(the sites' popularity lists; new candidates collected the same night)",
+      "collectors": "(one after another; each needs the site to answer)",
+      "opening": "(each set once a week)",
+      "closing": "(pictures, lot sizes: the last 14 days nightly and all of them weekly, value history, buy timing, rule tests, opportunities)",
+      "backup": "(the whole database, once a day)",
+      "alerts": "(failures to admins, buy timing alerts)"
+    },
+    "colSource": "Collector",
+    "colNext": "Next (about)",
+    "colLast": "Last night",
+    "colTook": "Took",
+    "status": {
+      "running": "running",
+      "ok": "fine",
+      "partial": "partly done",
+      "failed": "failed",
+      "blocked": "blocked by the site"
+    },
+    "estimate": "Times are estimates: the collect waits up to 5 minutes at random before it starts, and a site may answer slower or faster than last night.",
+    "others": "Other timers",
+    "other": {
+      "morning": "The morning check: every day from {hour} (app time), \"nothing ran\" alerts and the daily summaries.",
+      "feed": "The store feed check: every 2 minutes (a silent feed or board is told).",
+      "update": "Server updates: every 5 minutes, only when there are new commits and never during a collect.",
+      "backupCopy": "Backup copies to your PC: from the PC, every 6 hours while it is on (a Windows task)."
+    },
+    "underMinute": "<1 min",
+    "minutes": "{m} min",
+    "link": "Schedule"
   },
   "activity": {
     "title": "Activity",

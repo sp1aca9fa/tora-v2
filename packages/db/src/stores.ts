@@ -5,8 +5,11 @@ import {
   DEFAULT_FEED_PREFS,
   PLACE,
   type StoreEntry,
+  linesNotice,
   localDate,
   productsInPost,
+  storeNotice,
+  storeUnknownNotice,
   storesInArea,
   storesInPost,
   toLocalIso,
@@ -17,7 +20,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import {
   type AlertContext,
   type AlertTexts,
-  type RichMessage,
   appUrl,
   localeFor,
   sendToUser,
@@ -484,45 +486,59 @@ export async function sendFeedMessages(
   const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
   const t = await textsFor(db, user, ctx);
   const base = await appUrl(db);
-  const lines: string[] = [];
+  const link = base ? `${base}/stores` : null;
+  const status: { text: string; role: 'info' | 'warning' }[] = [];
   if (received.connected)
-    lines.push(
-      fill(
+    status.push({
+      text: fill(
         t.feedConnected ??
           'Tora: connected to the browser feed ({source}), tracking these boards: {boards}',
         { source: received.connected.source, boards: received.connected.boards.join(', ') },
       ),
-    );
-  else if (received.resumed) lines.push(t.feedBack ?? 'Tora: the store feed is sending again.');
+      role: 'info',
+    });
+  else if (received.resumed)
+    status.push({ text: t.feedBack ?? 'Tora: the store feed is sending again.', role: 'info' });
   if (received.boardBack)
-    lines.push(
-      fill(t.boardBack ?? 'Tora: the {board} board gives posts again.', {
+    status.push({
+      text: fill(t.boardBack ?? 'Tora: the {board} board gives posts again.', {
         board: received.boardBack,
       }),
-    );
+      role: 'info',
+    });
   if (received.gap)
-    lines.push(
-      fill(
+    status.push({
+      text: fill(
         t.feedGap ??
           'Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.',
         { posts: received.gap.posts, chain: received.gap.chain ?? '-' },
       ),
-    );
+      role: 'warning',
+    });
+  let sent = 0;
+  if (status.length) {
+    sent += await sendToUser(db, userId, linesNotice('feed', null, status, link, t.storeLink), ctx);
+  }
   // Any board: with places, every post naming an area is placed; the rest may be a code Tora
   // does not know yet (or no sighting at all: questions, chat).
-  if (prefs.unknown) {
-    const unknown = unknownPosts;
-    if (unknown.length) {
-      lines.push(
-        t.storeUnknown ??
-          'Tora: posts naming no store Tora knows (add the code on the Stores page):',
-      );
-      for (const p of unknown) lines.push(`${short(p.text)}${p.url ? `\n${p.url}` : ''}`);
-    }
+  if (prefs.unknown && unknownPosts.length) {
+    sent += await sendToUser(
+      db,
+      userId,
+      storeUnknownNotice(
+        t,
+        unknownPosts.map((p) => ({
+          author: p.author,
+          text: p.text,
+          when: p.postedAt.slice(5, 16).replace('T', ' '),
+          url: p.url,
+        })),
+        link,
+      ),
+      ctx,
+    );
   }
-  if (!lines.length) return 0;
-  const link = base ? `\n${base}/stores` : '';
-  return sendToUser(db, userId, `${lines.join('\n')}${link}`, ctx);
+  return sent;
 }
 
 /**
@@ -560,7 +576,18 @@ async function checkBoards(
   const next = { ...boards };
   for (const [key, b] of quiet) next[key] = { ...b, alertedAt: at };
   await db.update(feedTokens).set({ boards: next }).where(eq(feedTokens.userId, user.id));
-  await sendToUser(db, user.id, `${lines.join('\n')}${base ? `\n${base}/stores` : ''}`, ctx);
+  await sendToUser(
+    db,
+    user.id,
+    linesNotice(
+      'feed',
+      null,
+      lines.map((text) => ({ text, role: 'warning' as const })),
+      base ? `${base}/stores` : null,
+      t.storeLink,
+    ),
+    ctx,
+  );
   return quiet.length;
 }
 
@@ -629,7 +656,18 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
       .update(feedTokens)
       .set({ silenceAlertedAt: toLocalIso(now) })
       .where(eq(feedTokens.userId, user.id));
-    await sendToUser(db, user.id, `${text}${base ? `\n${base}/stores` : ''}`, ctx);
+    await sendToUser(
+      db,
+      user.id,
+      linesNotice(
+        'feed',
+        null,
+        [{ text, role: 'warning' }],
+        base ? `${base}/stores` : null,
+        t.storeLink,
+      ),
+      ctx,
+    );
     told++;
   }
   return told;
@@ -720,12 +758,9 @@ export async function sendStoreNotices(
     chosen.push(...mine.filter((p) => p.replyTo));
     if (!chosen.length) continue;
     chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
-    const message: RichMessage = {
-      head: t.storePosts ?? 'Tora: cards on sale in your area',
-      link: base ? `${base}/stores` : null,
-      linkText: t.storeLink ?? 'Store notices in Tora',
-      urlText: t.storeOpen ?? 'post',
-      cards: chosen.map((p) => {
+    const message = storeNotice(
+      t,
+      chosen.map((p) => {
         const where = p.storeIds
           .filter((id) => area.has(id))
           .map((id) => storeLabel(byId.get(id)!, t, locale))
@@ -733,16 +768,17 @@ export async function sendStoreNotices(
         let products = named(p.text);
         if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
         return {
-          title: p.replyTo ? fill(t.storeComment ?? 'Comment to {store}', { store: where }) : where,
-          sub: products.length ? products.join(', ') : null,
-          quote: p.text,
+          store: where,
+          products,
+          text: p.text,
           // "10-21 18:00", as the Stores page shows it.
           when: p.postedAt.slice(5, 16).replace('T', ' '),
           url: p.url,
-          color: p.replyTo ? ('blue' as const) : ('orange' as const),
+          comment: !!p.replyTo,
         };
       }),
-    };
+      base ? `${base}/stores` : null,
+    );
     for (const id of told) {
       await db
         .insert(storeNotices)

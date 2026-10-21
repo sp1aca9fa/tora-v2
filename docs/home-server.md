@@ -156,4 +156,9 @@ sudo chmod 440 /etc/sudoers.d/tora-update && sudo visudo -c
 (`OnCalendar=*:0/5`), enabled like the others. By hand, any time:
 `ssh -t <server> code/tora-v2/scripts/update-server.sh`.
 
+Settings > Collectors > Schedule shows when things run: the server's hourly check (each one is
+recorded by `pnpm collect:request`), the next daily collect, each collector's likely start (last
+night's, moved to the next collect), what else the collect does, and the other timers (the
+morning check, the store feed check, updates).
+
 Logs: `journalctl -u tora-app`, `~/.local/state/tora/collect.log`, `~/.local/state/tora/update.log`.

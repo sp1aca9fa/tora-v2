@@ -9,12 +9,10 @@ import { listActivity, recordActivity } from './activity';
 import {
   type AlertContext,
   addDiscordChannel,
-  discordPayloads,
-  plainText,
-  telegramHtml,
   alertFailures,
   channelsOf,
   checkMissedRuns,
+  morningCheck,
   connectTelegram,
   sendSummaries,
   sendWatchAlerts,
@@ -49,7 +47,18 @@ const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => 
   if (url.startsWith('https://discord.com/')) {
     if (!init?.method) return Response.json({ name: 'tora-alerts' });
     if (failDiscord) return new Response('no', { status: 404 });
-    sent.push({ to: 'discord', text: body.content });
+    // A message's text and its cards (embeds) as one text.
+    const embeds = (body.embeds ?? []) as {
+      title?: string;
+      description?: string;
+      footer?: { text: string };
+    }[];
+    sent.push({
+      to: 'discord',
+      text: [body.content, ...embeds.flatMap((e) => [e.title, e.description, e.footer?.text])]
+        .filter(Boolean)
+        .join('\n'),
+    });
     return new Response(null, { status: 204 });
   }
   const method = url.split('/').pop();
@@ -180,7 +189,7 @@ it('sends each person a daily summary of imports that did not add every row', as
   expect(await listActivity(db, { id: admin, admin: true })).toHaveLength(1);
 
   expect(await sendSummaries(db, ctx)).toBe(1);
-  expect(sent[0]!.text).toBe(`summary\n\nSpreadsheet: 1 added, 1 existing, 0 skipped, 1 problems`);
+  expect(sent[0]!.text).toBe(`-# summary\nSpreadsheet: 1 added, 1 existing, 0 skipped, 1 problems`);
   // At most one a day.
   expect(await sendSummaries(db, ctx)).toBe(0);
   const [after] = await db.select().from(activity).where(eq(activity.kind, 'import'));
@@ -241,7 +250,7 @@ it('alerts a watch entering the buy zone or with an ask under its target, again 
   // In the zone (Steady: under the lower quarter) and an ask under the target: both, one message.
   expect(await night('2026-11-01', 9_000, 8_500)).toEqual({ sent: 1, alerts: 2 });
   expect(sent[0]!.text).toBe(
-    'buy\n\nBox: good ¥9,000 under ¥9,500\n\nBox: ask ¥8,500 SNKRDUNK under ¥9,000',
+    '-# buy\nBox\ngood ¥9,000 under ¥9,500\nBox\nask ¥8,500 SNKRDUNK under ¥9,000',
   );
   // Still in: nothing. Out for 5 days and back: nothing.
   expect(await night('2026-11-02', 9_000, 8_500)).toEqual({ sent: 0, alerts: 0 });
@@ -301,48 +310,12 @@ it('reads why a run stopped from the collect log, without the pnpm noise', () =>
   expect(stoppedReason('=== 2026-10-17 ===\n$ tsx x\n')).toBeNull();
 });
 
-it('writes card messages for each channel, the data text as written', () => {
-  const m = {
-    head: 'Tora: cards',
-    link: 'https://tora.test/stores',
-    linkText: 'Stores',
-    cards: [
-      {
-        title: 'Yodobashi Ueno',
-        sub: 'Snow *set*',
-        quote: 'a *b*\nline 2',
-        when: '10-21 18:00',
-        url: 'https://x.test/a_b',
-      },
-      { title: 'Comment to Yodobashi Ueno', quote: '<sold out>', color: 'blue' as const },
-    ],
-  };
-  const [discord] = discordPayloads(m);
-  expect(discord).toEqual({
-    content: '-# Tora: cards · <https://tora.test/stores>',
-    embeds: [
-      {
-        title: 'Yodobashi Ueno',
-        url: 'https://x.test/a_b',
-        description: '*Snow \\*set\\**\n> a \\*b\\*\n> line 2',
-        footer: { text: '10-21 18:00' },
-        color: 0xf59e0b,
-      },
-      { title: 'Comment to Yodobashi Ueno', description: '> \\<sold out\\>', color: 0x3b82f6 },
-    ],
-    allowed_mentions: { parse: [] },
-  });
-  // More than 10 cards: more messages, the heading on the first only.
-  const many = discordPayloads({ ...m, cards: Array(12).fill(m.cards[1]) });
-  expect(many.map((p) => (p.embeds as unknown[]).length)).toEqual([10, 2]);
-  expect(many[1]!.content).toBeUndefined();
-  expect(telegramHtml(m)).toBe(
-    [
-      '<i>Tora: cards</i>',
-      '<b>Yodobashi Ueno</b>\n<i>Snow *set*</i>\n<blockquote>a *b*\nline 2</blockquote>\n<code>10-21 18:00</code> · <a href="https://x.test/a_b">post</a>',
-      '<b>Comment to Yodobashi Ueno</b>\n<blockquote>&lt;sold out&gt;</blockquote>',
-      '<a href="https://tora.test/stores">Stores</a>',
-    ].join('\n\n'),
-  );
-  expect(plainText(m)).toContain('Comment to Yodobashi Ueno\n<sold out>');
+it('runs the morning check once a day from 08:00 on a long-lived server', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  await recordActivity(db, { kind: 'collect', occurredAt: '2026-10-19T00:30:00.000+09:00' });
+  expect(await morningCheck(db, ctx, new Date('2026-10-21T07:58:00+09:00'))).toBe(false);
+  expect(await morningCheck(db, ctx, new Date('2026-10-21T08:02:00+09:00'))).toBe(true);
+  expect(sent.map((s) => s.text)).toEqual(['no collect for 55 h']);
+  expect(await morningCheck(db, ctx, new Date('2026-10-21T08:04:00+09:00'))).toBe(false);
+  expect(await morningCheck(db, ctx, new Date('2026-10-22T08:00:00+09:00'))).toBe(true);
 });

@@ -33,6 +33,7 @@ export * from './signals';
 export * from './opportunities';
 export * from './rankings';
 export * from './plan';
+export * from './schedule';
 export * from './opening';
 export * from './stores';
 export * from './accounts';

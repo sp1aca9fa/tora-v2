@@ -1,6 +1,7 @@
 import { alertPrefs } from '@tora/core';
 import { channelsOf, telegramBotName, telegramLink } from '@tora/db';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { nativeName } from '@/i18n/locale';
@@ -36,6 +37,12 @@ export default async function AlertSettingsPage() {
         <CardHeader>
           <CardTitle>{t('title')}</CardTitle>
           <CardDescription>{t('info')}</CardDescription>
+          <p className="pt-1 text-sm">
+            <Link href="/settings/alerts/style" className="font-medium underline">
+              {t('styleLink')}
+            </Link>{' '}
+            <span className="text-muted-foreground">{t('styleInfo')}</span>
+          </p>
         </CardHeader>
         <CardContent className="space-y-5">
           <section className="space-y-2">
