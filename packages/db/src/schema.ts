@@ -1068,6 +1068,36 @@ export const openingCards = sqliteTable(
   ],
 );
 
+/**
+ * A site's ranking (S13), one row per day and ranked item: its rank, its page, the price and the
+ * activity numbers the site shows, and the item it is (a candidate made for it when nobody tracked
+ * it).
+ */
+export const rankings = sqliteTable(
+  'rankings',
+  {
+    id: id(),
+    /** The ranking plug-in's key, and the collector source whose ids its items carry. */
+    ranking: text('ranking').notNull(),
+    source: text('source').notNull(),
+    day: text('day').notNull(),
+    rank: integer('rank').notNull(),
+    externalId: text('external_id').notNull(),
+    productId: text('product_id').references(() => products.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    url: text('url'),
+    /** In the source's currency, as shown. */
+    price: integer('price'),
+    numbers: text('numbers', { mode: 'json' }).$type<Record<string, number>>(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('rankings_uq').on(t.ranking, t.day, t.externalId),
+    index('rankings_product_idx').on(t.productId, t.day),
+    index('rankings_day_idx').on(t.day),
+  ],
+);
+
 /** Physical stores for store notices (S25), shared: filled by store directory plug-ins. */
 export const stores = sqliteTable(
   'stores',
@@ -1187,6 +1217,7 @@ export type AccountSetup = typeof accountSetups.$inferSelect;
 export type TcgSet = typeof tcgSets.$inferSelect;
 export type NewTcgSet = typeof tcgSets.$inferInsert;
 export type Product = typeof products.$inferSelect;
+export type Ranking = typeof rankings.$inferSelect;
 export type NewProduct = typeof products.$inferInsert;
 export type ProductSource = typeof productSources.$inferSelect;
 export type SourceCandidate = typeof sourceCandidates.$inferSelect;

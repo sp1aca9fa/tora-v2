@@ -372,6 +372,13 @@
       "when": 1792583951814,
       "tag": "0052_store_label_en",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1792586882978,
+      "tag": "0053_rankings",
+      "breakpoints": true
     }
   ]
 }

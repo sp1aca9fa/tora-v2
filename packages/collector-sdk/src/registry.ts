@@ -4,6 +4,7 @@ import {
   saveGlossary,
   saveRateSources,
   saveSourceInfos,
+  saveRankingSources,
   saveStores,
   saveSuggestedRates,
 } from '@tora/db';
@@ -19,6 +20,7 @@ import type {
   RateSource,
   SetCardSource,
   StoreDirectory,
+  RankingSource,
 } from './types';
 
 /**
@@ -38,6 +40,7 @@ export interface LoadedCollectors {
   setCards: SetCardSource[];
   pullRates: PullRateSource[];
   stores: StoreDirectory[];
+  rankings: RankingSource[];
   missing: string[];
 }
 
@@ -49,6 +52,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const setCards: SetCardSource[] = [];
   const pullRates: PullRateSource[] = [];
   const stores: StoreDirectory[] = [];
+  const rankings: RankingSource[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -64,8 +68,9 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     setCards.push(...(mod.setCards ?? []));
     pullRates.push(...(mod.pullRates ?? []));
     stores.push(...(mod.stores ?? []));
+    rankings.push(...(mod.rankings ?? []));
   }
-  return { collectors, importers, rates, sources, setCards, pullRates, stores, missing };
+  return { collectors, importers, rates, sources, setCards, pullRates, stores, rankings, missing };
 }
 
 /**
@@ -81,6 +86,10 @@ export async function loadAndRegister(db: Db, root?: string): Promise<LoadedColl
     loaded.rates.map(({ key, label, currencies }) => ({ key, label, currencies })),
   );
   await saveSuggestedRates(db, (await Promise.all(loaded.pullRates.map((p) => p.rates()))).flat());
+  await saveRankingSources(
+    db,
+    loaded.rankings.map(({ key, label, source }) => ({ key, label, source })),
+  );
   for (const directory of loaded.stores) {
     await saveStores(db, directory.key, await directory.stores());
     await saveGlossary(db, directory.key, directory.glossary ?? []);

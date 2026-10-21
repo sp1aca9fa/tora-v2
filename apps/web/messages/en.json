@@ -1632,7 +1632,20 @@
       "sales_down": "{sales30} sales in 30 days, {before} a month before.",
       "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
       "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items)."
-    }
+    },
+    "rankLine": "#{rank} on {label} ({move})",
+    "rankNew": "new",
+    "rankSame": "same as a week ago",
+    "rankUp": "up {n} in a week",
+    "rankDown": "down {n} in a week",
+    "popularTitle": "Popular now: {label}",
+    "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top 30 are added as candidates and collected while they stay there; how a rank change does as a signal is tested once enough days are saved.",
+    "colItem": "Item",
+    "colWeek": "Week",
+    "colPrice": "Price",
+    "colListings": "Listings",
+    "colFavorites": "Favorites",
+    "candidate": "Candidate"
   },
   "forSale": {
     "title": "For sale now",

@@ -1632,7 +1632,20 @@
       "sales_down": "直近30日で{sales30}件、その前は月{before}件。",
       "strong_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。",
       "weak_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。"
-    }
+    },
+    "rankLine": "{label}で{rank}位({move})",
+    "rankNew": "新規",
+    "rankSame": "1週間前と同じ",
+    "rankUp": "1週間で{n}位上昇",
+    "rankDown": "1週間で{n}位下降",
+    "popularTitle": "人気:{label}",
+    "popularIntro": "サイト自体のランキング({day}の収集時に取得)。上位30のうち誰も追跡していない商品は候補として追加され、ランキングにある間は価格を収集します。順位の変化がシグナルとして有効かは、十分な日数が貯まってから検証します。",
+    "colItem": "商品",
+    "colWeek": "週",
+    "colPrice": "価格",
+    "colListings": "出品数",
+    "colFavorites": "お気に入り",
+    "candidate": "候補"
   },
   "forSale": {
     "title": "現在の出品",

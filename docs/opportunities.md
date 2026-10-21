@@ -13,6 +13,18 @@ past prices only and is never a sure thing.
   each group's signals and their record against buying on any day.
 - **MCP** (`opportunities`): the same list for a Claude chat.
 
+## Rankings
+
+Ranking plug-ins ([Collectors](collectors.md#ranking-sources)) read a site's popularity ranking
+once a day (the private package reads SNKRDUNK's Pokemon sealed products sorted by popularity,
+boxes only: three pages, about 34 boxes). Each ranked item is matched to an item Tora knows; the
+top 30 nobody tracks become candidates, created and collected like watched items while they stay
+in the top 30 (within 30 days). The Opportunities page shows each ranking ("Popular now": rank,
+the change in a week, price, listings, favorites, owned / watching / candidate) in its item type's
+tab, and a ranked item's rank on its row; MCP `opportunities` gives the ranks too. Candidates
+join the signals once their prices are collected. Rank changes as a signal are tested once enough
+days are saved (ranks partly follow price moves).
+
 ## Signals
 
 Worked out after each collect, per item, on its prices with the most days of sales (one source and

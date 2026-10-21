@@ -45,6 +45,7 @@ import {
   manualPrices,
   priceObservations,
   productImages,
+  rankings,
   productSources,
   products,
   sourceCandidates,
@@ -366,7 +367,12 @@ async function insertHolding(
 // ---------------------------------------------------------------------------------------------
 // products
 
-export async function createProduct(db: Db, userId: string, input: ProductInput): Promise<Product> {
+/** A new item; `userId` null for one Tora makes itself (a ranking's candidate, S13). */
+export async function createProduct(
+  db: Db,
+  userId: string | null,
+  input: ProductInput,
+): Promise<Product> {
   const checked = await checkedProduct(db, input);
   const [product] = await db
     .insert(products)
@@ -1090,6 +1096,7 @@ export async function mergeProducts(
     await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));
     await tx.delete(productImages).where(eq(productImages.productId, fromId));
     await moveSupply(tx, fromId, intoId);
+    await tx.update(rankings).set({ productId: intoId }).where(eq(rankings.productId, fromId));
     // Buy timing numbers are worked out again for the merged item on the next collect.
     await tx.delete(signals).where(eq(signals.productId, fromId));
     await clearBucketValues(tx, [fromId, intoId]);

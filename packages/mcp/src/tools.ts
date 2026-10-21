@@ -29,7 +29,9 @@ import {
   productLines,
   releaseDates,
   latestSignals,
+  latestRanks,
   loadOpportunities,
+  rankingLabels,
   getUserById,
   similarKey,
   similarProducts,
@@ -819,6 +821,13 @@ export async function opportunities(db: Db, filter: { itemType?: string; limit?:
     const p = await getProduct(db, o.productId);
     if (p) names.set(o.productId, p);
   }
+  const [ranks, labels] = await Promise.all([
+    latestRanks(
+      db,
+      list.map((o) => o.productId),
+    ),
+    rankingLabels(db),
+  ]);
   const record = (o: (typeof list)[number], key: string) => {
     const t = o.tests?.signals[key as keyof NonNullable<typeof o.tests>['signals']];
     return t ? { checked: t.checked, higher90d: t.higher, medianChange90d: t.change } : null;
@@ -830,8 +839,18 @@ export async function opportunities(db: Db, filter: { itemType?: string; limit?:
       name: names.get(o.productId)?.name ?? null,
       kind: names.get(o.productId)?.kind ?? null,
       itemType: o.itemType,
+      // Made by Tora from a ranking's top (nobody added it), collected while it stays there.
+      candidate: !names.get(o.productId)?.createdBy,
       bucket: o.bucket || null,
       priceSource: o.source,
+      // Its place in the sites' rankings (rank today, a week before; the site's own numbers).
+      rankings: (ranks.get(o.productId) ?? []).map((r) => ({
+        ranking: labels.get(r.ranking) ?? r.ranking,
+        day: r.day,
+        rank: r.rank,
+        weekAgo: r.weekAgo,
+        numbers: r.numbers,
+      })),
       // Signals proven on the group's past prices rank items; warnings count against; the rest
       // are on but not proven (too few checks, or no better than buying on any day).
       signals: o.proven,

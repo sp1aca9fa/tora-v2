@@ -5,7 +5,14 @@ import {
   PROVEN_MIN_CHECKS,
   provenEdge,
 } from '@tora/core';
-import { type Opportunity, type Product, imageVersions, opportunitiesFor } from '@tora/db';
+import {
+  type Opportunity,
+  type Product,
+  type RankingBoard,
+  imageVersions,
+  opportunitiesFor,
+  rankingBoards,
+} from '@tora/db';
 import { Binoculars, ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -41,8 +48,9 @@ const CHIP = {
  */
 export default async function OpportunitiesPage() {
   const { db, user } = await authed();
-  const [data, t, money] = await Promise.all([
+  const [data, boards, t, money] = await Promise.all([
     opportunitiesFor(db, user.id),
+    rankingBoards(db, user.id),
     getTranslations(),
     getMoney(),
   ]);
@@ -91,6 +99,92 @@ export default async function OpportunitiesPage() {
     });
   };
 
+  /** "#3 on SNKRDUNK popular Pokemon boxes (up 2 in a week)" for a ranked item. */
+  const rankLine = (rank: number, weekAgo: number | null, label: string) =>
+    t('opportunities.rankLine', {
+      rank,
+      label,
+      move:
+        weekAgo === null
+          ? t('opportunities.rankNew')
+          : weekAgo === rank
+            ? t('opportunities.rankSame')
+            : t(weekAgo > rank ? 'opportunities.rankUp' : 'opportunities.rankDown', {
+                n: Math.abs(weekAgo - rank),
+              }),
+    });
+  const rankOf = (productId: string) => {
+    for (const b of boards) {
+      const i = b.items.find((x) => x.productId === productId);
+      if (i) return rankLine(i.rank, i.weekAgo, b.label);
+    }
+    return null;
+  };
+  /** A ranking's items in order, with what the site shows and what the person has. */
+  const popular = (b: RankingBoard) => (
+    <section key={b.ranking} className="space-y-2">
+      <div className="space-y-1">
+        <h2 className="font-semibold">{t('opportunities.popularTitle', { label: b.label })}</h2>
+        <p className="max-w-3xl text-xs text-muted-foreground">
+          {t('opportunities.popularIntro', { day: b.day })}
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-xl border bg-card">
+        <table className="w-full text-xs">
+          <thead className="text-muted-foreground">
+            <tr className="border-b text-left">
+              <th className="px-3 py-2 text-right font-medium">#</th>
+              <th className="px-3 py-2 font-medium">{t('opportunities.colItem')}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('opportunities.colWeek')}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('opportunities.colPrice')}</th>
+              <th className="px-3 py-2 text-right font-medium">{t('opportunities.colListings')}</th>
+              <th className="px-3 py-2 text-right font-medium">
+                {t('opportunities.colFavorites')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {b.items.map((i) => (
+              <tr key={`${i.rank}|${i.title}`} className="border-b last:border-0 align-top">
+                <td className="px-3 py-1.5 text-right">{i.rank}</td>
+                <td className="px-3 py-1.5">
+                  {i.productId ? (
+                    <Link href={`/products/${i.productId}`} className="hover:underline">
+                      {i.title}
+                    </Link>
+                  ) : (
+                    i.title
+                  )}
+                  <span className="ml-2 text-muted-foreground">
+                    {[
+                      i.owned && t('opportunities.owned'),
+                      i.watching && t('opportunities.watching'),
+                      i.candidate && !i.owned && !i.watching && t('opportunities.candidate'),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  {i.weekAgo === null
+                    ? t('opportunities.rankNew')
+                    : i.weekAgo === i.rank
+                      ? '='
+                      : `${i.weekAgo > i.rank ? '+' : '-'}${Math.abs(i.weekAgo - i.rank)}`}
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  {i.price !== null ? money(i.price) : '-'}
+                </td>
+                <td className="px-3 py-1.5 text-right">{i.numbers?.listings ?? '-'}</td>
+                <td className="px-3 py-1.5 text-right">{i.numbers?.favorites ?? '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+
   const row = (o: Item) => {
     const signals = [
       ...o.proven.map((key) => ({ key, style: 'proven' as const })),
@@ -112,6 +206,10 @@ export default async function OpportunitiesPage() {
               {o.bucket && <span className="font-mono">{o.bucket}</span>}
               {o.owned && <span>{t('opportunities.owned')}</span>}
               {o.watching && <span>{t('opportunities.watching')}</span>}
+              {!o.product.createdBy && !o.owned && !o.watching && (
+                <span>{t('opportunities.candidate')}</span>
+              )}
+              {rankOf(o.productId) && <span>{rankOf(o.productId)}</span>}
             </p>
           </div>
           <div className="max-w-[45%] shrink-0 space-y-0.5 text-right text-sm">
@@ -248,7 +346,12 @@ export default async function OpportunitiesPage() {
       });
   };
 
-  const types = [...new Set(items.map((o) => o.itemType))];
+  const types = [
+    ...new Set([
+      ...items.map((o) => o.itemType),
+      ...boards.flatMap((b) => b.items.flatMap((i) => (i.itemType ? [i.itemType] : []))),
+    ]),
+  ];
   const panels = types.map((type) => {
     const list = shown.filter((o) => o.itemType === type);
     const others = items.filter(
@@ -274,6 +377,7 @@ export default async function OpportunitiesPage() {
               </p>
             )}
           </section>
+          {boards.filter((b) => b.items.some((i) => i.itemType === type)).map(popular)}
           <section className="space-y-3">
             <div className="space-y-1">
               <h2 className="font-semibold">{t('opportunities.recordsTitle')}</h2>

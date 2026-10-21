@@ -8,6 +8,7 @@ export * from './lock';
 export * from './mbox';
 export * from './images';
 export * from './purchases';
+export * from './rankings';
 export * from './links';
 export * from './ai-import';
 export * from './ai-import-plan';

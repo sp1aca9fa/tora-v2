@@ -8,6 +8,8 @@ import type {
   Product,
   ProductInput,
   ProductSource,
+  RankedEntry,
+  RankingInfo,
   RecentSale,
   SourceQuery,
 } from '@tora/db';
@@ -283,6 +285,24 @@ export interface PullRateSource {
   rates(): SuggestedRates[] | Promise<SuggestedRates[]>;
 }
 
+/**
+ * Reads a site's ranking once a day, with the nightly collect (S13): its items in rank order, each
+ * with its id on the plug-in's `source` (the id that source's collector links items by), its page,
+ * and any price and activity numbers the site shows. Tora saves the day's ranks; the top items
+ * nobody tracks become candidates, created and collected like watched items while they stay in
+ * the ranking (requirements S13, docs/collectors.md).
+ */
+export interface RankingSource {
+  /** Saved with each rank ("snkrdunk-pokemon-boxes"). */
+  key: string;
+  label: string;
+  /** The collector source whose ids the items carry ("snkrdunk"). */
+  source: string;
+  /** What a candidate made from it is. */
+  item: RankingInfo['item'];
+  rank(ctx: Pick<CollectorContext, 'http' | 'now' | 'log'>): Promise<RankedEntry[]>;
+}
+
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
@@ -295,4 +315,5 @@ export interface CollectorModule {
   setCards?: SetCardSource[];
   pullRates?: PullRateSource[];
   stores?: StoreDirectory[];
+  rankings?: RankingSource[];
 }

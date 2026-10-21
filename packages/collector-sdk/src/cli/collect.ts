@@ -40,6 +40,7 @@ import { updateRates } from '../rates';
 import { loadAndRegister } from '../registry';
 import { defaultLockDir, lockSource } from '../lock';
 import { readOpeningCards } from '../opening';
+import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
@@ -84,7 +85,8 @@ try {
   // Without it the schedule counts days on the PC's clock.
 }
 // The plug-ins' source descriptions are saved first: the app reads them.
-const { collectors, importers, rates, sources, setCards, missing } = await loadAndRegister(db);
+const { collectors, importers, rates, sources, setCards, rankings, missing } =
+  await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
 const selected = collectors.filter(
@@ -105,10 +107,17 @@ const withLinks = !values.product && importers.some((i) => i.readLink);
 const withRates = !values.product && !values.source && rates.length > 0;
 // The box opening value's cards (S20): each set once a week, in any full or per-market run.
 const withOpening = !values.product && !values.source && setCards.length > 0;
+// Rankings (S13): before the collectors, so new candidates are collected the same night.
+const withRankings = !values.product && !values.source && rankings.length > 0;
 // Steps: exchange rates, purchase links, each collector, box opening cards, then pictures + lot
 // sizes + snapshots.
 const progress = new Progress(
-  (withRates ? 1 : 0) + (withLinks ? 1 : 0) + selected.length + (withOpening ? 1 : 0) + 1,
+  (withRates ? 1 : 0) +
+    (withLinks ? 1 : 0) +
+    (withRankings ? 1 : 0) +
+    selected.length +
+    (withOpening ? 1 : 0) +
+    1,
 );
 const log = progress.log;
 // Exchange rates first: foreign prices collected in this run are converted with today's rate.
@@ -151,6 +160,26 @@ if (!values.product && !values.source) {
     if (read) log(`uploads: ${read} batch(es) read (see Imports > Review)`);
   } catch (error) {
     log(`uploads: stopped (${errorText(error)})`);
+  }
+}
+if (withRankings) {
+  progress.next('rankings');
+  const locks = rankings.map((r) => lockSource(r.source));
+  try {
+    if (locks.some((l) => 'heldBy' in l)) {
+      log('rankings: skipped, another collect is reading the same site');
+    } else {
+      const read = await readRankings(db, rankings, new PoliteHttp({ maxRequests: 20 }), {
+        log: (m) => log(`[rankings] ${m}`),
+      });
+      log(
+        `rankings: ${read.read} read, ${read.candidates} new candidate(s), ${read.failed} failed`,
+      );
+    }
+  } catch (error) {
+    log(`rankings: stopped (${errorText(error)})`);
+  } finally {
+    for (const l of locks) if (!('heldBy' in l)) l.release();
   }
 }
 if (selected.length === 0) console.log('No collectors registered.');

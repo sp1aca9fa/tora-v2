@@ -36,6 +36,7 @@ import {
   sourceCounts,
   unpackSales,
 } from './item-sales';
+import { rankedProductIds } from './rankings';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { clearBucketValues } from './valuation';
 import {
@@ -307,8 +308,8 @@ export async function bucketStats(
 // collector side (home PC)
 
 /**
- * Products someone owns, has opened (the box view values them "as received") or watches (S9):
- * the ones collectors match and collect.
+ * Products someone owns, has opened (the box view values them "as received") or watches (S9), and
+ * a ranking's top items (S13): the ones collectors match and collect.
  */
 async function trackedProductIds(db: Db): Promise<Set<string>> {
   const held = await db
@@ -316,7 +317,9 @@ async function trackedProductIds(db: Db): Promise<Set<string>> {
     .from(holdings)
     .where(inArray(holdings.status, ['owned', 'consumed']));
   const watched = await db.selectDistinct({ id: watches.productId }).from(watches);
-  return new Set([...held, ...watched].map((r) => r.id));
+  // A ranking's top items (S13): candidates are collected while they stay there.
+  const ranked = await rankedProductIds(db);
+  return new Set([...[...held, ...watched].map((r) => r.id), ...ranked]);
 }
 
 /** These products, oldest first (in chunks: an id list can be long). */

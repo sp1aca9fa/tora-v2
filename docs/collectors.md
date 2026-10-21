@@ -84,6 +84,7 @@ export const rates: RateSource[] = []; // optional: exchange rates (see markets.
 export const sources: SourceInfo[] = [/* one per collector, and per shop purchases come from */];
 export const setCards: SetCardSource[] = []; // optional: a set's hit cards for the box opening value
 export const pullRates: PullRateSource[] = []; // optional: suggested pull rates per set
+export const rankings: RankingSource[] = []; // optional: a site's popularity ranking (S13)
 ```
 
 ## Describing a source (`SourceInfo`)
@@ -291,6 +292,44 @@ export const pullRates: PullRateSource[] = [
   },
 ];
 ```
+
+## Ranking sources
+
+A `RankingSource` reads a site's popularity ranking once a day, with the nightly collect (before
+the collectors, so what it adds is collected the same night): its items in rank order, each with
+its id on the plug-in's `source` (the id that source's collector links items by), its kind, its
+page, and any price and activity numbers the site shows (`numbers`, e.g. listings, favorites).
+Tora saves each day's ranks and matches every item: by its id on the source, else an item of the
+same kind from the same catalog set or with the same name. The top 30 that match nothing become
+candidates: Tora creates them (no creator), links them to the source and collects them like
+watched items while they were in the top 30 within the last 30 days. They show on the
+Opportunities page ([Opportunities](opportunities.md)) with their rank and the site's numbers;
+how a rank change does as a signal is tested once enough days are saved.
+
+```ts
+export const rankings: RankingSource[] = [
+  {
+    key: 'myshop-popular-boxes',
+    label: 'My shop popular boxes',
+    source: 'myshop', // its collector links items by these ids
+    item: { category: 'tcg', franchise: 'pokemon', region: 'jp' },
+    async rank(ctx) {
+      const html = await ctx.http.text('https://myshop.example/ranking?kind=box');
+      return parseRanking(html).map((p) => ({
+        externalId: p.id,
+        title: p.title,
+        kind: 'booster_box',
+        url: p.url,
+        price: p.price,
+        numbers: { listings: p.listings },
+      }));
+    },
+  },
+];
+```
+
+Read only what the ranking page shows, one or a few requests a day, and keep the reader's tests
+on a saved page (`test/fixtures`).
 
 ## Checklist before turning a source on
 
