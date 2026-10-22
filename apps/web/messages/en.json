@@ -1413,6 +1413,8 @@
     "storeLink": "Store notices in Tora",
     "storeOpen": "post",
     "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).",
+    "feedSilentStart": "Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).",
+    "feedStillSilent": "Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).",
     "feedBack": "Tora: the store feed is sending again.",
     "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",
     "storeUnknown": "Tora: posts naming no store or place Tora knows (add the code on the Stores page):",

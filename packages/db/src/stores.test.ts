@@ -262,6 +262,29 @@ it('tells once when the feed goes silent within the hours, and when it speaks ag
   expect(await checkFeeds(db, ctx, later(31 + 11 * 60))).toBe(0);
 });
 
+it('counts silence from the server start after a night off, and reminds while it lasts', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '08:00', to: '23:00' } });
+  // The feed's last push the night before; the server starts at 09:00.
+  const night = new Date('2026-10-21T22:30:00+09:00');
+  await receivePush(db, uid, { source: 'gamenv', posts: [] }, night);
+  const startedAt = new Date('2026-10-22T09:00:00+09:00');
+  const at = (time: string) => new Date(`2026-10-22T${time}:00+09:00`);
+  sent = [];
+  expect(await checkFeeds(db, ctx, at('09:05'), { startedAt })).toBe(0);
+  expect(await checkFeeds(db, ctx, at('09:11'), { startedAt })).toBe(1);
+  expect(sent.at(-1)).toContain('since the server started at 10-22 09:00 (11 min');
+  expect(sent.at(-1)).toContain('its last push: 10-21 22:30');
+  // Still silent: again every 2 hours.
+  expect(await checkFeeds(db, ctx, at('10:30'), { startedAt })).toBe(0);
+  expect(await checkFeeds(db, ctx, at('11:12'), { startedAt })).toBe(1);
+  expect(sent.at(-1)).toContain('still silent: nothing since 10-22 09:00 (2 h)');
+  // A push clears it.
+  await receivePush(db, uid, { source: 'gamenv', posts: [] }, at('11:20'));
+  expect(await checkFeeds(db, ctx, at('11:25'), { startedAt })).toBe(0);
+});
+
 it('adds and removes stores by hand, never a plug-in one', async () => {
   const added = await addStore(db, {
     chain: 'place',

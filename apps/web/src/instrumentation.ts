@@ -9,13 +9,15 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs' || process.env.VERCEL) return;
   const { checkFeeds, getDb, loadTimeZone, morningCheck } = await import('@tora/db');
   const { alertContext } = await import('./lib/alert-context');
+  // Silence is counted from here when later than a feed's last push (the server was off).
+  const startedAt = new Date();
   const check = async () => {
     const ctx = alertContext();
     if (!ctx) return;
     try {
       const db = getDb();
       await loadTimeZone(db);
-      await checkFeeds(db, ctx);
+      await checkFeeds(db, ctx, new Date(), { startedAt });
     } catch (error) {
       console.error('store feed check:', error);
     }

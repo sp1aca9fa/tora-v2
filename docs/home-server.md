@@ -135,6 +135,14 @@ Four services, all with `User=<user>`:
 - `tora-browser`: `Environment=DISPLAY=:1`, `/usr/bin/firefox --profile /home/<user>/.tora-firefox
 --no-remote <board address>`, `Restart=always`, after and requiring `tora-display`.
 
+One window with the board, kept between restarts: the service starts Firefox without an address
+(an address opens a new tab each time) and the profile's `user.js` pins the settings Firefox applies
+at every start: restore the last session (`browser.startup.page` 3, also after a crash without
+asking: `browser.sessionstore.max_resumed_crashes` -1), the board as home page when there is no
+session, and no welcome or "what's new" tabs (`browser.startup.homepage_override.mstone` "ignore",
+`startup.homepage_welcome_url` and `startup.homepage_override_url` empty,
+`browser.aboutwelcome.enabled` false).
+
 To see the screen, from your PC: `ssh -L 5900:localhost:5900 <server>` and a VNC viewer (e.g.
 TigerVNC) on `localhost:5900`; copy and paste work both ways (the viewer's Options > Input >
 clipboard boxes ticked). Install your userscript manager and feed there; the feed's address is

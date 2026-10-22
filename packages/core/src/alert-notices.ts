@@ -51,7 +51,16 @@ export const NOTICE_KIND_ROLES: Record<NoticeKind, NoticeRole[]> = {
 export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
   store: ['storePosts', 'storeComment', 'storeArea', 'storeLink', 'storeOpen'],
   storeUnknown: ['storeUnknown', 'storeLink', 'storeOpen'],
-  feed: ['feedConnected', 'feedBack', 'boardBack', 'feedGap', 'feedSilent', 'boardSilent'],
+  feed: [
+    'feedConnected',
+    'feedBack',
+    'boardBack',
+    'feedGap',
+    'feedSilent',
+    'feedSilentStart',
+    'feedStillSilent',
+    'boardSilent',
+  ],
   buy: ['buyTitle', 'buyZone', 'buyLimited', 'buyTarget'],
   summary: [
     'summaryTitle',

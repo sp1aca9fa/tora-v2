@@ -541,9 +541,27 @@ export async function sendFeedMessages(
   return sent;
 }
 
+/** Drops posts older than a month. */
+export async function pruneStorePosts(db: Db, now = new Date()): Promise<number> {
+  const gone = await db
+    .delete(storePosts)
+    .where(
+      lt(storePosts.postedAt, toLocalIso(new Date(now.getTime() - KEEP_POSTS_DAYS * 86_400_000))),
+    )
+    .returning({ id: storePosts.id });
+  return gone.length;
+}
+
+/** While a feed or a board stays silent, it is told again this often (within the person's hours). */
+const REMIND_HOURS = 2;
+
+/** The local "MM-DD HH:mm" of a time. */
+const shortAt = (iso: string) => toLocalIso(new Date(iso)).slice(5, 16).replace('T', ' ');
+
 /**
- * The silence check, run every few minutes by the app (no silent failures): each feed quiet for
- * longer than its person's limit, within their hours, is told once; the next push clears it.
+ * Boards of a running feed that gave no posts for longer than the limit (counted from the app's
+ * start when that is later: time the server was off is no board's silence), each told once and
+ * again every 2 hours while it lasts.
  */
 async function checkBoards(
   db: Db,
@@ -552,10 +570,14 @@ async function checkBoards(
   boards: Record<string, BoardState>,
   silentMinutes: number,
   now: Date,
+  startedAt: number,
 ): Promise<number> {
   const limit = now.getTime() - silentMinutes * 60_000;
+  const remind = now.getTime() - REMIND_HOURS * 3_600_000;
   const quiet = Object.entries(boards).filter(
-    ([, b]) => !b.alertedAt && Date.parse(b.readAt ?? b.at) < limit,
+    ([, b]) =>
+      Math.max(Date.parse(b.readAt ?? b.at), startedAt) < limit &&
+      (!b.alertedAt || Date.parse(b.alertedAt) < remind),
   );
   if (!quiet.length) return 0;
   const t = await textsFor(db, user, ctx);
@@ -566,8 +588,8 @@ async function checkBoards(
         'Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.',
       {
         board: key,
-        since: (b.readAt ?? '-').slice(0, 16).replace('T', ' '),
-        at: b.at.slice(0, 16).replace('T', ' '),
+        since: b.readAt ? shortAt(b.readAt) : '-',
+        at: shortAt(b.at),
         posts: b.posts,
       },
     ),
@@ -591,67 +613,75 @@ async function checkBoards(
   return quiet.length;
 }
 
-/** Forgets a board the feed no longer reads (its state and its silence alerts). */
-export async function forgetBoard(db: Db, userId: string, key: string) {
-  const [token] = await db
-    .select({ boards: feedTokens.boards })
-    .from(feedTokens)
-    .where(eq(feedTokens.userId, userId));
-  if (!token?.boards?.[key]) return;
-  const { [key]: _, ...rest } = token.boards;
-  await db.update(feedTokens).set({ boards: rest }).where(eq(feedTokens.userId, userId));
-}
-
-/** Posts are kept this long (the page shows the latest; a post seen again later is new). */
-const KEEP_POSTS_DAYS = 30;
-const PRUNE_EVERY_MS = 60 * 60_000;
-let prunedAt = 0;
-
-/** Drops posts older than a month. */
-export async function pruneStorePosts(db: Db, now = new Date()): Promise<number> {
-  const gone = await db
-    .delete(storePosts)
-    .where(
-      lt(storePosts.postedAt, toLocalIso(new Date(now.getTime() - KEEP_POSTS_DAYS * 86_400_000))),
-    )
-    .returning({ id: storePosts.id });
-  return gone.length;
-}
-
-export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): Promise<number> {
+/**
+ * The silence check, run every few minutes by the app (no silent failures): a feed quiet for
+ * longer than its person's limit, within their hours, is told, and again every 2 hours while it
+ * lasts; the next push clears it. Silence counts from the app's start (`startedAt`, a long-lived
+ * server) when that is later than the feed's last push: after a night with the server off, the
+ * feed is only told once it stayed silent with the server on, and the message says since when.
+ */
+export async function checkFeeds(
+  db: Db,
+  ctx: AlertContext,
+  now = new Date(),
+  opts: { startedAt?: Date } = {},
+): Promise<number> {
   const rows = await db
     .select({ token: feedTokens, user: users })
     .from(feedTokens)
     .innerJoin(users, eq(users.id, feedTokens.userId))
-    .where(and(isNull(users.disabledAt), isNull(feedTokens.silenceAlertedAt)));
+    .where(isNull(users.disabledAt));
   if (now.getTime() - prunedAt > PRUNE_EVERY_MS) {
     prunedAt = now.getTime();
     await pruneStorePosts(db, now);
   }
   const time = toLocalIso(now).slice(11, 16);
+  const startedAt = opts.startedAt?.getTime() ?? 0;
   let told = 0;
   for (const { token, user } of rows) {
     if (!token.lastSeenAt) continue;
     const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
-    const minutes = Math.floor((now.getTime() - Date.parse(token.lastSeenAt)) / 60_000);
     if (!withinHours(time, prefs.from, prefs.to)) continue;
+    const lastSeen = Date.parse(token.lastSeenAt);
+    const since = Math.max(lastSeen, startedAt);
+    const minutes = Math.floor((now.getTime() - since) / 60_000);
     if (minutes < prefs.silentMinutes) {
       // The feed runs, but a board may give nothing (an access check, a changed page) or no
-      // longer be visited: each such board is told once.
-      told += await checkBoards(db, ctx, user, token.boards ?? {}, prefs.silentMinutes, now);
+      // longer be visited.
+      told += await checkBoards(
+        db,
+        ctx,
+        user,
+        token.boards ?? {},
+        prefs.silentMinutes,
+        now,
+        startedAt,
+      );
       continue;
     }
+    const alerted = token.silenceAlertedAt ? Date.parse(token.silenceAlertedAt) : null;
+    if (alerted !== null && now.getTime() - alerted < REMIND_HOURS * 3_600_000) continue;
     const t = await textsFor(db, user, ctx);
     const base = await appUrl(db);
-    const text = fill(
-      t.feedSilent ??
-        'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
-      {
-        source: token.lastSource ?? '-',
-        since: token.lastSeenAt.slice(0, 16).replace('T', ' '),
-        minutes,
-      },
-    );
+    const sinceText = shortAt(new Date(since).toISOString());
+    const text =
+      alerted !== null
+        ? fill(
+            t.feedStillSilent ??
+              'Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).',
+            { since: sinceText, hours: Math.floor(minutes / 60) },
+          )
+        : startedAt > lastSeen
+          ? fill(
+              t.feedSilentStart ??
+                'Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
+              { started: sinceText, minutes, last: shortAt(token.lastSeenAt) },
+            )
+          : fill(
+              t.feedSilent ??
+                'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
+              { source: token.lastSource ?? '-', since: sinceText, minutes },
+            );
     await db
       .update(feedTokens)
       .set({ silenceAlertedAt: toLocalIso(now) })
@@ -672,6 +702,22 @@ export async function checkFeeds(db: Db, ctx: AlertContext, now = new Date()): P
   }
   return told;
 }
+
+/** Forgets a board the feed no longer reads (its state and its silence alerts). */
+export async function forgetBoard(db: Db, userId: string, key: string) {
+  const [token] = await db
+    .select({ boards: feedTokens.boards })
+    .from(feedTokens)
+    .where(eq(feedTokens.userId, userId));
+  if (!token?.boards?.[key]) return;
+  const { [key]: _, ...rest } = token.boards;
+  await db.update(feedTokens).set({ boards: rest }).where(eq(feedTokens.userId, userId));
+}
+
+/** Posts are kept this long (the page shows the latest; a post seen again later is new). */
+const KEEP_POSTS_DAYS = 30;
+const PRUNE_EVERY_MS = 60 * 60_000;
+let prunedAt = 0;
 
 /**
  * The store as people read it in a notice: its English label for people reading another language
