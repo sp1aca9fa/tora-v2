@@ -71,6 +71,8 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'dbBudget',
     'selfCheck',
     'updateFailed',
+    'funnelDown',
+    'funnelBack',
     'logHint',
   ],
   test: ['test', 'connected'],

@@ -144,6 +144,7 @@ export default async function SchedulePage() {
               </li>
               <li>{t('other.feed')}</li>
               <li>{t('other.update')}</li>
+              <li>{t('other.funnel')}</li>
               <li>{t('other.backupCopy')}</li>
             </ul>
           </section>

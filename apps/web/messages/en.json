@@ -1420,7 +1420,9 @@
     "feedConnected": "Tora: connected to the browser feed ({source}), tracking these boards: {boards}",
     "boardBack": "Tora: the {board} board gives posts again.",
     "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.",
-    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log"
+    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log",
+    "funnelDown": "Tora: the public address {url} does not answer, and resetting it did not help. The app runs on the home server: check its network (tailscale status).",
+    "funnelBack": "Tora: the public address {url} answers again."
   },
   "alerts": {
     "title": "Alerts",
@@ -1584,7 +1586,8 @@
       "morning": "The morning check: every day from {hour} (app time), \"nothing ran\" alerts and the daily summaries.",
       "feed": "The store feed check: every 2 minutes (a silent feed or board is told).",
       "update": "Server updates: every 5 minutes, only when there are new commits and never during a collect.",
-      "backupCopy": "Backup copies to your PC: from the PC, every 6 hours while it is on (a Windows task)."
+      "backupCopy": "Backup copies to your PC: from the PC, every 6 hours while it is on (a Windows task).",
+      "funnel": "The public address check: every 5 minutes on the home server (the Funnel is set up again when the address stops answering)."
     },
     "underMinute": "<1 min",
     "minutes": "{m} min",
@@ -1663,7 +1666,10 @@
       "userSetupDone": "Setup done",
       "collectRequested": "Collect requested",
       "serverUpdate": "Server updated",
-      "serverUpdateFailed": "Server update failed (went back)"
+      "serverUpdateFailed": "Server update failed (went back)",
+      "funnelReset": "Public address reset",
+      "funnelDown": "Public address down",
+      "funnelBack": "Public address back"
     },
     "role": {
       "admin": "admin",

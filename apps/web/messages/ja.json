@@ -1420,7 +1420,9 @@
     "feedConnected": "Tora:ブラウザのフィード({source})に接続しました。追跡中の掲示板:{boards}",
     "boardBack": "Tora:{board}掲示板から投稿が再び届いています。",
     "boardSilent": "Tora:{board}掲示板から{since}以降投稿が届いていません(最終訪問 {at}、{posts}件)。フィードは動作中:届くまでこの掲示板の通知はありません。",
-    "updateFailed": "Tora: サーバーを{to}に更新できませんでした（段階: {step}）。{from}に戻して動作を続けています。サーバーのログ: ~/.local/state/tora/update.log"
+    "updateFailed": "Tora: サーバーを{to}に更新できませんでした（段階: {step}）。{from}に戻して動作を続けています。サーバーのログ: ~/.local/state/tora/update.log",
+    "funnelDown": "Tora:公開アドレス {url} に接続できず、再設定しても直りません。アプリはホームサーバーで動いています。ネットワークを確認してください(tailscale status)。",
+    "funnelBack": "Tora:公開アドレス {url} に再び接続できます。"
   },
   "alerts": {
     "title": "アラート",
@@ -1584,7 +1586,8 @@
       "morning": "朝のチェック:毎日{hour}(アプリの時刻)から、未実行の通知と毎日のまとめ。",
       "feed": "店舗フィードのチェック:2分ごと(停止したフィード・掲示板を通知)。",
       "update": "サーバー更新:5分ごと、新しいコミットがあるときのみ、収集中は行わない。",
-      "backupCopy": "PCへのバックアップコピー:PCが起動中に6時間ごと(Windowsタスク)。"
+      "backupCopy": "PCへのバックアップコピー:PCが起動中に6時間ごと(Windowsタスク)。",
+      "funnel": "公開アドレスのチェック:ホームサーバーで5分ごと(接続できなくなったらFunnelを再設定)。"
     },
     "underMinute": "1分未満",
     "minutes": "{m}分",
@@ -1663,7 +1666,10 @@
       "userSetupDone": "設定完了",
       "collectRequested": "収集をリクエスト",
       "serverUpdate": "サーバーを更新",
-      "serverUpdateFailed": "サーバーの更新に失敗（元に戻しました）"
+      "serverUpdateFailed": "サーバーの更新に失敗（元に戻しました）",
+      "funnelReset": "公開アドレスを再設定",
+      "funnelDown": "公開アドレスに接続できない",
+      "funnelBack": "公開アドレスが復旧"
     },
     "role": {
       "admin": "管理者",

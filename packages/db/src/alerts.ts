@@ -620,6 +620,48 @@ export async function alertServerUpdate(
   return sent;
 }
 
+/**
+ * The public address checked by the home server (`scripts/funnel-check.sh`): a reset of the
+ * Funnel goes to the activity log; an address still down after resets, and back again, also to
+ * admins (the messages leave by the internet, not through the address).
+ */
+export async function alertFunnel(
+  db: Db,
+  ctx: AlertContext,
+  event: 'reset' | 'down' | 'back',
+  detail: { url: string; restarted?: boolean },
+): Promise<number> {
+  await recordActivity(db, {
+    kind: 'admin',
+    action: event === 'reset' ? 'funnelReset' : event === 'down' ? 'funnelDown' : 'funnelBack',
+    level: event === 'down' ? 'failed' : event === 'reset' ? 'problem' : 'ok',
+    detail,
+    href: '/settings/activity',
+  });
+  if (event === 'reset') return 0;
+  let sent = 0;
+  for (const admin of await adminsToAlert(db)) {
+    const t = await textsFor(db, admin, ctx);
+    const text =
+      event === 'down'
+        ? fill(
+            t.funnelDown ??
+              'Tora: the public address {url} does not answer, and resetting it did not help. The app runs on the home server: check its network (tailscale status).',
+            { url: detail.url },
+          )
+        : fill(t.funnelBack ?? 'Tora: the public address {url} answers again.', {
+            url: detail.url,
+          });
+    sent += await sendToUser(
+      db,
+      admin.id,
+      lines('admin', null, [{ text, role: event === 'down' ? 'bad' : 'info' }]),
+      ctx,
+    );
+  }
+  return sent;
+}
+
 /** Hours without a run before the daily check says so. */
 const MISSED_HOURS = 26;
 

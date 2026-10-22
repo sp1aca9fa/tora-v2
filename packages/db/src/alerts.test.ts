@@ -9,6 +9,7 @@ import { listActivity, recordActivity } from './activity';
 import {
   type AlertContext,
   addDiscordChannel,
+  alertFunnel,
   alertFailures,
   channelsOf,
   checkMissedRuns,
@@ -318,4 +319,23 @@ it('runs the morning check once a day from 08:00 on a long-lived server', async 
   expect(sent.map((s) => s.text)).toEqual(['no collect for 55 h']);
   expect(await morningCheck(db, ctx, new Date('2026-10-21T08:04:00+09:00'))).toBe(false);
   expect(await morningCheck(db, ctx, new Date('2026-10-22T08:00:00+09:00'))).toBe(true);
+});
+
+it('logs a reset of the public address, and tells admins when it stays down and comes back', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const url = 'https://tora.example.ts.net';
+  expect(await alertFunnel(db, ctx, 'reset', { url })).toBe(0);
+  expect(sent).toEqual([]);
+  expect(await alertFunnel(db, ctx, 'down', { url, restarted: true })).toBe(1);
+  expect(sent.at(-1)!.text).toContain('https://tora.example.ts.net does not answer');
+  expect(await alertFunnel(db, ctx, 'back', { url })).toBe(1);
+  expect(sent.at(-1)!.text).toContain('answers again');
+  const log = await listActivity(db, { id: admin, admin: true });
+  expect(log.map((e) => [e.action, e.level])).toEqual(
+    expect.arrayContaining([
+      ['funnelReset', 'problem'],
+      ['funnelDown', 'failed'],
+      ['funnelBack', 'ok'],
+    ]),
+  );
 });

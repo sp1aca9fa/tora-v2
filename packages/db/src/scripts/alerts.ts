@@ -5,6 +5,8 @@
 //       watched items' buy zone and target alerts (S9 part 5; from today's numbers only).
 //   update --from <rev> --to <rev> [--failed <step>]
 //       Run by scripts/update-server.sh --auto: logs a home server's update, a failure to admins.
+//   funnel reset|down|back --url <address> [--restarted]
+//       Run by scripts/funnel-check.sh: the public address was reset, is still down, or is back.
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
 //       each person at most once in 20 hours).
 import { localDate, toLocalIso } from '@tora/core';
@@ -14,6 +16,7 @@ import { parseArgs } from 'node:util';
 import { lastActivity, recordActivity } from '../activity';
 import {
   type AlertContext,
+  alertFunnel,
   type AlertTexts,
   alertFailures,
   alertServerUpdate,
@@ -42,6 +45,8 @@ const { values, positionals } = parseArgs({
     from: { type: 'string' },
     to: { type: 'string' },
     failed: { type: 'string' },
+    url: { type: 'string' },
+    restarted: { type: 'boolean' },
   },
 });
 const db = createDb(dbConfigFromEnv());
@@ -102,6 +107,18 @@ if (command === 'after-run') {
   console.log(
     `alerts: server update ${values.failed ? 'failed' : 'done'}, ${sent} message(s) sent`,
   );
+} else if (command === 'funnel') {
+  // Run by scripts/funnel-check.sh: reset (the Funnel was set up again), down, back.
+  const event = positionals[1];
+  if (event !== 'reset' && event !== 'down' && event !== 'back') {
+    console.error('alerts funnel: reset | down | back --url <address> [--restarted]');
+    process.exit(1);
+  }
+  const sent = await alertFunnel(db, ctx, event, {
+    url: values.url ?? '?',
+    ...(values.restarted ? { restarted: true } : {}),
+  });
+  console.log(`alerts: public address ${event}, ${sent} message(s) sent`);
 } else if (command === 'check') {
   const missed = await checkMissedRuns(db, ctx);
   const summaries = await sendSummaries(db, ctx);
@@ -110,7 +127,7 @@ if (command === 'after-run') {
   );
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step>]',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step>] | funnel reset|down|back --url <address> [--restarted]',
   );
   process.exit(1);
 }

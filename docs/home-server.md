@@ -90,6 +90,25 @@ take from minutes to about an hour to appear in public DNS. With https, logins w
 (no `TORA_LOCAL_HTTP`). Sign the old devices out (`pnpm user revoke <name> all`) before logging in
 at the new address: each account has 2 device slots.
 
+### Keeping the address up
+
+After a boot with no network for a while, the Funnel can stay half set up: the box answers, the
+address does not (the browser says the connection was closed). `scripts/funnel-check.sh` checks
+the address every 5 minutes as the internet sees it (public DNS, Tailscale's relays) and, while
+the app itself answers, sets the Funnel up again after 2 failed checks, restarts tailscaled too
+after 4 and tells admins it is down (and when it is back). Resets are in Settings > Activity; the
+log is `~/.local/state/tora/funnel.log`. Once:
+
+```bash
+sudo tailscale set --operator=$USER   # the Funnel without sudo
+echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart tailscaled" | sudo tee /etc/sudoers.d/tora-funnel
+sudo chmod 440 /etc/sudoers.d/tora-funnel && sudo visudo -c
+```
+
+and `tora-funnel.service` (`Type=oneshot`, `User=<user>`, the same `PATH` as the collect,
+`ExecStart=/home/<user>/code/tora-v2/scripts/funnel-check.sh`) with `tora-funnel.timer`
+(`OnCalendar=*:0/5`, `OnBootSec=3min`).
+
 ## 5. A browser for store feeds
 
 A real Firefox on a virtual screen, seen from your PC through ssh:
