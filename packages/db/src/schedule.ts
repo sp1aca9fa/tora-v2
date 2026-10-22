@@ -1,7 +1,7 @@
-// When things run (Settings > Collectors > Schedule): the home server's hourly check
+// When things run (Settings > Collectors > Schedule): the server's hourly check
 // (scripts/collect-cron.sh) is heard from at each check; from those times, today's collect and
 // the last night's collector runs, the next check, the next daily collect and each collector's
-// likely start are worked out. The timers themselves are the server's (docs/home-server.md).
+// likely start are worked out. The timers themselves are the server's.
 import { localDate, localTime, median, toLocalIso } from '@tora/core';
 import { desc, gte } from 'drizzle-orm';
 import { lastActivity } from './activity';
@@ -15,7 +15,7 @@ const KEY = 'collectChecks';
 const KEEP = 6;
 const MINUTE = 60_000;
 
-/** Called at each of the home server's checks (`pnpm collect:request`). */
+/** Called at each of the server's checks (`pnpm collect:request`). */
 export async function recordCheck(db: Db, now = new Date()): Promise<void> {
   const had = (await readSetting<string[]>(db, KEY)) ?? [];
   await saveSetting(db, KEY, [...had, toLocalIso(now)].slice(-KEEP));

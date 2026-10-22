@@ -1,4 +1,4 @@
-// Runs once when the app's server starts. On the home server (a long-lived server) it checks
+// Runs once when the app's server starts. On a self-hosted server (long-lived) it checks
 // every few minutes whether a store feed went silent (requirements S25: no silent failures), and
 // runs the morning check once a day from 08:00 (nothing ran; the daily summaries, S17). A hosted
 // app has no long-lived server: there, /api/feed/check and /api/cron/daily are called from

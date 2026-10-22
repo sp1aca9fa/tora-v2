@@ -1422,9 +1422,7 @@
     "feedConnected": "Tora: connected to the browser feed ({source}), tracking these boards: {boards}",
     "boardBack": "Tora: the {board} board gives posts again.",
     "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.",
-    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log",
-    "funnelDown": "Tora: the public address {url} does not answer, and resetting it did not help. The app runs on the home server: check its network (tailscale status).",
-    "funnelBack": "Tora: the public address {url} answers again."
+    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log"
   },
   "alerts": {
     "title": "Alerts",
@@ -1538,10 +1536,10 @@
   },
   "schedule": {
     "title": "Schedule",
-    "info": "When things run on the home server. Its hourly check is heard from here; each collector's time is last night's, moved to the next collect.",
-    "noChecks": "No check heard from the home server yet (it is recorded from the next update on).",
-    "stale": "No check heard from the home server since {last}: is it on? (sudo systemctl status tora-collect.timer)",
-    "checks": "The home server checks every {every} min: last {last}, next {next}.",
+    "info": "When things run on the server. Its hourly check is heard from here; each collector's time is last night's, moved to the next collect.",
+    "noChecks": "No check heard from the server yet (each run of `pnpm collect:request` is one).",
+    "stale": "No check heard from the server since {last}: is it on, and is its hourly collect timer running?",
+    "checks": "The server checks every {every} min: last {last}, next {next}.",
     "nextCollect": "Next daily collect: {at}",
     "nextCollectUnknown": "Next daily collect: at the first check after midnight.",
     "doneToday": "Today's collect ran ({at}, {level}).",
@@ -1583,13 +1581,10 @@
       "blocked": "blocked by the site"
     },
     "estimate": "Times are estimates: the collect waits up to 5 minutes at random before it starts, and a site may answer slower or faster than last night.",
-    "others": "Other timers",
+    "others": "Other checks",
     "other": {
       "morning": "The morning check: every day from {hour} (app time), \"nothing ran\" alerts and the daily summaries.",
-      "feed": "The store feed check: every 2 minutes (a silent feed or board is told).",
-      "update": "Server updates: every 5 minutes, only when there are new commits and never during a collect.",
-      "backupCopy": "Backup copies to your PC: from the PC, every 6 hours while it is on (a Windows task).",
-      "funnel": "The public address check: every 5 minutes on the home server (the Funnel is set up again when the address stops answering)."
+      "feed": "The store feed check: every 2 minutes (a silent feed or board is told)."
     },
     "underMinute": "<1 min",
     "minutes": "{m} min",
@@ -1669,9 +1664,7 @@
       "collectRequested": "Collect requested",
       "serverUpdate": "Server updated",
       "serverUpdateFailed": "Server update failed (went back)",
-      "funnelReset": "Public address reset",
-      "funnelDown": "Public address down",
-      "funnelBack": "Public address back"
+      "serverEvent": "Server"
     },
     "role": {
       "admin": "admin",
@@ -2110,8 +2103,8 @@
     "addTitle": "Add a store or place",
     "addInfo": "For a chain or an area Tora has no list for. A place (an area's name or emoji, with its location) is matched on every board; a store only on its chain's board.",
     "chain": "Chain",
-    "chainKey": "key, e.g. biccamera",
-    "chainLabel": "name, e.g. ビックカメラ",
+    "chainKey": "key, e.g. arcade",
+    "chainLabel": "name, e.g. アーケード",
     "placeOption": "A place (area)",
     "newChain": "Another chain...",
     "name": "Name",
@@ -2147,7 +2140,7 @@
     "otherCodes": "Other codes (no store or place)",
     "noOtherCodes": "None yet.",
     "productCodes": "Product codes",
-    "productCodesInfo": "Named in notices next to the store (\"Yodobashi Ueno · ストームエメラルダ\"). From the board's own list, and the ones admins add (these count anywhere in a post; the board's one-letter codes only among other codes).",
+    "productCodesInfo": "Named in notices next to the store (\"Megastore Minato · Snow set\"). From the board's own list, and the ones admins add (these count anywhere in a post; the board's one-letter codes only among other codes).",
     "noProductCodes": "None yet: the board's list comes with the feed's next push.",
     "isProduct": "Product",
     "fromFeed": "board list",

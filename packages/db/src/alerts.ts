@@ -588,7 +588,7 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
 }
 
 /**
- * A home server's automatic update (docs/home-server.md, `scripts/update-server.sh --auto`): in the
+ * A server's automatic update (its update script, `pnpm alerts update`): in the
  * activity log; a failure (the server went back to the version before) goes to admins at once.
  */
 export async function alertServerUpdate(
@@ -621,41 +621,40 @@ export async function alertServerUpdate(
 }
 
 /**
- * The public address checked by the home server (`scripts/funnel-check.sh`): a reset of the
- * Funnel goes to the activity log; an address still down after resets, and back again, also to
- * admins (the messages leave by the internet, not through the address).
+ * Something a server's own scripts noticed (a private ops script: its address stopped answering
+ * and was set up again, ...): in the activity log, and with `tell` to admins at once (the text as
+ * the script wrote it).
  */
-export async function alertFunnel(
+export async function alertServerEvent(
   db: Db,
   ctx: AlertContext,
-  event: 'reset' | 'down' | 'back',
-  detail: { url: string; restarted?: boolean },
+  event: {
+    title: string;
+    text?: string | null;
+    level: 'ok' | 'problem' | 'failed';
+    tell?: boolean;
+  },
 ): Promise<number> {
+  const { title, text, level, tell } = event;
   await recordActivity(db, {
     kind: 'admin',
-    action: event === 'reset' ? 'funnelReset' : event === 'down' ? 'funnelDown' : 'funnelBack',
-    level: event === 'down' ? 'failed' : event === 'reset' ? 'problem' : 'ok',
-    detail,
+    action: 'serverEvent',
+    level,
+    detail: { event: title, ...(text ? { text } : {}) },
     href: '/settings/activity',
   });
-  if (event === 'reset') return 0;
+  if (!tell) return 0;
   let sent = 0;
   for (const admin of await adminsToAlert(db)) {
-    const t = await textsFor(db, admin, ctx);
-    const text =
-      event === 'down'
-        ? fill(
-            t.funnelDown ??
-              'Tora: the public address {url} does not answer, and resetting it did not help. The app runs on the home server: check its network (tailscale status).',
-            { url: detail.url },
-          )
-        : fill(t.funnelBack ?? 'Tora: the public address {url} answers again.', {
-            url: detail.url,
-          });
     sent += await sendToUser(
       db,
       admin.id,
-      lines('admin', null, [{ text, role: event === 'down' ? 'bad' : 'info' }]),
+      lines('admin', null, [
+        {
+          text: `Tora: ${title}${text ? `. ${text}` : ''}`,
+          role: level === 'failed' ? 'bad' : 'info',
+        },
+      ]),
       ctx,
     );
   }
@@ -703,7 +702,7 @@ export async function checkMissedRuns(
 export const MORNING_CHECK_HOUR = 8;
 
 /**
- * The morning check on a long-lived server (the home server; a hosted app has its cron job):
+ * The morning check on a long-lived server (a self-hosted app; a hosted one has its cron job):
  * once a day from 08:00 app time, the "nothing ran" checks and the daily summaries. True when it
  * ran now.
  */

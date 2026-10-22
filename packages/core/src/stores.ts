@@ -3,17 +3,17 @@
 
 /** A physical store, as a store directory plug-in or the admin describes it. */
 export interface StoreEntry {
-  /** The chain's key ("yodobashi"); posts of a chain's board are matched to its stores. */
+  /** The chain's key ("megastore"); posts of a chain's board are matched to its stores. */
   chain: string;
-  /** The chain as people read it ("ヨドバシカメラ"). */
+  /** The chain as people read it ("メガストア"). */
   chainLabel?: string | null;
   name: string;
   /**
-   * A short label in English for people reading notices in English ("Yodobashi Ikebukuro"; a
-   * place: "Ikebukuro"); without one, the chain and name as written.
+   * A short label in English for people reading notices in English ("Megastore Ekimae"; a
+   * place: "Ekimae"); without one, the chain and name as written.
    */
   labelEn?: string | null;
-  /** What posters write for it: codes, short names ("梅田", "AKIBA"). */
+  /** What posters write for it: codes, short names ("中央", "KITA"). */
   codes: string[];
   /** Prefecture or region, for picking stores by hand. */
   region?: string | null;
@@ -94,7 +94,7 @@ const norm = (s: string) =>
     .replace(/[\uFE0E\uFE0F]/g, '');
 const ascii = /^[\x20-\x7e]+$/;
 
-/** Whether a code is in a post: Latin codes as whole words ("AKB" not in "AKBX"), others anywhere. */
+/** Whether a code is in a post: Latin codes as whole words ("KTA" not in "KTAX"), others anywhere. */
 function mentions(text: string, code: string): boolean {
   const c = norm(code).trim();
   if (!c) return false;
@@ -104,7 +104,7 @@ function mentions(text: string, code: string): boolean {
 }
 
 /**
- * The chain of places: an area's name or code with its location ("池袋", "⭐"), matched on every
+ * The chain of places: an area's name or code with its location ("駅前", "◆"), matched on every
  * board. Posters often name the area, not the store (one emoji per area, whatever the chain), and
  * some boards mix dozens of chains no store list covers.
  */
@@ -175,7 +175,7 @@ export interface CodeMeaning {
 
 /**
  * The codes of the stores and places, each with what it stands for: the ones that are not just
- * the name or part of it ("UMD" for "マルチメディア梅田", not "梅田"), most used first.
+ * the name or part of it ("MID" for "メガストア中央", not "中央"), most used first.
  */
 export function codeIndex<T extends Pick<StoreEntry, 'name' | 'codes'>>(
   stores: T[],

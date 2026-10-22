@@ -36,7 +36,7 @@ import {
 
 export interface StoreView {
   id: string;
-  /** The chain's key ("yodobashi", "place"). */
+  /** The chain's key ("megastore", "place"). */
   chainKey: string;
   /** The chain as people read it. */
   chain: string;

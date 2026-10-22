@@ -220,7 +220,7 @@ export interface Push {
   gap?: boolean | null;
   /** The feed (re)started: a new tab or browser session, or a new version (told "connected"). */
   hello?: boolean | null;
-  /** The board's chain ("yodobashi"), when the whole push is one chain's. */
+  /** The board's chain ("megastore"), when the whole push is one chain's. */
   chain?: string | null;
   /**
    * The feed's own product codes (a board's list of what its codes stand for), named in notices
@@ -721,7 +721,7 @@ let prunedAt = 0;
 
 /**
  * The store as people read it in a notice: its English label for people reading another language
- * than Japanese ("Yodobashi Ikebukuro"), else the chain and name as written; a place: "池袋 area".
+ * than Japanese ("Megastore Ekimae"), else the chain and name as written; a place: "駅前 area".
  */
 function storeLabel(store: Store, t: AlertTexts, locale: string): string {
   const en = locale !== 'ja' ? store.labelEn : null;

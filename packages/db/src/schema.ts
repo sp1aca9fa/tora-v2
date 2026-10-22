@@ -1107,10 +1107,10 @@ export const stores = sqliteTable(
     source: text('source').notNull(),
     sourceKey: text('source_key').notNull(),
     chain: text('chain').notNull(),
-    /** The chain as people read it ("ヨドバシカメラ"). */
+    /** The chain as people read it ("メガストア"). */
     chainLabel: text('chain_label'),
     name: text('name').notNull(),
-    /** A short label in English for notices ("Yodobashi Ikebukuro"; a place: "Ikebukuro"). */
+    /** A short label in English for notices ("Megastore Ekimae"; a place: "Ekimae"). */
     labelEn: text('label_en'),
     /** What posters write for it, from the plug-in. */
     codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),

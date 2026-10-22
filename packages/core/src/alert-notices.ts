@@ -80,8 +80,6 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'dbBudget',
     'selfCheck',
     'updateFailed',
-    'funnelDown',
-    'funnelBack',
     'logHint',
   ],
   test: ['test', 'connected'],
@@ -258,7 +256,7 @@ export function plainText(n: Notice, style?: NoticeStyle): string {
 // ---- Builders: each kind's notice from its data and the person's texts ----
 
 export interface StorePostData {
-  /** The store as the person reads it ("Yodobashi Ikebukuro"). */
+  /** The store as the person reads it ("Megastore Ekimae"). */
   store: string;
   products: string[];
   text: string;
@@ -387,15 +385,15 @@ export function noticeExamples(
       t,
       [
         {
-          store: 'Yodobashi Ueno',
+          store: 'Megastore Minato',
           products: ['9 card sets'],
-          text: '⬇の 9種🐜',
+          text: 'X1 9種●',
           when: '10-21 18:00',
           url: 'https://board.example/#1',
           comment: false,
         },
         {
-          store: 'Yodobashi Ueno',
+          store: 'Megastore Minato',
           products: ['9 card sets'],
           text: 'まだ並んでる 40人くらい',
           when: '10-21 18:12',
@@ -410,7 +408,7 @@ export function noticeExamples(
       [
         {
           author: 'みかん箱',
-          text: '🦄 カードセット開始',
+          text: '▲ カードセット開始',
           when: '10-21 18:30',
           url: 'https://board.example/#3',
         },
@@ -423,14 +421,14 @@ export function noticeExamples(
       [
         {
           text: fillText(t.feedConnected ?? '', {
-            source: 'gamenv',
-            boards: 'yodobashi, biccamera',
+            source: 'myboard',
+            boards: 'megastore, arcade',
           }),
           role: 'info',
         },
         {
           text: fillText(t.feedSilent ?? '', {
-            source: 'gamenv',
+            source: 'myboard',
             since: '10-21 14:02',
             minutes: 12,
           }),

@@ -18,7 +18,7 @@ Each person picks their channels, switches each kind on or off and chooses the l
 messages in **Settings > Alerts**. A failure at night arrives at night; Telegram and Discord can
 mute a chat.
 
-The morning check runs from 08:00 (app time): on the home server inside the app itself (every
+The morning check runs from 08:00 (app time): on a self-hosted server inside the app itself (every
 2 minutes it checks whether today's ran), on a hosted app from its cron job (`/api/cron/daily`).
 
 ### How messages look (Settings > Alerts > Message style)

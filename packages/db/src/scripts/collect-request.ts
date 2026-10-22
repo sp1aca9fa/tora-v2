@@ -1,6 +1,6 @@
 // `pnpm collect:request`: takes a "collect now" left in the app (requirements S21). Exit 0 when
 // one was waiting (the caller then runs a collect), 3 when none. Called at each check of
-// scripts/collect-cron.sh (hourly on the home server).
+// scripts/collect-cron.sh (hourly on a server).
 import { createDb } from '../client';
 import { takeCollectRequest } from '../collect-request';
 import { recordCheck } from '../schedule';

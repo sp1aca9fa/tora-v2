@@ -19,11 +19,11 @@ export const stores: StoreDirectory[] = [
     label: 'My stores',
     stores: () => [
       {
-        key: 'yodobashi-umeda', // stable within the list
-        chain: 'yodobashi', // posts from a chain's board are matched to its stores only
-        chainLabel: 'ヨドバシカメラ',
-        name: 'マルチメディア梅田',
-        codes: ['梅田', 'UMD'], // what posters write for it
+        key: 'megastore-chuo', // stable within the list
+        chain: 'megastore', // posts from a chain's board are matched to its stores only
+        chainLabel: 'メガストア',
+        name: 'メガストア中央',
+        codes: ['中央', 'MID'], // what posters write for it
         region: '大阪府',
         lat: 34.7041,
         lon: 135.4963,
@@ -33,8 +33,8 @@ export const stores: StoreDirectory[] = [
 ];
 ```
 
-A store can carry `labelEn`, a short label in English ("Yodobashi Ikebukuro"; a place:
-"Ikebukuro"), used in notices and on the Stores page for people reading another language than
+A store can carry `labelEn`, a short label in English ("Megastore Ekimae"; a place:
+"Ekimae"), used in notices and on the Stores page for people reading another language than
 Japanese; without one, the chain and name as written.
 
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
@@ -42,7 +42,7 @@ A list can also carry a `glossary`: codes posters use that are no store or place
 Stores page shows every code with what it stands for, and admins can add other codes there,
 products ticked as such.
 
-Product codes are named in notices next to the store ("ヨドバシカメラ 上野 · ストームエメラルダ"),
+Product codes are named in notices next to the store ("メガストア 港町 · スノーセット"),
 then the post as written. An admin's codes and emoji codes count anywhere in a post (Latin ones as
 whole words), as do codes of three characters or more; a feed's shorter ones ("X", "b") only in a
 run of the post (between spaces and punctuation) made entirely of codes, numbers and common words,
@@ -54,8 +54,8 @@ be picked by hand. Admins can add codes the list does not know on the Stores pag
 
 How a post is matched: within the post's chain, a store whose name or one of its codes appears in
 the text (a chain's codes count on its own board only); when none matches, or the board mixes
-chains, a place (chain `place`: an area's name or code with its location) the text names. Codes in Latin letters must stand as whole words ("AKB"
-does not match "AKBX"); other codes match anywhere. When one code contains another that also
+chains, a place (chain `place`: an area's name or code with its location) the text names. Codes in Latin letters must stand as whole words ("KTA"
+does not match "KTAX"); other codes match anywhere. When one code contains another that also
 matched ("新宿西口", "新宿"), the longer one wins.
 
 ## Feeds: pushing posts
@@ -71,12 +71,12 @@ Content-Type: application/json
 
 {
   "source": "myboard",
-  "chain": "yodobashi",
+  "chain": "megastore",
   "posts": [
     {
       "id": "12345",
-      "text": "UMD 30th 店頭販売開始",
-      "author": "梅田の人",
+      "text": "MID 30th 店頭販売開始",
+      "author": "中央の人",
       "url": "https://example.com/board#12345",
       "postedAt": "2026-10-19T12:34:00+09:00"
     }
@@ -100,7 +100,7 @@ Content-Type: application/json
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
 - `products` (optional): the board's own list of product codes (`[{ "code": "X1", "meaning":
-"ストームエメラルダ" }]`), saved when it changes; send it when it changes (and with `hello`).
+"スノーセット" }]`), saved when it changes; send it when it changes (and with `hello`).
 - `replyTo` (per post): the id of the post it answers, for replies (comments) such as "still a
   line" or "sold out". A reply naming no store takes the stores of the post it answers; replies
   are sent to the people whose area holds the store at once, marked as a comment to their post,

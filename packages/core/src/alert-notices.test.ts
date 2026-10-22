@@ -16,14 +16,14 @@ const m: Notice = {
   urlText: 'post',
   cards: [
     {
-      title: 'Yodobashi Ueno',
+      title: 'Megastore Minato',
       sub: 'Snow *set*',
       quote: 'a *b*\nline 2',
       when: '10-21 18:00',
       url: 'https://x.test/a_b',
       role: 'post',
     },
-    { title: 'Comment to Yodobashi Ueno', quote: '<sold out>', role: 'comment' },
+    { title: 'Comment to Megastore Minato', quote: '<sold out>', role: 'comment' },
   ],
 };
 
@@ -34,13 +34,13 @@ describe('notices', () => {
       content: '-# Tora: cards · <https://tora.test/stores>',
       embeds: [
         {
-          title: 'Yodobashi Ueno',
+          title: 'Megastore Minato',
           url: 'https://x.test/a_b',
           description: '*Snow \\*set\\**\n> a \\*b\\*\n> line 2',
           footer: { text: '10-21 18:00' },
           color: 0xf59e0b,
         },
-        { title: 'Comment to Yodobashi Ueno', description: '> \\<sold out\\>', color: 0x3b82f6 },
+        { title: 'Comment to Megastore Minato', description: '> \\<sold out\\>', color: 0x3b82f6 },
       ],
       allowed_mentions: { parse: [] },
     });
@@ -57,7 +57,7 @@ describe('notices', () => {
     });
     expect(styled!.content).toBe('<https://tora.test/stores>');
     expect((styled!.embeds as Record<string, unknown>[])[0]).toEqual({
-      title: 'Yodobashi Ueno',
+      title: 'Megastore Minato',
       url: 'https://x.test/a_b',
       description: '*Snow \\*set\\**',
       color: 16,
@@ -71,21 +71,21 @@ describe('notices', () => {
     expect(telegramHtml(m)).toBe(
       [
         '<i>Tora: cards</i>',
-        '<b>Yodobashi Ueno</b>\n<i>Snow *set*</i>\n<blockquote>a *b*\nline 2</blockquote>\n<code>10-21 18:00</code> · <a href="https://x.test/a_b">post</a>',
-        '<b>Comment to Yodobashi Ueno</b>\n<blockquote>&lt;sold out&gt;</blockquote>',
+        '<b>Megastore Minato</b>\n<i>Snow *set*</i>\n<blockquote>a *b*\nline 2</blockquote>\n<code>10-21 18:00</code> · <a href="https://x.test/a_b">post</a>',
+        '<b>Comment to Megastore Minato</b>\n<blockquote>&lt;sold out&gt;</blockquote>',
         '<a href="https://tora.test/stores">Stores</a>',
       ].join('\n\n'),
     );
-    expect(plainText(m)).toContain('Comment to Yodobashi Ueno\n<sold out>');
+    expect(plainText(m)).toContain('Comment to Megastore Minato\n<sold out>');
   });
 
   it("builds each kind from the person's texts, examples included", () => {
     const n = storeNotice(
       { storeComment: 'Reply at {store}', storePosts: 'On sale' },
-      [{ store: 'Ueno', products: [], text: 'x', when: '10-21 18:00', url: null, comment: true }],
+      [{ store: 'Minato', products: [], text: 'x', when: '10-21 18:00', url: null, comment: true }],
       null,
     );
-    expect(n.cards[0]).toMatchObject({ title: 'Reply at Ueno', role: 'comment' });
+    expect(n.cards[0]).toMatchObject({ title: 'Reply at Minato', role: 'comment' });
     const examples = noticeExamples({ test: 'Hello' }, (n) => `¥${n}`);
     expect(Object.keys(examples)).toEqual([
       'store',

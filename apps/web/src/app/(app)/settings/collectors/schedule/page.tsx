@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * When things run on the home server: its checks, the next daily collect and each collector's
- * likely start (from last night's run), what else the collect does, and the other timers.
+ * When things run on the server: its checks, the next daily collect and each collector's likely
+ * start (from last night's run), what else the collect does, and the app's own checks.
  */
 export default async function SchedulePage() {
   const { db } = await authed();
@@ -143,9 +143,6 @@ export default async function SchedulePage() {
                 {t('other.morning', { hour: `${String(MORNING_CHECK_HOUR).padStart(2, '0')}:00` })}
               </li>
               <li>{t('other.feed')}</li>
-              <li>{t('other.update')}</li>
-              <li>{t('other.funnel')}</li>
-              <li>{t('other.backupCopy')}</li>
             </ul>
           </section>
         </CardContent>

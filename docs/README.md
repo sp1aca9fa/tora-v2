@@ -13,7 +13,6 @@ this order the first time.
 | [Running collectors](running.md)      | `pnpm collect`, the daily schedule, many collectors, logs, imports, the data review  |
 | [Languages](languages.md)             | The app's two languages and adding a new one                                         |
 | [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
-| [A home server](home-server.md)       | All of Tora on one always-on box at home, reached through a Tailscale Funnel address |
 | [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
 | [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
 | [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |

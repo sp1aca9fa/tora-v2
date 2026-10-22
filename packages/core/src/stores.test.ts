@@ -11,25 +11,25 @@ import {
   withinHours,
 } from './stores';
 
-const umeda = {
+const chuo = {
   id: 'u',
-  chain: 'yodobashi',
-  name: 'マルチメディア梅田',
-  codes: ['梅田', 'UMD'],
+  chain: 'megastore',
+  name: 'メガストア中央',
+  codes: ['中央', 'MID'],
   lat: 34.704,
   lon: 135.496,
 };
-const akiba = {
+const kita = {
   id: 'a',
-  chain: 'yodobashi',
-  name: 'マルチメディアAkiba',
-  codes: ['AKB', 'アキバ'],
+  chain: 'megastore',
+  name: 'メガストアKita',
+  codes: ['KTA', 'キタ'],
   lat: 35.699,
   lon: 139.774,
 };
 const shinjuku = {
   id: 's',
-  chain: 'yodobashi',
+  chain: 'megastore',
   name: '新宿西口本店',
   codes: ['新宿', '新宿西口'],
   lat: 35.692,
@@ -37,18 +37,18 @@ const shinjuku = {
 };
 const bicShinjuku = {
   id: 'b',
-  chain: 'biccamera',
+  chain: 'arcade',
   name: '新宿東口店',
   codes: ['新宿東口'],
   lat: 35.692,
   lon: 139.701,
 };
-const all = [umeda, akiba, shinjuku, bicShinjuku];
+const all = [chuo, kita, shinjuku, bicShinjuku];
 
 describe('store notices: areas', () => {
   it('measures distances and keeps points rough', () => {
-    expect(distanceKm(akiba, shinjuku)).toBeGreaterThan(6);
-    expect(distanceKm(akiba, shinjuku)).toBeLessThan(8);
+    expect(distanceKm(kita, shinjuku)).toBeGreaterThan(6);
+    expect(distanceKm(kita, shinjuku)).toBeLessThan(8);
     expect(roundPoint({ lat: 35.6987654, lon: 139.7734567 })).toEqual({
       lat: 35.699,
       lon: 139.773,
@@ -86,24 +86,24 @@ describe('store notices: areas', () => {
 
 describe('store notices: posts', () => {
   it("finds the chain's stores a post names, by code or name", () => {
-    expect(storesInPost('UMD 30th 店頭販売開始!', all, 'yodobashi')).toEqual([umeda]);
-    expect(storesInPost('ｕｍｄ 入荷', all, 'yodobashi')).toEqual([umeda]);
+    expect(storesInPost('MID 30th 店頭販売開始!', all, 'megastore')).toEqual([chuo]);
+    expect(storesInPost('ｍｉｄ 入荷', all, 'megastore')).toEqual([chuo]);
     // A Latin code only as a whole word.
-    expect(storesInPost('AKBX は関係なし', all, 'yodobashi')).toEqual([]);
-    expect(storesInPost('アキバと梅田で販売中', all, 'yodobashi')).toEqual([umeda, akiba]);
+    expect(storesInPost('KTAX は関係なし', all, 'megastore')).toEqual([]);
+    expect(storesInPost('キタと中央で販売中', all, 'megastore')).toEqual([chuo, kita]);
   });
 
   it('matches emoji codes with or without their variation mark', () => {
-    const sunny = { chain: 'yodobashi', name: 'テスト店', codes: ['\u2600\uFE0F'] };
-    expect(storesInPost('\u2600 開始', [sunny], 'yodobashi')).toEqual([sunny]);
+    const sunny = { chain: 'megastore', name: 'テスト店', codes: ['\u2600\uFE0F'] };
+    expect(storesInPost('\u2600 開始', [sunny], 'megastore')).toEqual([sunny]);
     expect(
-      storesInPost('\u2600\uFE0F 開始', [{ ...sunny, codes: ['\u2600'] }], 'yodobashi'),
+      storesInPost('\u2600\uFE0F 開始', [{ ...sunny, codes: ['\u2600'] }], 'megastore'),
     ).toHaveLength(1);
   });
 
   it('prefers the longer code, and keeps to the board chain', () => {
-    expect(storesInPost('新宿西口 整理券配布', all, 'yodobashi')).toEqual([shinjuku]);
-    expect(storesInPost('新宿東口 販売', all, 'biccamera')).toEqual([bicShinjuku]);
+    expect(storesInPost('新宿西口 整理券配布', all, 'megastore')).toEqual([shinjuku]);
+    expect(storesInPost('新宿東口 販売', all, 'arcade')).toEqual([bicShinjuku]);
     // A board mixing chains: places only, never a chain's codes.
     expect(storesInPost('新宿東口 販売', all)).toEqual([]);
   });
@@ -117,21 +117,21 @@ it('tells hours apart, also past midnight', () => {
 });
 
 it("names a place when no store of the board's chain matched", () => {
-  const ikebukuro = { chain: PLACE, name: '池袋', codes: ['⭐'], lat: 35.73, lon: 139.71 };
+  const ekimae = { chain: PLACE, name: '駅前', codes: ['◆'], lat: 35.73, lon: 139.71 };
   const kiba = { chain: PLACE, name: '木場', codes: [], lat: 35.67, lon: 139.81 };
-  const list = [...all, ikebukuro, kiba];
+  const list = [...all, ekimae, kiba];
   expect(storesInPost('イトヨ木場 カードセット', list)).toEqual([kiba]);
-  // On a board mixing chains, ⭐ is the area, not a chain's store.
-  expect(storesInPost('⭐🎈 販売', [...list, { ...umeda, codes: ['⭐'] }])).toEqual([ikebukuro]);
-  expect(storesInPost('⭐🎈 30th', list, 'biccamera')).toEqual([ikebukuro]);
+  // On a board mixing chains, ◆ is the area, not a chain's store.
+  expect(storesInPost('◆■ 販売', [...list, { ...chuo, codes: ['◆'] }])).toEqual([ekimae]);
+  expect(storesInPost('◆■ 30th', list, 'arcade')).toEqual([ekimae]);
   // The board's own store wins over the place.
-  expect(storesInPost('アキバ 30th', list, 'yodobashi')).toEqual([akiba]);
+  expect(storesInPost('キタ 30th', list, 'megastore')).toEqual([kita]);
 });
 
 it('lists the codes that are more than the name, with what they stand for', () => {
   const index = codeIndex(all);
-  expect(index.map((e) => e.code)).toEqual(['AKB', 'UMD', 'アキバ']);
-  expect(index.find((e) => e.code === 'UMD')!.stores).toEqual([umeda]);
+  expect(index.map((e) => e.code)).toEqual(['KTA', 'MID', 'キタ']);
+  expect(index.find((e) => e.code === 'MID')!.stores).toEqual([chuo]);
 });
 
 describe('store notices: products in a post', () => {
@@ -141,14 +141,14 @@ describe('store notices: products in a post', () => {
     { code: 'B', meaning: 'Battle', product: true },
     { code: '9種', meaning: '9 card sets', product: true },
     { code: 'XYZ', meaning: 'Expansion XYZ', product: true },
-    { code: '🐞', meaning: 'there is some' },
+    { code: '○', meaning: 'there is some' },
   ];
   const names = (text: string) =>
-    productsInPost(text, products, ['🐝', '上野']).map((p) => p.meaning);
+    productsInPost(text, products, ['◇', '港町']).map((p) => p.meaning);
 
   it('reads short codes in runs of codes, numbers and common words', () => {
     expect(names('雪(1) 16:00-')).toEqual(['Snow set']);
-    expect(names('上野 9種🐝')).toEqual(['9 card sets']);
+    expect(names('港町 9種◇')).toEqual(['9 card sets']);
     expect(names('雪あり b(5P)')).toEqual(['Snow set', 'Black']);
     // Case matters: b and B are different products.
     expect(names('B 10P')).toEqual(['Battle']);
@@ -159,19 +159,19 @@ describe('store notices: products in a post', () => {
     expect(names('今日はXYZがあった')).toEqual(['Expansion XYZ']);
     expect(names('XYZW')).toEqual([]);
     // Codes that are no product (emoji states) are never named.
-    expect(names('🐞')).toEqual([]);
+    expect(names('○')).toEqual([]);
     expect(names('雪 雪')).toEqual(['Snow set']);
   });
 
   it("counts an admin's codes and emoji codes anywhere, an admin's first", () => {
     const list = [
       ...products,
-      { code: '🌀', meaning: 'Swirl box', product: true },
+      { code: '△', meaning: 'Swirl box', product: true },
       { code: '種', meaning: 'feed meaning', product: true },
       { code: '種', meaning: 'Seeds', product: true, byHand: true },
     ];
     const read = (text: string) => productsInPost(text, list).map((p) => p.meaning);
-    expect(read('上野🌀継続中')).toEqual(['Swirl box']);
+    expect(read('港町△継続中')).toEqual(['Swirl box']);
     expect(read('ゼルビア種あり')).toEqual(['Seeds']);
   });
 });
