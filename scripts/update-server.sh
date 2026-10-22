@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Updates a Tora home server (docs/home-server.md) to the latest pushed code: both repos, packages,
-# database migrations, the plug-ins' data, a new build, and a restart of the app, then checks the
-# app answers. When a step fails, it goes back to the version before (migrations already run stay:
+# Updates a Tora home server (docs/home-server.md) to the latest pushed code: both repos, the Node
+# version the repo names (.nvmrc), packages, database migrations, the plug-ins' data, a new build,
+# and a restart of the app, then checks the app answers. When a step fails, it goes back to the version before (migrations already run stay:
 # they only add) and keeps that running.
 #
 #   scripts/update-server.sh          now, by hand: `ssh -t minipc code/tora-v2/scripts/update-server.sh`
@@ -16,6 +16,30 @@
 set -euo pipefail
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tora"
+# The services run Node through this link (their PATH: $NODE_LINK/bin), so a new Node needs no
+# change to them (docs/home-server.md).
+NODE_LINK="${XDG_DATA_HOME:-$HOME/.local/share}/tora/node"
+
+# The Node version the repo names (.nvmrc): installed when missing (nvm), made the default, and
+# the services' link pointed at it. A Node security release is then just a push.
+ensure_node() {
+  [ -f .nvmrc ] && command -v nvm >/dev/null || return 0
+  local want dir
+  want="$(tr -d ' \n' <.nvmrc)"
+  if [ "$(nvm version "$want")" = "N/A" ]; then
+    echo "installing Node $want"
+    nvm install "$want" >/dev/null || return 1
+  fi
+  nvm alias default "$want" >/dev/null
+  nvm use "$want" >/dev/null || return 1
+  corepack enable || return 1
+  dir="$(dirname "$(dirname "$(nvm which "$want")")")"
+  if [ "$(readlink "$NODE_LINK" 2>/dev/null)" != "$dir" ]; then
+    mkdir -p "$(dirname "$NODE_LINK")"
+    ln -sfn "$dir" "$NODE_LINK"
+    echo "Node $want now runs the services"
+  fi
+}
 
 restart_app() {
   if [ "$AUTO" = 1 ]; then sudo -n systemctl restart tora-app; else sudo systemctl restart tora-app; fi
@@ -69,6 +93,7 @@ main() {
   }
   if run pull git pull --ff-only &&
     run pull git submodule update --init &&
+    run node ensure_node &&
     run install pnpm install --frozen-lockfile &&
     run migrate pnpm db:migrate &&
     run plugins pnpm plugins &&
@@ -91,7 +116,7 @@ main() {
   git rev-parse '@{u}' >"$failed_file"
   git reset -q --hard "$before"
   git submodule update --init
-  if pnpm install --frozen-lockfile && pnpm build && restart_app && app_answers; then
+  if ensure_node && pnpm install --frozen-lockfile && pnpm build && restart_app && app_answers; then
     echo "Back on $before, running."
   else
     echo "Going back failed too: the app may be down. journalctl -u tora-app -n 50 --no-pager"

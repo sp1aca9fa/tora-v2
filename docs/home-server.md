@@ -30,7 +30,10 @@ The steps below are for Ubuntu Server 24.04; each is run on the server unless sa
 
 ## 2. Node, the code, the data
 
-- Node 24 with nvm, then `corepack enable` (pnpm comes from `packageManager`).
+- Node with nvm, the version the repo names in `.nvmrc` (`nvm install`, then `corepack enable`;
+  pnpm comes from `packageManager`), and a link the services run Node through:
+  `ln -sfn "$(dirname "$(dirname "$(nvm which default)")")" ~/.local/share/tora/node`. Updates
+  install a new `.nvmrc` version themselves and move the link (section 7).
 - The code: give the server read-only deploy keys on GitHub (one per repo, write access off) with
   an ssh host alias each, clone, point the `collectors` submodule at its alias, `pnpm install`.
 - The data from the previous machine: the database file (`~/.local/share/tora/local/tora.db`),
@@ -42,7 +45,8 @@ The steps below are for Ubuntu Server 24.04; each is run on the server unless sa
 ## 3. Services
 
 `/etc/systemd/system/tora-app.service` (the app, on the box only; the Funnel brings the outside
-in). `$NODE_BIN` is the folder of `command -v node`:
+in). `$NODE_BIN` is `/home/<user>/.local/share/tora/node/bin` (the link above, so a new Node
+needs no change here):
 
 ```ini
 [Unit]
@@ -155,6 +159,11 @@ sudo chmod 440 /etc/sudoers.d/tora-update && sudo visudo -c
 `ExecStart=/home/<user>/code/tora-v2/scripts/update-server.sh --auto`) and `tora-update.timer`
 (`OnCalendar=*:0/5`), enabled like the others. By hand, any time:
 `ssh -t <server> code/tora-v2/scripts/update-server.sh`.
+
+Node: the repo names its version in `.nvmrc` (e.g. after a Node security release). An update
+that brings a new one installs it with nvm, makes it the default and points
+`~/.local/share/tora/node` at it before installing packages; going back to the version before
+points it back.
 
 Settings > Collectors > Schedule shows when things run: the server's hourly check (each one is
 recorded by `pnpm collect:request`), the next daily collect, each collector's likely start (last
