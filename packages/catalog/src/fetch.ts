@@ -5,6 +5,7 @@
 // Sources (set names, codes, types and release dates are facts; nothing else is copied):
 //   Pokemon (JP)   Official product list https://www.pokemon-card.com/products/
 //                  (+ set codes from TCGdex when name and date match)
+//   Pokemon (EN)   TCGdex https://tcgdex.dev (international sets: names, official codes, dates)
 //   One Piece (JP) Official product list https://www.onepiece-cardgame.com/products/
 //   Yu-Gi-Oh! OCG  Yugipedia (SMW API)   https://yugipedia.com/api.php
 //   Magic          Scryfall API          https://api.scryfall.com/sets
@@ -89,7 +90,47 @@ async function pokemon(): Promise<CatalogSetEntry[]> {
       }
     }
   }
-  return backfillPokemonCodes(out);
+  return [...(await backfillPokemonCodes(out)), ...(await pokemonInternational())];
+}
+
+/**
+ * The international (English) sets from TCGdex: printed code (EVS, MEW), name and release date.
+ * TCG Pocket's digital sets are left out; promos, kits and gift sets are special sets.
+ */
+async function pokemonInternational(): Promise<CatalogSetEntry[]> {
+  type Detail = {
+    id: string;
+    name: string;
+    releaseDate?: string;
+    serie?: { id: string };
+    abbreviation?: { official?: string };
+    tcgOnline?: string;
+  };
+  const list = await getJson<{ id: string }[]>('https://api.tcgdex.net/v2/en/sets');
+  const out: CatalogSetEntry[] = [];
+  for (const s of list) {
+    await sleep(150);
+    const d = await getJson<Detail>(
+      `https://api.tcgdex.net/v2/en/sets/${encodeURIComponent(s.id)}`,
+    ).catch(() => null);
+    if (!d || d.serie?.id === 'tcgp') continue;
+    const name = clean(d.name);
+    const special = /promo|mcdonald|trainer kit|celebration|collection|futsal|trick or trade/i.test(
+      name,
+    );
+    out.push({
+      franchise: 'pokemon',
+      region: 'en',
+      code: (d.abbreviation?.official ?? d.tcgOnline)?.toUpperCase() ?? null,
+      name,
+      nameAlias: null,
+      setType: special ? 'special' : 'expansion',
+      releaseDate: d.releaseDate ?? null,
+      source: 'tcgdex',
+      sourceKey: `en:${d.id}`,
+    });
+  }
+  return out;
 }
 
 /**
