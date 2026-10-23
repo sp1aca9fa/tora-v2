@@ -218,7 +218,8 @@
       "import_review": "{count, plural, one {# imported lot} other {# imported lots}} to review",
       "failed_link": "{count, plural, one {# purchase link} other {# purchase links}} could not be imported",
       "data_review": "{count, plural, one {# data review suggestion} other {# data review suggestions}} to decide",
-      "source_quality": "{count, plural, one {# price source} other {# price sources}} lowered to comparison"
+      "source_quality": "{count, plural, one {# price source} other {# price sources}} lowered to comparison",
+      "admin_setup": "{count, plural, one {# setup step} other {# setup steps}} left"
     },
     "all": "All",
     "openReview": "Open the import review (e.g. to merge two lots)",
@@ -232,7 +233,15 @@
       "explain": "Its sales stray too far from the reference source's on the same items and conditions, so values no longer use them; they stay visible as a comparison. It is checked again on each collect. An admin can change the source's role in Settings.",
       "dismiss": "Keep it this way"
     },
-    "openSettings": "Open price sources in Settings"
+    "openSettings": "Open price sources in Settings",
+    "setup": {
+      "title": "Finish the setup",
+      "currency": "Base currency: still the default ({currency})",
+      "timeZone": "Time zone: still the default ({timeZone})",
+      "explain": "A new install starts in yen and Tokyo time. Choose your own in Settings before adding anything (later changes rewrite stored amounts and times), or keep these.",
+      "keep": "Keep {currency} and {timeZone}",
+      "open": "Open Settings"
+    }
   },
   "lotActions": {
     "partialHint": "You have {total}. Choosing fewer moves them into a separate entry first.",
@@ -1006,7 +1015,8 @@
       "import_review": "Imported lots to review",
       "failed_link": "Purchase links that failed",
       "data_review": "Data review suggestions",
-      "source_quality": "Price source that disagrees with the reference (admins)"
+      "source_quality": "Price source that disagrees with the reference (admins)",
+      "admin_setup": "New install still on the defaults (admins)"
     },
     "default": "Default: {level}",
     "reset": "Back to defaults",
@@ -1173,7 +1183,7 @@
     "useDevice": "Use it",
     "confirm": "Change the time zone from {from} to {to}? Every stored time is rewritten as the same moment in the new zone, then values and the daily history are rebuilt (a minute or two). Do it while no collect is running.",
     "changeInfo": "Changing it later is rare (e.g. after moving abroad): stored times keep their moment, and days near midnight may move to the day before or after.",
-    "setupInfo": "Nothing is stored yet: changing it now rewrites nothing."
+    "setupInfo": "No lots, prices or history yet: changing it now only rewrites the app's own records (accounts, sets, settings)."
   },
   "conditionLists": {
     "card_grades": "Card grades (raw S-D, slabs)",
@@ -1669,7 +1679,8 @@
       "collectRequested": "Collect requested",
       "serverUpdate": "Server updated",
       "serverUpdateFailed": "Server update failed (went back)",
-      "serverEvent": "Server"
+      "serverEvent": "Server",
+      "setupKept": "Setup defaults kept"
     },
     "role": {
       "admin": "admin",

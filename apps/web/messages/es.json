@@ -218,7 +218,8 @@
       "import_review": "{count, plural, one {# lote importado} other {# lotes importados}} por revisar",
       "failed_link": "{count, plural, one {# enlace de compra} other {# enlaces de compra}} no se pudieron importar",
       "data_review": "{count, plural, one {# sugerencia de revisión de datos} other {# sugerencias de revisión de datos}} por decidir",
-      "source_quality": "{count, plural, one {# fuente de precios bajada} other {# fuentes de precios bajadas}} a comparación"
+      "source_quality": "{count, plural, one {# fuente de precios bajada} other {# fuentes de precios bajadas}} a comparación",
+      "admin_setup": "{count, plural, one {Queda # paso de configuración} other {Quedan # pasos de configuración}}"
     },
     "all": "Todo",
     "openReview": "Abrir la revisión de importación (p. ej. para fusionar dos lotes)",
@@ -232,7 +233,15 @@
       "explain": "Sus ventas se alejan demasiado de las de la fuente de referencia en los mismos artículos y estados, así que los valores ya no las usan; siguen visibles para comparar. Se vuelve a comprobar en cada recogida. Un administrador puede cambiar el papel de la fuente en Ajustes.",
       "dismiss": "Dejarlo así"
     },
-    "openSettings": "Abrir las fuentes de precios en Ajustes"
+    "openSettings": "Abrir las fuentes de precios en Ajustes",
+    "setup": {
+      "title": "Termina la configuración",
+      "currency": "Moneda base: aún la de por defecto ({currency})",
+      "timeZone": "Zona horaria: aún la de por defecto ({timeZone})",
+      "explain": "Una instalación nueva empieza en yenes y hora de Tokio. Elige las tuyas en Ajustes antes de añadir nada (cambiarlas después reescribe importes y horas guardados), o quédate con estas.",
+      "keep": "Quedarse con {currency} y {timeZone}",
+      "open": "Abrir Ajustes"
+    }
   },
   "lotActions": {
     "partialHint": "Tienes {total}. Si eliges menos, primero se pasan a una entrada aparte.",
@@ -1006,7 +1015,8 @@
       "import_review": "Lotes importados por revisar",
       "failed_link": "Enlaces de compra que fallaron",
       "data_review": "Sugerencias de la revisión de datos",
-      "source_quality": "Fuente de precios que no coincide con la referencia (administradores)"
+      "source_quality": "Fuente de precios que no coincide con la referencia (administradores)",
+      "admin_setup": "Instalación nueva con los valores por defecto (administradores)"
     },
     "default": "Por defecto: {level}",
     "reset": "Volver a los valores por defecto",
@@ -1173,7 +1183,7 @@
     "useDevice": "Usarla",
     "confirm": "¿Cambiar la zona horaria de {from} a {to}? Cada hora guardada se reescribe como el mismo momento en la nueva zona, y luego se reconstruyen los valores y el historial diario (un minuto o dos). Hazlo mientras no haya una recogida en curso.",
     "changeInfo": "Cambiarla después es raro (p. ej. tras mudarse al extranjero): las horas guardadas conservan su momento, y los días cerca de medianoche pueden pasar al día anterior o siguiente.",
-    "setupInfo": "Aún no hay nada guardado: cambiarla ahora no reescribe nada."
+    "setupInfo": "Aún no hay lotes, precios ni historial: cambiarla ahora solo reescribe los registros de la propia app (cuentas, sets, ajustes)."
   },
   "conditionLists": {
     "card_grades": "Grados de carta (sin gradear S-D, gradeadas)",
@@ -1669,7 +1679,8 @@
       "collectRequested": "Recogida solicitada",
       "serverUpdate": "Servidor actualizado",
       "serverUpdateFailed": "Fallo al actualizar el servidor (volvió atrás)",
-      "serverEvent": "Servidor"
+      "serverEvent": "Servidor",
+      "setupKept": "Valores iniciales confirmados"
     },
     "role": {
       "admin": "administrador",

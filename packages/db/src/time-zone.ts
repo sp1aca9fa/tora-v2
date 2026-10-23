@@ -5,7 +5,7 @@ import { type SQL, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
 import { refreshItemSales } from './item-sales';
-import { loadSourceRegistry, setTimeZoneSetting } from './registry';
+import { loadSourceRegistry, readSetting, setTimeZoneSetting } from './registry';
 
 /** JSON columns that may hold times (sale times, event payloads, a collector's progress). */
 const JSON_TIMES = [
@@ -61,7 +61,11 @@ function rewritten(column: string, periods: { until: number | null; offset: numb
 export async function changeTimeZone(db: Db, to: string, now = new Date()): Promise<number> {
   if (!isTimeZone(to)) throw new DomainError('invalid_time_zone');
   await loadSourceRegistry(db);
-  if (to === appTimeZone()) return 0;
+  if (to === appTimeZone()) {
+    // The default chosen as is: stored, so setup no longer asks (S10).
+    if ((await readSetting(db, 'timeZone')) === null) await setTimeZoneSetting(db, to);
+    return 0;
+  }
   const columns = await timeColumns(db);
   // The zone's offsets from the oldest stored time to a year ahead.
   let oldest = now.getTime();

@@ -8,7 +8,8 @@ import {
   identitySources,
   toLocalIso,
   conditionListOf,
-  IDENTITY_MIN_COST,
+  baseCurrency,
+  identityMinCostFor,
 } from '@tora/core';
 import {
   and,
@@ -1064,7 +1065,11 @@ export function identityFor(
   const cls = productClass(product);
   // Cards and sealed TCG always; other items (the item-condition list, the admin's lists) when not cheap.
   const always = ['card_grades', 'sealed'].includes(conditionListOf(cls));
-  if (!always && costBase <= (registry.markets?.identityMinCost ?? IDENTITY_MIN_COST)) return null;
+  if (
+    !always &&
+    costBase <= (registry.markets?.identityMinCost ?? identityMinCostFor(baseCurrency(registry)))
+  )
+    return null;
   const accepted = identitySources(registry, cls, market);
   return accepted.length ? { preferred: accepted[0]!, accepted } : null;
 }

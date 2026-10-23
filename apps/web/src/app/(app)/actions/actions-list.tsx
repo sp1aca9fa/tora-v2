@@ -37,6 +37,7 @@ import {
   dismissSourceQualityAction,
   setLotConditionAction,
   setLotGradeAction,
+  keepSetupDefaultsAction,
   setSourceWarningAction,
 } from './actions';
 import { useMoney } from '@/components/money-context';
@@ -46,7 +47,7 @@ export interface ActionCardView {
   key: string;
   type: NoticeType;
   level: NoticeLevel;
-  kind: 'source' | 'lot' | 'link' | 'suggestion' | 'quality';
+  kind: 'source' | 'lot' | 'link' | 'suggestion' | 'quality' | 'setup';
   title: string;
   /** Kind, set, number... */
   meta: string;
@@ -74,6 +75,8 @@ export interface ActionCardView {
   review?: ReviewItem;
   /** The item class a source quality notice is about. */
   qualityClass?: ProductClass;
+  /** The setup card's button: keep the defaults as they are. */
+  setupKeep?: string;
   /** A purchase link that failed. */
   linkId?: string;
   url?: string;
@@ -258,7 +261,9 @@ function ActionCard({
             ? t('actions.openImports')
             : c.kind === 'quality'
               ? t('actions.openSettings')
-              : t('actions.openDataReview');
+              : c.kind === 'setup'
+                ? t('actions.setup.open')
+                : t('actions.openDataReview');
 
   return (
     <li
@@ -302,7 +307,20 @@ function ActionCard({
               </Button>
             </div>
           )}
-          {c.kind !== 'link' && c.kind !== 'quality' && (
+          {c.kind === 'setup' && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('actions.setup.explain')}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => run(() => keepSetupDefaultsAction())}
+              >
+                {c.setupKeep}
+              </Button>
+            </div>
+          )}
+          {c.kind !== 'link' && c.kind !== 'quality' && c.kind !== 'setup' && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex gap-3 rounded-md border p-2">
                 <Thumb src={c.image} className="size-16" />

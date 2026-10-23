@@ -28,6 +28,8 @@ export const NOTICE_TYPES = [
   'data_review',
   /** A price source whose sales disagree with the reference: valued as comparison only (admins). */
   'source_quality',
+  /** A new install still on the defaults (yen, Tokyo): base currency or time zone not chosen (admins). */
+  'admin_setup',
 ] as const;
 export type NoticeType = (typeof NOTICE_TYPES)[number];
 
@@ -38,6 +40,7 @@ export const DEFAULT_NOTICE_LEVELS: Record<NoticeType, NoticeLevel> = {
   failed_link: 'yellow',
   data_review: 'yellow',
   source_quality: 'yellow',
+  admin_setup: 'orange',
   game_main_source: 'blue',
   game_condition: 'blue',
   second_source: 'blue',

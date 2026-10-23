@@ -2,13 +2,19 @@
 
 import {
   CONDITIONS,
+  appTimeZone,
+  baseCurrency,
   type CardGrade,
   type Condition,
   type ProductClass,
   toLocalIso,
 } from '@tora/core';
 import {
+  changeBaseCurrency,
   changeCondition,
+  changeTimeZone,
+  loadSourceRegistry,
+  recordAdminChange,
   dismissSourceQuality,
   getHoldingDetail,
   setCardGrade,
@@ -52,5 +58,22 @@ export async function dismissSourceQualityAction(source: string, cls: ProductCla
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
   await dismissSourceQuality(db, source, cls);
+  revalidatePath('/', 'layout');
+}
+
+/** A new install's base currency and time zone kept as they are (admins, S10: setup card). */
+export async function keepSetupDefaultsAction() {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const registry = await loadSourceRegistry(db);
+  await changeBaseCurrency(db, baseCurrency(registry));
+  await changeTimeZone(db, appTimeZone());
+  await recordAdminChange(
+    db,
+    user.id,
+    'setupKept',
+    { currency: baseCurrency(registry), timeZone: appTimeZone() },
+    '/settings/admin/markets',
+  );
   revalidatePath('/', 'layout');
 }

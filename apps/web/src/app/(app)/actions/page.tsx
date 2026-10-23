@@ -1,3 +1,4 @@
+import { appTimeZone } from '@tora/core';
 import { dismissedSourceWarnings, getProduct } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -58,6 +59,18 @@ export default async function ActionsPage() {
         href: '/settings/admin/sources',
         source: i.source,
         qualityClass: i.cls,
+      };
+    }
+    if (i.kind === 'setup') {
+      const values = { currency: money.base, timeZone: appTimeZone().replaceAll('_', ' ') };
+      return {
+        ...base,
+        title: t('actions.setup.title'),
+        meta: '',
+        summary: i.missing.map((k) => t(`actions.setup.${k}`, values)).join(' · '),
+        image: null,
+        href: i.missing[0] === 'timeZone' ? '/settings/admin/time-zone' : '/settings/admin/markets',
+        setupKeep: t('actions.setup.keep', values),
       };
     }
     if (i.kind === 'link') {

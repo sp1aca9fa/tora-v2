@@ -24,7 +24,7 @@ import {
 import { type Db, createDb } from './client';
 import { finishImportRun, saveImportRows, startImportRun } from './imports';
 import { migrateDb } from './migrate';
-import { saveSourceInfos } from './registry';
+import { saveSetting, saveSourceInfos } from './registry';
 import { createProduct } from './mutations';
 import { activity, alertChannels, signals, supply, watches } from './schema';
 import { addWatch } from './watches';
@@ -313,6 +313,9 @@ it('reads why a run stopped from the collect log, without the pnpm noise', () =>
 
 it('runs the morning check once a day from 08:00 on a long-lived server', async () => {
   await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  // Set up (no "finish the setup" card in the summary).
+  await saveSetting(db, 'currency', { base: 'JPY', rates: {} });
+  await saveSetting(db, 'timeZone', 'Asia/Tokyo');
   await recordActivity(db, { kind: 'collect', occurredAt: '2026-10-19T00:30:00.000+09:00' });
   expect(await morningCheck(db, ctx, new Date('2026-10-21T07:58:00+09:00'))).toBe(false);
   expect(await morningCheck(db, ctx, new Date('2026-10-21T08:02:00+09:00'))).toBe(true);

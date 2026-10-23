@@ -103,7 +103,11 @@ export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<Source
     ),
     declared,
     quality,
-    markets: resolveMarkets(infos, markets?.value as Partial<MarketSettings> | undefined),
+    markets: resolveMarkets(
+      infos,
+      markets?.value as Partial<MarketSettings> | undefined,
+      resolveCurrency(setting('currency') as Partial<CurrencySettings> | undefined).base,
+    ),
     // Rates only change how prices collected next are converted: saved values stay valid.
     changedAt: [
       ...rows,

@@ -1,7 +1,7 @@
 // Sources and roles (requirements S8, "bring your own sources"). Plug-in packages describe their
 // price sources and the shops purchases come from; collectors save these descriptions to the
 // database and the app reads them there. Nothing here names a store: the descriptions do.
-import type { CurrencySettings, RateSourceInfo } from './money';
+import { type CurrencySettings, type RateSourceInfo, currencyDigits } from './money';
 import { type Taxonomy, itemTypes, resolveTaxonomy } from './categories';
 import type { LanguageSettings } from './names';
 import type { ProductClass } from './taxonomy';
@@ -131,8 +131,13 @@ export interface MarketSettings {
   identityMinCost?: number;
 }
 
-/** The default of `MarketSettings.identityMinCost` (¥3,000 when the base is yen). */
+/** The default of `MarketSettings.identityMinCost` when the base is yen (¥3,000). */
 export const IDENTITY_MIN_COST = 3000;
+
+/** The default threshold in a base currency's smallest unit: ¥3,000, else 20 (€20, $20, R$20). */
+export function identityMinCostFor(base: string): number {
+  return base === 'JPY' ? IDENTITY_MIN_COST : 20 * 10 ** currencyDigits(base);
+}
 
 /** Markets the sources belong to, best first (by their best source's priority). */
 export function marketsOf(sources: SourceInfo[]): string[] {
@@ -163,6 +168,7 @@ export function marketsInUse(
 export function resolveMarkets(
   sources: SourceInfo[],
   saved: Partial<MarketSettings> | null | undefined,
+  base = 'JPY',
 ): MarketSettings {
   const all = marketsOf(sources);
   const primary = saved?.primary && all.includes(saved.primary) ? saved.primary : (all[0] ?? null);
@@ -177,7 +183,7 @@ export function resolveMarkets(
     secondary,
     identity: saved?.identity ?? {},
     compare: saved?.compare === 'all' ? 'all' : 'secondary',
-    identityMinCost: saved?.identityMinCost ?? IDENTITY_MIN_COST,
+    identityMinCost: saved?.identityMinCost ?? identityMinCostFor(base),
   };
 }
 

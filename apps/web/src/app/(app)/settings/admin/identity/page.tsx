@@ -1,4 +1,10 @@
-import { IDENTITY_MIN_COST, identityChoices, identitySources, typesOf } from '@tora/core';
+import {
+  baseCurrency,
+  identityChoices,
+  identityMinCostFor,
+  identitySources,
+  typesOf,
+} from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +33,7 @@ export default async function IdentitySettingsPage() {
   const labels = Object.fromEntries(registry.sources.map((s) => [s.key, s.label]));
   // Other markets' items are not flagged.
   const markets = marketsInOrder(registry);
-  const amount = registry.markets?.identityMinCost ?? IDENTITY_MIN_COST;
+  const amount = registry.markets?.identityMinCost ?? identityMinCostFor(baseCurrency(registry));
   return (
     <div className="space-y-4">
       <Card>

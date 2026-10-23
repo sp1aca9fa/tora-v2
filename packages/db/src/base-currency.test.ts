@@ -4,14 +4,16 @@ import { join } from 'node:path';
 import { baseCurrency } from '@tora/core';
 import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
+import { pendingActions } from './actions';
 import { baseChoices, changeBaseCurrency, storedAmounts } from './base-currency';
 import { type Db, createDb } from './client';
 import { fxRateOn, saveFxRates } from './fx';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
-import { loadSourceRegistry, setCurrencySettings } from './registry';
+import { loadSourceRegistry, saveSetting, setCurrencySettings } from './registry';
 import { holdings, priceObservations } from './schema';
 import { insertObservations } from './sources';
+import { changeTimeZone } from './time-zone';
 import { createUser } from './users';
 
 let db: Db;
@@ -105,4 +107,33 @@ it('takes any currency at setup, and later only one with a rate', async () => {
   );
   expect(await baseChoices(db)).toEqual([]);
   await expect(changeBaseCurrency(db, 'GBP')).rejects.toThrow('no_rate');
+});
+
+it('keeps the identity cost threshold in the base currency', async () => {
+  // The default follows the base: ¥3,000, else 20 in the currency's own units.
+  expect((await loadSourceRegistry(db)).markets?.identityMinCost).toBe(3000);
+  await changeBaseCurrency(db, 'EUR');
+  expect((await loadSourceRegistry(db)).markets?.identityMinCost).toBe(2000);
+  // A typed threshold is converted with the rate when amounts are converted...
+  await saveSetting(db, 'markets', { identityMinCost: 5000 });
+  await saveFxRates(db, 'JPYEUR', [{ date: '2026-10-01', rate: 0.006 }]);
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+    { quantity: 1, costTotalBase: 1000, acquiredAt: '2026-10-02T12:00:00.000+09:00' },
+  );
+  await changeBaseCurrency(db, 'JPY', new Date('2026-10-03T12:00:00Z'));
+  expect((await loadSourceRegistry(db)).markets?.identityMinCost).toBe(8333);
+});
+
+it('asks admins to finish the setup until the currency and time zone are chosen, even as they are', async () => {
+  const setup = async () =>
+    (await pendingActions(db, userId, null, { admin: true })).find((i) => i.kind === 'setup');
+  expect(await setup()).toMatchObject({ missing: ['currency', 'timeZone'] });
+  expect((await pendingActions(db, userId)).some((i) => i.kind === 'setup')).toBe(false);
+  await changeBaseCurrency(db, 'JPY');
+  expect(await setup()).toMatchObject({ missing: ['timeZone'] });
+  await changeTimeZone(db, 'Asia/Tokyo');
+  expect(await setup()).toBeUndefined();
 });

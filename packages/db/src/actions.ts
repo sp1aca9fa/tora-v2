@@ -30,7 +30,7 @@ import {
   purchaseLinks,
   sourceCandidates,
 } from './schema';
-import { loadSourceRegistry } from './registry';
+import { loadSourceRegistry, readSetting } from './registry';
 import { brokenListings, dismissedSourceWarnings, identityFor } from './sources';
 import { openSuggestions } from './suggestions';
 
@@ -80,6 +80,7 @@ export type ActionItem = ActionBase &
       }
     /** A source the quality gate lowered to comparison for a class (admins). */
     | { kind: 'quality'; source: string; cls: ProductClass; quality: SourceQuality }
+    | { kind: 'setup'; missing: ('currency' | 'timeZone')[] }
   );
 
 /** Every pending action of the user, most urgent level first (levels: the user's choices). */
@@ -303,6 +304,18 @@ export async function pendingActions(
   }
 
   if (options.admin) {
+    // A new install starts in yen and Tokyo time: asked until the admin has chosen both (S10).
+    const keys = ['currency', 'timeZone'] as const;
+    const chosen = await Promise.all(keys.map((k) => readSetting(db, k)));
+    const notChosen = keys.filter((_, i) => chosen[i] === null);
+    if (notChosen.length)
+      items.push({
+        key: 'setup',
+        type: 'admin_setup',
+        level: level('admin_setup'),
+        kind: 'setup',
+        missing: notChosen,
+      });
     for (const [source, byClass] of Object.entries(registry.quality ?? {})) {
       for (const [cls, quality] of Object.entries(byClass)) {
         if (quality?.status !== 'disagrees' || quality.dismissedAt) continue;

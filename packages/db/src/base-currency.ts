@@ -2,6 +2,7 @@
 // stored amount is converted with the exchange rate of its own date.
 import {
   type CurrencySettings,
+  type MarketSettings,
   baseCurrency,
   currencyDigits,
   ratePair,
@@ -13,7 +14,7 @@ import { DomainError } from './mutations';
 import { fxRateOn } from './fx';
 import { refreshItemSales } from './item-sales';
 import { runSnapshots } from './valuation';
-import { loadSourceRegistry, setCurrencySettings } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting, setCurrencySettings } from './registry';
 import { fxRates, holdingEvents, productSources } from './schema';
 
 /** Tables and columns holding amounts in the base, with the date each amount belongs to. */
@@ -62,6 +63,21 @@ export async function baseChoices(db: Db): Promise<string[]> {
 }
 
 /**
+ * The identity cost threshold the admin typed (Markets), in the base's smallest unit: converted
+ * with `factor`, or dropped (the new base's default applies) when there is no rate.
+ */
+async function convertIdentityMinCost(db: Db, factor: number | null): Promise<void> {
+  const saved = await readSetting<Partial<MarketSettings>>(db, 'markets');
+  if (saved?.identityMinCost === undefined) return;
+  const { identityMinCost, ...rest } = saved;
+  await saveSetting(
+    db,
+    'markets',
+    factor === null ? rest : { ...rest, identityMinCost: Math.round(identityMinCost * factor) },
+  );
+}
+
+/**
  * Makes `to` the base. At setup (nothing stored) any currency; later, converts every stored amount from the current base to `to` with the rate of its date (the last
  * one on or before it, else the first after), then makes `to` the base. Exchange rates follow:
  * each currency's rates to the old base become rates to the new one. Saved values per condition
@@ -70,12 +86,19 @@ export async function baseChoices(db: Db): Promise<string[]> {
 export async function changeBaseCurrency(db: Db, to: string, now = new Date()): Promise<number> {
   const registry = await loadSourceRegistry(db);
   const from = baseCurrency(registry);
-  if (to === from) return 0;
+  if (to === from) {
+    // The default chosen as is: stored, so setup no longer asks (S10).
+    if ((await readSetting(db, 'currency')) === null)
+      await setCurrencySettings(db, registry.currency!);
+    return 0;
+  }
   // Setting up (nothing stored yet): any currency, nothing to convert.
   if ((await storedAmounts(db)) === 0) {
     if (!Intl.supportedValuesOf('currency').includes(to)) throw new DomainError('no_rate');
     const { [to]: _, ...rates } = registry.currency?.rates ?? {};
     await setCurrencySettings(db, { base: to, rates });
+    // No rate yet: a typed identity threshold goes back to the new base's default.
+    await convertIdentityMinCost(db, null);
     return 0;
   }
   // Units of the old base per unit of the new one.
@@ -164,6 +187,7 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   delete rates[to];
   if (toSetting) rates[from] = 'manual' in toSetting ? { manual: 1 / toSetting.manual } : toSetting;
   await setCurrencySettings(db, { base: to, rates });
+  await convertIdentityMinCost(db, await factor(today));
   await refreshItemSales(db, { full: true });
   // The value history, from the converted sales (each at its own day's rate).
   await runSnapshots(db, now);
