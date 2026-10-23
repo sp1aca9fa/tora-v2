@@ -5,7 +5,7 @@
 # already succeeded, so it is safe to trigger often. After that, a "collect now" left in the app
 # (Settings > Collectors, requirements S21) runs it again; only the task without arguments takes
 # those requests.
-# Logs to ~/.local/state/tora/collect.log.
+# Logs to ~/.local/state/tora/collect.log (TORA_STATE_DIR: elsewhere).
 #
 # Arguments go to `pnpm collect` (e.g. `collect-cron.sh --market us`), to spread markets or
 # collectors across the night (requirements S16); each set of arguments runs once per day.
@@ -15,7 +15,9 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tora"
+# TORA_STATE_DIR (environment or the repo's .env): a second Tora on this PC keeps its own folder.
+TORA_STATE_DIR="${TORA_STATE_DIR:-$(sed -n 's/^TORA_STATE_DIR=//p' "$REPO_DIR/.env" 2>/dev/null | tail -n 1)}"
+STATE_DIR="${TORA_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/tora}"
 LOG="$STATE_DIR/collect.log"
 # One stamp and lock per set of arguments ("--market us" -> "market-us").
 SUFFIX="$(printf '%s' "$*" | tr -c 'A-Za-z0-9_' '-' | sed 's/^-*//')"

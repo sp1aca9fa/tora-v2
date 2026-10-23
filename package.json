@@ -22,7 +22,7 @@
     "db:seed": "pnpm --filter @tora/db seed",
     "collect": "pnpm --filter @tora/collector-sdk collect",
     "collect:request": "pnpm --silent --filter @tora/db collect-request",
-    "collect:log": "tail -n 80 \"${XDG_STATE_HOME:-$HOME/.local/state}/tora/collect.log\"",
+    "collect:log": "d=${TORA_STATE_DIR:-$(sed -n 's/^TORA_STATE_DIR=//p' .env 2>/dev/null | tail -n 1)}; tail -n 80 \"${d:-${XDG_STATE_HOME:-$HOME/.local/state}/tora}/collect.log\"",
     "purchases": "pnpm --silent --filter @tora/collector-sdk purchases",
     "review": "pnpm --silent --filter @tora/collector-sdk review",
     "import-ai": "pnpm --silent --filter @tora/collector-sdk import-ai",

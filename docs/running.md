@@ -49,6 +49,10 @@ To read the end of that log (why the last run stopped, what each source did), ru
 live. A run that stops early sends admins the reason read from the log (e.g. a database migration
 not run yet) and records it on Settings > Activity; the schedule tries again the next hour.
 
+A second Tora on the same PC (a test copy, another market) needs its own state folder, or the
+two share one log, one set of locks and one daily stamp: set `TORA_STATE_DIR` in that copy's
+`.env` (e.g. `~/.local/state/tora-test`).
+
 **Windows Task Scheduler** (recommended when the PC is not always on), from WSL, no admin needed:
 
 ```bash

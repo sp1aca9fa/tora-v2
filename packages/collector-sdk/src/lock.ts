@@ -2,9 +2,16 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+/**
+ * The install's state folder (collect log, locks, the schedule's stamps): `TORA_STATE_DIR`, so a
+ * second Tora on the same PC keeps its own, else `~/.local/state/tora`.
+ */
+export const stateDir = () =>
+  process.env.TORA_STATE_DIR ||
+  join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'tora');
+
 /** Where the home PC keeps one lock per site (next to the collect log). */
-export const defaultLockDir = () =>
-  join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'tora', 'locks');
+export const defaultLockDir = () => join(stateDir(), 'locks');
 
 const alive = (pid: number) => {
   try {
