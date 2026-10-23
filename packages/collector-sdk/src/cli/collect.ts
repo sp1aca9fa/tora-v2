@@ -26,8 +26,9 @@ import {
   saveSetting,
   saveUsage,
   loadTimeZone,
+  loadSourceRegistry,
 } from '@tora/db';
-import { INSIGHT_PERIODS, localDate } from '@tora/core';
+import { INSIGHT_PERIODS, localDate, marketsInUse } from '@tora/core';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -89,11 +90,24 @@ const { collectors, importers, rates, sources, setCards, rankings, missing } =
   await loadAndRegister(db);
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
+// Only the markets the admin uses, unless a market or source is asked for by name (S10).
+const inUse = marketsInUse(sources, (await loadSourceRegistry(db)).markets);
+const used = (source: string) => {
+  const market = marketOf.get(source);
+  return !!values.market || !!values.source || !market || inUse.has(market);
+};
+const unused = collectors.filter((c) => !used(c.source)).map((c) => c.source);
+if (unused.length)
+  console.log(
+    `Not collected (their market is not in use, Settings > Markets): ${unused.join(', ')}`,
+  );
 const selected = collectors.filter(
   (c) =>
+    used(c.source) &&
     (!values.source || c.source === values.source) &&
     (!values.market || marketOf.get(c.source) === values.market),
 );
+const usedRankings = rankings.filter((r) => used(r.source));
 if (values.market && selected.length === 0) {
   const known = [...new Set(sources.map((s) => s.market).filter(Boolean))].join(', ');
   console.error(`No collectors for market "${values.market}" (markets: ${known || 'none'}).`);
@@ -108,7 +122,7 @@ const withRates = !values.product && !values.source && rates.length > 0;
 // The box opening value's cards (S20): each set once a week, in any full or per-market run.
 const withOpening = !values.product && !values.source && setCards.length > 0;
 // Rankings (S13): before the collectors, so new candidates are collected the same night.
-const withRankings = !values.product && !values.source && rankings.length > 0;
+const withRankings = !values.product && !values.source && usedRankings.length > 0;
 // Steps: exchange rates, purchase links, each collector, box opening cards, then pictures + lot
 // sizes + snapshots.
 const progress = new Progress(
@@ -164,12 +178,12 @@ if (!values.product && !values.source) {
 }
 if (withRankings) {
   progress.next('rankings');
-  const locks = rankings.map((r) => lockSource(r.source));
+  const locks = usedRankings.map((r) => lockSource(r.source));
   try {
     if (locks.some((l) => 'heldBy' in l)) {
       log('rankings: skipped, another collect is reading the same site');
     } else {
-      const read = await readRankings(db, rankings, new PoliteHttp({ maxRequests: 20 }), {
+      const read = await readRankings(db, usedRankings, new PoliteHttp({ maxRequests: 20 }), {
         log: (m) => log(`[rankings] ${m}`),
       });
       log(

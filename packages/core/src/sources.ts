@@ -146,6 +146,19 @@ export function marketsOf(sources: SourceInfo[]): string[] {
   ];
 }
 
+/**
+ * Markets the collect gathers prices for (S10): the primary and the secondary, or every market when
+ * item pages compare them all. A plug-in of another market registers (so Settings offers it) but
+ * neither searches nor collects.
+ */
+export function marketsInUse(
+  sources: SourceInfo[],
+  markets: MarketSettings | undefined,
+): Set<string> {
+  if (!markets?.primary || markets.compare === 'all') return new Set(marketsOf(sources));
+  return new Set([markets.primary, markets.secondary].filter((m): m is string => !!m));
+}
+
 /** The settings with what is not set filled in: the first two markets, by their sources. */
 export function resolveMarkets(
   sources: SourceInfo[],

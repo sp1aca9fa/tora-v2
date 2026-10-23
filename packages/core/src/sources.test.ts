@@ -5,6 +5,7 @@ import {
   referenceSource,
   shopOf,
   valuationOrder,
+  marketsInUse,
 } from './sources';
 import { orderSourceOf, singleItemOrders } from './text';
 import { valueUnit } from './valuation';
@@ -99,4 +100,21 @@ describe('source registry', () => {
     expect(singleItemOrders(registry, 'cards')).toBe(true);
     expect(singleItemOrders(registry, 'retail')).toBe(false);
   });
+});
+
+it('collects only the markets in use: primary and secondary, or all when comparing all', () => {
+  const sources = [
+    { key: 'a', label: 'A', market: 'eu' },
+    { key: 'b', label: 'B', market: 'br' },
+    { key: 'c', label: 'C', market: 'us' },
+  ];
+  const markets = { primary: 'eu', secondary: 'br', compare: 'secondary' as const };
+  expect([...marketsInUse(sources, markets)].sort()).toEqual(['br', 'eu']);
+  expect([...marketsInUse(sources, { ...markets, secondary: null })]).toEqual(['eu']);
+  expect([...marketsInUse(sources, { ...markets, compare: 'all' })].sort()).toEqual([
+    'br',
+    'eu',
+    'us',
+  ]);
+  expect(marketsInUse(sources, undefined).size).toBe(3);
 });
