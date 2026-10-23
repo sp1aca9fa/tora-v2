@@ -1,9 +1,16 @@
 import 'server-only';
-import { type ProductClass, REGIONS, SEALED_KINDS, itemTypeOf, productClass } from '@tora/core';
+import {
+  type ProductClass,
+  REGIONS,
+  SEALED_KINDS,
+  itemTypeOf,
+  missingFields,
+  productClass,
+} from '@tora/core';
 import { type Db, type ProductRef, getProduct, getSet } from '@tora/db';
 import { z } from 'zod';
 import { type FormState, optEnum, optText, parseForm, reqEnum } from '@/lib/form';
-import { productInputFrom, productSchema } from '@/lib/schemas';
+import { fieldInputNames, productInputFrom, productSchema } from '@/lib/schemas';
 import { getTaxonomy } from '@/lib/taxonomy';
 
 /** How the Add flow names its item: picked, typed as new, or a catalog set's sealed product. */
@@ -54,6 +61,9 @@ export async function productRefFrom(
   const taxonomy = await getTaxonomy();
   const product = productInputFrom(parsed.data, taxonomy, formData);
   if (!product) return { state: { error: 'check', fields: ['name'] } };
+  // Required fields, checked here too (the form's own check can be skipped).
+  const missing = missingFields(taxonomy, product);
+  if (missing.length) return { state: { error: 'check', fields: fieldInputNames(missing) } };
   return {
     ref: { product },
     cls: itemTypeOf(taxonomy, product.category, product.kind) ?? productClass(product),

@@ -6,6 +6,7 @@ import {
   type ProductClass,
   RAW_GRADES,
   REGIONS,
+  STANDARD_FIELDS,
   type Taxonomy,
   conditionListOf,
   fieldType,
@@ -36,6 +37,10 @@ export const productSchema = z.object({
 });
 
 /** The category's custom fields typed in a form (`f_{key}`), as numbers, yes / no or text (S16). */
+/** Form input names of an item's fields: custom fields are `f_<key>` (see `customFieldsFrom`). */
+export const fieldInputNames = (keys: string[]) =>
+  keys.map((k) => ((STANDARD_FIELDS as readonly string[]).includes(k) ? k : `f_${k}`));
+
 function customFieldsFrom(
   taxonomy: Taxonomy,
   category: string,

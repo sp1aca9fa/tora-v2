@@ -7,6 +7,7 @@ import {
   PACKAGING_STATES,
   RAW_GRADES,
   localDateToIso,
+  missingFields,
 } from '@tora/core';
 import {
   type Db,
@@ -45,7 +46,7 @@ import {
   amount,
 } from '@/lib/form';
 import { getTaxonomy } from '@/lib/taxonomy';
-import { productInputFrom, productSchema } from '@/lib/schemas';
+import { fieldInputNames, productInputFrom, productSchema } from '@/lib/schemas';
 
 const holdingPath = (id: string) => `/holdings/${id}`;
 const at = (date: string) => localDateToIso(date);
@@ -239,8 +240,11 @@ export async function editProductAction(
 ) {
   const parsed = await parseForm(productSchema, formData);
   if ('state' in parsed) return parsed.state;
-  const input = productInputFrom(parsed.data, await getTaxonomy(), formData);
+  const taxonomy = await getTaxonomy();
+  const input = productInputFrom(parsed.data, taxonomy, formData);
   if (!input) return { error: 'check', fields: ['name'] };
+  const missing = missingFields(taxonomy, input);
+  if (missing.length) return { error: 'check', fields: fieldInputNames(missing) };
   return handle(
     formData,
     z.object({}),

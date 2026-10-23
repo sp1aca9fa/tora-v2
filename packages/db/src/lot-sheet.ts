@@ -7,10 +7,15 @@ import {
   type Grader,
   RAW_GRADES,
   type RawGrade,
+  type FieldDef,
+  type Names,
+  type Taxonomy,
   categoryDef,
+  fieldsFor,
   holdingFieldsFor,
   itemTypeOf,
   localDate,
+  missingFields,
   localTime,
   orderSourceOf,
   productClass,
@@ -61,6 +66,35 @@ export const SHEET_COLUMNS = [
 ] as const;
 export type SheetColumn = (typeof SHEET_COLUMNS)[number];
 
+/** A custom field's column (S10): the admin's own fields, after the standard columns. */
+export type FieldColumn = `field:${string}`;
+
+/** A name in the person's language from the admin's names (`pickName` with the locale). */
+export type LabelOf = (names: Names | undefined, fallback: string) => string;
+
+/** The custom fields of the given items' kinds (every category's when none are given), by key. */
+export function sheetFields(
+  taxonomy: Taxonomy,
+  items?: { category: string; kind: string }[],
+): FieldDef[] {
+  const kinds =
+    items ??
+    taxonomy.categories.flatMap((c) => c.kinds.map((k) => ({ category: c.key, kind: k.key })));
+  const out = new Map<string, FieldDef>();
+  for (const { category, kind } of kinds)
+    for (const f of fieldsFor(taxonomy, category, kind))
+      if (!f.standard && !out.has(f.key)) out.set(f.key, f);
+  return [...out.values()];
+}
+
+/** A custom field's value as its cell shows it (choices and yes/no by their names). */
+function fieldCell(f: FieldDef, v: unknown, name: NameOf, label: LabelOf): string {
+  if (v === undefined || v === null || v === '') return '';
+  if (f.type === 'yesno') return name('common', v ? 'yes' : 'no');
+  if (f.type === 'choice') return label(f.choices?.find((c) => c.key === v)?.names, String(v));
+  return String(v);
+}
+
 /** A key's name as the app shows it; `ns` is its texts section (`kind`, `conditionValue.<list>`...). */
 export type NameOf = (ns: string, key: string) => string;
 /** A cell back to its key (the key, or its name in one of the app's languages); null: none. */
@@ -92,6 +126,7 @@ export async function lotSheet(
   userId: string,
   header: (column: SheetColumn) => string,
   name: NameOf,
+  label: LabelOf,
   now = new Date(),
 ): Promise<string[][]> {
   const rows = await db
@@ -117,7 +152,14 @@ export async function lotSheet(
       : []
     ).map((r) => [r.holding_events.holdingId, r.holding_events]),
   );
-  const out: string[][] = [SHEET_COLUMNS.map(header)];
+  const taxonomy = (await loadSourceRegistry(db)).taxonomy ?? resolveTaxonomy(null);
+  const custom = sheetFields(
+    taxonomy,
+    rows.map((r) => r.product),
+  );
+  const out: string[][] = [
+    [...SHEET_COLUMNS.map(header), ...custom.map((f) => label(f.names, f.key))],
+  ];
   for (const { holding: h, product: p } of rows) {
     const value = values.get(h.id) ?? null;
     const sale = sold.get(h.id);
@@ -151,7 +193,10 @@ export async function lotSheet(
       from_lot: text(h.parentHoldingId),
       notes: text(h.notes),
     };
-    out.push(SHEET_COLUMNS.map((c) => cells[c]));
+    out.push([
+      ...SHEET_COLUMNS.map((c) => cells[c]),
+      ...custom.map((f) => fieldCell(f, p.fields?.[f.key], name, label)),
+    ]);
   }
   return out;
 }
@@ -171,7 +216,9 @@ export type SheetError =
   | 'bad_date'
   | 'bad_condition'
   | 'bad_packaging'
-  | 'bad_graded';
+  | 'bad_graded'
+  | 'bad_field'
+  | 'missing_field';
 
 /** A lot the row would add. */
 export interface NewLot {
@@ -202,7 +249,7 @@ export type SheetEntry = { line: number; item: string } & (
 
 export interface SheetRead {
   /** Data rows by column, with their line in the file. */
-  rows: { line: number; cells: Partial<Record<SheetColumn, string>> }[];
+  rows: { line: number; cells: Partial<Record<SheetColumn | FieldColumn, string>> }[];
   /** Header cells not recognized (ignored). */
   ignored: string[];
 }
@@ -221,7 +268,7 @@ export const headerKey = (cell: string) =>
  */
 export function readSheet(
   table: string[][],
-  column: (cell: string) => SheetColumn | null,
+  column: (cell: string) => SheetColumn | FieldColumn | null,
 ): SheetRead | null {
   const [head, ...data] = table;
   if (!head) return null;
@@ -236,6 +283,36 @@ export function readSheet(
     })),
     ignored: head.filter((_, j) => !columns[j]),
   };
+}
+
+/** A custom field's value from its cell; null when it cannot be read. */
+function fieldValue(f: FieldDef, cell: string, keyOf: KeyOf): string | number | boolean | null {
+  const raw = cell.normalize('NFKC').trim();
+  const norm = raw.toLowerCase();
+  switch (f.type) {
+    case 'number': {
+      const n = Number(raw.replace(/,(?=\d{1,2}$)/, '.').replace(/,/g, ''));
+      return Number.isFinite(n) ? n : null;
+    }
+    case 'yesno': {
+      const key = keyOf('common', raw);
+      if (key === 'yes' || ['true', '1', 'y'].includes(norm)) return true;
+      if (key === 'no' || ['false', '0', 'n'].includes(norm)) return false;
+      return null;
+    }
+    case 'choice':
+      return (
+        f.choices?.find(
+          (c) =>
+            c.key === norm ||
+            Object.values(c.names).some((n) => n.normalize('NFKC').trim().toLowerCase() === norm),
+        )?.key ?? null
+      );
+    case 'date':
+      return day(raw);
+    default:
+      return raw.slice(0, 500);
+  }
 }
 
 /** A whole number from a spreadsheet cell ("¥12,000", "１２０００", "12000.0"). */
@@ -383,6 +460,20 @@ export async function planSheet(
           continue;
         }
       }
+      // The admin's own fields (S10): checked like the form does.
+      const own: Record<string, string | number | boolean> = {};
+      let badField = false;
+      for (const f of fieldsFor(taxonomy, category, kind)) {
+        const cell = f.standard ? undefined : cells[`field:${f.key}`];
+        if (!cell) continue;
+        const v = fieldValue(f, cell, keyOf);
+        if (v === null) badField = true;
+        else own[f.key] = v;
+      }
+      if (badField) {
+        fail('bad_field');
+        continue;
+      }
       const fields = {
         category,
         kind,
@@ -395,7 +486,12 @@ export async function planSheet(
         rarity: cells.rarity ?? null,
         variant: cells.variant ?? null,
         region: region as Product['region'],
+        fields: Object.keys(own).length ? own : null,
       };
+      if (missingFields(taxonomy, fields).length) {
+        fail('missing_field');
+        continue;
+      }
       product = await findSameProduct(db, fields);
       ref = product ? { productId: product.id } : { product: fields };
     }

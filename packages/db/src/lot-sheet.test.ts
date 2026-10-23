@@ -19,6 +19,8 @@ import {
 import { migrateDb } from './migrate';
 import { createHolding, sellHolding } from './mutations';
 import { saveSourceInfos } from './registry';
+import { saveTaxonomy } from './categories';
+import { resolveTaxonomy } from '@tora/core';
 import { holdings, importRows, importRuns } from './schema';
 import { importRunDetail } from './imports';
 import { seedCollection } from './seed';
@@ -97,7 +99,13 @@ it('downloads every lot, and a re-import adds only what is not in Tora yet', asy
     occurredAt: '2026-10-10T12:00:00.000+09:00',
   });
 
-  const sheet = await lotSheet(db, a, (c) => (c === 'cost' ? 'Cost (JPY)' : c), english);
+  const sheet = await lotSheet(
+    db,
+    a,
+    (c) => (c === 'cost' ? 'Cost (JPY)' : c),
+    english,
+    (names, fallback) => names?.en ?? fallback,
+  );
   const lots = await db.select().from(holdings).where(eq(holdings.userId, a));
   expect(sheet).toHaveLength(lots.length + 1);
   const at = (row: string[], c: SheetColumn) => row[SHEET_COLUMNS.indexOf(c)]!;
@@ -331,4 +339,84 @@ it('downloads the account data without collected prices or secrets', async () =>
   expect(text).not.toMatch(
     /passwordHash|totpSecretEnc|backupCodeHashes|recentSales|price_observations/,
   );
+});
+
+it("carries the admin's own fields both ways and checks them on import", async () => {
+  const base = resolveTaxonomy(null);
+  await saveTaxonomy(
+    db,
+    resolveTaxonomy({
+      categories: [
+        ...base.categories,
+        {
+          key: 'watch',
+          names: { en: 'Watches' },
+          kinds: [{ key: 'wristwatch', conditions: 'watch_condition' }],
+          fields: [
+            { key: 'reference', names: { en: 'Reference' }, type: 'text', required: true },
+            { key: 'box', names: { en: 'Box' }, type: 'yesno' },
+            {
+              key: 'dial',
+              names: { en: 'Dial' },
+              type: 'choice',
+              choices: [{ key: 'black', names: { en: 'Black', es: 'Negra' } }],
+            },
+          ],
+        },
+      ],
+      lists: [{ key: 'watch_condition', values: [{ key: 'worn', names: { en: 'Worn' } }] }],
+    }),
+    true,
+  );
+  await createHolding(
+    db,
+    a,
+    {
+      product: {
+        category: 'watch',
+        kind: 'wristwatch',
+        name: 'Seiko',
+        fields: { reference: 'SPB143', box: true, dial: 'black' },
+      },
+    },
+    {
+      quantity: 1,
+      costTotalBase: 800,
+      conditionValue: 'worn',
+      acquiredAt: '2026-10-01T12:00:00.000+09:00',
+    },
+  );
+  const label = (names: Record<string, string> | undefined, fallback: string) =>
+    names?.en ?? fallback;
+  const sheet = await lotSheet(db, a, (c) => c, english, label);
+  const head = sheet[0]!;
+  expect(head.slice(-3)).toEqual(['Reference', 'Box', 'Dial']);
+  expect(sheet[sheet.length - 1]!.slice(-3)).toEqual(['SPB143', 'yes', 'Black']);
+
+  const custom = (cell: string) =>
+    ({ reference: 'field:reference', box: 'field:box', dial: 'field:dial' })[headerKey(cell)] as
+      `field:${string}` | undefined;
+  const read = readSheet(
+    [
+      ['item', 'category', 'kind', 'cost', 'Reference', 'Box', 'Dial'],
+      ['Omega', 'watch', 'wristwatch', '6000', '310.30', 'no', 'Negra'],
+      ['Rolex', 'watch', 'wristwatch', '9000', '', '', ''],
+      ['Tudor', 'watch', 'wristwatch', '3000', 'M79', 'maybe', ''],
+    ],
+    (cell) => custom(cell) ?? column(cell),
+  )!;
+  const known: KeyOf = (ns, cell) =>
+    ['watch', 'wristwatch'].includes(cell) ? cell : keyOf(ns, cell);
+  const plan = await planSheet(db, a, read, known);
+  expect(plan.map((e) => (e.type === 'error' ? e.error : e.type))).toEqual([
+    'new',
+    'missing_field',
+    'bad_field',
+  ]);
+  const omega = plan[0]!;
+  expect(omega.type === 'new' && 'product' in omega.ref && omega.ref.product.fields).toEqual({
+    reference: '310.30',
+    box: false,
+    dial: 'black',
+  });
 });

@@ -249,6 +249,26 @@ export function fieldsFor(taxonomy: Taxonomy, category: string, kind: string): F
   );
 }
 
+/**
+ * The required fields an item leaves empty (S10): standard ones read from the item, custom ones
+ * from its `fields`. Forms and the spreadsheet import refuse such an item; purchase imports keep it.
+ */
+export function missingFields(
+  taxonomy: Taxonomy,
+  item: { category: string; kind: string; fields?: Record<string, unknown> | null } & Record<
+    string,
+    unknown
+  >,
+): string[] {
+  return fieldsFor(taxonomy, item.category, item.kind)
+    .filter((f) => f.required)
+    .filter((f) => {
+      const v = f.standard ? item[f.key] : item.fields?.[f.key];
+      return v === undefined || v === null || v === '';
+    })
+    .map((f) => f.key);
+}
+
 /** A standard field's or custom field's value type. */
 export const fieldType = (f: FieldDef): FieldType | 'amount' =>
   f.standard ? STANDARD_TYPES[f.key as ProductField] : (f.type ?? 'text');

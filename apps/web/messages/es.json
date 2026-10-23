@@ -843,7 +843,9 @@
         "bad_date": "Fecha ilegible o futura (usa 2026-10-16 o 2026/10/16)",
         "bad_condition": "Estado desconocido para este tipo",
         "bad_packaging": "Embalaje desconocido",
-        "bad_graded": "Gradeada: la empresa y luego la nota, p. ej. PSA 10"
+        "bad_graded": "Gradeada: la empresa y luego la nota, p. ej. PSA 10",
+        "bad_field": "No se pudo leer un campo de la categoría (un número, una opción o sí / no)",
+        "missing_field": "Falta un campo obligatorio de la categoría"
       },
       "import": "{count, plural, one {Importar # lote} other {Importar # lotes}}",
       "importing": "Importando...",

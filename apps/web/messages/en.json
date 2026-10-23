@@ -843,7 +843,9 @@
         "bad_date": "Date not readable or in the future (use 2026-10-16 or 2026/10/16)",
         "bad_condition": "Condition not known for this kind",
         "bad_packaging": "Packaging not known",
-        "bad_graded": "Graded: the grader then the grade, e.g. PSA 10"
+        "bad_graded": "Graded: the grader then the grade, e.g. PSA 10",
+        "bad_field": "A field of the category could not be read (a number, a choice or yes / no)",
+        "missing_field": "A required field of the category is empty"
       },
       "import": "{count, plural, one {Import # lot} other {Import # lots}}",
       "importing": "Importing...",
