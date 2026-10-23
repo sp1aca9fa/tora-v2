@@ -9,6 +9,7 @@ import {
   type ProductClass,
   type SourceQuality,
   conditionListOf,
+  marketsInUse,
   countsInBadge,
   noticeLevelsFor,
   noticeRank,
@@ -166,6 +167,14 @@ export async function pendingActions(
     pending.filter((c) => !c.imageUrl).map((c) => ({ source: c.source, externalId: c.externalId })),
   );
 
+  // Suggestions from a market the admin does not use wait, unshown (S10).
+  const inUse = marketsInUse(registry.sources, registry.markets);
+  const marketOf = new Map(registry.sources.map((s) => [s.key, s.market]));
+  const shown = (source: string) => {
+    const market = marketOf.get(source);
+    return !market || inUse.has(market);
+  };
+
   const brokenOf = (productId: string, source: string) => {
     const f = broken.get(`${productId}|${source}`);
     return f ? { since: f.since, error: f.error } : null;
@@ -185,7 +194,8 @@ export async function pendingActions(
     // on the item page).
     const bySource = new Map<string, typeof pending>();
     for (const c of pending) {
-      if (c.productId !== product.id || has.has(`${product.id}|${c.source}`)) continue;
+      if (c.productId !== product.id || has.has(`${product.id}|${c.source}`) || !shown(c.source))
+        continue;
       bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);
     }
     // No identity link: a card even without suggestions, unless the user said not to warn
