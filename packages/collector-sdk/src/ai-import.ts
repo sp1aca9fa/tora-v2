@@ -14,7 +14,6 @@ import {
   BUILT_IN_CATEGORIES,
   pickName,
   type ProductKind,
-  REGIONS,
   type Region,
   type SourceRegistry,
   baseCurrency,
@@ -481,6 +480,8 @@ export function aiImporter(
   registry: SourceRegistry = EMPTY_REGISTRY,
 ): PurchaseImporter {
   const byKey = new Map(rows.map((r) => [r.receipt.orderId, r.row]));
+  const regionsOf = (category: string) =>
+    categoriesOf(registry).find((c) => c.key === category)?.regions ?? [];
   return {
     source: shop,
     label: sourceName(registry, shop),
@@ -510,9 +511,10 @@ export function aiImporter(
         cardNumber: p.cardNumber,
         rarity: p.rarity,
         platform: p.platform,
-        region: (REGIONS as readonly string[]).includes(p.region ?? '')
+        // A region of its category, else the category's first (the admin orders the list).
+        region: regionsOf(p.category).includes(p.region ?? '')
           ? (p.region as Region)
-          : 'jp',
+          : (regionsOf(p.category)[0] ?? null),
       };
     },
     holdingFor: (receipt) => {

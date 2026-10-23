@@ -7,6 +7,7 @@ import {
   type FieldDef,
   type FieldType,
   type Names,
+  REGIONS,
   STANDARD_FIELDS,
   type Taxonomy,
   pickName,
@@ -14,7 +15,7 @@ import {
 import type { CategoryUsage } from '@tora/db';
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { type ReactNode, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -101,7 +102,26 @@ function withNamedKeys(draft: Taxonomy, saved: Taxonomy): Taxonomy {
         ...(f.kinds ? { kinds: f.kinds.map((k) => kindKeys.get(k) ?? k) } : {}),
       };
     });
-    return { ...c, key, kinds, fields };
+    // New regions: keys from their names too (S10), their names moved along.
+    const takenRegions = [...(before?.regions ?? []), ...REGIONS];
+    const regionNames: Record<string, Names> = {};
+    const regions = c.regions?.map((r) => {
+      const rk =
+        before?.regions?.includes(r) || (REGIONS as readonly string[]).includes(r)
+          ? r
+          : keyFrom(keyName(c.regionNames?.[r]), takenRegions, r);
+      takenRegions.push(rk);
+      if (c.regionNames?.[r]) regionNames[rk] = c.regionNames[r];
+      return rk;
+    });
+    return {
+      ...c,
+      key,
+      kinds,
+      fields,
+      ...(regions ? { regions } : {}),
+      ...(Object.keys(regionNames).length ? { regionNames } : { regionNames: undefined }),
+    };
   });
   return { categories, lists };
 }
@@ -374,6 +394,15 @@ export function CategoriesForm({
                   onChange={(fields) => setCategory(c.key, (x) => ({ ...x, fields }))}
                 />
 
+                <RegionsEditor
+                  category={c}
+                  usage={usage}
+                  namesInput={namesInput}
+                  onChange={(regions, regionNames) =>
+                    setCategory(c.key, (x) => ({ ...x, regions, regionNames }))
+                  }
+                />
+
                 {!saved.has(c.key) || items === 0 ? (
                   <Button
                     type="button"
@@ -611,6 +640,99 @@ export function CategoriesForm({
           <p className="text-xs text-muted-foreground">{t('saved')}</p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A category's regions (S10): print languages, game regions, a record's pressing country... in
+ * order (the first is the default when an import cannot tell). Built-in ones keep the app's
+ * names unless renamed; removing one in use clears it from those items (asked first on save).
+ */
+function RegionsEditor({
+  category,
+  usage,
+  namesInput,
+  onChange,
+}: {
+  category: CategoryDef;
+  usage: CategoryUsage;
+  namesInput: (names: Names | undefined, onChange: (n: Names) => void, label: string) => ReactNode;
+  onChange: (regions: string[], regionNames: Record<string, Names> | undefined) => void;
+}) {
+  const t = useTranslations('categories');
+  const tAll = useTranslations();
+  const locale = useLocale();
+  const regions = category.regions ?? [];
+  const names = category.regionNames ?? {};
+  const set = (next: string[], nextNames: Record<string, Names> = names) =>
+    onChange(next, Object.keys(nextNames).length ? nextNames : undefined);
+  const iconButton =
+    'rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30';
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {t('regions')}
+      </h3>
+      <p className="text-xs text-muted-foreground">{t('regionsInfo')}</p>
+      {regions.map((r, i) => {
+        const used = usage.regions[`${category.key}/${r}`] ?? 0;
+        return (
+          <div key={r} className="space-y-2 rounded-md bg-muted/40 p-2">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>
+                {pickName(names[r], locale, tAll.has(`region.${r}`) ? tAll(`region.${r}`) : r)}
+                {' · '}
+                {t('items', { count: used })}
+              </span>
+              <span className="flex items-center">
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={t('up')}
+                  disabled={i === 0}
+                  onClick={() => set(move(regions, i, -1))}
+                >
+                  <ChevronUp className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={t('down')}
+                  disabled={i === regions.length - 1}
+                  onClick={() => set(move(regions, i, 1))}
+                >
+                  <ChevronDown className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className={iconButton}
+                  aria-label={t('remove')}
+                  onClick={() => {
+                    const { [r]: _, ...rest } = names;
+                    set(
+                      regions.filter((x) => x !== r),
+                      rest,
+                    );
+                  }}
+                >
+                  <X className="size-4" />
+                </button>
+              </span>
+            </div>
+            {namesInput(names[r], (n) => set(regions, { ...names, [r]: n }), t('regionName'))}
+          </div>
+        );
+      })}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => set([...regions, keyFrom('', regions, `region${regions.length + 1}`)])}
+      >
+        <Plus className="size-4" />
+        {t('addRegion')}
+      </Button>
     </div>
   );
 }

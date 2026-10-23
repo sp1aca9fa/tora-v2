@@ -5,7 +5,6 @@ import {
   PACKAGING_STATES,
   type ProductClass,
   RAW_GRADES,
-  REGIONS,
   STANDARD_FIELDS,
   type Taxonomy,
   conditionListOf,
@@ -24,7 +23,11 @@ export const productSchema = z.object({
   name: optText,
   nameAlias: optText,
   franchise: optText,
-  region: optEnum(REGIONS),
+  // Checked against the item's category's regions when saved (S10).
+  region: z.preprocess(
+    (v) => (typeof v === 'string' ? v.trim() || undefined : v),
+    z.string().max(40).optional(),
+  ),
   platform: optText,
   setId: optText,
   setName: optText,

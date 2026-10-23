@@ -12,7 +12,6 @@ import {
   OBSERVATION_TYPES,
   PACKAGING_STATES,
   RAW_GRADES,
-  REGIONS,
   SET_TYPES,
   USER_ROLES,
   newId,
@@ -156,8 +155,8 @@ export const tcgSets = sqliteTable(
   {
     id: id(),
     franchise: text('franchise').notNull(),
-    /** Null when the set is the same in every region (e.g. Magic). */
-    region: text('region', { enum: REGIONS }),
+    /** Null when the set is the same in every region (e.g. Magic). A category's region key. */
+    region: text('region'),
     code: text('code'),
     name: text('name').notNull(),
     nameAlias: text('name_alias'),
@@ -168,7 +167,6 @@ export const tcgSets = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    check('tcg_sets_region_check', oneOf(t.region, REGIONS)),
     check('tcg_sets_type_check', oneOf(t.setType, SET_TYPES)),
     uniqueIndex('tcg_sets_source_uq').on(t.source, t.sourceKey),
     index('tcg_sets_franchise_idx').on(t.franchise, t.releaseDate),
@@ -187,7 +185,8 @@ export const products = sqliteTable(
     name: text('name').notNull(),
     nameAlias: text('name_alias'),
     franchise: text('franchise'),
-    region: text('region', { enum: REGIONS }),
+    /** One of its category's regions (S10: the admin's lists, so the app checks it). */
+    region: text('region'),
     platform: text('platform'),
     setId: text('set_id').references(() => tcgSets.id),
     setName: text('set_name'),
@@ -211,7 +210,6 @@ export const products = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    check('products_region_check', oneOf(t.region, REGIONS)),
     check('products_name_check', sql`length(trim(${t.name})) > 0`),
     index('products_kind_idx').on(t.category, t.kind),
     index('products_set_idx').on(t.setId, t.kind),

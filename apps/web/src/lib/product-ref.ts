@@ -1,7 +1,6 @@
 import 'server-only';
 import {
   type ProductClass,
-  REGIONS,
   SEALED_KINDS,
   itemTypeOf,
   missingFields,
@@ -20,7 +19,11 @@ export const productRefSchema = z.object({
   catalogSetId: optText,
   catalogKind: optEnum(SEALED_KINDS),
   catalogVariant: optText,
-  region: optEnum(REGIONS),
+  // Checked against the item's category's regions when saved (S10).
+  region: z.preprocess(
+    (v) => (typeof v === 'string' ? v.trim() || undefined : v),
+    z.string().max(40).optional(),
+  ),
 });
 
 /** The item the Add flow names (a lot's or a watch's), with its class for the condition fields. */

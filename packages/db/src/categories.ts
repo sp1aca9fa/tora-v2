@@ -1,7 +1,7 @@
 // The admin's categories (requirements S16 part 3): how many items use each part, what a change
 // touches, and saving it (items follow: item types, removed fields and values cleared).
 import { type Taxonomy, checkTaxonomy, conditionListOf, itemTypeKey } from '@tora/core';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
 import { loadSourceRegistry, setTaxonomy } from './registry';
@@ -18,10 +18,19 @@ export interface CategoryUsage {
   choices: Record<string, number>;
   /** `{list}/{value}`: lots */
   values: Record<string, number>;
+  /** `{category}/{region}` */
+  regions: Record<string, number>;
 }
 
 export async function categoryUsage(db: Db): Promise<CategoryUsage> {
-  const usage: CategoryUsage = { categories: {}, kinds: {}, fields: {}, choices: {}, values: {} };
+  const usage: CategoryUsage = {
+    categories: {},
+    kinds: {},
+    fields: {},
+    choices: {},
+    values: {},
+    regions: {},
+  };
   const add = (map: Record<string, number>, key: string, n = 1) => {
     map[key] = (map[key] ?? 0) + n;
   };
@@ -31,6 +40,13 @@ export async function categoryUsage(db: Db): Promise<CategoryUsage> {
     .groupBy(products.category, products.kind)) {
     add(usage.categories, r.category, Number(r.n));
     add(usage.kinds, `${r.category}/${r.kind}`, Number(r.n));
+  }
+  for (const r of await db
+    .select({ category: products.category, region: products.region, n: sql<number>`count(*)` })
+    .from(products)
+    .where(isNotNull(products.region))
+    .groupBy(products.category, products.region)) {
+    add(usage.regions, `${r.category}/${r.region}`, Number(r.n));
   }
   for (const p of await db
     .select({ category: products.category, fields: products.fields })
@@ -82,6 +98,12 @@ export function taxonomyChange(
         touched.push({ code: 'kind_list', name: `${before.key}/${k.key}`, count: n });
       }
     }
+    for (const r of before.regions ?? []) {
+      const n = usage.regions[`${before.key}/${r}`] ?? 0;
+      if (n && !after.regions?.includes(r)) {
+        touched.push({ code: 'region_removed', name: `${before.key}: ${r}`, count: n });
+      }
+    }
     for (const f of before.fields.filter((x) => !x.standard)) {
       const n = usage.fields[`${before.key}/${f.key}`] ?? 0;
       const now = after.fields.find((x) => x.key === f.key);
@@ -124,8 +146,16 @@ export async function saveTaxonomy(
   if (change.blocked.length) throw new DomainError('invalid_input');
   if (change.touched.length && !confirmed) return change;
 
-  // Removed custom fields and choices leave the items.
+  // Removed custom fields, choices and regions leave the items.
   for (const c of next.categories) {
+    const removed = (prev.categories.find((x) => x.key === c.key)?.regions ?? []).filter(
+      (r) => !c.regions?.includes(r),
+    );
+    if (removed.length)
+      await db
+        .update(products)
+        .set({ region: null })
+        .where(and(eq(products.category, c.key), inArray(products.region, removed)));
     const keep = new Map(
       c.fields.filter((f) => !f.standard).map((f) => [f.key, f.choices?.map((x) => x.key)]),
     );

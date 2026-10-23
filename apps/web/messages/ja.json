@@ -1249,7 +1249,8 @@
       "kind_list": "{name}: {count}件が別の状態リストに移ります（ロットの状態の再入力が必要）",
       "field_removed": "項目 {name}: {count}件から削除",
       "choice_removed": "{name}: {count}件で解除",
-      "value_removed": "{name}: {count}ロットで解除"
+      "value_removed": "{name}: {count}ロットで解除",
+      "region_removed": "{name}: {count}件のアイテムから外れます"
     },
     "blocked": {
       "category_in_use": "アイテムのあるカテゴリーは削除できません。非表示にしてください。",
@@ -1262,8 +1263,13 @@
       "kind_key": "同じ名前の種類が2つあります。",
       "kind_list": "削除した状態リストを使っている種類があります。",
       "field_key": "同じ名前の項目が2つあります。",
-      "choice_empty": "選択リスト項目には選択肢が1つ以上必要です。"
-    }
+      "choice_empty": "選択リスト項目には選択肢が1つ以上必要です。",
+      "region_key": "同じ名前の地域が2つあります。"
+    },
+    "regions": "地域",
+    "regionsInfo": "このカテゴリーの地域項目の選択肢（印刷言語、ゲームの地域、プレス国など）。順番どおりで、取り込みで判断できないときは先頭が使われます。プラグインはこのキーを読みます。",
+    "regionName": "地域名",
+    "addRegion": "地域を追加"
   },
   "database": {
     "title": "データベース",

@@ -3,7 +3,6 @@
 import {
   type Category,
   type ProductKind,
-  REGIONS,
   type Region,
   type SetType,
   TCG_FRANCHISES,
@@ -104,7 +103,7 @@ export async function searchSetsAction(
   if (!TCG_FRANCHISES.includes(franchise as never)) return [];
   const rows = await searchSets(db, {
     franchise,
-    region: region && REGIONS.includes(region) ? region : null,
+    region: region ? region.slice(0, 40) : null,
     q: q.slice(0, 100) || undefined,
     limit: 60,
   });

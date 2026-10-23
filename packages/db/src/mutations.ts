@@ -15,6 +15,7 @@ import {
   catalogProductName,
   isConsumedAfterOpening,
   fieldsFor,
+  categoryDef,
   itemTypeOf,
   resolveTaxonomy,
   kindsForSetType,
@@ -158,6 +159,9 @@ async function checkedProduct(
   const taxonomy = (await loadSourceRegistry(tx)).taxonomy ?? resolveTaxonomy(null);
   const itemType = itemTypeOf(taxonomy, input.category, input.kind);
   if (!itemType) throw new DomainError('invalid_input');
+  // A region from its category's list (S10: the admin's lists, no longer a fixed one).
+  if (input.region && !categoryDef(taxonomy, input.category)?.regions?.includes(input.region))
+    throw new DomainError('invalid_input');
   const custom = new Set(
     fieldsFor(taxonomy, input.category, input.kind)
       .filter((f) => !f.standard)

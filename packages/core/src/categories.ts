@@ -78,6 +78,11 @@ export interface CategoryDef {
   fields: FieldDef[];
   /** Region choices (TCG print language, game region); none: no region field. */
   regions?: string[];
+  /**
+   * Names of the regions the admin added (S10); built-in ones (`REGIONS`) use the app's texts
+   * unless named here.
+   */
+  regionNames?: Record<string, Names>;
   /** TCG: franchise chips and the pre-registered set catalog. */
   setCatalog?: boolean;
 }
@@ -304,6 +309,10 @@ export function checkTaxonomy(t: Taxonomy): string[] {
       problems.push('kind_key');
     }
     if (c.kinds.some((k) => !listKeys.has(k.conditions))) problems.push('kind_list');
+    const regions = c.regions ?? [];
+    if (new Set(regions).size !== regions.length || regions.some((r) => !isKey(r))) {
+      problems.push('region_key');
+    }
     const fields = new Set(c.fields.map((f) => f.key));
     if (
       fields.size !== c.fields.length ||

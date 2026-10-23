@@ -18,6 +18,10 @@ Categories**. TCG and games are ready-made templates; anything else (watches, fi
     page or not. Saved per item (`products.fields`).
 - **A condition list per kind**: what condition a lot can be in, which decides which prices value
   it.
+- **Regions** (optional): what the region field offers (TCG print languages, game regions, a
+  record's pressing country), in order; the first is the default when an import cannot tell.
+  Built-in values keep their keys; add your own with names in the app's languages. Plug-ins read
+  the keys (`product.region`), so a plug-in for Spanish prints checks `region === 'es'`.
 
 Keys are made from the English name when saved and never change (stored data uses them). A change
 that touches registered items (a removed field or value, a kind's list) says how many and asks

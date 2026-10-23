@@ -1249,7 +1249,8 @@
       "kind_list": "{name}: {count, plural, one {# artículo pasa} other {# artículos pasan}} a otra lista de estados (sus lotes necesitan el nuevo estado)",
       "field_removed": "Campo {name}: quitado de {count, plural, one {# artículo} other {# artículos}}",
       "choice_removed": "{name}: vaciado en {count, plural, one {# artículo} other {# artículos}}",
-      "value_removed": "{name}: vaciado en {count, plural, one {# lote} other {# lotes}}"
+      "value_removed": "{name}: vaciado en {count, plural, one {# lote} other {# lotes}}",
+      "region_removed": "{name}: se quita de {count, plural, one {# artículo} other {# artículos}}"
     },
     "blocked": {
       "category_in_use": "Una categoría con artículos no se puede quitar; ocúltala.",
@@ -1262,8 +1263,13 @@
       "kind_key": "Dos tipos tienen el mismo nombre.",
       "kind_list": "Un tipo usa una lista de estados quitada.",
       "field_key": "Dos campos tienen el mismo nombre.",
-      "choice_empty": "Un campo de opciones necesita al menos una opción."
-    }
+      "choice_empty": "Un campo de opciones necesita al menos una opción.",
+      "region_key": "Dos regiones tienen el mismo nombre."
+    },
+    "regions": "Regiones",
+    "regionsInfo": "Lo que ofrece el campo de región en esta categoría (idioma de impresión, región del juego, país de prensado...), en orden: la primera es la de por defecto cuando una importación no lo sabe. Los plug-ins leen estas claves.",
+    "regionName": "Nombre de la región",
+    "addRegion": "Añadir región"
   },
   "database": {
     "title": "Base de datos",

@@ -162,3 +162,33 @@ it('keeps the built-in item types and roles for TCG and games', async () => {
   expect(product.itemType).toBe('game');
   expect(registry.roles.surugaya?.game).toBe('reference');
 });
+
+it("takes the admin's own regions, refuses others, and clears a removed one after asking", async () => {
+  const base = resolveTaxonomy(null);
+  const withSpanish = (regions: string[]): Taxonomy => ({
+    ...base,
+    categories: base.categories.map((c) =>
+      c.key === 'tcg'
+        ? { ...c, regions, regionNames: { es: { en: 'Spanish', es: 'Español' } } }
+        : c,
+    ),
+  });
+  await saveTaxonomy(db, withSpanish(['jp', 'en', 'es']), true);
+  const card = (region: string) =>
+    createHolding(
+      db,
+      userId,
+      { product: { category: 'tcg', kind: 'single', name: 'Umbreon VMAX', region } },
+      { quantity: 1, costTotalBase: 100, acquiredAt: toLocalIso() },
+    );
+  const { product } = await card('es');
+  expect(product.region).toBe('es');
+  await expect(card('xx')).rejects.toThrow('invalid_input');
+  expect((await categoryUsage(db)).regions['tcg/es']).toBe(1);
+
+  const change = await saveTaxonomy(db, withSpanish(['jp', 'en']), false);
+  expect(change.touched).toEqual([{ code: 'region_removed', name: 'tcg: es', count: 1 }]);
+  await saveTaxonomy(db, withSpanish(['jp', 'en']), true);
+  const [after] = await db.select().from(schema.products).where(eq(schema.products.id, product.id));
+  expect(after!.region).toBeNull();
+});

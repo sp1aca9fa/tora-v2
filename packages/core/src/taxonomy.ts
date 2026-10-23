@@ -62,7 +62,11 @@ export const REGIONS = [
   'id',
   'other',
 ] as const;
-export type Region = (typeof REGIONS)[number];
+/**
+ * A region key: the built-in ones above, or one an admin added to a category's list (S10), so
+ * any string; `categoryDef(...).regions` says which a category takes.
+ */
+export type Region = string;
 
 export const SET_TYPES = ['expansion', 'deck', 'special'] as const;
 export type SetType = (typeof SET_TYPES)[number];

@@ -12,13 +12,14 @@ type Texts = Record<string, unknown>;
 
 /**
  * The admin's names for categories, kinds, item types, fields and condition values (S16), added
- * to a language's texts, so every `t('kind.x')` shows them: `category.{key}`, `kind.{key}`,
+ * to a language's texts, so every `t('kind.x')` shows them: `category.{key}`, `kind.{key}`, `region.{key}`,
  * `sourceRoles.class.{type}`, `fieldIn.{category}.{field}`, `conditionValue.{list}.{value}`,
  * `conditionLists.{list}`. Built-in ones keep the translation files' texts unless renamed.
  */
 export function withTaxonomy(messages: Messages, taxonomy: Taxonomy, locale: string): Messages {
   const section = (key: string): Texts => ({ ...((messages[key] as Texts | undefined) ?? {}) });
   const category = section('category');
+  const region = section('region');
   const kind = section('kind');
   const roles = section('sourceRoles');
   const cls: Texts = { ...((roles.class as Texts | undefined) ?? {}) };
@@ -31,6 +32,9 @@ export function withTaxonomy(messages: Messages, taxonomy: Taxonomy, locale: str
   for (const c of taxonomy.categories) {
     category[c.key] = name(c.names, category, c.key);
     for (const k of c.kinds) kind[k.key] = name(k.names, kind, k.key);
+    // The admin's own regions, and built-in ones they renamed (S10).
+    for (const [key, names] of Object.entries(c.regionNames ?? {}))
+      region[key] = name(names, region, key);
     const fields: Texts = {};
     for (const f of c.fields) if (f.names) fields[f.key] = pickName(f.names, locale, f.key);
     fieldIn[c.key] = fields;
@@ -51,6 +55,7 @@ export function withTaxonomy(messages: Messages, taxonomy: Taxonomy, locale: str
     ...messages,
     category,
     kind,
+    region,
     sourceRoles: { ...roles, class: cls },
     conditionLists: lists,
     fieldIn,

@@ -1249,7 +1249,8 @@
       "kind_list": "{name}: {count, plural, one {# item moves} other {# items move}} to another condition list (their lots need the new condition)",
       "field_removed": "Field {name}: removed from {count, plural, one {# item} other {# items}}",
       "choice_removed": "{name}: cleared on {count, plural, one {# item} other {# items}}",
-      "value_removed": "{name}: cleared on {count, plural, one {# lot} other {# lots}}"
+      "value_removed": "{name}: cleared on {count, plural, one {# lot} other {# lots}}",
+      "region_removed": "{name}: cleared on {count, plural, one {# item} other {# items}}"
     },
     "blocked": {
       "category_in_use": "A category with items cannot be removed; hide it.",
@@ -1262,8 +1263,13 @@
       "kind_key": "Two kinds have the same name.",
       "kind_list": "A kind uses a removed condition list.",
       "field_key": "Two fields have the same name.",
-      "choice_empty": "A choice field needs at least one choice."
-    }
+      "choice_empty": "A choice field needs at least one choice.",
+      "region_key": "Two regions have the same name."
+    },
+    "regions": "Regions",
+    "regionsInfo": "What the region field offers for this category (print language, game region, pressing country...), in order: the first is the default when an import cannot tell. Plug-ins read these keys.",
+    "regionName": "Region name",
+    "addRegion": "Add region"
   },
   "database": {
     "title": "Database",
