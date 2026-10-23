@@ -203,6 +203,7 @@
     "yourItem": "Your item",
     "owned": "{units, plural, one {# unit} other {# units}} · paid {amount}",
     "moreSuggestions": "{count, plural, one {# more suggestion} other {# more suggestions}}",
+    "broken": "Its {source} page stopped working on {day} ({error}) and is no longer collected: link the new one.",
     "paste": "Or paste the {source} page of this item:",
     "openItem": "Open item",
     "openLot": "Open lot",
@@ -920,6 +921,7 @@
     "intro": "Everything recorded under the duplicate (lots, prices, listings) moves to the existing item, and the duplicate is deleted.",
     "from": "Duplicate",
     "into": "Keep",
+    "sameListing": "The listing you picked is already linked to the item below, so the two are one item. Merge them to keep one item with all of the listing's sales (a listing's sales are kept once, under one item).",
     "submit": "Merge",
     "confirm": "Move {lots, plural, one {# lot} other {# lots}} (and its sales data and listings) to \"{name}\" and delete the duplicate."
   },

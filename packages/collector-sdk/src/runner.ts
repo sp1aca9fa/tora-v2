@@ -5,6 +5,8 @@ import {
   createQuerySource,
   heldBuckets,
   finishRun,
+  LISTING_BROKEN_NIGHTS,
+  recordListingFailure,
   listProductSources,
   setSourceQuery,
   insertObservations,
@@ -30,6 +32,7 @@ import {
   type PoliteHttpOptions,
   RequestCapError,
   errorText,
+  listingGone,
 } from './http';
 import { baseConverter } from './money';
 import { awakeClock } from './clock';
@@ -229,6 +232,12 @@ export async function runCollector(
       if (sources.length < all.length)
         log(`${all.length - sources.length} listing(s) already collected today, left out`);
       total += sources.length;
+      // Listings whose older history is still to fill in (collectors with a history phase).
+      const behind: {
+        link: (typeof all)[number]['source'];
+        product: (typeof all)[number]['product'];
+      }[] = [];
+      const fresh: CollectorContext = collector.historyPhase ? { ...ctx, phase: 'fresh' } : ctx;
       for (const { source: listing, product } of sources) {
         tick();
         let link = listing;
@@ -260,9 +269,14 @@ export async function runCollector(
           const result = await collector.collect(
             link,
             product,
-            ctx,
+            fresh,
             await heldBuckets(db, product.id),
           );
+          if (collector.historyPhase && !result.complete)
+            behind.push({
+              link: { ...link, state: result.state ?? null, title: result.title ?? link.title },
+              product,
+            });
           if (result.query) await setSourceQuery(db, link.id, result.query);
           await updateSourceProgress(db, link.id, {
             state: result.state,
@@ -311,7 +325,36 @@ export async function runCollector(
           );
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
-          fail(`collect ${product.name}`, e);
+          // A listing failing night after night is set aside (its item asks for a new link on
+          // Actions), so a run is not partial forever over a page that is gone.
+          if (listingGone(e) && (await recordListingFailure(db, listing, errorText(e), now)))
+            log(
+              `collect "${product.name}": failed ${LISTING_BROKEN_NIGHTS} nights in a row, set aside until relinked (${errorText(e)})`,
+            );
+          else fail(`collect ${product.name}`, e);
+        }
+      }
+      // Older history with the requests left once every listing had its new sales; running out
+      // here is normal (it continues next run), not a partial run.
+      for (const { link, product } of behind) {
+        try {
+          const result = await collector.collect(
+            link,
+            product,
+            { ...ctx, phase: 'history' },
+            await heldBuckets(db, product.id),
+          );
+          await updateSourceProgress(db, link.id, { state: result.state });
+          log(
+            `history of "${product.name}": ${result.complete ? 'caught up' : 'continues next run'}`,
+          );
+        } catch (e) {
+          if (e instanceof RequestCapError) {
+            log('request cap reached; older history continues next run');
+            break;
+          }
+          if (e instanceof BlockedError) throw e;
+          fail(`history ${product.name}`, e);
         }
       }
     }

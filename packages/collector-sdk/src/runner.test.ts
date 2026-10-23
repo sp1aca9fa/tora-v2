@@ -5,11 +5,13 @@ import {
   confirmCandidate,
   createDb,
   createHolding,
+  createProduct,
   createQuerySource,
   createUser,
   currentSupply,
   lowestAsk,
   linkSource,
+  pendingActions,
   listPendingCandidates,
   listProductSources,
   pendingMatchesForUser,
@@ -25,7 +27,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
-import { BlockedError } from './http';
+import { BlockedError, ListingGoneError, RequestCapError } from './http';
 import { pace, runCollector } from './runner';
 import type { Collector } from './types';
 
@@ -437,4 +439,72 @@ it('saves what is for sale now, one report per source and day', async () => {
   expect(rows.map((r) => [r.bucket, r.lowestAskBase])).toEqual([['sealed:shrink', 9_800]]);
   // Too old: nothing for sale now.
   expect((await currentSupply(db, [product.id], new Date('2026-10-20T03:00:00Z'))).size).toBe(0);
+});
+
+it('gives every listing its new sales first, held items before candidates, then older history', async () => {
+  const candidate = await createProduct(db, null, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Ranked BOX',
+    setName: 'RK',
+  });
+  await linkSource(db, candidate.id, { source: 'fake', externalId: 'C1' });
+  const { product } = await box();
+  await linkSource(db, product.id, { source: 'fake', externalId: 'H1' });
+  const calls: string[] = [];
+  let requests = 0;
+  const collector = fakeCollector({
+    historyPhase: true,
+    collect: async (link, _p, ctx) => {
+      calls.push(`${ctx.phase} ${link.externalId}`);
+      // Each history pass uses up the rest of the run's requests.
+      if (ctx.phase === 'history' && ++requests > 1) throw new RequestCapError();
+      return { state: { phase: ctx.phase }, complete: false };
+    },
+  });
+  const summary = await runCollector(db, collector, { ...quiet, collectOnly: true });
+  expect(calls).toEqual(['fresh H1', 'fresh C1', 'history H1', 'history C1']);
+  // Running out during the history is normal: it continues next run.
+  expect(summary.status).toBe('ok');
+  const held = (await listProductSources(db, product.id)).find((s) => s.externalId === 'H1')!;
+  expect(held.state).toEqual({ phase: 'history' });
+});
+
+it('sets a listing aside after 3 nights gone, then asks for a new link; other errors never do', async () => {
+  const { product } = await box();
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
+  let error: Error = new Error('database is locked');
+  const collector = fakeCollector({
+    collect: async () => {
+      throw error;
+    },
+  });
+  const night = (n: number) => ({
+    ...quiet,
+    collectOnly: true,
+    now: new Date(Date.UTC(2026, 9, 10 + n, 3)),
+  });
+  const link = async () =>
+    (await listProductSources(db, product.id)).find((s) => s.externalId === 'X1')!;
+  for (const n of [0, 1, 2, 3]) await runCollector(db, collector, night(n));
+  expect((await link()).active).toBe(true);
+  expect((await link()).failure).toBeNull();
+
+  error = new ListingGoneError('item X1 not found');
+  expect((await runCollector(db, collector, night(4))).status).toBe('partial');
+  // A retry the same night does not count again.
+  await runCollector(db, collector, night(4));
+  expect((await link()).failure).toMatchObject({ nights: 1 });
+  await runCollector(db, collector, night(5));
+  expect((await runCollector(db, collector, night(6))).status).toBe('ok');
+  expect(await link()).toMatchObject({ active: false, failure: { nights: 3 } });
+  const cards = await pendingActions(db, userId);
+  expect(cards).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ kind: 'source', source: 'fake', broken: expect.anything() }),
+    ]),
+  );
+  // Linked again: collected as before.
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
+  expect(await link()).toMatchObject({ active: true, failure: null });
 });

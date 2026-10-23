@@ -1,4 +1,13 @@
-import { type Db, createDb, createHolding, createUser, insertObservations, schema } from '@tora/db';
+import {
+  type Db,
+  createDb,
+  createHolding,
+  createProduct,
+  createUser,
+  insertObservations,
+  linkSource,
+  schema,
+} from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -86,4 +95,19 @@ it('runs read-only SQL only', async () => {
   expect(await querySql(db, 'select 1; delete from users')).toHaveProperty('error');
   expect(await querySql(db, 'with x as (select 1) delete from users')).toHaveProperty('error');
   expect((await db.select().from(schema.users)).length).toBe(1);
+});
+
+it('finds a twin nobody holds, and a listing linked to two items', async () => {
+  const held = await createHolding(db, uid, card('ブラッキーVMAX', '095'), lot());
+  const twin = await createProduct(db, uid, card('ブラッキーVMAX', '095').product);
+  await linkSource(db, twin.id, { source: 'snkrdunk', externalId: '93021' });
+  await linkSource(db, held.product.id, { source: 'snkrdunk', externalId: '93021' });
+  // Search links are per item, never shared.
+  await linkSource(db, twin.id, { source: 'mercari', externalId: 'search' });
+  await linkSource(db, held.product.id, { source: 'mercari', externalId: 'search' });
+  const checks = Object.fromEntries((await dataChecks(db, uid, now)).map((c) => [c.check, c]));
+  expect(checks.look_alikes?.count).toBe(1);
+  expect(checks.shared_listings?.items).toEqual([
+    expect.objectContaining({ source: 'snkrdunk', listing: '93021' }),
+  ]);
 });

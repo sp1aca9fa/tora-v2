@@ -307,7 +307,12 @@ export async function refreshSignals(
       lowAge = lowAges.get(lowKey) ?? null;
     }
     if (pattern) withPattern++;
-    const ask = lowestAsk(supply.get(product.id) ?? [], bucket ?? '');
+    // Like for like (as Opportunities): the price source's own ask; another site's cheapest
+    // listing is too often something else (Mercari asks at a third of the sales price).
+    const ask = lowestAsk(
+      (supply.get(product.id) ?? []).filter((x) => !picked || x.source === picked.source),
+      bucket ?? '',
+    );
     rows.push({
       productId: product.id,
       bucket: bucket ?? '',

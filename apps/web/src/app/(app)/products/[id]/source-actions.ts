@@ -11,12 +11,16 @@ import {
   updateSourceQuery,
   getCandidate,
   getProductSource,
+  canEditProduct,
+  getProduct,
+  itemWithListing,
   linkSource,
   rejectCandidate,
   unlinkSource,
   userHoldsProduct,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { authed } from '@/lib/auth/guard';
 import { getRegistry } from '@/lib/sources';
 import type { FormState } from '@/lib/form';
@@ -27,10 +31,25 @@ async function allowed(productId: string) {
   return (await userHoldsProduct(db, user.id, productId)) ? db : null;
 }
 
+/**
+ * A listing already linked to another item means the two are one item: the merge page instead
+ * of a second link (sales are stored once per site, so the second item would get almost none).
+ */
+async function mergeInstead(productId: string, link: { source: string; externalId: string }) {
+  const { db, user } = await authed();
+  const other = await itemWithListing(db, link, productId);
+  const product = other && (await getProduct(db, productId));
+  if (other && product && canEditProduct(user, product))
+    redirect(`/products/${productId}/merge?into=${other.id}&why=listing`);
+}
+
 export async function confirmCandidateAction(candidateId: string) {
   const { db } = await authed();
   const c = await getCandidate(db, candidateId);
-  if (c && (await allowed(c.productId))) await confirmCandidate(db, candidateId);
+  if (c && (await allowed(c.productId))) {
+    await mergeInstead(c.productId, c);
+    await confirmCandidate(db, candidateId);
+  }
   revalidatePath('/', 'layout');
 }
 
@@ -68,6 +87,7 @@ export async function linkUrlAction(
       },
     };
   }
+  await mergeInstead(productId, parsed);
   await linkSource(db, productId, parsed);
   // Also the Actions page and the badges (a main source may be linked now).
   revalidatePath('/', 'layout');

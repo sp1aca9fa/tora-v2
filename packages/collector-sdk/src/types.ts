@@ -32,6 +32,13 @@ export interface CollectorContext {
   setOf?: (product: Product) => Promise<{ code: string | null; releaseDate: string | null } | null>;
   /** The product's active listings on other sources (e.g. TCGplayer's English title). */
   linkedListings?: (productId: string) => Promise<{ source: string; title: string | null }[]>;
+  /**
+   * For collectors with `historyPhase`: `fresh` asks for the new sales, what is for sale and the
+   * last sale only (older history left for later: `complete: false`); `history` asks only to
+   * catch up older history, with the requests left once every listing had its fresh pass.
+   * Undefined for other collectors (one pass doing everything).
+   */
+  phase?: 'fresh' | 'history';
 }
 
 /**
@@ -114,6 +121,12 @@ export interface Collector {
    * run; queries the user edited (`extra.edited`) are kept.
    */
   queryVersion?: number;
+  /**
+   * The collector fills in older history apart from the new sales (`ctx.phase`): every listing
+   * gets its fresh pass first, and the history is caught up with the requests left, so a long
+   * backfill never keeps other listings from their daily prices.
+   */
+  historyPhase?: boolean;
   /**
    * Fetches new observations for a linked listing and saves them through `ctx.save`.
    * `heldBuckets`: the conditions users own of this product (e.g. `graded:PSA:10`), for sources

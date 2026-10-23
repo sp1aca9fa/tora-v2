@@ -30,7 +30,7 @@ import {
   sourceCandidates,
 } from './schema';
 import { loadSourceRegistry } from './registry';
-import { dismissedSourceWarnings, identityFor } from './sources';
+import { brokenListings, dismissedSourceWarnings, identityFor } from './sources';
 import { openSuggestions } from './suggestions';
 
 export interface ListingSuggestion {
@@ -65,6 +65,8 @@ export type ActionItem = ActionBase &
         units: number;
         /** Best first; empty when nothing was found (paste a link). */
         candidates: ListingSuggestion[];
+        /** The item's listing of this source stopped working and was set aside. */
+        broken: { since: string; error: string } | null;
       }
     /** A lot without a grade or condition, or an imported lot to review. */
     | { kind: 'lot'; product: Product; imageVersion: string | null; holding: Holding }
@@ -157,11 +159,17 @@ export async function pendingActions(
             ),
         ]);
   const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
+  const broken = await brokenListings(db, ids);
   const registry = await loadSourceRegistry(db);
   const known = await linkedListingImages(
     db,
     pending.filter((c) => !c.imageUrl).map((c) => ({ source: c.source, externalId: c.externalId })),
   );
+
+  const brokenOf = (productId: string, source: string) => {
+    const f = broken.get(`${productId}|${source}`);
+    return f ? { since: f.since, error: f.error } : null;
+  };
 
   const items: ActionItem[] = [];
   const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
@@ -196,6 +204,12 @@ export async function pendingActions(
     if (second && !dismissed.has(product.id)) {
       bySource.set(second, bySource.get(second) ?? []);
     }
+    // A listing that stopped working: asks for a new one, whatever its role.
+    for (const key of broken.keys()) {
+      const [id, source] = key.split('|') as [string, string];
+      if (id === product.id && !dismissed.has(product.id))
+        bySource.set(source, bySource.get(source) ?? []);
+    }
     for (const [source, candidates] of bySource) {
       const isMain = source === main;
       const type: NoticeType = !isMain
@@ -216,6 +230,7 @@ export async function pendingActions(
         source,
         // An identity link asked for (either market): the card stays until linked or dismissed.
         main: isMain || source === second,
+        broken: brokenOf(product.id, source),
         costBase,
         units: Number(units),
         candidates: candidates

@@ -915,7 +915,9 @@ export async function runSnapshots(db: Db, now = new Date()) {
     const key = `${userId}|${product.id}|${bucket}|${day}`;
     let v = unitCache.get(key);
     if (!v) {
-      const at = endOfDay(day);
+      // Today's value as of now, like the saved values the Portfolio total shows (the end of
+      // today would already drop the sales of 30 days ago that are still in its window).
+      const at = day === today ? now : endOfDay(day);
       const s = seriesFor(userId, product.id, bucket);
       const from = lowerBound(s.at, at.getTime() - WINDOW_DAYS * DAY);
       const to = lowerBound(s.at, at.getTime() + 1);

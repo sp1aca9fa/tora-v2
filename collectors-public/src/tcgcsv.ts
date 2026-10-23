@@ -1,4 +1,5 @@
 import type { Collector, CollectorContext, PoliteHttp } from '@tora/collector-sdk';
+import { ListingGoneError } from '@tora/collector-sdk';
 import { localDate, toLocalIso } from '@tora/core';
 import type { Product } from '@tora/db';
 
@@ -159,7 +160,8 @@ export const tcgcsv: Collector = {
       const group = (await groupsOf(ctx.http, cat))
         .filter((g) => path.includes(`/${prefix}${groupSlug(g.name)}-`))
         .sort((a, b) => b.name.length - a.name.length)[0];
-      if (!group) throw new Error(`set of TCGplayer product ${link.externalId} not found`);
+      if (!group)
+        throw new ListingGoneError(`set of TCGplayer product ${link.externalId} not found`);
       groupId = group.groupId;
     }
     const id = Number(link.externalId);

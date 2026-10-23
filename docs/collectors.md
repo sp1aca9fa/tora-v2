@@ -125,6 +125,7 @@ interface Collector {
   findCandidates(product, ctx): Promise<FoundCandidate[]>;
   defaultQuery?(product): SourceQuery | null; // search-based sources only
   queryVersion?: number;
+  historyPhase?: boolean; // older history in a second pass (see "Long histories")
   collect(link, product, ctx, heldBuckets?): Promise<CollectResult>;
   productDetails?(title, product): ProductDetails | null;
 }
@@ -197,7 +198,13 @@ Return a `CollectResult`:
 
 Long histories: read a few pages per run (the template uses 5) and resume. For histories that
 give only a day and no sale ID, `sweepHistory` in `@tora/collector-sdk` saves complete days only
-and resumes where it stopped. `heldBuckets` lists the conditions users own, for sites that show
+and resumes where it stopped. A collector whose history fill-in is long (a new listing with years of
+sales) sets `historyPhase: true`: each run then calls `collect` once per listing with
+`ctx.phase === 'fresh'` (new sales, what is for sale, last sale; return `complete: false` when
+older history is left), items someone holds or watches first, and then again with
+`ctx.phase === 'history'` (older history only) for the listings left behind, with the requests
+that remain. A backfill then never keeps other listings from their daily prices, and running out
+of requests in the history pass is normal. `heldBuckets` lists the conditions users own, for sites that show
 few trades per condition.
 
 ### Search-based sources

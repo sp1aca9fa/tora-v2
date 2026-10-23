@@ -45,10 +45,11 @@ import {
   currentSupply,
   savedBucketValues,
   bucketValueKey,
+  QUERY_SOURCE_ID,
 } from '@tora/db';
-import { and, desc, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, notInArray } from 'drizzle-orm';
 
-const { holdings, products, priceObservations, productImages, productSources } = schema;
+const { holdings, products, priceObservations, productImages, productSources, watches } = schema;
 
 const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
 const pct = (part: number, whole: number) =>
@@ -418,9 +419,16 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     ),
   );
 
-  // Look-alikes: the same name (and card number) registered as separate products.
+  // Look-alikes: the same name (and card number) registered as separate products, among every
+  // item (a twin nobody holds can still take the sales), shown when one is the user's.
+  const mine = new Set([
+    ...productIds,
+    ...(
+      await db.select({ id: watches.productId }).from(watches).where(eq(watches.userId, userId))
+    ).map((w) => w.id),
+  ]);
   const groups = new Map<string, Product[]>();
-  for (const p of new Map(rows.map((r) => [r.product.id, r.product])).values()) {
+  for (const p of await db.select().from(products)) {
     const key = `${p.kind}|${sameNameKey(p.name)}|${cardNumberKey(p.cardNumber) ?? ''}`;
     groups.set(key, [...(groups.get(key) ?? []), p]);
   }
@@ -430,8 +438,38 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       'warn',
       'Separate products with the same name and number: probably duplicates (merge them from the product edit page).',
       [...groups.values()]
-        .filter((g) => g.length > 1)
+        .filter((g) => g.length > 1 && g.some((p) => mine.has(p.id)))
         .map((g) => g.map((p) => ({ productId: p.id, name: p.name, setCode: p.setCode }))),
+    ),
+  );
+
+  // One listing linked to several items: its sales are stored once, under one of them.
+  const links = await db
+    .select({
+      source: productSources.source,
+      externalId: productSources.externalId,
+      product: products,
+    })
+    .from(productSources)
+    .innerJoin(products, eq(products.id, productSources.productId))
+    .where(and(eq(productSources.active, true), ne(productSources.externalId, QUERY_SOURCE_ID)));
+  const byListing = new Map<string, typeof links>();
+  for (const l of links) {
+    const key = `${l.source}|${l.externalId}`;
+    byListing.set(key, [...(byListing.get(key) ?? []), l]);
+  }
+  findings.push(
+    finding(
+      'shared_listings',
+      'warn',
+      'One listing linked to several items: a sale is stored once, so only one item gets them. They are the same item: merge them from the product edit page.',
+      [...byListing.values()]
+        .filter((g) => g.length > 1 && g.some((l) => mine.has(l.product.id)))
+        .map((g) => ({
+          source: g[0]!.source,
+          listing: g[0]!.externalId,
+          items: g.map((l) => ({ productId: l.product.id, name: l.product.name })),
+        })),
     ),
   );
 

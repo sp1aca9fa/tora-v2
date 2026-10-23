@@ -260,6 +260,12 @@ export const productSources = sqliteTable(
      * times). Shown as "last sale"; history and medians use price_observations only.
      */
     recentSales: text('recent_sales', { mode: 'json' }).$type<RecentSale[]>(),
+    /**
+     * The listing failing night after night (a page gone, an item removed): cleared by a
+     * success. After `LISTING_BROKEN_NIGHTS` nights it is set aside (`active` false, `brokenAt`)
+     * and the item asks for a new link on Actions.
+     */
+    failure: text('failure', { mode: 'json' }).$type<ListingFailure>(),
     ...timestamps,
   },
   (t) => [
@@ -268,6 +274,17 @@ export const productSources = sqliteTable(
     uniqueIndex('product_sources_external_uq').on(t.productId, t.source, t.externalId),
   ],
 );
+
+export interface ListingFailure {
+  /** Nights in a row the listing failed. */
+  nights: number;
+  /** The first failure of this streak, and the last night one was counted (YYYY-MM-DD). */
+  since: string;
+  day: string;
+  error: string;
+  /** Set aside as broken (no longer collected). */
+  brokenAt?: string;
+}
 
 export const CANDIDATE_STATUSES = ['pending', 'rejected'] as const;
 

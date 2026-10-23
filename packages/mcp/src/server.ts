@@ -213,7 +213,7 @@ server.registerTool(
   {
     title: 'Data checks',
     description:
-      'Runs the sanity checks and returns findings, each with what it means: unvalued lots, low-confidence or pooled values, look-alike products (duplicates), odd recent sales, weak searches, collector health, missing details (card number, set name, picture), estimated lot sizes, imports waiting for review. Start here for "does anything look off?".',
+      'Runs the sanity checks and returns findings, each with what it means: unvalued lots, low-confidence or pooled values, look-alike products (duplicates), listings linked to two items, odd recent sales, weak searches, collector health, missing details (card number, set name, picture), estimated lot sizes, imports waiting for review. Start here for "does anything look off?".',
     inputSchema: {},
   },
   async () => json(await dataChecks(db, user.id)),

@@ -40,6 +40,7 @@ import { rankedProductIds } from './rankings';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { clearBucketValues } from './valuation';
 import {
+  type ListingFailure,
   type NewPriceObservation,
   type Product,
   type ProductSource,
@@ -117,6 +118,7 @@ export async function linkSource(
         target: [productSources.productId, productSources.source, productSources.externalId],
         set: {
           active: true,
+          failure: null,
           ...(link.title ? { title: link.title } : {}),
           ...(imageUrl ? { imageUrl } : {}),
         },
@@ -146,6 +148,32 @@ export async function linkSource(
     }
     return row!;
   });
+}
+
+/**
+ * Another item already linked to this listing (sales are stored once per site, so two items
+ * sharing a listing split its sales): null when none.
+ */
+export async function itemWithListing(
+  db: Db,
+  link: { source: string; externalId: string },
+  productId: string,
+): Promise<Product | null> {
+  if (link.externalId === QUERY_SOURCE_ID) return null;
+  const [row] = await db
+    .select({ product: products })
+    .from(productSources)
+    .innerJoin(products, eq(products.id, productSources.productId))
+    .where(
+      and(
+        eq(productSources.source, link.source),
+        eq(productSources.externalId, link.externalId),
+        eq(productSources.active, true),
+        ne(productSources.productId, productId),
+      ),
+    )
+    .limit(1);
+  return row?.product ?? null;
 }
 
 export async function confirmCandidate(db: Db, candidateId: string): Promise<ProductSource | null> {
@@ -419,8 +447,28 @@ export async function activeSources(
           filter.productId ? eq(productSources.productId, filter.productId) : undefined,
         ),
       )
-      // Sources never collected (or least recently) first, so a capped run still makes progress.
-      .orderBy(sql`${productSources.lastSuccessAt} IS NOT NULL`, asc(productSources.lastSuccessAt))
+      // Items someone holds or watches first (candidates nobody tracks after), then sources never
+      // collected (or least recently) first, so a capped run still makes progress.
+      .orderBy(
+        sql`NOT (${exists(
+          db
+            .select({ one: sql`1` })
+            .from(holdings)
+            .where(
+              and(
+                eq(holdings.productId, products.id),
+                inArray(holdings.status, ['owned', 'consumed']),
+              ),
+            ),
+        )} OR ${exists(
+          db
+            .select({ one: sql`1` })
+            .from(watches)
+            .where(eq(watches.productId, products.id)),
+        )})`,
+        sql`${productSources.lastSuccessAt} IS NOT NULL`,
+        asc(productSources.lastSuccessAt),
+      )
   );
 }
 
@@ -513,7 +561,7 @@ export async function updateSourceProgress(
     .update(productSources)
     .set({
       ...(patch.state !== undefined ? { state: patch.state } : {}),
-      ...(patch.success ? { lastSuccessAt: toLocalIso() } : {}),
+      ...(patch.success ? { lastSuccessAt: toLocalIso(), failure: null } : {}),
       ...(patch.title ? { title: patch.title } : {}),
       ...(patch.url ? { url: patch.url } : {}),
       ...(patch.recentSales ? { recentSales: patch.recentSales } : {}),
@@ -522,6 +570,66 @@ export async function updateSourceProgress(
     .where(eq(productSources.id, sourceId))
     .returning({ productId: productSources.productId });
   if (link && patch.recentSales) await clearBucketValues(db, [link.productId]);
+}
+
+/** Nights in a row a listing may fail before it is set aside as broken. */
+export const LISTING_BROKEN_NIGHTS = 3;
+
+/**
+ * Counts a failed collect of a listing (once a night; a retry the same night does not count
+ * again). On the `LISTING_BROKEN_NIGHTS`th night the listing is set aside: no longer collected,
+ * and its item asks for a new link on Actions. Returns whether it is broken now.
+ */
+export async function recordListingFailure(
+  db: Db,
+  link: Pick<ProductSource, 'id' | 'failure'>,
+  error: string,
+  now = new Date(),
+): Promise<boolean> {
+  const at = toLocalIso(now);
+  const day = at.slice(0, 10);
+  const prev = link.failure;
+  const nights = !prev ? 1 : prev.day === day ? prev.nights : prev.nights + 1;
+  const broken = nights >= LISTING_BROKEN_NIGHTS;
+  const failure: ListingFailure = {
+    nights,
+    since: prev?.since ?? at,
+    day,
+    error: error.slice(0, 300),
+    ...(broken ? { brokenAt: at } : {}),
+  };
+  await db
+    .update(productSources)
+    .set({ failure, ...(broken ? { active: false } : {}) })
+    .where(eq(productSources.id, link.id));
+  return broken;
+}
+
+/**
+ * Listings set aside as broken, per item (`productId|source`), where the item has no other
+ * active listing of that source.
+ */
+export async function brokenListings(
+  db: Db,
+  productIds: string[],
+): Promise<Map<string, ListingFailure>> {
+  const out = new Map<string, ListingFailure>();
+  if (productIds.length === 0) return out;
+  const rows = await db
+    .select({
+      productId: productSources.productId,
+      source: productSources.source,
+      active: productSources.active,
+      failure: productSources.failure,
+    })
+    .from(productSources)
+    .where(inArray(productSources.productId, productIds));
+  const linked = new Set(rows.filter((r) => r.active).map((r) => `${r.productId}|${r.source}`));
+  for (const r of rows) {
+    const key = `${r.productId}|${r.source}`;
+    if (!r.active && r.failure?.brokenAt && !linked.has(key)) out.set(key, r.failure);
+  }
+  return out;
 }
 
 /** A run still "running" after this long was interrupted (runs take about half an hour). */

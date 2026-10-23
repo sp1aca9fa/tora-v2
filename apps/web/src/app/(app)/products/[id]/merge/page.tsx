@@ -13,10 +13,10 @@ export default async function MergePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ into?: string }>;
+  searchParams: Promise<{ into?: string; why?: string }>;
 }) {
   const { id } = await params;
-  const { into: intoId } = await searchParams;
+  const { into: intoId, why } = await searchParams;
   const { db, user } = await authed();
   const [from, into] = await Promise.all([
     getProduct(db, id),
@@ -47,6 +47,7 @@ export default async function MergePage({
     <div className="space-y-5">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{t('merge.title')}</h1>
+        {why === 'listing' && <p className="text-sm">{t('merge.sameListing')}</p>}
         <p className="text-sm text-muted-foreground">{t('merge.intro')}</p>
       </header>
       <div className="space-y-2">

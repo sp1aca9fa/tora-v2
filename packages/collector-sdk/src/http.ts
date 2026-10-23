@@ -21,6 +21,23 @@ export class RequestCapError extends Error {
   }
 }
 
+/**
+ * The listing is gone from the site (an item removed, a page that no longer exists). Thrown by a
+ * collector, or an HTTP 404 / 410: after a few nights in a row the listing is set aside and its
+ * item asks for a new link. Other errors never do (a bug must not unlink listings).
+ */
+export class ListingGoneError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ListingGoneError';
+  }
+}
+
+/** Whether an error says the listing itself is gone. */
+export const listingGone = (e: unknown) =>
+  e instanceof ListingGoneError ||
+  (e instanceof HttpError && (e.status === 404 || e.status === 410));
+
 export class HttpError extends Error {
   constructor(
     readonly status: number,

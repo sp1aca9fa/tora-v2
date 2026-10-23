@@ -126,9 +126,15 @@ export default async function ActionsPage() {
     }
     return {
       ...common,
-      summary: i.candidates.length
-        ? t('actions.suggestions', { count: i.candidates.length, source: sourceLabel(i.source) })
-        : t('actions.noSuggestion', { source: sourceLabel(i.source) }),
+      summary: i.broken
+        ? t('actions.broken', {
+            source: sourceLabel(i.source),
+            day: i.broken.since.slice(0, 10),
+            error: i.broken.error,
+          })
+        : i.candidates.length
+          ? t('actions.suggestions', { count: i.candidates.length, source: sourceLabel(i.source) })
+          : t('actions.noSuggestion', { source: sourceLabel(i.source) }),
       href: `/products/${i.product.id}/details#sources`,
       source: i.source,
       sourceLabel: sourceLabel(i.source),
