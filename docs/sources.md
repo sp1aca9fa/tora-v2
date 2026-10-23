@@ -58,8 +58,10 @@ The reference decides what everything is worth, so it needs:
 - **Stable access**: the same pages or API every day, without blocks or captchas.
 - **Terms that allow it**: see below.
 
-A daily **market price** computed by the site from its own sales (like TCGplayer's) can be a
-reference too: it is one price a day rather than each sale.
+A daily **market price** computed by the site from its own sales (like Cardmarket's trend) can be a
+reference too: its plug-in declares `priceKinds: ['market']` and saves it as one sale a day, so
+values are the median of those days. TCGCSV still saves TCGplayer's market price as an asking
+price: right for comparing markets, weak as a primary market's only source.
 
 **Supporting** fits a source with real sales but less reliable matching (a flea-market search that
 may include bundles or fakes, filtered by rules). **Comparison** fits asks, buy-back prices, and any
@@ -117,7 +119,7 @@ secondary US):
 | TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices (one a day)                                |
 | eBay               | US     | supporting | supporting | -             | -             | US asking prices (official API; `noAi`)                     |
 
-Only TCGCSV and eBay are public (`collectors-public/`); the others are private plug-ins.
+Only TCGCSV, eBay and Cardmarket are public (`collectors-public/`); the others are private plug-ins.
 
 - **TCGCSV**: TCGplayer's catalog and daily market prices as public files, for Japanese and English
   Pokemon cards and sealed product. TCGplayer prices ungraded cards only.
@@ -127,3 +129,8 @@ Only TCGCSV and eBay are public (`collectors-public/`); the others are private p
   data to AI models, so it is `noAi`. Needs a production keyset from developer.ebay.com in the home
   PC's `.env` (`EBAY_CLIENT_ID` = App ID, `EBAY_CLIENT_SECRET` = Cert ID); without it the collector
   is skipped.
+- **Cardmarket (TCGdex)**: Cardmarket's daily price guide in euros through [TCGdex](https://tcgdex.dev)
+  (open, keyless, MIT licensed), for single cards of the international prints (no sealed product).
+  Its market is `eu` (Europe). Off unless `ENABLE_CARDMARKET=1` is in the home PC's `.env`, since
+  it would otherwise search every English card each night. Its identity link is TCGdex's card
+  link (`https://api.tcgdex.net/v2/en/cards/swsh7-215`).

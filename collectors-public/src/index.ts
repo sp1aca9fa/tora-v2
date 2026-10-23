@@ -4,15 +4,39 @@ import { ebay } from './ebay';
 import { frankfurter } from './fx';
 import { pullRateSuggestions } from './pull-rates';
 import { tcgcsv } from './tcgcsv';
+import { tcgdex } from './tcgdex';
 
-// Collectors safe to publish: public APIs only. eBay needs a keyset (EBAY_CLIENT_ID / _SECRET).
+// Collectors safe to publish: public APIs only. eBay needs a keyset (EBAY_CLIENT_ID / _SECRET);
+// Cardmarket is switched on by ENABLE_CARDMARKET=1 (for a European market).
 export const collectors: Collector[] = [
   tcgcsv,
   ...(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET ? [ebay] : []),
+  ...(process.env.ENABLE_CARDMARKET === '1' ? [tcgdex] : []),
 ];
 export const rates: RateSource[] = [frankfurter];
 // Community pull rates for the box opening value (S20).
 export const pullRates: PullRateSource[] = [pullRateSuggestions];
+
+/** Cardmarket through TCGdex: a European market's price reference for cards. */
+const cardmarket: SourceInfo = {
+  key: 'tcgdex',
+  label: 'Cardmarket',
+  badge: 'C',
+  market: 'eu',
+  currency: 'EUR',
+  // Cardmarket's daily trend price, worked out from its sales: one "sale" a day.
+  priceKinds: ['market'],
+  roles: { card: 'reference' },
+  identity: ['card'],
+  priority: 40,
+  // TCGdex's card link (its API answer for the card): a stable page per card.
+  links: [
+    {
+      pattern: 'api\\.tcgdex\\.net/v2/\\w+/cards/([\\w.-]+)',
+      url: 'https://api.tcgdex.net/v2/en/cards/{id}',
+    },
+  ],
+};
 
 /**
  * How the app should use these (requirements S8, sources with roles; part of the "Japan
@@ -51,6 +75,8 @@ export const sources: SourceInfo[] = [
     noAi: true,
     detailsDays: 14,
   },
+  // Only when switched on: otherwise its market would show in Settings without prices.
+  ...(process.env.ENABLE_CARDMARKET === '1' ? [cardmarket] : []),
   // Shops purchases come from (not price sources).
   {
     key: 'amazon',

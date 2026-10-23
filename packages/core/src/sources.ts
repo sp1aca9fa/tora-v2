@@ -35,8 +35,11 @@ export interface SourceInfo {
   /** Country of its market (ISO 3166, e.g. "jp") and its currency (ISO 4217). */
   market?: string;
   currency?: string;
-  /** What its prices are: sales, asking prices, buy prices. */
-  priceKinds?: ('sold' | 'listing' | 'buylist')[];
+  /**
+   * What its prices are: sales, asking prices, buy prices, or a daily market price the site works
+   * out from its sales (`market`: saved as one sale a day, valued like sales).
+   */
+  priceKinds?: ('sold' | 'market' | 'listing' | 'buylist')[];
   /** Suggested role per item type (`card`, `game`, `watch/dial`...); types not listed are off. */
   roles?: Partial<Record<ProductClass, SourceRole>>;
   /**

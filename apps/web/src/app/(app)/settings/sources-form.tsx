@@ -165,7 +165,8 @@ export function SourcesForm({
                     {/* Asking or store prices only (e.g. eBay, 駿河屋): usable, but not sales. */}
                     {(role === 'reference' || role === 'supporting') &&
                       !!s.priceKinds?.length &&
-                      !s.priceKinds.includes('sold') && (
+                      !s.priceKinds.includes('sold') &&
+                      !s.priceKinds.includes('market') && (
                         <span className="mt-1 block w-full text-xs text-amber-700 dark:text-amber-400">
                           {t('asksOnly')}
                         </span>

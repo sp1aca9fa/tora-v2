@@ -92,24 +92,24 @@ export const rankings: RankingSource[] = []; // optional: a site's popularity ra
 Defined in `packages/core/src/sources.ts`. One per collector (same `key` as its `source`), plus one
 per shop purchases come from that is not a price source (`shopOnly`).
 
-| Field                     | What it says                                                                                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `key`                     | Stored with every price; **never change it** once data exists                                                                                                                 |
-| `label`, `badge`, `color` | How it is shown (badge: one or two characters; chart colour)                                                                                                                  |
-| `market`                  | ISO 3166 country of its prices (`jp`, `us`, `fr`)                                                                                                                             |
-| `currency`                | ISO 4217 currency of its prices (`JPY`, `USD`, `EUR`)                                                                                                                         |
-| `priceKinds`              | `sold` (real sales), `listing` (asking prices), `buylist` (what a shop pays)                                                                                                  |
-| `categories`              | Category keys it collects; none: the built-in TCG and games ([Categories](categories.md))                                                                                     |
-| `roles`                   | Suggested role per item type: `{ card: 'reference', sealed: 'supporting' }`; unlisted: off                                                                                    |
-| `priority`                | Default order among sources of the same role (lower first)                                                                                                                    |
-| `identity`                | Item types it has **one stable page per item** for (an identity page candidate)                                                                                               |
-| `links`                   | `[{ pattern, url }]`: a regular expression for its item links (without protocol and `www.`; group 1 = the ID, optional group 2 = `{rest}`) and the canonical link with `{id}` |
-| `aliases`                 | Names purchases from it show in receipts, screenshots, notes (case-blind)                                                                                                     |
-| `singleItemOrders`        | Each order is one item (an order ID is one lot)                                                                                                                               |
-| `orderIds`                | `{ pattern, hint }`: the shape of its order IDs and where a purchase page shows them                                                                                          |
-| `shopOnly`                | A shop purchases come from, not a price source                                                                                                                                |
-| `noAi`                    | Its terms forbid giving its data to AI models: left out of the data review and MCP tools                                                                                      |
-| `detailsDays`             | Listing details (`raw.ids`, `raw.listings`) dropped after this many days; the day's price stays                                                                               |
+| Field                     | What it says                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `key`                     | Stored with every price; **never change it** once data exists                                                                                                                  |
+| `label`, `badge`, `color` | How it is shown (badge: one or two characters; chart colour)                                                                                                                   |
+| `market`                  | ISO 3166 country of its prices (`jp`, `us`, `fr`)                                                                                                                              |
+| `currency`                | ISO 4217 currency of its prices (`JPY`, `USD`, `EUR`)                                                                                                                          |
+| `priceKinds`              | `sold` (real sales), `market` (a daily market price the site works out from its sales, saved as one `sold` row a day), `listing` (asking prices), `buylist` (what a shop pays) |
+| `categories`              | Category keys it collects; none: the built-in TCG and games ([Categories](categories.md))                                                                                      |
+| `roles`                   | Suggested role per item type: `{ card: 'reference', sealed: 'supporting' }`; unlisted: off                                                                                     |
+| `priority`                | Default order among sources of the same role (lower first)                                                                                                                     |
+| `identity`                | Item types it has **one stable page per item** for (an identity page candidate)                                                                                                |
+| `links`                   | `[{ pattern, url }]`: a regular expression for its item links (without protocol and `www.`; group 1 = the ID, optional group 2 = `{rest}`) and the canonical link with `{id}`  |
+| `aliases`                 | Names purchases from it show in receipts, screenshots, notes (case-blind)                                                                                                      |
+| `singleItemOrders`        | Each order is one item (an order ID is one lot)                                                                                                                                |
+| `orderIds`                | `{ pattern, hint }`: the shape of its order IDs and where a purchase page shows them                                                                                           |
+| `shopOnly`                | A shop purchases come from, not a price source                                                                                                                                 |
+| `noAi`                    | Its terms forbid giving its data to AI models: left out of the data review and MCP tools                                                                                       |
+| `detailsDays`             | Listing details (`raw.ids`, `raw.listings`) dropped after this many days; the day's price stays                                                                                |
 
 The roles are suggestions: the admin sets them in Settings. Suggest **comparison** for a new
 source until its numbers have been checked.

@@ -29,7 +29,8 @@ interface ReferenceInfo {
 export async function SearchSource({ db, link }: { db: Db; link: ProductSource }) {
   const money = await getMoney();
   const [sourceLabel, registry] = await Promise.all([sourceLabels(), getRegistry()]);
-  const asks = !sourceInfo(registry, link.source)?.priceKinds?.includes('sold');
+  const kinds = sourceInfo(registry, link.source)?.priceKinds;
+  const asks = !kinds?.includes('sold') && !kinds?.includes('market');
   const [t, format, sales, kept] = await Promise.all([
     getTranslations(),
     getFormatter(),

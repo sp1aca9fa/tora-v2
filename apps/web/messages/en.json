@@ -564,7 +564,8 @@
     "nothingYet": "Nothing from {source} for this item yet. The next collector run looks for it.",
     "market": {
       "jp": "Japan",
-      "us": "US"
+      "us": "US",
+      "eu": "Europe"
     },
     "pasteUrl": "Paste a product link from a price source ({sources})",
     "link": "Link",
@@ -1082,6 +1083,7 @@
     },
     "kind": {
       "sold": "sales",
+      "market": "daily market price",
       "listing": "asking prices",
       "buylist": "buy prices"
     },
