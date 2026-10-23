@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@libsql/client', 'libsql'],
   outputFileTracingRoot: repoRoot,
   poweredByHeader: false,
+  // `next dev` would otherwise write an AGENTS.md for AI agents into apps/web.
+  agentRules: false,
 };
 
 export default createNextIntlPlugin('./src/i18n/request.ts')(nextConfig);
