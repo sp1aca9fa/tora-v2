@@ -61,6 +61,11 @@ export interface SourceInfo {
    * name) and how a purchase page shows them (a hint for the import's reader).
    */
   orderIds?: { pattern?: string; hint?: string };
+  /**
+   * What the data review's model should know about its sales (how its titles read, what a sale
+   * without a title is), in English; given with the cases from this source.
+   */
+  reviewNotes?: string;
   /** A shop purchases come from, not a price source. */
   shopOnly?: boolean;
   /**

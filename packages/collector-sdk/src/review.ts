@@ -337,7 +337,7 @@ export const ANSWER_SCHEMA = {
   required: ['verdicts', 'fixes'],
 };
 
-export const SYSTEM_PROMPT = `You check data for a collectibles price tracker in Japan (trading cards, sealed boxes, video games). Sales are collected automatically from marketplaces by searching for each product, and a filter keeps the listings that look like the product. You judge only the cases given and reply with the requested JSON.`;
+export const SYSTEM_PROMPT = `You check data for a collectibles price tracker. Sales are collected automatically from marketplaces by searching for each product, and a filter keeps the listings that look like the product. You judge only the cases given and reply with the requested JSON.`;
 
 export const INSTRUCTIONS = `Below are cases flagged by automatic checks, as JSON.
 
@@ -353,7 +353,7 @@ Fixes (optional, in "fixes"; each refers to one case):
 - "fix_product": product details that are missing or wrong, when the titles make them clear (fields: ${FIXABLE_FIELDS.join(', ')}). Give only the fields to change. For promo cards: cardNumber is the number before the slash ("208"), setCode the promo code ("S-P"), rarity "P".
 Prefer one exclude_word fix over excluding many sales for the same reason.
 
-Japanese title notes: "X様" or "X様専用" means the seller reserved the listing for a buyer who asked; it is still an ordinary sale, judge it by its title and price like any other. 未開封 = unopened; シュリンク = shrink wrap; PSA/BGS/ARS = graded; ソフト = game software (often disc or cartridge only); 箱説付き = with box and manual. SNKRDUNK sales have no title: they are sales of exactly the linked product; judge them only by price.
+"sources": notes on the sources the cases come from (how their titles read, what a sale without a title means), by source key. Follow them.
 
 "notes": comments the collector (the user) left on earlier suggestions. They know these products: follow their notes over your own judgment, for the product named and for anything the note says in general.
 
@@ -365,7 +365,12 @@ Cases:
 /** Asks a model; returns its answer and what it cost. */
 export type Judge = (
   model: 'haiku' | 'sonnet',
-  input: { notes: UserNote[]; sales: SaleCase[]; searches: SearchCase[] },
+  input: {
+    notes: UserNote[];
+    sources?: Record<string, string>;
+    sales: SaleCase[];
+    searches: SearchCase[];
+  },
 ) => Promise<{ answer: ReviewAnswer; costUsd: number; tokens: number; modelName: string }>;
 
 export interface ReviewSummary {
@@ -407,8 +412,19 @@ export async function runReview(
     summary.tokens += r.tokens;
     return { ...r.answer, modelName: r.modelName };
   };
+  // Each source's notes for the model (its plug-in's), for the sources these cases come from.
+  const used = new Set([
+    ...cases.sales.flatMap((c) => [c.sale.source, ...c.otherSalesInBucket.map((o) => o.source)]),
+    ...cases.searches.map((c) => c.source),
+  ]);
+  const sources = Object.fromEntries(
+    (await loadSourceRegistry(db)).sources
+      .filter((s) => used.has(s.key) && s.reviewNotes)
+      .map((s) => [s.key, s.reviewNotes!]),
+  );
   const first = await ask('haiku', {
     notes: cases.notes,
+    ...(Object.keys(sources).length ? { sources } : {}),
     sales: cases.sales,
     searches: cases.searches,
   });
@@ -432,6 +448,7 @@ export async function runReview(
     summary.escalated = doubtful.size;
     const second = await ask('sonnet', {
       notes: cases.notes,
+      ...(Object.keys(sources).length ? { sources } : {}),
       sales: cases.sales.filter((c) => doubtful.has(c.case)),
       searches: cases.searches.filter((c) => doubtful.has(c.case)),
     });
