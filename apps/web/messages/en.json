@@ -271,7 +271,7 @@
       "existing": "Registered card"
     },
     "name": "Card name",
-    "nameHint": "Japanese name as printed (e.g. メガレックウザex) lets prices match automatically. Set, franchise and region come from the box.",
+    "nameHint": "The name as printed on the card (e.g. Mega Rayquaza ex) lets prices match automatically. Set, franchise and region come from the box.",
     "add": "Add pull",
     "done": "Done"
   },
@@ -1106,7 +1106,7 @@
       "dismissed": "notice dismissed"
     },
     "suggestedRole": "Suggested: {role}",
-    "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup (the Japan collectibles preset), not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
+    "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup, not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
     "perClass": "Each kind of item has its own roles and order. Within a role, the arrows set the order: values try sources sharing a role in this order (with two references, the first one is the main one), and item pages list them in it. Values and the value history follow a change within seconds.",
     "identityNone": "None",
     "asksOnly": "Asking or store prices, not sales: usually above what items sell for.",
@@ -1135,12 +1135,12 @@
   },
   "identity": {
     "whatTitle": "Why identity pages matter",
-    "what": "An identity page is one stable product page that says exactly what an item is: its name, set, number and picture (e.g. a SNKRDUNK card page).",
+    "what": "An identity page is one stable product page that says exactly what an item is: its name, set, number and picture (e.g. a card's page on a card marketplace).",
     "why": "It is the item's ID card. Once an item is linked to it, Tora knows precisely which item it is and can find the same item on every other source, so prices are matched to the right item. Without one, matches are guesses from the name.",
     "how": "Pick one source per kind of item and market. Items without an identity page are listed under Actions. A product page from another source of the same market that has them counts too. It does not have to be the price reference.",
     "primaryNotice": "Items without an identity page in {market} show under Actions as \"without an identity link\".",
     "secondaryNotice": "Items without an identity page in {market} show under Actions with their own notice type (blue by default).",
-    "notListed": "Only sources with one product page per item can be identity pages. Search-based sources (Mercari, Yahoo Auctions, eBay) cannot, but they can still be any market's price reference: set that under Price sources.",
+    "notListed": "Only sources with one product page per item can be identity pages. Search-based sources (flea markets, auctions, eBay) cannot, but they can still be any market's price reference: set that under Price sources.",
     "otherNotice": "Items without an identity page in {market} are not flagged.",
     "amount": "Identity links for other items",
     "amountInfo": "Cards and sealed TCG always need an identity link. Other items only when they cost more than this ({amount} now).",
@@ -1981,7 +1981,7 @@
   },
   "setLines": {
     "title": "Set lines",
-    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough (3 or more), else with the whole group. Pokemon items get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
+    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough (3 or more), else with the whole group. Japanese Pokemon sets get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
     "builtIn": "Built in",
     "others": "Other lines, one per line",
     "saved": "Saved."

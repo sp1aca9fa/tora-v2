@@ -1,6 +1,6 @@
 import type { SourceInfo } from '@tora/core';
 import type { Collector } from '@tora/collector-sdk';
-import { exampleMarket } from './example-market';
+import { CURRENCY, exampleMarket } from './example-market';
 
 // A plug-in package's entry point (docs/collectors.md). `pnpm collect` loads
 // `collectors-public/src/index.ts` and `collectors/src/index.ts`, not this template.
@@ -13,7 +13,7 @@ export const sources: SourceInfo[] = [
     label: 'Example Market',
     badge: 'X',
     market: 'jp',
-    currency: 'JPY',
+    currency: CURRENCY,
     // Real sales: it can be a reference (docs/sources.md). Asking prices would be 'listing'.
     priceKinds: ['sold'],
     // A suggestion; the admin decides in Settings. New sources are best started as comparison.

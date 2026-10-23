@@ -15,6 +15,8 @@ import type { Product } from '@tora/db';
  */
 
 export const BASE = 'https://example-market.test';
+/** The site's currency (its `SourceInfo` says the same). */
+export const CURRENCY = 'JPY';
 /** Pages read per listing per run: a long history is read over several runs. */
 export const MAX_PAGES = 5;
 
@@ -91,7 +93,8 @@ export const exampleMarket: Collector = {
           title: item.title,
           url: item.url,
           imageUrl: item.image,
-          price: item.currency === 'JPY' ? item.price : null,
+          // In the site's own currency; a listing priced in another has none.
+          price: item.currency === CURRENCY ? item.price : null,
           score: Math.round(score * 100) / 100,
         };
       })

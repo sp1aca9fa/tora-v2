@@ -271,7 +271,7 @@
       "existing": "Carta registrada"
     },
     "name": "Nombre de la carta",
-    "nameHint": "El nombre japonés tal como está impreso (p. ej. メガレックウザex) permite que los precios coincidan solos. El set, la franquicia y la región vienen de la caja.",
+    "nameHint": "El nombre tal como está impreso en la carta (p. ej. Mega Rayquaza ex) permite que los precios coincidan solos. El set, la franquicia y la región vienen de la caja.",
     "add": "Añadir carta sacada",
     "done": "Hecho"
   },
@@ -1106,7 +1106,7 @@
       "dismissed": "aviso descartado"
     },
     "suggestedRole": "Sugerido: {role}",
-    "suggestedWhy": "El papel que sugiere el plug-in de la fuente: la configuración probada por su autor (el preajuste de coleccionables de Japón), no una medición. La prueba es la comprobación bajo cada fuente de apoyo: cómo se comparan sus ventas con las de la referencia en los mismos artículos.",
+    "suggestedWhy": "El papel que sugiere el plug-in de la fuente: la configuración probada por su autor, no una medición. La prueba es la comprobación bajo cada fuente de apoyo: cómo se comparan sus ventas con las de la referencia en los mismos artículos.",
     "perClass": "Cada tipo de artículo tiene sus propios papeles y orden. Dentro de un papel, las flechas fijan el orden: los valores prueban las fuentes que comparten papel en este orden (con dos referencias, la primera es la principal), y las páginas de artículo las listan así. Los valores y su historial siguen un cambio en segundos.",
     "identityNone": "Ninguna",
     "asksOnly": "Precios pedidos o de tienda, no ventas: suelen estar por encima de lo que se vende.",
@@ -1135,12 +1135,12 @@
   },
   "identity": {
     "whatTitle": "Por qué importan las páginas de identidad",
-    "what": "Una página de identidad es una página de producto estable que dice exactamente qué es un artículo: su nombre, set, número e imagen (p. ej. la página de una carta en SNKRDUNK).",
+    "what": "Una página de identidad es una página de producto estable que dice exactamente qué es un artículo: su nombre, set, número e imagen (p. ej. la página de una carta en un mercado de cartas).",
     "why": "Es el DNI del artículo. Una vez enlazado, Tora sabe con precisión qué artículo es y puede encontrar el mismo en todas las demás fuentes, así que los precios se asignan al artículo correcto. Sin ella, las coincidencias son suposiciones a partir del nombre.",
     "how": "Elige una fuente por tipo de artículo y mercado. Los artículos sin página de identidad aparecen en Pendientes. También cuenta una página de producto de otra fuente del mismo mercado que las tenga. No tiene por qué ser la referencia de precios.",
     "primaryNotice": "Los artículos sin página de identidad en {market} aparecen en Pendientes como \"sin enlace de identidad\".",
     "secondaryNotice": "Los artículos sin página de identidad en {market} aparecen en Pendientes con su propio tipo de aviso (azul por defecto).",
-    "notListed": "Solo las fuentes con una página de producto por artículo pueden ser páginas de identidad. Las fuentes de búsqueda (Mercari, Yahoo Auctions, eBay) no, pero pueden ser la referencia de precios de cualquier mercado: eso se elige en Fuentes de precios.",
+    "notListed": "Solo las fuentes con una página de producto por artículo pueden ser páginas de identidad. Las fuentes de búsqueda (mercadillos, subastas, eBay) no, pero pueden ser la referencia de precios de cualquier mercado: eso se elige en Fuentes de precios.",
     "otherNotice": "Los artículos sin página de identidad en {market} no se marcan.",
     "amount": "Enlaces de identidad para otros artículos",
     "amountInfo": "Las cartas y el TCG sellado siempre necesitan enlace de identidad. Los demás artículos solo cuando cuestan más de esto ({amount} ahora).",
@@ -1981,7 +1981,7 @@
   },
   "setLines": {
     "title": "Líneas de sets",
-    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes (3 o más), y si no con todo el grupo. Los artículos de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario); los demás se marcan a mano en su página de edición.",
+    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes (3 o más), y si no con todo el grupo. Los sets japoneses de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario); los demás se marcan a mano en su página de edición.",
     "builtIn": "Incluidas",
     "others": "Otras líneas, una por línea",
     "saved": "Guardado."
