@@ -287,7 +287,7 @@
   "settings": {
     "title": "設定",
     "collectors": "価格収集",
-    "collectorsInfo": "価格収集は自宅PCで実行され（pnpm collect、cronで毎日）、データベースに書き込みます。Vercelでは実行されません。",
+    "collectorsInfo": "価格収集は自宅PCまたはサーバーで実行され（pnpm collect、タイマーで毎日）、データベースに書き込みます。ホスティング環境では実行されません。",
     "noRuns": "収集の実行履歴はまだありません。",
     "account": "アカウント",
     "logout": "ログアウト",
@@ -1462,7 +1462,8 @@
     "botSave": "ボットを保存",
     "botRemove": "ボットを削除",
     "botRemoveConfirm": "ボットを削除しますか？全員の Telegram 送信先が止まります。",
-    "schedule": "朝のチェックは毎日 {time} ごろに一度実行されます（Vercel の cron、apps/web/vercel.json で設定）。",
+    "schedule": "朝のチェックは毎日 {time}(アプリの時刻)からサーバー上で一度実行されます。",
+    "scheduleHosted": "朝のチェックは毎日 {time} ごろに一度実行されます（Vercel の cron、apps/web/vercel.json で設定）。",
     "error": {
       "invalid": "正しくないようです。確認してもう一度お試しください。",
       "unreachable": "サービスに接続できませんでした。しばらくしてからもう一度お試しください。",

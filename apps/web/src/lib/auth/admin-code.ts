@@ -6,7 +6,7 @@ import type { Session } from './guard';
 import { isLockedOut, recordAttempt } from './lockout';
 import { authConfigFromEnv } from './session';
 
-/** The client's IP as the platform gives it (Vercel's edge sets these headers). */
+/** The client's IP as the platform gives it (a hosting platform's edge or the server's proxy sets these headers). */
 export async function clientIp(): Promise<string> {
   const h = await headers();
   return h.get('x-real-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';

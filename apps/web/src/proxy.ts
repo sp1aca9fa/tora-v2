@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Everything except the login pages and public static assets (PWA manifest and icons must
-  // load without credentials). Vercel's cron jobs check their own secret (api/cron), store notice
+  // load without credentials). A hosting platform's cron job checks its own secret (api/cron), store notice
   // feeds their token (api/feed).
   matcher: [
     '/((?!login|api/cron/|api/feed/|_next/static|_next/image|icons/|manifest\\.webmanifest|favicon\\.ico|icon\\.svg|apple-icon).*)',

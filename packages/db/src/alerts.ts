@@ -1,8 +1,8 @@
 // Alerts outside the app (requirements S17): Telegram (one bot for the app, set by an admin) and
 // Discord (a webhook per person). Failures of the home PC's runs go out at once to admins; imports
-// with rows not added and what waits on Actions go out in one daily summary per person. The home
-// PC sends failures after its runs (`pnpm alerts after-run`); the app's morning check (a Vercel
-// cron job) sends "nothing ran" and the summaries, so they never arrive in the night. Watched
+// with rows not added and what waits on Actions go out in one daily summary per person. The PC or
+// server sends failures after its runs (`pnpm alerts after-run`); the app's morning check (run by
+// the server itself, or a hosting platform's cron job) sends "nothing ran" and the summaries, so they never arrive in the night. Watched
 // items (S9 part 5): the buy zone and an ask under the target go out at once after the collect,
 // sharp drops of owned and watched items in the summary.
 import { decryptSecret, encryptSecret, keyedHash } from '@tora/auth';

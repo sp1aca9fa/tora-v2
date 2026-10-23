@@ -12,6 +12,7 @@ import {
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
+import { rememberAppUrl } from '@/lib/alerts';
 import {
   SESSION_COOKIE,
   authConfigFromEnv,
@@ -58,6 +59,8 @@ export const currentSession = cache(async (): Promise<Session | null> => {
 export async function authed(): Promise<Session> {
   const session = await currentSession();
   if (!session) redirect('/login');
+  // The address people sign in through is the one messages link to.
+  await rememberAppUrl(session.db);
   return session;
 }
 

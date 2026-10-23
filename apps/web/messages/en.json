@@ -287,7 +287,7 @@
   "settings": {
     "title": "Settings",
     "collectors": "Collectors",
-    "collectorsInfo": "Collectors run on your home PC (pnpm collect, daily via cron) and write to the database. They never run on Vercel.",
+    "collectorsInfo": "Collectors run on your home PC or server (pnpm collect, daily via a timer) and write to the database. They never run on a hosting platform.",
     "noRuns": "No collector runs recorded yet.",
     "account": "Account",
     "logout": "Sign out",
@@ -1462,7 +1462,8 @@
     "botSave": "Save the bot",
     "botRemove": "Remove the bot",
     "botRemoveConfirm": "Remove the bot? Everyone's Telegram channels stop.",
-    "schedule": "The morning check runs once a day at about {time} (Vercel cron, set in apps/web/vercel.json).",
+    "schedule": "The morning check runs once a day from {time} (app time), on the server itself.",
+    "scheduleHosted": "The morning check runs once a day at about {time} (Vercel cron, set in apps/web/vercel.json).",
     "error": {
       "invalid": "That does not look right. Check it and try again.",
       "unreachable": "Could not reach the service. Try again in a moment.",

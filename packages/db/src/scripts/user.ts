@@ -8,7 +8,7 @@
 //   pnpm user revoke <username> <device-id|all>
 //   pnpm user disable|enable <username>
 //
-// AUTH_SECRET in .env must equal the one on Vercel: it encrypts the authenticator secrets.
+// AUTH_SECRET in .env must equal the app's: it encrypts the authenticator secrets.
 import {
   encryptSecret,
   generateBackupCodes,
@@ -93,8 +93,7 @@ async function askPassword(): Promise<string> {
 
 /** Shows the QR code and requires one valid code before saving, so a bad scan cannot lock you out. */
 async function enrollAuthenticator(username: string) {
-  if (authSecret.length < 32)
-    fail('AUTH_SECRET (32+ chars, same as on Vercel) must be set in .env.');
+  if (authSecret.length < 32) fail('AUTH_SECRET (32+ chars, same as the app) must be set in .env.');
   const secret = generateTotpSecret();
   const uri = otpauthUri(secret, username);
   console.log('\nScan with your authenticator app (Google Authenticator, 1Password, ...):\n');

@@ -1,6 +1,6 @@
 // `pnpm restore <file>`: loads a backup (`tora-YYYY-MM-DD.db.gz`) into the database in
 // DATABASE_URL, which must be a new, empty one: a restore never overwrites data.
-// docs/backups.md: making a new Turso database, restoring, and switching Vercel and the PC to it.
+// docs/backups.md: making a new Turso database, restoring, and switching the app and the PC to it.
 import { createClient } from '@libsql/client';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';

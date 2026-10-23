@@ -1,5 +1,5 @@
 import { alertPrefs } from '@tora/core';
-import { channelsOf, telegramBotName, telegramLink } from '@tora/db';
+import { MORNING_CHECK_HOUR, channelsOf, telegramBotName, telegramLink } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getFormatter, getTranslations } from 'next-intl/server';
@@ -28,8 +28,13 @@ export default async function AlertSettingsPage() {
   ]);
   const prefs = alertPrefs(user.preferences);
   const admin = user.role === 'admin';
+  // On a hosting platform its cron job runs the morning check (UTC); a server runs it itself.
+  const hosted = !!process.env.VERCEL;
   const check = new Date();
   check.setUTCHours(MORNING_CHECK_UTC_HOUR, 0, 0, 0);
+  const morning = hosted
+    ? t('scheduleHosted', { time: format.dateTime(check, { timeStyle: 'short' }) })
+    : t('schedule', { time: `${String(MORNING_CHECK_HOUR).padStart(2, '0')}:00` });
   const langs = [languages.primary, languages.secondary].filter((l): l is string => !!l);
   return (
     <div className="space-y-4">
@@ -76,9 +81,7 @@ export default async function AlertSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>{t('what')}</CardTitle>
-          <CardDescription>
-            {t('schedule', { time: format.dateTime(check, { timeStyle: 'short' }) })}
-          </CardDescription>
+          <CardDescription>{morning}</CardDescription>
         </CardHeader>
         <CardContent>
           <AlertPrefsForm
