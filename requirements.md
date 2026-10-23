@@ -42,7 +42,7 @@
 | S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | built 2026-10-20 (no migration; suggestions appear after the next collect or `pnpm plugins`) |
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
-| S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | in progress (2026-10-23): A data checks done; C the Spain + Brazil setup and the two-category test done (findings 1, 3-12 to fix, user 2026-10-24; pages after the dev server may run outside the sandbox); then the status page and the page crawler, B the deep dive, D the write-up |
+| S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | in progress (2026-10-23): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); left of C: the pages; then the status page and the page crawler, B the deep dive, D the write-up |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | todo (user, 2026-10-14; infinite scroll added 2026-10-20) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
@@ -833,6 +833,17 @@ Two-category test (user, 2026-10-24: instead of more card checks, prove Tora wor
 10. A required custom field is only checked by the browser form: the server, the spreadsheet import and Claude's imports accept an item without it.
 11. The lot spreadsheet (download and import) has no columns for custom fields, so a watch's reference or a record's catalogue number is lost in a round trip.
 12. The built-in Region list (TCG print languages, game regions) cannot be extended in Settings, and the admin's own categories have none (a custom choice field works for people, not for plug-ins). To fix (user, 2026-10-24): each category's region list editable in Settings, built-in keys kept.
+
+Fixed (2026-10-24, user: 1 and 3-12; 2 not needed, 9 is Claude's sandbox):
+- 1: the Pokemon catalog has TCGdex's international sets (197, with printed codes); `pnpm catalog:fetch` keeps both.
+- 3: a new install's admin gets an Actions card until the base currency and time zone are chosen (keeping the defaults stores them); the identity cost threshold defaults per base currency (¥3,000, else 20) and a typed one is converted with the base; the time zone's setup text says what it rewrites.
+- 4: the collect gathers only the markets in use (primary and secondary, or all when item pages compare all; a market or source named on the command line still runs); Actions leaves out other markets' suggestions; eBay's source registers only with its keys; the Japanese shops moved to the private package.
+- 5, 8: docs (replace the repo's `collectors/` entry before adding your own; graded cards need a source that prices them).
+- 6: texts and the template no longer assume Japan.
+- 7: `TORA_STATE_DIR` for a second install on one PC.
+- 10: required fields are checked by the server (Add, item edit, spreadsheet import); purchase imports stay lenient.
+- 11: the lot spreadsheet carries the admin's own fields both ways.
+- 12: region lists per category in Settings > Categories (migration 0056 drops the fixed region checks; tested on a copy of the analysis database: counts and links unchanged); Claude's imports fall back to the category's first region.
 ## S17: Notifications and activity log
 
 Idea (user, 2026-10-16): alerts that reach the user outside the app, and a log of what happened. The user first planned alerts by email, Telegram or Discord; "price alerts" went into S9 without a channel. Placed after S6 and before S9, so S9's price alerts have somewhere to go.
