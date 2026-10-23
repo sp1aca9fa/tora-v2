@@ -33,9 +33,11 @@ export const stores: StoreDirectory[] = [
 ];
 ```
 
-A store can carry `labelEn`, a short label in English ("Megastore Ekimae"; a place:
-"Ekimae"), used in notices and on the Stores page for people reading another language than
-Japanese; without one, the chain and name as written.
+A list says the language its stores' names are written in (`language: 'ja'`), and a store can
+carry short labels in other languages (`labels: { en: 'Megastore Ekimae' }`; a place:
+`{ en: 'Ekimae' }`), used in notices and on the Stores page for people reading that language;
+someone reading a language with no label of its own gets the English one, and without any, the
+chain and name as written.
 
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
 "none", a chain's mark, a product), each with its meaning; `product: true` marks a product. The

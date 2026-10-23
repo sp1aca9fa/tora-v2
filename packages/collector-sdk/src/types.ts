@@ -269,6 +269,8 @@ export interface StoreDirectory {
   /** Saved as the stores' source ("japan-stores"). */
   key: string;
   label: string;
+  /** The language the stores' names are written in ("ja"), for their labels in other languages. */
+  language?: string;
   stores(): ListedStore[] | Promise<ListedStore[]>;
   /** Codes posters use that are no store or place (states, chain marks, products). */
   glossary?: CodeMeaning[];

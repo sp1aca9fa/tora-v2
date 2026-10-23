@@ -8,11 +8,13 @@ export interface StoreEntry {
   /** The chain as people read it ("メガストア"). */
   chainLabel?: string | null;
   name: string;
+  /** The language its name is written in ("ja"), when the list says. */
+  language?: string | null;
   /**
-   * A short label in English for people reading notices in English ("Megastore Ekimae"; a
-   * place: "Ekimae"); without one, the chain and name as written.
+   * Short labels for people reading another language, by language ({ en: "Megastore Ekimae" };
+   * a place: { en: "Ekimae" }); without one, the chain and name as written.
    */
-  labelEn?: string | null;
+  labels?: Record<string, string> | null;
   /** What posters write for it: codes, short names ("中央", "KITA"). */
   codes: string[];
   /** Prefecture or region, for picking stores by hand. */
@@ -101,6 +103,18 @@ function mentions(text: string, code: string): boolean {
   if (!ascii.test(c)) return text.includes(c);
   const escaped = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(text);
+}
+
+/**
+ * A store's label for a person reading `locale`, or null for its chain and name as written: the
+ * label in that language, else (the name being in another language) the English one.
+ */
+export function storeLabelIn(
+  store: Pick<StoreEntry, 'language' | 'labels'>,
+  locale: string,
+): string | null {
+  if (store.language === locale) return null;
+  return store.labels?.[locale] ?? (store.language ? (store.labels?.en ?? null) : null);
 }
 
 /**

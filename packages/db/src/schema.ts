@@ -1110,8 +1110,10 @@ export const stores = sqliteTable(
     /** The chain as people read it ("メガストア"). */
     chainLabel: text('chain_label'),
     name: text('name').notNull(),
-    /** A short label in English for notices ("Megastore Ekimae"; a place: "Ekimae"). */
-    labelEn: text('label_en'),
+    /** The language its name is written in ("ja"), when the list says. */
+    language: text('language'),
+    /** Short labels in other languages, by language ({ en: "Megastore Ekimae" }). */
+    labels: text('labels', { mode: 'json' }).$type<Record<string, string>>(),
     /** What posters write for it, from the plug-in. */
     codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),
     /** Codes the admin added. */

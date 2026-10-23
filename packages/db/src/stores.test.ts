@@ -206,14 +206,15 @@ it('sends replies at once as comments to their post, with the products its codes
   expect(sent.at(-1)).toContain('Comment to メガストアKita\n*Snow set*');
   // Replies naming no store are no "unknown store" post.
   expect(await sendFeedMessages(db, uid, more, ctx, now)).toBe(0);
-  // A store's English label, for people reading English.
+  // A store's English label, for people reading English (its name being Japanese).
   const kita = (await listStores(db)).find((s) => s.sourceKey === 'kita')!;
   await saveStores(db, 'test', [
     {
       key: 'kita',
       chain: kita.chain,
       name: kita.name,
-      labelEn: 'Megastore Kita',
+      language: 'ja',
+      labels: { en: 'Megastore Kita' },
       codes: kita.codes,
       lat: kita.lat,
       lon: kita.lon,

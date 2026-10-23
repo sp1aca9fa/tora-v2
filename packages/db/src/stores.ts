@@ -9,6 +9,7 @@ import {
   localDate,
   productsInPost,
   storeNotice,
+  storeLabelIn,
   storeUnknownNotice,
   storesInArea,
   storesInPost,
@@ -65,7 +66,8 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
       chain: s.chain,
       chainLabel: s.chainLabel ?? null,
       name: s.name,
-      labelEn: s.labelEn ?? null,
+      language: s.language ?? null,
+      labels: s.labels && Object.keys(s.labels).length ? s.labels : null,
       codes: s.codes,
       region: s.region ?? null,
       lat: s.lat ?? null,
@@ -720,14 +722,14 @@ const PRUNE_EVERY_MS = 60 * 60_000;
 let prunedAt = 0;
 
 /**
- * The store as people read it in a notice: its English label for people reading another language
- * than Japanese ("Megastore Ekimae"), else the chain and name as written; a place: "駅前 area".
+ * The store as people read it in a notice: its label in their language ("Megastore Ekimae"), else
+ * the chain and name as written; a place: "駅前 area".
  */
 function storeLabel(store: Store, t: AlertTexts, locale: string): string {
-  const en = locale !== 'ja' ? store.labelEn : null;
+  const label = storeLabelIn(store, locale);
   return store.chain === PLACE
-    ? fill(t.storeArea ?? '{name} area', { name: en ?? store.name })
-    : (en ?? [store.chainLabel, store.name].filter(Boolean).join(' '));
+    ? fill(t.storeArea ?? '{name} area', { name: label ?? store.name })
+    : (label ?? [store.chainLabel, store.name].filter(Boolean).join(' '));
 }
 
 /**

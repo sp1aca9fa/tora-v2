@@ -7,6 +7,7 @@ import {
   storesInArea,
   PLACE,
   productsInPost,
+  storeLabelIn,
   storesInPost,
   withinHours,
 } from './stores';
@@ -173,5 +174,19 @@ describe('store notices: products in a post', () => {
     const read = (text: string) => productsInPost(text, list).map((p) => p.meaning);
     expect(read('港町△継続中')).toEqual(['Swirl box']);
     expect(read('ゼルビア種あり')).toEqual(['Seeds']);
+  });
+});
+
+describe('store labels', () => {
+  it("names a store in the reader's language, English when theirs has none", () => {
+    const store = { language: 'ja', labels: { en: 'Megastore Kita', fr: 'Mégastore Kita' } };
+    expect(storeLabelIn(store, 'ja')).toBeNull();
+    expect(storeLabelIn(store, 'fr')).toBe('Mégastore Kita');
+    expect(storeLabelIn({ ...store, labels: { en: 'Megastore Kita' } }, 'fr')).toBe(
+      'Megastore Kita',
+    );
+    // A name in an unknown language stays as written unless the reader's language has a label.
+    expect(storeLabelIn({ labels: { en: 'Kita' } }, 'fr')).toBeNull();
+    expect(storeLabelIn({ labels: { en: 'Kita' } }, 'en')).toBe('Kita');
   });
 });

@@ -379,6 +379,20 @@
       "when": 1792586882978,
       "tag": "0053_rankings",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1792756186618,
+      "tag": "0054_store_labels",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1792756187431,
+      "tag": "0055_store_label_en_dropped",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,12 @@
 import 'server-only';
-import { PLACE, type StoreArea, localDate, productsInPost, storesInArea } from '@tora/core';
+import {
+  PLACE,
+  type StoreArea,
+  localDate,
+  productsInPost,
+  storeLabelIn,
+  storesInArea,
+} from '@tora/core';
 import { type Db, cachedStores, postsPage, storeCodes, storeGlossary } from '@tora/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 
@@ -55,12 +62,12 @@ export async function postViews(
       names: p.storeIds.flatMap((id) => {
         const s = byId.get(id);
         if (!s) return [];
-        // English labels for people reading another language than Japanese.
-        const en = locale !== 'ja' ? s.labelEn : null;
+        // The label in the reader's language, else the name as written.
+        const label = storeLabelIn(s, locale);
         return [
           s.chain === PLACE
-            ? t('areaOf', { name: en ?? s.name })
-            : (en ?? [s.chainLabel, s.name].filter(Boolean).join(' ')),
+            ? t('areaOf', { name: label ?? s.name })
+            : (label ?? [s.chainLabel, s.name].filter(Boolean).join(' ')),
         ];
       }),
       mine: p.storeIds.some((id) => inArea.has(id)),

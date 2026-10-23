@@ -91,7 +91,11 @@ export async function loadAndRegister(db: Db, root?: string): Promise<LoadedColl
     loaded.rankings.map(({ key, label, source }) => ({ key, label, source })),
   );
   for (const directory of loaded.stores) {
-    await saveStores(db, directory.key, await directory.stores());
+    await saveStores(
+      db,
+      directory.key,
+      (await directory.stores()).map((s) => ({ language: directory.language ?? null, ...s })),
+    );
     await saveGlossary(db, directory.key, directory.glossary ?? []);
   }
   return loaded;
