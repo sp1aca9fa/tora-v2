@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FormState } from '@/lib/form';
 
+/** `label`: the sentence shown above the box, with its source names filled in. */
 export function LinkUrlForm({
   action,
+  label,
 }: {
   action: (state: FormState, formData: FormData) => Promise<FormState>;
+  label: string;
 }) {
   const t = useTranslations('sources');
   const [state, formAction, pending] = useActionState(action, {});
@@ -23,7 +26,7 @@ export function LinkUrlForm({
           inputMode="url"
           required
           placeholder="https://…"
-          aria-label={t('pasteUrl')}
+          aria-label={label}
         />
         <Button type="submit" variant="outline" disabled={pending}>
           {t('link')}

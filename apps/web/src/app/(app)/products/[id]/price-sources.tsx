@@ -154,7 +154,10 @@ export async function PriceSources({
       <p className="text-xs text-muted-foreground">
         {t('sources.pasteUrl', { sources: linkable })}
       </p>
-      <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
+      <LinkUrlForm
+        action={linkUrlAction.bind(null, product.id)}
+        label={t('sources.pasteUrl', { sources: linkable })}
+      />
     </div>
   );
 
@@ -195,7 +198,10 @@ export async function PriceSources({
     const pasteHere = canPaste && !(pasteUp && key === missing) && (
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">{t('sources.pasteOne', { source: label })}</p>
-        <LinkUrlForm action={linkUrlAction.bind(null, product.id)} />
+        <LinkUrlForm
+          action={linkUrlAction.bind(null, product.id)}
+          label={t('sources.pasteOne', { source: label })}
+        />
       </div>
     );
     return (

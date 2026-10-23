@@ -547,7 +547,10 @@ function SourceControls({
         <p className="text-xs text-muted-foreground">
           {t('actions.paste', { source: c.sourceLabel ?? '' })}
         </p>
-        <LinkUrlForm action={linkUrlAction.bind(null, c.productId!)} />
+        <LinkUrlForm
+          action={linkUrlAction.bind(null, c.productId!)}
+          label={t('actions.paste', { source: c.sourceLabel ?? '' })}
+        />
       </div>
       {c.main && (
         <Button
