@@ -57,7 +57,7 @@ const box = (name: string) =>
     region: 'jp',
   });
 
-// Three months of daily data for several items: slow under a loaded machine.
+// Over two years of daily data for eleven items: slow on a loaded machine.
 it('saves every item signals and its group tests, and ranks them', async () => {
   // Ten boxes flat for 600 days, then rising 2 % a week for 250, one flat throughout: the flat
   // one lags a rising line, and the line's rise was followed by higher prices.
