@@ -5,9 +5,10 @@ amiibo, controllers, ...): what I own, what I paid, and what it is worth now, ba
 second-hand market data accumulated in its own database. A few accounts (family); each sees only
 their own collection, while the product catalog and market data are shared.
 
-- **Web app** (`apps/web`): Next.js, hosted on Vercel, behind username + password + authenticator
-  code, limited to 2 devices per account.
-- **Database**: Turso (hosted libSQL / SQLite) via Drizzle ORM. Local dev uses a SQLite file.
+- **Web app** (`apps/web`): Next.js, hosted on Vercel (free) or on any always-on machine of your
+  own, behind username + password + authenticator code, limited to 2 devices per account.
+- **Database**: Turso (hosted libSQL / SQLite, free) or a SQLite file on your own machine, via
+  Drizzle ORM. Local dev uses a SQLite file.
 - **Collectors**: run only on a home PC in WSL2 (residential IP) and write straight to Turso.
   The public repo ships the app and the collector framework, **not** scrapers for any site.
 

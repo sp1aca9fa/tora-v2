@@ -55,8 +55,9 @@ it.
      pnpm restore ~/.local/share/tora/backups/tora-2026-10-16.db.gz
    DATABASE_URL=libsql://tora-restored-<org>.turso.io DATABASE_AUTH_TOKEN=<token> pnpm db:migrate
    ```
-3. Switch to it: put the new URL and token in the home PC's `.env` and in Vercel's environment
-   variables, then redeploy on Vercel. Sign in and check the portfolio.
+3. Switch to it: put the new URL and token in the home PC's `.env` and in the app's environment
+   (on Vercel its environment variables, then redeploy; on your own server its `.env`, then restart
+   the app). Sign in and check the portfolio.
 4. Once happy, delete the old database (`turso db destroy tora`).
 
 To look inside a copy without the app, unzip it and open it with any SQLite tool:

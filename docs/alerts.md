@@ -39,7 +39,8 @@ watch's condition or target starts over.
 
 ## Setting up (admin, once)
 
-1. **The morning check.** Add `CRON_SECRET` (any random value, e.g. `openssl rand -base64 32`) to
+1. **The morning check.** On your own server, nothing to do: the app runs it itself from 08:00
+   (app time). On Vercel, add `CRON_SECRET` (any random value, e.g. `openssl rand -base64 32`) to
    the Vercel project's environment variables and redeploy. Vercel then calls `/api/cron/daily`
    once a day with it; without it the call is refused. The time is in `apps/web/vercel.json`
    (`"0 23 * * *"`: 23:00 UTC, 08:00 in Japan); change it for another time zone and keep
@@ -49,7 +50,7 @@ watch's condition or target starts over.
    `/newbot`, pick a name, and paste the token it gives into Settings > Alerts > Telegram bot. One
    bot serves every account. It is stored encrypted with `AUTH_SECRET`.
 3. **The home PC.** Nothing to add: `scripts/collect-cron.sh` runs `pnpm alerts after-run` after
-   the collect and the backup. It needs `AUTH_SECRET` in `.env` (the same as Vercel's, as for
+   the collect and the backup. It needs `AUTH_SECRET` in `.env` (the same as the app's, as for
    `pnpm user`).
 
 ## Adding a channel (each person)

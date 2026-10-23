@@ -22,7 +22,7 @@ Settings > Admin preferences > Commands lists the home-PC commands with what eac
 ## How Tora fits together
 
 ```
-phone / browser ──> web app (Vercel) ──> database (Turso)
+phone / browser ──> web app (Vercel, or your server) ──> database (Turso, or a file there)
                                               ^
 home PC (WSL or Linux): pnpm collect ─────────┘   plug-ins fetch prices from the sites you choose
 ```

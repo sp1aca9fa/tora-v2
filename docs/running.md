@@ -134,7 +134,7 @@ every purchase; the code checks each row and Sonnet reads again the flagged ones
 Nothing is written before you confirm; readings are cached in the folder (`.tora-import.json`).
 The same import runs from the app (**Imports > Upload**, up to 30 files of 4 MB): read on the home
 PC by the next `pnpm collect` or `pnpm import-uploads` (your Claude plan), or right away by the app
-when Vercel has an `ANTHROPIC_API_KEY` (a few cents per batch).
+when the app has an `ANTHROPIC_API_KEY` (a few cents per batch).
 
 **A spreadsheet** (no command; **Imports > Spreadsheet**, in the app). A CSV in the layout of
 **Settings > Your data**'s lots download (or its empty template): headers and names (category,

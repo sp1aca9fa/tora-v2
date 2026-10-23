@@ -83,6 +83,13 @@ migrated. For UI work against a throwaway database, point `DATABASE_URL` back at
 
 ## 3. Web app (Vercel)
 
+This guide hosts the app on Vercel and the database on Turso: both free, nothing to keep running.
+The app also runs on any always-on machine of your own with Node: `pnpm build`, then
+`pnpm --filter @tora/web start`, with `DATABASE_URL=file:/path/to/tora.db` in `.env` (no Turso, no
+read quota) and the collect and backups on the same machine. There the app runs the morning check
+of [alerts](alerts.md) itself (no `CRON_SECRET`), and reaching it from your phone is up to you (a
+tunnel such as Tailscale Funnel or Cloudflare Tunnel, or your own domain).
+
 1. Push the repo to GitHub and import it in Vercel.
 2. **Root Directory**: `apps/web`. Framework: Next.js (detected).
 3. Environment variables (Production): `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `AUTH_SECRET`,
