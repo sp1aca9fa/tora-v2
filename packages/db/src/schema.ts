@@ -1114,6 +1114,8 @@ export const stores = sqliteTable(
     language: text('language'),
     /** Short labels in other languages, by language ({ en: "Megastore Ekimae" }). */
     labels: text('labels', { mode: 'json' }).$type<Record<string, string>>(),
+    /** Before labels (0052): unused, kept so a rolled-back update still reads the table. */
+    labelEn: text('label_en'),
     /** What posters write for it, from the plug-in. */
     codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),
     /** Codes the admin added. */
