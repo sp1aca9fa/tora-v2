@@ -10,12 +10,13 @@ Item names do not follow the app's language: an item's name is as sold in the pr
 collectors find it on that market's sites), and its second name is the secondary market's. Both
 are editable and searched.
 
-Installed today: English (`en`) and Japanese (`ja`).
+Installed today: English (`en`), Japanese (`ja`) and Spanish (`es`; drafted by Claude for the S10
+Spain setup, not yet checked by a native speaker).
 
 ## Adding a language
 
 1. Copy `apps/web/messages/en.json` to `apps/web/messages/{code}.json` (`fr`, `zh`, ... as BCP 47
-   codes) and translate the values, never the keys. About 900 texts; Claude can draft it ("translate
+   codes) and translate the values, never the keys. About 1,900 texts; Claude can draft it ("translate
    this file's values into French, keep the keys, the `{placeholders}` and the ICU plural and select
    syntax as they are"), then read it through.
 2. Add the code to `LANGUAGES` in `apps/web/src/i18n/locale.ts`, with the toggle's short label:

@@ -8,6 +8,7 @@ import { type LanguageSettings, type Locale, resolveLanguages } from '@tora/core
 export const LANGUAGES: Record<Locale, { short: string }> = {
   en: { short: 'EN' },
   ja: { short: 'JP' },
+  es: { short: 'ES' },
 };
 export const LOCALES = Object.keys(LANGUAGES);
 export const LOCALE_COOKIE = 'locale';
