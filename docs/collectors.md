@@ -24,10 +24,15 @@ there.
 Set up your private package:
 
 ```bash
+# This repo's own `collectors/` entry points at its author's private repo: replace it with yours.
+git rm collectors
 # a new private repo (e.g. on GitHub), then in the Tora checkout:
 git submodule add git@github.com:<you>/<your-collectors>.git collectors
 mkdir -p collectors/src collectors/test/fixtures
 ```
+
+Without a private repo, a plain `collectors/` folder works too (after `git rm collectors`); it is
+then part of your copy of the repo.
 
 `collectors/package.json`:
 

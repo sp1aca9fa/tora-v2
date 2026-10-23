@@ -19,6 +19,11 @@ Each compared market shows its reference source's price for the item (else a sup
 source's), converted to the base currency. Markets are told apart by their sources' market, not
 their currency: two markets may share one (France and Germany both in euros).
 
+**Graded cards need a source that prices them.** A lot is valued only from prices in its own
+condition. If the primary market's sources price ungraded cards only (Cardmarket's price guide,
+TCGplayer), graded cards there get no value until a source with graded sales is added or a manual
+price is set; another market's graded sales are compared, never counted.
+
 **Which condition is compared.** TCG: ungraded cards in their own grade, graded cards at ungraded
 A (other markets often price ungraded near-mint only), sealed product with shrink wrap unless the
 lot has none. Other categories: the lot's own condition (the one most units are in); another
