@@ -2,10 +2,10 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type SignalStats, baseCurrency } from '@tora/core';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { pendingActions } from './actions';
-import { baseChoices, changeBaseCurrency, storedAmounts } from './base-currency';
+import { AMOUNTS, baseChoices, changeBaseCurrency, storedAmounts } from './base-currency';
 import { type Db, createDb } from './client';
 import { fxRateOn, saveFxRates } from './fx';
 import { migrateDb } from './migrate';
@@ -207,4 +207,13 @@ it('converts the amounts of watches, asks, daily numbers, buy plans and review s
   expect((await db.select().from(suggestions))[0]!.evidence).toEqual({
     sale: { priceBase: 10_000 },
   });
+});
+
+it('converts every amount column of the schema (a new `*_base` column must join the list)', async () => {
+  const columns = await db.all<{ name: string }>(sql`
+    SELECT m.name || '.' || c.name AS name
+    FROM sqlite_master m, pragma_table_info(m.name) c
+    WHERE m.type = 'table' AND c.name LIKE '%\\_base' ESCAPE '\\'`);
+  const converted = AMOUNTS.flatMap(({ table, columns: cs }) => cs.map((c) => `${table}.${c}`));
+  expect(columns.map((c) => c.name).sort()).toEqual(converted.sort());
 });

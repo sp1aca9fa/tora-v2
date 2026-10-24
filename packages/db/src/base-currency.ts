@@ -18,7 +18,7 @@ import { loadSourceRegistry, readSetting, saveSetting, setCurrencySettings } fro
 import { fxRates, holdingEvents, productSources, suggestions } from './schema';
 
 /** Tables and columns holding amounts in the base, with the date each amount belongs to. */
-const AMOUNTS = [
+export const AMOUNTS = [
   { table: 'holdings', columns: ['cost_total_base'], date: 'substr(acquired_at, 1, 10)' },
   {
     table: 'holding_events',
