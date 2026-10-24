@@ -365,18 +365,22 @@ async function deliverTo(
   const token = channel.kind === 'telegram' ? await telegramToken(db, ctx.secret) : null;
   const now = toLocalIso();
   // The history keeps what was sent as plain text, in the person's style.
+  // A history row that cannot be written never turns a delivery into a failure.
   const log = (status: AlertLogStatus, error: string | null) =>
-    db.insert(alertLog).values({
-      userId: channel.userId,
-      channelId: channel.id,
-      channelKind: channel.kind,
-      channelLabel: channel.label,
-      kind: typeof text === 'string' ? null : text.kind,
-      text: typeof text === 'string' ? text : plainText(text, style),
-      status,
-      error,
-      sentAt: now,
-    });
+    db
+      .insert(alertLog)
+      .values({
+        userId: channel.userId,
+        channelId: channel.id,
+        channelKind: channel.kind,
+        channelLabel: channel.label,
+        kind: typeof text === 'string' ? null : text.kind,
+        text: typeof text === 'string' ? text : plainText(text, style),
+        status,
+        error,
+        sentAt: now,
+      })
+      .catch((e: unknown) => ctx.log?.(`alerts: history not written: ${errorText(e)}`));
   try {
     await deliver(channel, text, ctx, token, style);
     await db

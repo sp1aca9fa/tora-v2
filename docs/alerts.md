@@ -19,7 +19,8 @@ messages in **Settings > Alerts**. A failure at night arrives at night; Telegram
 mute a chat.
 
 The morning check runs from 08:00 (app time): on a self-hosted server inside the app itself (every
-2 minutes it checks whether today's ran), on a hosted app from its cron job (`/api/cron/daily`).
+2 minutes it checks whether today's ran), on a hosted app from its cron job (`/api/cron/daily`). A dev server (`pnpm dev`) runs it only with
+`TORA_DEV_ALERTS=1`: it often runs on a copy of the real database, with its real channels.
 
 ### How messages look (Settings > Alerts > Message style)
 
