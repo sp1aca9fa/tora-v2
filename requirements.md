@@ -844,6 +844,10 @@ Fixed (2026-10-24, user: 1 and 3-12; 2 not needed, 9 is Claude's sandbox):
 - 10: required fields are checked by the server (Add, item edit, spreadsheet import); purchase imports stay lenient.
 - 11: the lot spreadsheet carries the admin's own fields both ways.
 - 12: region lists per category in Settings > Categories (migration 0056 drops the fixed region checks; tested on a copy of the analysis database: counts and links unchanged); Claude's imports fall back to the category's first region.
+
+Follow-ups (user, 2026-10-24):
+- Set catalogs are plug-ins: the TCG set lists moved from the core (`packages/catalog`) to the public plug-in package (`collectors-public/catalog`, `catalogs` in a plug-in module); only the regions a set category lists are loaded (a watches-only setup loads none; the Spain test copy with English and Spanish prints kept 539 of 1,962 sets), and the collect loads them when they or the categories change (`pnpm catalog:sync` only to do it at once). Why (user): nothing particular to one setup in the core; a person tracking other things in Spain and Brazil needs no Pokemon sets.
+- Pages gone: SNKRDUNK deleted the nine 30th CELEBRATION カードセット(御三家) pages (HTTP 404 from 2026-10-20). Part A's set-aside covers it (3 nights gone, an Actions card); now admins are told too: one alert after the run (item, site, error), a line in their morning summary while any wait, and the Actions card even for items they do not hold.
 ## S17: Notifications and activity log
 
 Idea (user, 2026-10-16): alerts that reach the user outside the app, and a log of what happened. The user first planned alerts by email, Telegram or Discord; "price alerts" went into S9 without a channel. Placed after S6 and before S9, so S9's price alerts have somewhere to go.
