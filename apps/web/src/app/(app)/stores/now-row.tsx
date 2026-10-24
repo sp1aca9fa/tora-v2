@@ -9,6 +9,93 @@ import { FreshSince } from './posts-list';
 /** Without a scroll, tap or key for this long, the reader has left an open row. */
 const IDLE_MS = 60_000;
 
+/** A row's opening: how many times it was opened, where its new messages start, whether any. */
+const Opening = createContext({ count: 0, since: null as string | null, any: false });
+
+/** Whether a point is on a character of text (not the empty space around it). */
+function onText(x: number, y: number): boolean {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+  };
+  const at = doc.caretPositionFromPoint
+    ? doc.caretPositionFromPoint(x, y)
+    : (() => {
+        const r = document.caretRangeFromPoint?.(x, y);
+        return r ? { offsetNode: r.startContainer, offset: r.startOffset } : null;
+      })();
+  const node = at?.offsetNode;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+  const range = document.createRange();
+  for (const o of [at.offset - 1, at.offset]) {
+    if (o < 0 || o >= (node.textContent ?? '').length) continue;
+    range.setStart(node, o);
+    range.setEnd(node, o + 1);
+    for (const b of range.getClientRects())
+      if (x >= b.left - 2 && x <= b.right + 2 && y >= b.top - 2 && y <= b.bottom + 2) return true;
+  }
+  return false;
+}
+
+/**
+ * A tap on an open row's empty space (not on text, a link or a picture) folds what it is in: a
+ * store's posts, a post's replies, or the row; its heading comes back into view if gone.
+ */
+function foldOnTap(e: React.MouseEvent<HTMLElement>) {
+  const target = e.target as HTMLElement;
+  if (target.closest('summary, a, button, img, input, select, textarea, label')) return;
+  if (!window.getSelection()?.isCollapsed || onText(e.clientX, e.clientY)) return;
+  const fold = target.closest('details');
+  if (!fold?.open) return;
+  fold.open = false;
+  const head = fold.querySelector(':scope > summary');
+  if (head && head.getBoundingClientRect().top < 56) head.scrollIntoView({ block: 'start' });
+}
+
+/**
+ * A store's posts in a Now row: folded, opened by itself when it holds a new message (or, none
+ * being new, when it is the row's newest); the reader folds and unfolds it.
+ */
+export function StoreSection({
+  name,
+  times,
+  newest,
+  children,
+}: {
+  name: string;
+  /** When its messages were posted. */
+  times: string[];
+  /** The row's store with the latest message. */
+  newest: boolean;
+  children: React.ReactNode;
+}) {
+  const t = useTranslations('stores');
+  const { count, since, any } = useContext(Opening);
+  const fresh = since !== null && times.some((at) => at > since);
+  const [open, setOpen] = useState(false);
+  // Set while rendering, so the posts are shown before the row scrolls to the newest.
+  const [was, setWas] = useState({ count: 0, since: null as string | null });
+  if (was.count !== count || was.since !== since) {
+    setWas({ count, since });
+    if (was.count !== count) setOpen(fresh || (!any && newest));
+    else if (fresh) setOpen(true);
+  }
+  if (!name) return <section>{children}</section>;
+  return (
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group/store">
+      <summary className="flex cursor-pointer list-none items-baseline gap-2 py-1 [&::-webkit-details-marker]:hidden">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{name}</h3>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {t('postCount', { n: times.length })}
+        </span>
+        <span className="text-xs text-muted-foreground group-open/store:rotate-90" aria-hidden>
+          ▸
+        </span>
+      </summary>
+      {children}
+    </details>
+  );
+}
+
 /** Tells the list which rows are open (their order is kept meanwhile). */
 const RowOpened = createContext<(id: string, open: boolean) => void>(() => {});
 
@@ -77,6 +164,7 @@ export function NowRow({
   // Where this opening's new messages start (kept while open, so updates do not untint them).
   const [since, setSince] = useState<string | null>(null);
   const [jump, setJump] = useState(0);
+  const [openings, setOpenings] = useState(0);
   const read = seenAt > readUpTo ? seenAt : readUpTo;
   const unread = times.filter((at) => at > read).length;
   const waiting = held ? times.filter((at) => at > held.latest).length : 0;
@@ -133,8 +221,10 @@ export function NowRow({
         if (!now) return setHeld(null);
         active.current = Date.now();
         setSince(read);
+        setOpenings((n) => n + 1);
         setJump((n) => n + 1);
       }}
+      onClick={foldOnTap}
     >
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1 space-y-0.5">{summary}</div>
@@ -167,7 +257,15 @@ export function NowRow({
           {t('waiting', { n: waiting })}
         </button>
       )}
-      <FreshSince.Provider value={since}>{held ? held.content : children}</FreshSince.Provider>
+      <Opening.Provider
+        value={{
+          count: openings,
+          since,
+          any: since !== null && times.some((at) => at > since),
+        }}
+      >
+        <FreshSince.Provider value={since}>{held ? held.content : children}</FreshSince.Provider>
+      </Opening.Provider>
     </details>
   );
 }

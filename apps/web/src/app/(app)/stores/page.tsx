@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
-import { NowList, NowRow } from './now-row';
+import { NowList, NowRow, StoreSection } from './now-row';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
@@ -162,15 +162,19 @@ export default async function NowPage({
       }
     >
       <div className="space-y-3 border-t px-4 pt-2 pb-3">
-        {stores.map(([id, list]) => (
-          <section key={id}>
-            {storeName(id) && <h3 className="text-sm font-medium">{storeName(id)}</h3>}
+        {stores.map(([id, list], i) => (
+          <StoreSection
+            key={id}
+            name={storeName(id)}
+            times={list.flatMap((th) => [th.post, ...th.replies]).map((m) => m.postedAt)}
+            newest={i === 0}
+          >
             <ul className="divide-y border-l pl-3">
               {list.map(({ post, replies }) => (
                 <PostItem key={post.id} post={post} replies={replies} stores={false} />
               ))}
             </ul>
-          </section>
+          </StoreSection>
         ))}
       </div>
     </NowRow>
