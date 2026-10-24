@@ -29,7 +29,8 @@ type Props = {
 /**
  * The item's Buy timing sub page (S22): the verdict first, the price history with the buy zone,
  * the reasons, what is for sale now against the zone, and the person's watches. One condition at
- * a time: the main one, or one of the person's watches and lots (`?condition=`). Not advice.
+ * a time: the main one, or one of the person's watches and lots, or another with numbers
+ * (`?condition=`, e.g. from Opportunities). Not advice.
  */
 export default async function BuyPage({ params, searchParams }: Props) {
   const { id } = await params;
@@ -44,6 +45,7 @@ export default async function BuyPage({ params, searchParams }: Props) {
       ].filter((b): b is string => !!b),
     ),
   ];
+  if (asked && !conditions.includes(asked) && (await loadSignal(id, asked))) conditions.push(asked);
   const bucket = asked && conditions.includes(asked) ? asked : mainBucket;
   const cls = productClass(product);
   const choice = strategyOf(user.preferences, cls);

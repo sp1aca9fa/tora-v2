@@ -1168,6 +1168,8 @@ export const stores = sqliteTable(
     codes: text('codes', { mode: 'json' }).notNull().$type<string[]>(),
     /** Codes the admin added. */
     extraCodes: text('extra_codes', { mode: 'json' }).$type<string[]>(),
+    /** The plug-in's codes the admin removed (a wrong guess, or one meaning another store). */
+    hiddenCodes: text('hidden_codes', { mode: 'json' }).$type<string[]>(),
     region: text('region'),
     lat: real('lat'),
     lon: real('lon'),

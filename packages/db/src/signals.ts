@@ -462,6 +462,25 @@ export async function latestSignals(
   return out;
 }
 
+/**
+ * The condition with the most sales in an item's latest numbers (within 3 days): the main one of
+ * an item the person neither holds nor watches. Null when none (or the item has no conditions).
+ */
+export async function busiestBucket(
+  db: Db,
+  productId: string,
+  now = new Date(),
+): Promise<string | null> {
+  const from = localDate(new Date(now.getTime() - SIGNAL_FRESH_DAYS * DAY));
+  const [row] = await db
+    .select({ bucket: signals.bucket })
+    .from(signals)
+    .where(and(eq(signals.productId, productId), gte(signals.day, from)))
+    .orderBy(desc(signals.day), desc(sql`json_extract(${signals.stats}, '$.sales30')`))
+    .limit(1);
+  return row?.bucket || null;
+}
+
 /** The item types a person owns (for their strategy choices). */
 export async function heldItemTypes(db: Db, userId: string): Promise<string[]> {
   const rows = await db

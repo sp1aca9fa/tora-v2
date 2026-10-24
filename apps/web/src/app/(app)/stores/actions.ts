@@ -69,7 +69,7 @@ export async function newFeedTokenAction(): Promise<string> {
   return token;
 }
 
-/** Codes posters use for a store, added by an admin. */
+/** Every code posters use for a store, set by an admin (the posts are matched again). */
 export async function setStoreCodesAction(storeId: string, codes: string[]) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
@@ -77,7 +77,7 @@ export async function setStoreCodesAction(storeId: string, codes: string[]) {
   const store = await setStoreCodes(db, storeId, clean);
   if (store)
     await recordAdminChange(db, user.id, 'storeCodes', { store, to: clean }, '/stores/area');
-  revalidatePath('/stores');
+  revalidatePath('/stores', 'layout');
 }
 
 /** What the person is told about their store feed: silence, unknown stores (S25). */

@@ -1,5 +1,5 @@
 import { PLACE, localDate } from '@tora/core';
-import { ADMIN_STORES, listStores } from '@tora/db';
+import { ADMIN_STORES, listStores, storeCodes } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
@@ -17,8 +17,7 @@ export default async function StoreAreaPage() {
     chainKey: s.chain,
     chain: s.chain === PLACE ? t('places') : (s.chainLabel ?? s.chain),
     name: s.name,
-    codes: s.codes,
-    extra: s.extraCodes ?? [],
+    codes: storeCodes(s),
     byHand: s.source === ADMIN_STORES,
     region: s.region,
     lat: s.lat,

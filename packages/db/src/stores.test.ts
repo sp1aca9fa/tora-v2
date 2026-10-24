@@ -28,8 +28,11 @@ import {
   sendFeedMessages,
   sendStoreNotices,
   setStoreCodes,
+  rematchPosts,
+  storeCodes,
   storeGlossary,
 } from './stores';
+import { storePosts } from './schema';
 import { createUser, setPreferences } from './users';
 
 const SECRET = 'x'.repeat(32);
@@ -101,12 +104,42 @@ const post = (id: string, text: string, minutesAgo = 1) => ({
 
 it('keeps admin codes when the plug-in lists its stores again', async () => {
   const [chuo] = await listStores(db);
-  await setStoreCodes(db, chuo!.id, [' ｕｍ ', 'um']);
+  await setStoreCodes(db, chuo!.id, ['MID', ' ｕｍ ', 'um']);
   await saveStores(db, 'test', [
     { key: 'chuo', chain: 'megastore', name: 'メガストア中央', codes: ['MID', '中央'] },
   ]);
   const again = (await listStores(db)).find((s) => s.id === chuo!.id)!;
   expect([again.codes, again.extraCodes]).toEqual([['MID', '中央'], ['um']]);
+  expect(storeCodes(again)).toEqual(['MID', '中央', 'um']);
+  // The plug-in's code left out is removed, and stays removed.
+  await setStoreCodes(db, chuo!.id, ['中央', 'um']);
+  await saveStores(db, 'test', [
+    { key: 'chuo', chain: 'megastore', name: 'メガストア中央', codes: ['MID', '中央'] },
+  ]);
+  expect(storeCodes((await listStores(db)).find((s) => s.id === chuo!.id)!)).toEqual([
+    '中央',
+    'um',
+  ]);
+});
+
+it("matches the chain's posts again when a store's codes change", async () => {
+  await newFeedToken(db, uid);
+  const [chuo, kita] = await listStores(db);
+  await setStoreCodes(db, kita!.id, ['KTA', '◆']);
+  await receivePush(
+    db,
+    uid,
+    { source: 'myboard', chain: 'megastore', posts: [post('1', '◆'), post('2', 'MID')] },
+    now,
+  );
+  const ids = async () =>
+    Object.fromEntries((await db.select().from(storePosts)).map((p) => [p.externalId, p.storeIds]));
+  expect(await ids()).toEqual({ '1': [kita!.id], '2': [chuo!.id] });
+  // ◆ meant メガストア中央 after all: moved there.
+  await setStoreCodes(db, kita!.id, ['KTA']);
+  await setStoreCodes(db, chuo!.id, ['MID', '◆']);
+  expect(await ids()).toEqual({ '1': [chuo!.id], '2': [chuo!.id] });
+  expect(await rematchPosts(db, 'megastore')).toBe(0);
 });
 
 it('knows a person by their feed token, and only the newest one', async () => {

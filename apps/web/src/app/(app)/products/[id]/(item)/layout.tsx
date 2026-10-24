@@ -20,11 +20,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /**
  * The item's header on every sub page (S22): picture, name, line and release, and what the
- * person's lots are worth (or, watched only, the market value); then the sub pages.
+ * person's lots are worth (or, none held, the market value); then the sub pages.
  */
 export default async function ItemLayout({ params, children }: Params & { children: ReactNode }) {
   const { id } = await params;
-  const { db, product, lots } = await loadItem(id);
+  const { db, product, lots, watches } = await loadItem(id);
   const [t, money, images, lines, released, totals, stats] = await Promise.all([
     getTranslations(),
     getMoney(),
@@ -34,6 +34,12 @@ export default async function ItemLayout({ params, children }: Params & { childr
     lots.length ? loadValues(id) : null,
     lots.length ? null : loadSignal(id),
   ]);
+  // Back to where the item is listed: the portfolio, the watchlist, else Opportunities.
+  const [back, backLabel] = lots.length
+    ? (['/', 'nav.portfolio'] as const)
+    : watches.length
+      ? (['/watchlist', 'nav.watchlist'] as const)
+      : (['/opportunities', 'nav.opportunities'] as const);
   const line = lines.get(product.id);
   const release = released.get(product.id);
   const signed = (n: number) => `${n > 0 ? '▲\u00a0+' : n < 0 ? '▼\u00a0' : ''}${money(n)}`;
@@ -55,8 +61,8 @@ export default async function ItemLayout({ params, children }: Params & { childr
           />
           <div className="min-w-0 space-y-1">
             <p className="text-sm text-muted-foreground">
-              <Link href={lots.length ? '/' : '/watchlist'} className="hover:underline">
-                {t(lots.length ? 'nav.portfolio' : 'nav.watchlist')}
+              <Link href={back} className="hover:underline">
+                {t(backLabel)}
               </Link>
             </p>
             <h1 className="text-xl leading-tight font-semibold tracking-tight">{product.name}</h1>

@@ -25,6 +25,7 @@ import {
   tradeCounts,
   portfolioSeries,
   portfolioValuation,
+  withLivePoint,
   priceHistory,
   runSnapshots,
   summarizeByProduct,
@@ -197,6 +198,12 @@ describe('portfolio (scenario 7)', () => {
     // The run saved the chart; summed again from the snapshots, it is the same.
     await db.delete(portfolioCharts);
     expect(await portfolioSeries(db, uid, 365, now)).toEqual(series);
+    // Today's point from the header's values: the same while nothing changed since the run, and
+    // the header's market value plus the lots still at cost.
+    const portfolio = await portfolioValuation(db, uid, now);
+    const live = withLivePoint(series, portfolio, now);
+    expect(live).toEqual(series);
+    expect(live.at(-1)!.valueBase - live.at(-1)!.atCostBase).toBe(portfolio.totals.valueBase);
     // A lot's cost changed after the run: summed again at once.
     const [mewtwo] = await db
       .update(holdings)

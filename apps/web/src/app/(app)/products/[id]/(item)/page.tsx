@@ -8,21 +8,27 @@ import { sourceLabels } from '@/lib/sources';
 import { loadItem, loadSignal } from '../item-data';
 import { MarketCompare, compareBucket } from '../market-compare';
 
-type Params = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ condition?: string }>;
+};
 
 /**
  * The item's Market sub page, the default (S22): the price history, large; the key numbers in
- * its main condition; the primary market against the others.
+ * its main condition, or another with numbers (`?condition=`, e.g. from Opportunities); the
+ * primary market against the others.
  */
-export default async function MarketPage({ params }: Params) {
+export default async function MarketPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { condition: asked } = await searchParams;
   const { db, product, mainBucket } = await loadItem(id);
-  const compare = await compareBucket(product, mainBucket);
+  const bucket = asked && (await loadSignal(id, asked)) ? asked : mainBucket;
+  const compare = await compareBucket(product, bucket);
   const [t, money, sourceLabel, stats, history, foreign, japan] = await Promise.all([
     getTranslations(),
     getMoney(),
     sourceLabels(),
-    loadSignal(id),
+    loadSignal(id, bucket),
     priceHistory(db, product.id, 365),
     foreignPrices(db, product.id),
     compare ? savedBucketValues(db, [{ product, bucket: compare.bucket }]) : null,
@@ -53,9 +59,9 @@ export default async function MarketPage({ params }: Params) {
             </div>
           ))}
         </dl>
-        {mainBucket && (
+        {bucket && (
           <p className="text-xs text-muted-foreground">
-            {t('product.market.condition', { condition: bucketLabel(mainBucket, t) })}
+            {t('product.market.condition', { condition: bucketLabel(bucket, t) })}
           </p>
         )}
       </section>
@@ -68,7 +74,7 @@ export default async function MarketPage({ params }: Params) {
         <CardContent>
           <PriceChart
             points={history}
-            defaultBucket={mainBucket}
+            defaultBucket={bucket}
             sourceLabels={Object.fromEntries(history.map((p) => [p.source, sourceLabel(p.source)]))}
             className="h-72 lg:h-96"
           />
@@ -80,7 +86,7 @@ export default async function MarketPage({ params }: Params) {
           compare={compare}
           japan={japan?.get(bucketValueKey(product.id, compare.bucket))?.valuation ?? null}
           product={product}
-          mainBucket={mainBucket}
+          mainBucket={bucket}
           foreign={foreign}
         />
       )}

@@ -60,14 +60,16 @@ export interface ListedStore extends StoreEntry {
 }
 
 /**
- * Saves a directory plug-in's stores (codes the admin added are kept); only the ones that changed
- * are written, since it runs with every collect. Returns how many were written.
+ * Saves a directory plug-in's stores (the admin's code changes are kept); only the ones that
+ * changed are written, since it runs with every collect. A chain whose codes changed has its posts
+ * matched again. Returns how many were written.
  */
 export async function saveStores(db: Db, source: string, list: ListedStore[]): Promise<number> {
   const saved = new Map(
     (await db.select().from(stores).where(eq(stores.source, source))).map((s) => [s.sourceKey, s]),
   );
   let written = 0;
+  const rematch = new Set<string>();
   for (const { key, ...s } of list) {
     const values = {
       chain: s.chain,
@@ -89,6 +91,7 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
     )
       continue;
     written++;
+    if (JSON.stringify(had?.codes) !== JSON.stringify(values.codes)) rematch.add(values.chain);
     forgetStores();
     await db
       .insert(stores)
@@ -98,6 +101,7 @@ export async function saveStores(db: Db, source: string, list: ListedStore[]): P
         set: { ...values, updatedAt: toLocalIso() },
       });
   }
+  for (const chain of rematch) await rematchPosts(db, chain);
   return written;
 }
 
@@ -129,24 +133,76 @@ export async function cachedStores(db: Pick<Db, 'select'>, now = Date.now()): Pr
   return list;
 }
 
-/** The codes a store is known by: its plug-in's and the admin's. */
-export const storeCodes = (s: Store) => [...s.codes, ...(s.extraCodes ?? [])];
+/** The codes a store is known by: its plug-in's (less those the admin removed) and the admin's. */
+export const storeCodes = (s: Store) => [
+  ...s.codes.filter((c) => !s.hiddenCodes?.includes(c)),
+  ...(s.extraCodes ?? []),
+];
 
-/** Codes the admin adds to a store (posters' nicknames the plug-in does not know). */
-/** Returns the store's name (null: no such store). */
+const cleanCode = (c: string) => c.normalize('NFKC').trim();
+
+/**
+ * Sets every code of a store (admins): those not from its plug-in are kept as the admin's, the
+ * plug-in's left out are removed (they stay removed when the plug-in lists them again). The
+ * chain's posts are matched again. Returns the store's name (null: no such store).
+ */
 export async function setStoreCodes(
   db: Db,
   storeId: string,
   codes: string[],
 ): Promise<string | null> {
+  const [store] = await db.select().from(stores).where(eq(stores.id, storeId));
+  if (!store) return null;
+  const clean = [...new Set(codes.map(cleanCode).filter(Boolean))];
+  const own = new Set(store.codes.map(cleanCode));
+  const extra = clean.filter((c) => !own.has(c));
+  const hidden = store.codes.filter((c) => !clean.includes(cleanCode(c)));
   forgetStores();
-  const clean = [...new Set(codes.map((c) => c.normalize('NFKC').trim()).filter(Boolean))];
-  const [row] = await db
+  await db
     .update(stores)
-    .set({ extraCodes: clean.length ? clean : null })
-    .where(eq(stores.id, storeId))
-    .returning({ name: stores.name });
-  return row?.name ?? null;
+    .set({
+      extraCodes: extra.length ? extra : null,
+      hiddenCodes: hidden.length ? hidden : null,
+      updatedAt: toLocalIso(),
+    })
+    .where(eq(stores.id, storeId));
+  await rematchPosts(db, store.chain);
+  return store.name;
+}
+
+/**
+ * Matches a chain's posts to the stores again, after its codes changed (a place's: every board's
+ * posts). Replies naming no store keep taking their post's. Nobody is told again. Returns how many
+ * posts moved.
+ */
+export async function rematchPosts(db: Db, chain: string): Promise<number> {
+  const listed = (await listStores(db)).map((s) => ({ ...s, codes: storeCodes(s) }));
+  const posts = await db
+    .select({
+      id: storePosts.id,
+      source: storePosts.source,
+      externalId: storePosts.externalId,
+      chain: storePosts.chain,
+      text: storePosts.text,
+      author: storePosts.author,
+      replyTo: storePosts.replyTo,
+      storeIds: storePosts.storeIds,
+    })
+    .from(storePosts)
+    .where(chain === PLACE ? undefined : eq(storePosts.chain, chain))
+    .orderBy(storePosts.postedAt);
+  const now = new Map<string, string[]>();
+  let moved = 0;
+  for (const p of posts) {
+    const own = storesInPost(`${p.author ?? ''}\n${p.text}`, listed, p.chain).map((s) => s.id);
+    const parent = p.replyTo ? now.get(`${p.source}|${p.replyTo}`) : undefined;
+    const ids = own.length ? own : p.replyTo ? (parent ?? p.storeIds) : [];
+    now.set(`${p.source}|${p.externalId}`, ids);
+    if (JSON.stringify(ids) === JSON.stringify(p.storeIds)) continue;
+    moved++;
+    await db.update(storePosts).set({ storeIds: ids }).where(eq(storePosts.id, p.id));
+  }
+  return moved;
 }
 
 // ---- Feed tokens ----

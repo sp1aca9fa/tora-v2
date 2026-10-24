@@ -421,6 +421,13 @@
       "when": 1792823116782,
       "tag": "0059_store_post_images",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1792830274518,
+      "tag": "0060_store_hidden_codes",
+      "breakpoints": true
     }
   ]
 }

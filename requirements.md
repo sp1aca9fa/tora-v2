@@ -732,6 +732,12 @@ Risks (with what covers them today):
 7. Data quality: listing matches on search sources (Mercari asks at 34-55 % of SNKRDUNK's are often other things: kept to the same site's asks), thin data (warned, never hidden), items registered twice (look-alike check, shared-listing check, merge).
 8. Texts: Spanish and Japanese drafted by Claude, not checked by native speakers.
 
+### The user's check (2026-10-24)
+
+1. The Portfolio chart's last point was last night's while the header is worked out when the page opens (a sale dropping out of its 30-day window in between moved the two apart): today's point is summed from the header's values now. The chart's value still counts lots without a market price at cost, which its legend says.
+2. Opportunities linked to item pages that answered "not found" for items the person neither holds nor watches: an item page opens for any item now (back link to Opportunities, the condition with the most sales as its main one, `?condition=` from the link honoured on Market and Buy timing).
+3. Store codes from the store list could not be changed in the app, only added to: an admin edits every code of a store; the list's codes left out stay removed when it lists them again (migration 0060), and the chain's posts are matched again after a change (also when the list's own codes change).
+
 ## S17: Notifications and activity log
 
 Alerts outside the app on Telegram (one bot per install; each person connects with a one-time code) and Discord (a webhook link per person), stored encrypted: the collect or the backup failed (at once, to admins), nothing ran for over a day, and a daily summary per person (imports with rows left out, what waits on Actions); each kind can be switched off, in the person's language. Settings > Activity lists collects, backups, imports and every admin change, newest first; members see their own imports.
@@ -836,7 +842,7 @@ Decided 2026-10-18 (user): the item page shows too much at once. One header on e
 - Lots & details: the lots with P/L, item details, edit and merge, the price sources setup.
 
 Built 2026-10-18:
-- Routes in a route group (`products/[id]/(item)/`) so the header layout stays off the edit and merge pages. The header shows units, market value and P/L (watched only: the market value); the item's kind, franchise and set moved to Lots & details.
+- Routes in a route group (`products/[id]/(item)/`) so the header layout stays off the edit and merge pages. The header shows units, market value and P/L (not held: the market value); any item has a page, also one the person neither holds nor watches (S10 check); the item's kind, franchise and set moved to Lots & details.
 - `item-data.ts`: the item, lots, watches and main condition, the signal and the lot values, each cached per request, so the layout and the page read them once; moving between sub pages re-renders only the page.
 - Market: five key numbers in the main condition (market value, sales in 30 days, 4 and 12 week change, 180-day range = lower to upper quarter of daily prices), the price history (taller), Japan vs US.
 - Buy timing: condition chips when the person watches or owns more than one condition (`?condition=`, the Watchlist links with the watched one); the verdict card; the chart with the buy zone shaded under its top, the 180-day quarters dotted and the lowest ask dashed (the scale stretches to show them); the reasons in three groups, the third saying the release age, when similar items bottom out (or the 90 days used) and the pattern; for sale now with "in the buy zone" or "N % above" on the condition's lowest ask; watches and "Bought it"; a marked place for S9 part 5's rule test card; not advice.

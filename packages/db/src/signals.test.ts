@@ -6,7 +6,13 @@ import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, mergeProducts } from './mutations';
 import { priceObservations, products, signals, suggestions, tcgSets } from './schema';
-import { latestSignals, refreshRuleTests, refreshSignals, ruleTestFor } from './signals';
+import {
+  busiestBucket,
+  latestSignals,
+  refreshRuleTests,
+  refreshSignals,
+  ruleTestFor,
+} from './signals';
 import { createUser } from './users';
 import { addWatch } from './watches';
 import { eq } from 'drizzle-orm';
@@ -76,6 +82,9 @@ it('saves the numbers per watched item and day, once a day', async () => {
   expect(s.pattern).toBeNull();
   const latest = await latestSignals(db, [{ productId: p.id, bucket: 'sealed:shrink' }], NOW);
   expect(latest.size).toBe(1);
+  // The main condition of an item the person neither holds nor watches.
+  expect(await busiestBucket(db, p.id, NOW)).toBe('sealed:shrink');
+  expect(await busiestBucket(db, (await box('Box B')).id, NOW)).toBeNull();
 });
 
 it('uses the new-set pattern of similar items with release dates, and drops a merged item', async () => {

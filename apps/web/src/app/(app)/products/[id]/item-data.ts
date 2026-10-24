@@ -1,5 +1,6 @@
 import 'server-only';
 import {
+  busiestBucket,
   getProduct,
   holdingBucket,
   latestSignals,
@@ -14,7 +15,7 @@ import { authed } from '@/lib/auth/guard';
 /**
  * The item, the person's lots and watches of it, and its main condition: what the header and
  * every sub page need (S22). Cached per request, so the layout and the page read it once.
- * Shown to people who hold or watch it.
+ * Shown for any item, also one the person neither holds nor watches (e.g. from Opportunities).
  */
 export const loadItem = cache(async (id: string) => {
   const { db, user } = await authed();
@@ -23,16 +24,18 @@ export const loadItem = cache(async (id: string) => {
     productLots(db, user.id, id),
     watchesOf(db, user.id, id),
   ]);
-  if (!product || (lots.length === 0 && watches.length === 0)) notFound();
+  if (!product) notFound();
   const owned = lots.filter((h) => h.status === 'owned');
-  // The main condition: the one most of the owned units are in, else the one first watched.
+  // The main condition: the one most of the owned units are in, else the one first watched, else
+  // the one with the most sales.
   const unitsByBucket = new Map<string, number>();
   for (const h of owned) {
     const b = holdingBucket(h, product);
     if (b) unitsByBucket.set(b, (unitsByBucket.get(b) ?? 0) + h.quantity);
   }
   const mainBucket =
-    [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (watches[0]?.bucket || null);
+    [...unitsByBucket].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    (watches.length ? watches[0]!.bucket || null : await busiestBucket(db, id));
   return { db, user, product, lots, watches, owned, mainBucket };
 });
 

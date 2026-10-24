@@ -1158,6 +1158,36 @@ export async function portfolioSeries(
   return series.filter((p) => p.date >= since);
 }
 
+/**
+ * The chart ending on the header's numbers: the saved points are worked out at night, the
+ * Portfolio header now, so today's point is summed again from `portfolioValuation`'s values
+ * (a price that dropped out of its window since then would else make the two disagree).
+ */
+export function withLivePoint(
+  series: PortfolioPoint[],
+  portfolio: Pick<Awaited<ReturnType<typeof portfolioValuation>>, 'rows' | 'opened'>,
+  now = new Date(),
+): PortfolioPoint[] {
+  const date = localDate(now);
+  const [live] = sumSeries([
+    ...portfolio.rows.map(({ holding, valuation }) => ({
+      date,
+      valueBase: valuation.valueBase,
+      quantityInferred: valuation.estimatedSamples > 0,
+      holding,
+    })),
+    // Opened: the cost stays, the value moved to the pulls (as in the snapshots).
+    ...portfolio.opened.map(({ holding }) => ({
+      date,
+      valueBase: 0,
+      quantityInferred: false,
+      holding,
+    })),
+  ]);
+  if (!live) return series;
+  return [...series.filter((p) => p.date < date), live];
+}
+
 export interface PricePoint {
   day: string;
   source: string;

@@ -1,5 +1,5 @@
 import { CATEGORIES, type Category } from '@tora/core';
-import { type Db, portfolioSeries, portfolioValuation } from '@tora/db';
+import { type Db, portfolioSeries, portfolioValuation, withLivePoint } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -118,7 +118,7 @@ export default async function SummaryPage() {
           <Suspense
             fallback={<div className="h-72 animate-pulse rounded-xl border bg-card" aria-hidden />}
           >
-            <ValueOverTime db={db} userId={user.id} />
+            <ValueOverTime db={db} userId={user.id} portfolio={portfolio} />
           </Suspense>
         </div>
         {portfolio.breakdown.length > 0 && (
@@ -167,9 +167,21 @@ export default async function SummaryPage() {
   );
 }
 
-/** The value-over-time chart, loaded after the rest of the page (it reads every snapshot). */
-async function ValueOverTime({ db, userId }: { db: Db; userId: string }) {
-  const [series, t] = await Promise.all([portfolioSeries(db, userId), getTranslations()]);
+/**
+ * The value-over-time chart, loaded after the rest of the page (it reads every snapshot); today's
+ * point from the header's values.
+ */
+async function ValueOverTime({
+  db,
+  userId,
+  portfolio,
+}: {
+  db: Db;
+  userId: string;
+  portfolio: Awaited<ReturnType<typeof portfolioValuation>>;
+}) {
+  const [saved, t] = await Promise.all([portfolioSeries(db, userId), getTranslations()]);
+  const series = withLivePoint(saved, portfolio);
   if (series.length < 2) return null;
   const points = series.map((s) => ({
     date: s.date,

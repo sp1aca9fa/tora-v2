@@ -43,7 +43,6 @@ export interface StoreView {
   name: string;
   codes: string[];
   /** Codes an admin added. */
-  extra: string[];
   /** Added by an admin (can be removed). */
   byHand: boolean;
   region: string | null;
@@ -143,7 +142,7 @@ export function StoreAreaForm({
     .filter(
       (s) =>
         !q ||
-        [s.name, s.chain, s.region ?? '', ...s.codes, ...s.extra].some((x) =>
+        [s.name, s.chain, s.region ?? '', ...s.codes].some((x) =>
           x.normalize('NFKC').toLowerCase().includes(q),
         ),
     )
@@ -374,10 +373,13 @@ export function StoreAreaForm({
                             .join(' · ')}
                         </span>
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {t('codes')}: {[...s.codes, ...s.extra].join(', ') || '-'}
-                      </p>
-                      {admin && <ExtraCodes store={s} />}
+                      {admin ? (
+                        <StoreCodes store={s} />
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {t('codes')}: {s.codes.join(', ') || '-'}
+                        </p>
+                      )}
                       {admin && s.byHand && <RemoveStore id={s.id} />}
                     </div>
                   </li>
@@ -392,23 +394,30 @@ export function StoreAreaForm({
   );
 }
 
-/** Codes posters use that the store list does not know (admins). */
-function ExtraCodes({ store }: { store: StoreView }) {
+/**
+ * Every code posters use for the store, the store list's too (admins): a wrong one can be removed
+ * or moved to another store; the posts are matched again.
+ */
+function StoreCodes({ store }: { store: StoreView }) {
   const t = useTranslations('stores');
-  const [value, setValue] = useState(store.extra.join(', '));
+  const [value, setValue] = useState(store.codes.join(', '));
   const [pending, startTransition] = useTransition();
   return (
-    <Input
-      value={value}
-      disabled={pending}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() =>
-        value !== store.extra.join(', ') &&
-        startTransition(() => setStoreCodesAction(store.id, value.split(/[,、]/)))
-      }
-      placeholder={t('extraCodes')}
-      className="mt-1 h-7 text-xs"
-    />
+    <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+      {t('codes')}
+      <Input
+        value={value}
+        disabled={pending}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() =>
+          value !== store.codes.join(', ') &&
+          startTransition(() => setStoreCodesAction(store.id, value.split(/[,、]/)))
+        }
+        placeholder={t('extraCodes')}
+        title={t('codesEdit')}
+        className="h-7 flex-1 text-xs"
+      />
+    </label>
   );
 }
 
