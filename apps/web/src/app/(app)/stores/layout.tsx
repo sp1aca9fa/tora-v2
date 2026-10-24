@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { FeedPill } from './feed-pill';
 import { StoresNav } from './stores-nav';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('stores'))('title') };
 }
 
-/** Store notices (S25): the title and the sub pages. */
+/** Store notices (S25): the title, the sub pages and the feed's status. */
 export default async function StoresLayout({ children }: { children: ReactNode }) {
   const t = await getTranslations('stores');
   return (
@@ -18,6 +19,7 @@ export default async function StoresLayout({ children }: { children: ReactNode }
       </header>
       <StoresNav />
       {children}
+      <FeedPill />
     </div>
   );
 }

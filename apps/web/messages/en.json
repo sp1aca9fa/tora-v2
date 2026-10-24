@@ -2292,7 +2292,17 @@
     "unread": "{n, plural, one {# new message} other {# new messages}}",
     "waiting": "{n, plural, one {# new message: show} other {# new messages: show}}",
     "unknownAreaTitle": "Area not recognised",
-    "unknownStoreTitle": "Store and area not recognised"
+    "unknownStoreTitle": "Store and area not recognised",
+    "pill": {
+      "none": "Feed not connected: set it up",
+      "online": "Online",
+      "last": "{board} read {time} ({posts} posts)",
+      "next": "next {board} in {in}",
+      "reading": "Reading {board}",
+      "late": "{board} late (due {time})",
+      "quiet": "No posts from {boards} for 10 min",
+      "silent": "Feed silent since {time}: notices stopped"
+    }
   },
   "accounts": {
     "newTitle": "New account",

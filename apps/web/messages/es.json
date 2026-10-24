@@ -2292,7 +2292,17 @@
     "unread": "{n, plural, one {# mensaje nuevo} other {# mensajes nuevos}}",
     "waiting": "{n, plural, one {# mensaje nuevo: ver} other {# mensajes nuevos: ver}}",
     "unknownAreaTitle": "Zona no reconocida",
-    "unknownStoreTitle": "Tienda y zona no reconocidas"
+    "unknownStoreTitle": "Tienda y zona no reconocidas",
+    "pill": {
+      "none": "Feed sin conectar: configúralo",
+      "online": "En línea",
+      "last": "{board} leído {time} ({posts} posts)",
+      "next": "siguiente {board} en {in}",
+      "reading": "Leyendo {board}",
+      "late": "{board} con retraso (previsto {time})",
+      "quiet": "Sin posts de {boards} en 10 min",
+      "silent": "Feed en silencio desde {time}: avisos parados"
+    }
   },
   "accounts": {
     "newTitle": "Cuenta nueva",

@@ -339,8 +339,13 @@ export interface Push {
    * next to the store; saved when they change.
    */
   products?: { code: string; meaning: string }[] | null;
+  /** When (an ISO time) and where (a board) the feed reads next: the Stores pages show it. */
+  next?: { board?: string | null; at: string } | null;
   posts: (PushedPost & { pictures?: PostImage[] })[];
 }
+
+/** How far ahead a feed's next read may be said to be. */
+const NEXT_MAX_MS = 6 * 3_600_000;
 
 /** A list of board keys, or null. */
 const keys = (v: unknown) =>
@@ -349,6 +354,16 @@ const keys = (v: unknown) =>
         .filter((w): w is string => typeof w === 'string' && /^[a-z0-9_-]{1,40}$/.test(w))
         .slice(0, 20)
     : null;
+
+/** A push's next read, when it is a time within the next hours (else none). */
+function readNext(v: unknown): Push['next'] {
+  const n = v as { board?: unknown; at?: unknown } | null;
+  if (!n || typeof n !== 'object' || typeof n.at !== 'string') return null;
+  const at = Date.parse(n.at);
+  if (Number.isNaN(at) || at > Date.now() + NEXT_MAX_MS) return null;
+  const board = typeof n.board === 'string' && /^[a-z0-9_-]{1,40}$/.test(n.board) ? n.board : null;
+  return { board, at: n.at };
+}
 
 /** Checks a pushed body: the push, or what is wrong with it. */
 export function readPush(body: unknown): Push | string {
@@ -389,6 +404,7 @@ export function readPush(body: unknown): Push | string {
           .slice(0, 500)
           .map((e) => ({ code: e.code.trim(), meaning: e.meaning.trim() }))
       : null,
+    next: readNext(b.next),
     posts: b.posts.map((p) => {
       const pictures = readImages(p.images);
       return {
@@ -464,6 +480,9 @@ export async function receivePush(
       boards: { ...token?.boards, [key]: board },
       ...(push.watching ? { watching: push.watching } : {}),
       ...(push.offered ? { offered: push.offered } : {}),
+      next: push.next
+        ? { board: push.next.board ?? null, at: toLocalIso(new Date(push.next.at)) }
+        : null,
     })
     .where(eq(feedTokens.userId, userId));
   const resumed = !!token?.silenceAlertedAt;
@@ -1142,9 +1161,38 @@ export async function storesState(db: Db, userId: string) {
       .from(storePosts)
       .orderBy(desc(storePosts.receivedAt))
       .limit(1),
-    db.select({ at: feedTokens.lastSeenAt }).from(feedTokens).where(eq(feedTokens.userId, userId)),
+    db
+      .select({
+        at: feedTokens.lastSeenAt,
+        source: feedTokens.lastSource,
+        boards: feedTokens.boards,
+        watching: feedTokens.watching,
+        next: feedTokens.next,
+      })
+      .from(feedTokens)
+      .where(eq(feedTokens.userId, userId)),
   ]);
-  return { post: post?.at ?? null, feed: token?.at ?? null };
+  // The feed at a glance (the Stores pages' status): its last push, the board it read last, its
+  // next read, and the boards it watches with when each last gave posts.
+  const boards = Object.entries(token?.boards ?? {});
+  const [lastBoard, last] = boards.sort(([, a], [, b]) => b.at.localeCompare(a.at))[0] ?? [];
+  return {
+    post: post?.at ?? null,
+    feed: token?.at ?? null,
+    status: token?.at
+      ? {
+          at: token.at,
+          source: token.source,
+          board: lastBoard ?? null,
+          posts: last?.posts ?? 0,
+          next: token.next ?? null,
+          watched: (token.watching ?? boards.map(([key]) => key)).map((key) => ({
+            key,
+            readAt: token.boards?.[key]?.readAt ?? null,
+          })),
+        }
+      : null,
+  };
 }
 
 /**

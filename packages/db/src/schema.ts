@@ -1242,6 +1242,13 @@ export interface BoardState {
   alertedAt?: string | null;
 }
 
+/** When and where a feed says it reads next (the Stores pages show it on time, due or late). */
+export interface FeedNext {
+  /** The board it reads next (null: the feed has one). */
+  board: string | null;
+  at: string;
+}
+
 /** A person's feed token (S25): the hash only; when and what it last sent. */
 export const feedTokens = sqliteTable(
   'feed_tokens',
@@ -1264,6 +1271,8 @@ export const feedTokens = sqliteTable(
     watching: text('watching', { mode: 'json' }).$type<string[]>(),
     /** The boards the feed can read (to choose from in the app). */
     offered: text('offered', { mode: 'json' }).$type<string[]>(),
+    /** Its next read, as its last push said (null: it does not say). */
+    next: text('next', { mode: 'json' }).$type<FeedNext>(),
     ...timestamps,
   },
   (t) => [index('feed_tokens_hash_idx').on(t.tokenHash)],

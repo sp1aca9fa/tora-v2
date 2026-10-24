@@ -98,6 +98,9 @@ Content-Type: application/json
   works it out from the posts sent, which costs a few more rows read per push.
 - `hello`: true once when the feed (re)starts (a new tab or browser session, a new version): its
   person is told "connected" again, so a restart is confirmed.
+- `next` (optional): where and when the feed reads next, `{ "board": "store-b", "at": "<ISO time>" }`;
+  the Stores pages show it counting down, then "reading" while it is due, and late when no push
+  comes within a minute and a half. A push without it clears it.
 - `watching`: every board the feed goes through; its person is told "connected, tracking these
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.

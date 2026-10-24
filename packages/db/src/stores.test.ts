@@ -21,6 +21,7 @@ import {
   pruneStorePosts,
   readPush,
   receivePush,
+  storesState,
   recentPosts,
   removeGlossary,
   removeStore,
@@ -170,10 +171,51 @@ it('checks what a feed pushes', () => {
     hello: null,
     chain: 'megastore',
     products: null,
+    next: null,
     posts: [
       { id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null, replyTo: null },
     ],
   });
+  const at = '2026-10-19T03:01:00.000Z';
+  expect(readPush({ source: 'myboard', posts: [], next: { board: 'b', at } })).toMatchObject({
+    next: { board: 'b', at },
+  });
+  expect(readPush({ source: 'myboard', posts: [], next: { at: 'soon' } })).toMatchObject({
+    next: null,
+  });
+});
+
+it("shows the feed's last read and its next one on the Stores pages", async () => {
+  await newFeedToken(db, uid);
+  expect((await storesState(db, uid)).status).toBeNull();
+  const next = { board: 'store-b', at: new Date(now.getTime() + 60_000).toISOString() };
+  await receivePush(
+    db,
+    uid,
+    {
+      source: 'myboard',
+      board: 'store-a',
+      watching: ['store-a', 'store-b'],
+      seen: 12,
+      posts: [],
+      next,
+    },
+    now,
+  );
+  expect((await storesState(db, uid)).status).toEqual({
+    at: toLocalIso(now),
+    source: 'myboard',
+    board: 'store-a',
+    posts: 12,
+    next: { board: 'store-b', at: toLocalIso(new Date(next.at)) },
+    watched: [
+      { key: 'store-a', readAt: toLocalIso(now) },
+      { key: 'store-b', readAt: null },
+    ],
+  });
+  // A push that does not say clears it.
+  await receivePush(db, uid, { source: 'myboard', board: 'store-b', seen: 3, posts: [] }, now);
+  expect((await storesState(db, uid)).status?.next).toBeNull();
 });
 
 it("notifies the people whose area holds a post's store, once per store for a while", async () => {
