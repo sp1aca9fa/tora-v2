@@ -632,11 +632,22 @@ export interface PortfolioRow {
 
 /** The user's owned holdings, valued now, with totals and a breakdown by category / kind. */
 export async function portfolioValuation(db: Db, userId: string, now = new Date()) {
-  const rows = await db
-    .select({ holding: holdings, product: products })
-    .from(holdings)
-    .innerJoin(products, eq(products.id, holdings.productId))
-    .where(and(eq(holdings.userId, userId), inArray(holdings.status, ['owned', 'consumed'])));
+  // Lots and their items read apart: joined, each item's columns came once per lot (S14).
+  const mine = and(eq(holdings.userId, userId), inArray(holdings.status, ['owned', 'consumed']));
+  const [lots, items] = await Promise.all([
+    db.select().from(holdings).where(mine),
+    db
+      .select()
+      .from(products)
+      .where(
+        inArray(
+          products.id,
+          db.selectDistinct({ id: holdings.productId }).from(holdings).where(mine),
+        ),
+      ),
+  ]);
+  const itemOf = new Map(items.map((p) => [p.id, p]));
+  const rows = lots.map((holding) => ({ holding, product: itemOf.get(holding.productId)! }));
   // Opened (consumed) items keep their cost in the totals at no market value: their value now
   // lives in the pulls logged from them, which carry no cost of their own.
   const opened = rows.filter((r) => r.holding.status === 'consumed');

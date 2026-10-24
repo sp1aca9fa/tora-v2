@@ -108,6 +108,7 @@
   },
   "inventory": {
     "search": "名前・セット・カード番号で検索",
+    "more": "ほか{count}件",
     "allTypes": "すべての種類",
     "allStatuses": "すべての状態",
     "emptyFiltered": "条件に一致する登録はありません。",

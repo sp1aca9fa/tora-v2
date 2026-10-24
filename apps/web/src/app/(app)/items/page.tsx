@@ -24,7 +24,8 @@ import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
 import { PortfolioHeader } from '../_portfolio/header';
-import { ItemCard } from './item-card';
+import { itemCardData } from './card-data';
+import { ItemList } from './item-list';
 import { ItemFilters } from './item-filters';
 import { getMoney } from '@/lib/money-server';
 import { getTaxonomy } from '@/lib/taxonomy';
@@ -68,13 +69,23 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
       : 'owned';
   const q = sp.q?.trim().slice(0, 100) || undefined;
 
-  const [rows, portfolio, actions, grades, t] = await Promise.all([
-    listInventory(db, user.id, { status, q }),
+  // Owned lots without a search are the valued ones: read once (S14), newest first as listed.
+  const plain = status === 'owned' && !q;
+  const [listed, portfolio, actions, grades, t] = await Promise.all([
+    plain ? null : listInventory(db, user.id, { status, q }),
     portfolioValuation(db, user.id),
     userActions(),
     cardGradeCounts(db, user.id),
     getTranslations(),
   ]);
+  const rows =
+    listed ??
+    portfolio.rows.toSorted(
+      (a, b) =>
+        b.holding.acquiredAt.localeCompare(a.holding.acquiredAt) ||
+        b.holding.createdAt.localeCompare(a.holding.createdAt) ||
+        a.holding.id.localeCompare(b.holding.id),
+    );
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
   // Everything the search and status match: the chips count it; the list shows the type picked.
   // Lots are summed per item within their tracking group (S8): investments, value only, ...
@@ -188,50 +199,23 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
           )}
         </div>
       ) : (
-        <div className="space-y-8">
-          {modes.map(({ mode, groups }) => (
-            <div key={mode} className="space-y-5">
-              {headed && (
-                <header className="space-y-0.5">
-                  <h2 className="text-lg font-semibold tracking-tight">
-                    {t(`tracking.group.${mode}`)}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">{t(`tracking.hint.${mode}`)}</p>
-                </header>
-              )}
-              {groups.map((g) => {
-                const st = stats(g.list);
-                return (
-                  <section key={g.key} className="space-y-2">
-                    {/* Below the phone's top bar; at the top on desktop. */}
-                    <h3 className="sticky top-[calc(3.1rem+env(safe-area-inset-top))] z-[5] -mx-4 flex items-baseline gap-2 border-b bg-background/95 px-4 py-1.5 text-sm font-medium backdrop-blur md:top-0 md:mx-0 md:px-1">
-                      <span>{g.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {t('portfolio.itemCount', { count: st.count })}
-                        {(mode === 'investment' || mode === 'value_only') && (
-                          <>
-                            {' · '}
-                            <span className="amount">{money(st.valueBase)}</span>
-                          </>
-                        )}
-                      </span>
-                    </h3>
-                    <ul className="divide-y rounded-xl border bg-card md:grid md:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] md:gap-3 md:divide-y-0 md:border-0 md:bg-transparent">
-                      {g.list.map((s) => (
-                        <ItemCard
-                          key={s.product.id}
-                          summary={s}
-                          mode={mode}
-                          version={images.get(s.product.id)}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        <ItemList
+          modes={modes.map(({ mode, groups }) => ({
+            mode,
+            title: headed ? t(`tracking.group.${mode}`) : null,
+            hint: headed ? t(`tracking.hint.${mode}`) : null,
+            groups: groups.map((g) => {
+              const st = stats(g.list);
+              return {
+                key: g.key,
+                label: g.label,
+                stats: t('portfolio.itemCount', { count: st.count }),
+                value: mode === 'investment' || mode === 'value_only' ? money(st.valueBase) : null,
+                cards: g.list.map((s) => itemCardData(s, mode, images.get(s.product.id), money, t)),
+              };
+            }),
+          }))}
+        />
       )}
       {grades.cards > 0 && grades.ungraded === 0 && (
         <p className="text-right text-sm">

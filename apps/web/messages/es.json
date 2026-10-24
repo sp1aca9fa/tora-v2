@@ -108,6 +108,7 @@
   },
   "inventory": {
     "search": "Buscar nombre, set, número de carta",
+    "more": "{count, plural, one {# artículo más} other {# artículos más}}",
     "allTypes": "Todos los tipos",
     "allStatuses": "Todos los estados",
     "emptyFiltered": "Ninguna entrada coincide con estos filtros.",

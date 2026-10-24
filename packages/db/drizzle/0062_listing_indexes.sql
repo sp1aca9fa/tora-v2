@@ -1,0 +1,2 @@
+CREATE INDEX `product_sources_listing_idx` ON `product_sources` (`source`,`external_id`);--> statement-breakpoint
+CREATE INDEX `product_sources_failed_idx` ON `product_sources` (`product_id`) WHERE active = 0 AND failure IS NOT NULL;

@@ -270,6 +270,12 @@ export const productSources = sqliteTable(
     index('product_sources_product_idx').on(t.productId, t.source, t.active),
     index('product_sources_source_idx').on(t.source, t.active),
     uniqueIndex('product_sources_external_uq').on(t.productId, t.source, t.externalId),
+    // A listing found by its site id (pictures of listings already linked, S14).
+    index('product_sources_listing_idx').on(t.source, t.externalId),
+    // Listings set aside (few): Actions looks for them on every page (the nav badge).
+    index('product_sources_failed_idx')
+      .on(t.productId)
+      .where(sql`active = 0 AND failure IS NOT NULL`),
   ],
 );
 

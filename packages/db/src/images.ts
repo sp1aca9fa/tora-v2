@@ -137,6 +137,7 @@ export async function linkedListingImages(
     .where(
       and(
         eq(productSources.active, true),
+        inArray(productSources.source, [...new Set(listings.map((l) => l.source))]),
         inArray(
           productSources.externalId,
           listings.map((l) => l.externalId),

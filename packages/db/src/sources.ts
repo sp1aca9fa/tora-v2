@@ -614,10 +614,9 @@ export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
     .from(productSources)
     .innerJoin(products, eq(products.id, productSources.productId))
     .where(
-      and(
-        eq(productSources.active, false),
-        sql`json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL`,
-      ),
+      // Written as the failed-listings index is (a bound false would not use it).
+      sql`${productSources.active} = 0 AND ${productSources.failure} IS NOT NULL
+        AND json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL`,
     );
   return rows.map((r) => r.product);
 }
