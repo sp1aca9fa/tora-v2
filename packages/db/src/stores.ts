@@ -34,6 +34,7 @@ import {
   type StorePost,
   feedTokens,
   storeNotices,
+  storePostImages,
   storePosts,
   stores,
   users,
@@ -46,6 +47,12 @@ const QUIET_MINUTES = 30;
 const POSTS_PER_PUSH = 200;
 /** A push this long all new (one pinned post aside) counts as a page turned over. */
 const GAP_MIN_POSTS = 10;
+/** Pictures in a post kept (the first ones), their size at most, and for how long. */
+const IMAGES_PER_POST = 4;
+const IMAGE_MAX_BYTES = 8_000_000;
+const IMAGE_DAYS = 7;
+/** Pictures attached to one notice at most (Discord's and Telegram's limit). */
+const IMAGES_PER_NOTICE = 10;
 
 /** A store as a directory plug-in lists it: its key there and what it is. */
 export interface ListedStore extends StoreEntry {
@@ -202,6 +209,46 @@ export interface PushedPost {
   chain?: string | null;
   /** A reply (comment): the id of the post it answers. */
   replyTo?: string | null;
+  /** Its pictures (JPEG, PNG, WebP or GIF), base64, with where they were found. */
+  images?: { url?: string | null; data: string }[] | null;
+}
+
+/** A post's picture as read from a push. */
+export interface PostImage {
+  url: string | null;
+  bytes: Buffer;
+  contentType: string;
+}
+
+/** The picture's type from its first bytes (what it says it is does not count), or null. */
+export function imageType(bytes: Buffer): string | null {
+  if (bytes.length < 12) return null;
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return 'image/png';
+  if (bytes.subarray(0, 4).toString('latin1') === 'GIF8') return 'image/gif';
+  if (
+    bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    bytes.subarray(8, 12).toString('latin1') === 'WEBP'
+  )
+    return 'image/webp';
+  return null;
+}
+
+/** A post's pictures that are pictures and not too big (the others left out). */
+function readImages(images: unknown): PostImage[] {
+  if (!Array.isArray(images)) return [];
+  const out: PostImage[] = [];
+  for (const i of images.slice(0, IMAGES_PER_POST)) {
+    if (!i || typeof i.data !== 'string' || i.data.length > (IMAGE_MAX_BYTES * 4) / 3 + 4) continue;
+    const bytes = Buffer.from(i.data, 'base64');
+    const contentType = imageType(bytes);
+    if (!contentType || bytes.length > IMAGE_MAX_BYTES) continue;
+    const url =
+      typeof i.url === 'string' && /^https?:\/\//.test(i.url) ? i.url.slice(0, 500) : null;
+    out.push({ url, bytes, contentType });
+  }
+  return out;
 }
 
 export interface Push {
@@ -229,7 +276,7 @@ export interface Push {
    * next to the store; saved when they change.
    */
   products?: { code: string; meaning: string }[] | null;
-  posts: PushedPost[];
+  posts: (PushedPost & { pictures?: PostImage[] })[];
 }
 
 /** A list of board keys, or null. */
@@ -279,15 +326,19 @@ export function readPush(body: unknown): Push | string {
           .slice(0, 500)
           .map((e) => ({ code: e.code.trim(), meaning: e.meaning.trim() }))
       : null,
-    posts: b.posts.map((p) => ({
-      id: p.id.slice(0, 200),
-      text: p.text.slice(0, 2000),
-      author: typeof p.author === 'string' ? p.author.slice(0, 100) : null,
-      url: typeof p.url === 'string' && /^https?:\/\//.test(p.url) ? p.url.slice(0, 500) : null,
-      postedAt: p.postedAt ?? null,
-      chain: typeof p.chain === 'string' ? p.chain : null,
-      replyTo: typeof p.replyTo === 'string' && p.replyTo ? p.replyTo.slice(0, 200) : null,
-    })),
+    posts: b.posts.map((p) => {
+      const pictures = readImages(p.images);
+      return {
+        id: p.id.slice(0, 200),
+        text: p.text.slice(0, 2000),
+        author: typeof p.author === 'string' ? p.author.slice(0, 100) : null,
+        url: typeof p.url === 'string' && /^https?:\/\//.test(p.url) ? p.url.slice(0, 500) : null,
+        postedAt: p.postedAt ?? null,
+        chain: typeof p.chain === 'string' ? p.chain : null,
+        replyTo: typeof p.replyTo === 'string' && p.replyTo ? p.replyTo.slice(0, 200) : null,
+        ...(pictures.length ? { pictures } : {}),
+      };
+    }),
   };
 }
 
@@ -437,7 +488,20 @@ export async function receivePush(
     if (row) fresh.push(row);
     // A post may be answered within the same push.
     if (row) parents.set(p.id, row);
+    if (row && p.pictures?.length) {
+      await db.insert(storePostImages).values(
+        p.pictures.map((img, position) => ({
+          postId: row.id,
+          position,
+          bytes: img.bytes,
+          contentType: img.contentType,
+          sourceUrl: img.url,
+          createdAt: at,
+        })),
+      );
+    }
   }
+  await dropOldImages(db, now);
   // A page shows a fixed number of posts (one may be pinned): all of them new means the page
   // turned over completely since the last visit.
   const gap = (
@@ -776,6 +840,11 @@ export async function sendStoreNotices(
       : []
     ).map((r) => [r.id, r.text]),
   );
+  // The posts' pictures, attached to the notices that carry them.
+  const pictures = await imagesOf(
+    db,
+    posts.map((p) => p.id),
+  );
   let sent = 0;
   for (const user of people) {
     const area = storesInArea(user.preferences!.storeArea, all, today);
@@ -827,6 +896,16 @@ export async function sendStoreNotices(
       }),
       base ? `${base}/stores` : null,
     );
+    const images = chosen
+      .flatMap((p) =>
+        (pictures.get(p.id) ?? []).map((img, i) => ({
+          name: `${p.externalId}-${i + 1}.${img.contentType.split('/')[1]}`,
+          contentType: img.contentType,
+          bytes: img.bytes,
+        })),
+      )
+      .slice(0, IMAGES_PER_NOTICE);
+    if (images.length) message.images = images;
     for (const id of told) {
       await db
         .insert(storeNotices)
@@ -839,6 +918,53 @@ export async function sendStoreNotices(
     if (await sendToUser(db, user.id, message, ctx)) sent++;
   }
   return sent;
+}
+
+/** The pictures of these posts (by post id), in their order. */
+async function imagesOf(
+  db: Db,
+  postIds: string[],
+): Promise<Map<string, (typeof storePostImages.$inferSelect)[]>> {
+  const map = new Map<string, (typeof storePostImages.$inferSelect)[]>();
+  if (!postIds.length) return map;
+  const rows = await db
+    .select()
+    .from(storePostImages)
+    .where(inArray(storePostImages.postId, postIds))
+    .orderBy(storePostImages.position);
+  for (const r of rows) map.set(r.postId, [...(map.get(r.postId) ?? []), r]);
+  return map;
+}
+
+/** The ids of these posts' pictures (by post id), in their order, without the bytes. */
+export async function postImageIds(db: Db, postIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (!postIds.length) return map;
+  const rows = await db
+    .select({ id: storePostImages.id, postId: storePostImages.postId })
+    .from(storePostImages)
+    .where(inArray(storePostImages.postId, postIds))
+    .orderBy(storePostImages.position);
+  for (const r of rows) map.set(r.postId, [...(map.get(r.postId) ?? []), r.id]);
+  return map;
+}
+
+export async function getPostImage(db: Db, id: string) {
+  const [row] = await db.select().from(storePostImages).where(eq(storePostImages.id, id));
+  return row ?? null;
+}
+
+let droppedAt = 0;
+
+/** Deletes pictures older than a week (at most once an hour); the posts stay. */
+export async function dropOldImages(db: Db, now = new Date()): Promise<void> {
+  if (now.getTime() - droppedAt < 3_600_000) return;
+  droppedAt = now.getTime();
+  await db
+    .delete(storePostImages)
+    .where(
+      lt(storePostImages.createdAt, toLocalIso(new Date(now.getTime() - IMAGE_DAYS * 86_400_000))),
+    );
 }
 
 /** The latest posts, newest first. */

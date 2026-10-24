@@ -7,7 +7,14 @@ import {
   storeLabelIn,
   storesInArea,
 } from '@tora/core';
-import { type Db, cachedStores, postsPage, storeCodes, storeGlossary } from '@tora/db';
+import {
+  type Db,
+  cachedStores,
+  postImageIds,
+  postsPage,
+  storeCodes,
+  storeGlossary,
+} from '@tora/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 /** Posts loaded at a time; more as the list is scrolled. */
@@ -28,6 +35,8 @@ export interface PostView {
   reply: boolean;
   text: string;
   url: string | null;
+  /** Its pictures (the app's addresses), for a week. */
+  images: string[];
 }
 
 /** A batch of posts, newest first (only the area's when asked), ready to show. */
@@ -53,6 +62,10 @@ export async function postViews(
     storeIds: opts.onlyArea ? [...inArea] : undefined,
   });
   const byId = new Map(all.map((s) => [s.id, s]));
+  const images = await postImageIds(
+    db,
+    posts.map((p) => p.id),
+  );
   return {
     more,
     posts: posts.map((p) => ({
@@ -75,6 +88,7 @@ export async function postViews(
       reply: !!p.replyTo,
       text: p.text,
       url: p.url,
+      images: (images.get(p.id) ?? []).map((id) => `/img/posts/${id}`),
     })),
   };
 }

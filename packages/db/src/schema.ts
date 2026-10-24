@@ -1208,6 +1208,30 @@ export const storePosts = sqliteTable(
   ],
 );
 
+/**
+ * A picture in a store post (S25), sent by the feed with the post and attached to its notices;
+ * deleted after a week (the post stays).
+ */
+export const storePostImages = sqliteTable(
+  'store_post_images',
+  {
+    id: id(),
+    postId: text('post_id')
+      .notNull()
+      .references(() => storePosts.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    bytes: blob('bytes', { mode: 'buffer' }).notNull(),
+    contentType: text('content_type').notNull(),
+    /** Where the feed found it (the picture on the board). */
+    sourceUrl: text('source_url'),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('store_post_images_post_idx').on(t.postId),
+    index('store_post_images_created_idx').on(t.createdAt),
+  ],
+);
+
 /** A board's state in a feed (S25). */
 export interface BoardState {
   at: string;

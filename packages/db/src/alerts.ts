@@ -11,6 +11,7 @@ import {
   type AlertState,
   type BuyAlertData,
   type Notice,
+  type NoticeImage,
   type NoticeKind,
   type NoticeRole,
   type NoticeStyle,
@@ -104,14 +105,15 @@ async function telegramToken(db: Db, secret: string): Promise<string | null> {
 async function telegram(
   token: string,
   method: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown> | FormData,
   fetchFn: typeof fetch,
 ): Promise<unknown> {
+  const form = body instanceof FormData;
   const res = await fetchFn(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
+    ...(form ? {} : { headers: { 'content-type': 'application/json' } }),
+    body: form ? body : JSON.stringify(body),
+    signal: AbortSignal.timeout(form ? 60_000 : 15_000),
   });
   const json = (await res.json().catch(() => null)) as {
     ok?: boolean;
@@ -332,6 +334,7 @@ async function deliver(
       });
       if (!res.ok) throw new Error(`Discord answered ${res.status}`);
     }
+    if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
     return;
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
@@ -350,6 +353,63 @@ async function deliver(
     },
     fetchFn,
   );
+  if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
+}
+
+/** Bytes of pictures sent in one message at most (Discord's and Telegram's limits allow more). */
+const IMAGE_BATCH_BYTES = 20_000_000;
+
+/**
+ * A notice's pictures, after its text, in as few messages as their size allows. A picture that
+ * does not go never fails the notice (its text went): the log says why.
+ */
+async function sendImages(
+  channel: AlertChannel,
+  target: string,
+  images: NoticeImage[],
+  ctx: AlertContext,
+  token: string | null,
+): Promise<void> {
+  const fetchFn = ctx.fetch ?? fetch;
+  const batches: NoticeImage[][] = [];
+  for (const img of images) {
+    const last = batches.at(-1);
+    const size = (last ?? []).reduce((n, i) => n + i.bytes.length, 0);
+    if (last && last.length < 10 && size + img.bytes.length <= IMAGE_BATCH_BYTES) last.push(img);
+    else batches.push([img]);
+  }
+  const file = (img: NoticeImage) =>
+    new Blob([new Uint8Array(img.bytes)], { type: img.contentType });
+  for (const batch of batches) {
+    try {
+      const form = new FormData();
+      if (channel.kind === 'discord') {
+        form.append('payload_json', JSON.stringify({ allowed_mentions: { parse: [] } }));
+        batch.forEach((img, i) => form.append(`files[${i}]`, file(img), img.name));
+        const res = await fetchFn(target, {
+          method: 'POST',
+          body: form,
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+      } else if (token) {
+        form.append('chat_id', target);
+        if (batch.length === 1) {
+          form.append('photo', file(batch[0]!), batch[0]!.name);
+          await telegram(token, 'sendPhoto', form, fetchFn);
+        } else {
+          form.append(
+            'media',
+            JSON.stringify(batch.map((_, i) => ({ type: 'photo', media: `attach://p${i}` }))),
+          );
+          batch.forEach((img, i) => form.append(`p${i}`, file(img), img.name));
+          await telegram(token, 'sendMediaGroup', form, fetchFn);
+        }
+      }
+    } catch (error) {
+      ctx.log?.(`alerts: pictures to ${channel.kind} not sent: ${errorText(error)}`);
+    }
+  }
 }
 
 /** Sends to one channel; remembers when it worked or why it failed. */

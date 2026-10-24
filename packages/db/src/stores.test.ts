@@ -10,11 +10,13 @@ import {
   boardsToWatch,
   addStore,
   checkFeeds,
+  dropOldImages,
   feedStatus,
   feedTokenUser,
   listStores,
   newFeedToken,
   postsPage,
+  postImageIds,
   pruneStorePosts,
   readPush,
   receivePush,
@@ -165,6 +167,53 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   // Another post about the same store soon after: no second notice.
   const again = await push([post('5', 'KTA まだある')]);
   expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
+});
+
+it("keeps a post's pictures a week and sends them after its notice", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  await receivePush(
+    db,
+    uid,
+    { source: 'myboard', chain: 'megastore', posts: [post('1', 'KTA')] },
+    now,
+  );
+  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, ...Array(12).fill(0)]).toString('base64');
+  const read = readPush({
+    source: 'myboard',
+    chain: 'megastore',
+    posts: [
+      {
+        ...post('2', 'KTA 販売中'),
+        // A picture, and a page that is no picture whatever it says (left out).
+        images: [
+          { url: 'https://example.com/a.jpg', data: jpeg },
+          { url: 'https://example.com/b.jpg', data: Buffer.from('<html>').toString('base64') },
+        ],
+      },
+    ],
+  });
+  if (typeof read === 'string') throw new Error(read);
+  expect(read.posts[0]!.pictures).toHaveLength(1);
+  const r = await receivePush(db, uid, read, now);
+  const files: string[] = [];
+  const withFiles = (async (url: string, init?: RequestInit) => {
+    if (init?.body instanceof FormData)
+      for (const [, v] of init.body.entries()) if (v instanceof Blob) files.push((v as File).name);
+    return fakeFetch(url, init?.body instanceof FormData ? undefined : init);
+  }) as typeof fetch;
+  expect(await sendStoreNotices(db, r, { ...ctx, fetch: withFiles }, now)).toBe(1);
+  expect(sent.at(-1)).toContain('KTA 販売中');
+  expect(files).toEqual(['2-1.jpeg']);
+  // Gone after a week; the post stays.
+  const id = r.fresh[0]!.id;
+  expect((await postImageIds(db, [id])).get(id)).toHaveLength(1);
+  await dropOldImages(db, new Date(now.getTime() + 8 * 86_400_000));
+  expect((await postImageIds(db, [id])).get(id)).toBeUndefined();
+  expect((await recentPosts(db)).some((p) => p.id === id)).toBe(true);
 });
 
 it('sends replies at once as comments to their post, with the products its codes name', async () => {

@@ -68,6 +68,22 @@ export function PostsList({
                 p.text
               )}
             </p>
+            {p.images.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {p.images.map((src) => (
+                  <a key={src} href={src} target="_blank" rel="noreferrer">
+                    {/* A picture stored by the app; next/image optimisation is not needed. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt=""
+                      loading="lazy"
+                      className="h-24 max-w-40 rounded border object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ul>

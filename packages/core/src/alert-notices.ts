@@ -115,6 +115,15 @@ export interface Notice {
   linkText?: string;
   /** A card link's text (Telegram, plain text). */
   urlText?: string;
+  /** Pictures sent after the text (Discord and Telegram). */
+  images?: NoticeImage[];
+}
+
+export interface NoticeImage {
+  /** The file's name ("362152-1.jpeg"). */
+  name: string;
+  contentType: string;
+  bytes: Uint8Array;
 }
 
 export interface NoticeStyle {

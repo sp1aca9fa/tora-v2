@@ -108,6 +108,10 @@ Content-Type: application/json
   are sent to the people whose area holds the store at once, marked as a comment to their post,
   even within the store's quiet time (a new post about a store makes at most one notice every 30
   minutes).
+- `images` (per post, optional): its pictures, `[{ "url": "<where it was found>", "data": "<base64>" }]`,
+  up to 4, 8 MB each (JPEG, PNG, WebP or GIF). Kept a week, attached to the post's notices and
+  shown on the Posts page. Send a post's pictures with its first push only (a post sent again is
+  ignored, pictures too), and shrink them first: every backup holds the week's pictures.
 - `id`: the post's id on its site (or any stable key): a post sent again is ignored, so sending
   the whole visible page every time is fine. At most 200 posts a push.
 - `author`: the poster's name, when the site shows one; stores are looked for in it too (some
