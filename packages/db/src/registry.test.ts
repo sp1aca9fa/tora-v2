@@ -17,7 +17,14 @@ import {
   setSourceOrder,
   setSourceRoles,
 } from './registry';
-import { collectorTimes, finishRun, identityFor, insertObservations, startRun } from './sources';
+import {
+  blockedOn,
+  collectorTimes,
+  finishRun,
+  identityFor,
+  insertObservations,
+  startRun,
+} from './sources';
 import * as schema from './schema';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -218,6 +225,17 @@ it('shows a third market and keeps the compare choice and identity amount (S16)'
   const game = { category: 'game', kind: 'software', itemType: 'game' };
   expect(identityFor(game, 9000, registry)).toBeNull();
   expect(identityFor(game, 12000, registry)).not.toBeNull();
+});
+
+it('lists the sources blocked on a day, so later retries leave them alone', async () => {
+  const run = async (source: string, status: 'ok' | 'blocked' | 'partial') =>
+    finishRun(db, await startRun(db, source), { status, requests: 1, observationsAdded: 0 });
+  await run('snkrdunk', 'blocked');
+  await run('snkrdunk', 'ok');
+  await run('mercari', 'partial');
+  const today = (await db.select().from(schema.collectorRuns))[0]!.startedAt.slice(0, 10);
+  expect([...(await blockedOn(db, today))]).toEqual(['snkrdunk']);
+  expect((await blockedOn(db, '2000-01-01')).size).toBe(0);
 });
 
 it("records each run's working time and flags a long run and a long night (S16)", async () => {

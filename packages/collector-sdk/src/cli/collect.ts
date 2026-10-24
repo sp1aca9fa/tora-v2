@@ -1,7 +1,8 @@
 // `pnpm collect [--market us] [--source x] [--product id] [--match-only] [--collect-only] [--refresh] [--review]`
 // --market / --source: one market's or one source's collectors (S16: spread across the night).
 // Listings already collected today are left out (a retry does only what is left) unless --refresh
-// or --product; a site another collect is running is skipped (never two runs for one site).
+// or --product; a site another collect is running is skipped (never two runs for one site), and
+// one that blocked a run today is left until tomorrow.
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
 import {
@@ -10,6 +11,7 @@ import {
   clearAllBucketValues,
   createDb,
   inferLotSizes,
+  blockedOn,
   linkSets,
   listUsers,
   recordActivity,
@@ -210,8 +212,18 @@ if (withRankings) {
   }
 }
 if (selected.length === 0) console.log('No collectors registered.');
+// A site that blocked an earlier run today is left alone until tomorrow (section 7), unless asked
+// for by name or with --refresh; its admins were told after that run.
+const blocked =
+  values.source || values.product || values.refresh
+    ? new Set<string>()
+    : await blockedOn(db, localDate(new Date(), timeZone));
 for (const collector of selected) {
   progress.next(collector.source);
+  if (blocked.has(collector.source)) {
+    log(`${collector.source}: skipped, it blocked an earlier run today (tried again tomorrow)`);
+    continue;
+  }
   const lock = lockSource(collector.source);
   if ('heldBy' in lock) {
     // Not a success: the schedule tries again later, when the other run is done.

@@ -22,6 +22,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  like,
   lt,
   ne,
   not,
@@ -678,6 +679,18 @@ export async function startRun(
     .values({ source, startedAt: toLocalIso(), status: 'running' })
     .returning({ id: collectorRuns.id });
   return run!.id;
+}
+
+/**
+ * Sources whose run was blocked (HTTP 403 / 429, a captcha) on this day of the app (`YYYY-MM-DD`):
+ * the day's later retries leave them alone (section 7: do not retry aggressively).
+ */
+export async function blockedOn(db: Db, day: string): Promise<Set<string>> {
+  const rows = await db
+    .selectDistinct({ source: collectorRuns.source })
+    .from(collectorRuns)
+    .where(and(eq(collectorRuns.status, 'blocked'), like(collectorRuns.startedAt, `${day}%`)));
+  return new Set(rows.map((r) => r.source));
 }
 
 export async function finishRun(

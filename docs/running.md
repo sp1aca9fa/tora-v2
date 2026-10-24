@@ -27,7 +27,9 @@ app's time zone, Settings > Admin preferences > Time zone) is left out: a run st
 day (a retry after the PC turned off, a second task) does only what is left. `--refresh` or
 `--product` collects again anyway. A site another collect is already running (by hand or by the
 schedule) is skipped, so two runs never fetch from the same site at once; the skipped run does not
-count as the day's run, and the schedule tries again later.
+count as the day's run, and the schedule tries again later. A site that blocked a run (HTTP 403 or
+429, a captcha) is left alone until the next day, so the day's retries do not keep knocking;
+`--source` or `--refresh` tries it anyway.
 
 **How items get prices.** Register an item; on the next run each collector searches its site for
 it and stores the best candidates; confirm the right one under **Actions** or the item's **Lots & details** page
