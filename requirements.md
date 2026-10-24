@@ -45,7 +45,7 @@
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
-| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
+| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person tested (nothing found); next the property tests and the account download round trip |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
 ### Decision log
@@ -898,6 +898,15 @@ Edge cases to try by hand or by script:
 
 Acceptance:
 - `pnpm check:all` passes; no severity 1 or 2 bug left open; the bug log and what is left for Open issues reviewed with the user.
+
+### Progress
+
+1. Server actions called by the wrong person (2026-10-25): `apps/web/src/app/actions-access.test.ts` calls every server action (sign-in and setup aside) as a member with every id of another person's data, learning each form from the fields it names back. It fails when the other person's rows change or are deleted, when a new row points at their private rows, or when their text comes back; a member's admin calls may add nothing, and a signed-out caller is only sent to sign in or refused before anything is read. As a control the owner, calling the same way, changes data through 39 actions; the others take inputs too specific to guess and were read by hand (each signs in, then checks ownership in its database function, the item's holders, or the admin role). Nothing found. The web tests now load the app's `@/` paths (`apps/web/vitest.config.ts`).
+
+### Bug log
+
+| # | What | How found | Severity | Commit |
+|---|---|---|---|---|
 
 ---
 
