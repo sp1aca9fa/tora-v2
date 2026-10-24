@@ -407,6 +407,13 @@
       "when": 1792811441523,
       "tag": "0057_alert_log",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1792818711558,
+      "tag": "0058_acquired_event_dates",
+      "breakpoints": true
     }
   ]
 }

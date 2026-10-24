@@ -421,6 +421,13 @@ describe('lot actions', () => {
     expect(await cardGradeCounts(db, uid)).toEqual({ cards: 2, ungraded: 1 });
   });
 
+  it('moves the acquired event with a corrected purchase date', async () => {
+    const { holding } = await amiiboLot();
+    await editHolding(db, uid, holding.id, { acquiredAt: day('03-04') });
+    const detail = await getHoldingDetail(db, uid, holding.id);
+    expect(detail?.events.find((e) => e.type === 'acquired')?.occurredAt).toBe(day('03-04'));
+  });
+
   it('edits facts and logs before/after; adds notes', async () => {
     const { holding } = await amiiboLot();
     await editHolding(db, uid, holding.id, { costTotalBase: 9_900, acquiredFrom: 'Amazon' });

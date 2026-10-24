@@ -499,6 +499,14 @@ export type HoldingEdit = Partial<
   >
 >;
 
+/** A corrected purchase date moves the lot's "acquired" event with it (its history's first line). */
+async function moveAcquiredEvent(tx: Pick<Db, 'update'>, holdingId: string, acquiredAt: string) {
+  await tx
+    .update(holdingEvents)
+    .set({ occurredAt: acquiredAt })
+    .where(and(eq(holdingEvents.holdingId, holdingId), eq(holdingEvents.type, 'acquired')));
+}
+
 /** Corrects recorded facts. Logged as a `note` event with `kind: 'edit'` and before/after. */
 export async function editHolding(
   db: Db,
@@ -541,6 +549,7 @@ export async function editHolding(
     if (Object.keys(changes).length === 0) throw new DomainError('no_change');
 
     const [updated] = await tx.update(holdings).set(patch).where(eq(holdings.id, id)).returning();
+    if (changes.acquiredAt) await moveAcquiredEvent(tx, id, updated!.acquiredAt);
     await insertEvent(tx, {
       holdingId: id,
       type: 'note',
@@ -663,6 +672,7 @@ export async function confirmImportReview(
         .update(holdings)
         .set({ ...patch, reviewPending: false })
         .where(eq(holdings.id, row.id));
+      if (changes.acquiredAt) await moveAcquiredEvent(tx, row.id, patch.acquiredAt!);
       if (Object.keys(changes).length > 0) {
         await insertEvent(tx, {
           holdingId: row.id,
