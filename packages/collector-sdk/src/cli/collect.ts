@@ -360,6 +360,8 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   if (quality.length) {
     log(`source quality changed: ${quality.join(', ')}`);
     await clearAllBucketValues(db);
+    // At once, not after the snapshots: until then every page works the values out from the sales.
+    await refreshBucketValues(db);
   }
   snap = await runSnapshots(db);
   // Today's value of everything held, read by the pages instead of every sale.

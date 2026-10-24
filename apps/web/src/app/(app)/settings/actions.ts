@@ -134,8 +134,9 @@ export async function setSourceRoleAction(key: string, cls: ProductClass, role: 
   await clearAllBucketValues(db);
   // The value-over-time history follows too (about 10 s), right after answering.
   after(async () => {
-    await runSnapshots(db);
+    // Values first: until they are saved again, every page works them out from the sales.
     await refreshBucketValues(db);
+    await runSnapshots(db);
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');
@@ -177,8 +178,9 @@ export async function moveSourceAction(key: string, cls: ProductClass, step: -1 
   );
   await clearAllBucketValues(db);
   after(async () => {
-    await runSnapshots(db);
+    // Values first: until they are saved again, every page works them out from the sales.
     await refreshBucketValues(db);
+    await runSnapshots(db);
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');
@@ -211,8 +213,9 @@ export async function setMarketsAction(primary: string, secondary: string | null
   );
   await clearAllBucketValues(db);
   after(async () => {
-    await runSnapshots(db);
+    // Values first: until they are saved again, every page works them out from the sales.
     await refreshBucketValues(db);
+    await runSnapshots(db);
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');
@@ -256,8 +259,9 @@ export async function saveCategoriesAction(
   );
   await clearAllBucketValues(db);
   after(async () => {
-    await runSnapshots(db);
+    // Values first: until they are saved again, every page works them out from the sales.
     await refreshBucketValues(db);
+    await runSnapshots(db);
     revalidatePath('/', 'layout');
   });
   revalidatePath('/', 'layout');

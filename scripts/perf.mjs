@@ -9,9 +9,16 @@
 // over its warm runs (time per visit); --out keeps the 5 costliest either way.
 //   pnpm perf [--base http://localhost:3200] [--runs 3] [--only Item] [--out <perf.json>]
 //             [--baseline <perf.json>] [--sql 3]
+//   pnpm perf --load <people> [--seconds 60]: many people at once (load.mjs)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { BASE, arg, session } from './session.mjs';
+
+// `--load <people>`: many people at once instead (S15, load.mjs).
+if (arg('load')) {
+  await (await import('./load.mjs')).runLoad();
+  process.exit();
+}
 
 const RUNS = Number(arg('runs', '3'));
 const ONLY = arg('only');
