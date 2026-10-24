@@ -194,3 +194,14 @@ it reads the same at `/api/server/status` (`Authorization: Bearer <token>`; `?li
 `?log=collect` for one log) and can change nothing. Values of secret settings and lines naming a
 source kept from AI models are left out. With `TORA_STATUS_URL` (the app's address) and
 `TORA_STATUS_TOKEN` in `.env`, `node scripts/server-status.mjs` prints it.
+
+## Checking every page: `pnpm crawl`
+
+Signs in, follows every link from the home page and opens each page at phone (390 px) and wide
+(1280 px) widths, then lists pages with an HTTP error, a console or page error, a raw text key, an
+unfilled `{placeholder}` or sideways scrolling; it exits with 1 when any has one. It only opens
+pages. Run it against a test copy with a dev server running (`--base`, default
+`http://localhost:3200`), with `CRAWL_USER`, `CRAWL_PASSWORD` and `CRAWL_TOTP_KEY` (or
+`CRAWL_TOTP_KEY_FILE`) in `.env`. Options: `--max 150` pages, `--per-pattern 2` pages per address
+shape (items, lots), `--only /settings`, `--shots <dir>` for screenshots, `--out <file>` for a
+JSON report.

@@ -7,8 +7,9 @@
 //              [--shots <dir>] [--out <report.json>]
 // Sign-in from the environment or `.env`: CRAWL_USER, CRAWL_PASSWORD, and CRAWL_TOTP_KEY (base32)
 // or CRAWL_TOTP_KEY_FILE.
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -30,6 +31,11 @@ const PER_PATTERN = Number(arg('per-pattern', '2'));
 const ONLY = arg('only');
 const SHOTS = arg('shots');
 const OUT = arg('out');
+// The session is kept between runs: each sign-in is a new device, and accounts allow few.
+const SESSION = join(
+  tmpdir(),
+  `tora-crawl-${createHash('sha256').update(BASE).digest('hex').slice(0, 12)}.json`,
+);
 const WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'wide', width: 1280, height: 900 },
@@ -175,8 +181,24 @@ async function inspect(page, keys) {
   return { problems, links: found.links, origin: found.origin };
 }
 
+/** The saved session if it still opens the app, else a new sign-in (saved for next time). */
+async function session(browser) {
+  if (existsSync(SESSION)) {
+    const saved = JSON.parse(readFileSync(SESSION, 'utf8'));
+    const context = await browser.newContext({ storageState: saved });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    const valid = !new URL(page.url()).pathname.startsWith('/login');
+    await context.close();
+    if (valid) return saved;
+  }
+  const state = await signIn(browser);
+  writeFileSync(SESSION, JSON.stringify(state), { mode: 0o600 });
+  return state;
+}
+
 const browser = await chromium.launch();
-const state = await signIn(browser);
+const state = await session(browser);
 const keys = messageKeys();
 const contexts = await Promise.all(
   WIDTHS.map((w) =>
