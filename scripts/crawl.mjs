@@ -86,6 +86,15 @@ async function signIn(browser) {
   await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   await page.fill('input[name="username"]', user);
   await page.fill('input[name="password"]', password);
+  // Two steps: the password, then the code.
+  await page.click('button[type="submit"]');
+  await page.waitForSelector('input[name="code"]', { timeout: 60_000 }).catch(async () => {
+    const alert = await page.locator('[role="alert"]').allInnerTexts();
+    console.error(
+      `Sign-in failed at the password step${alert.length ? `: ${alert.join(' ')}` : ''}.`,
+    );
+    process.exit(2);
+  });
   await page.fill('input[name="code"]', totp(key));
   await Promise.all([
     page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 60_000 }),
@@ -103,6 +112,8 @@ async function signIn(browser) {
 async function inspect(page, keys) {
   const found = await page.evaluate(() => {
     const text = document.body?.innerText ?? '';
+    // Text meant literally (placeholders explained, commands) is shown as code.
+    const literal = [...document.querySelectorAll('code, kbd, pre')].map((el) => el.innerText);
     const width = document.documentElement.clientWidth;
     const sideways = document.documentElement.scrollWidth > width + 1;
     // The outermost elements reaching past the right edge (not inside a scrolling box).
@@ -131,9 +142,16 @@ async function inspect(page, keys) {
       } "${(el.innerText ?? '').trim().slice(0, 40)}"`;
     return {
       text,
+      literal,
       sideways: sideways ? `${document.documentElement.scrollWidth}px > ${width}px` : null,
       wide: wide.map(describe),
-      overlay: !!document.querySelector('nextjs-portal'),
+      // The dev server's tools are always on the page; only an error adds its issues badge or
+      // opens its dialog.
+      issues: (() => {
+        const root = document.querySelector('nextjs-portal')?.shadowRoot;
+        if (!root?.querySelector('[data-issues], [data-nextjs-dialog-root]')) return null;
+        return root.querySelector('[data-issues-count]')?.textContent?.trim() || '?';
+      })(),
       links: [...document.querySelectorAll('a[href]')]
         .filter((a) => !a.hasAttribute('download') && a.target !== '_blank')
         .map((a) => a.href),
@@ -145,11 +163,13 @@ async function inspect(page, keys) {
   for (const m of found.text.matchAll(/\b[a-zA-Z]+(?:\.[a-zA-Z0-9_]+)+\b/g))
     if (keys.has(m[0])) raw.add(m[0]);
   if (raw.size) problems.push(`raw text keys: ${[...raw].slice(0, 5).join(', ')}`);
-  const placeholders = [...new Set(found.text.match(/\{[a-zA-Z]\w*\}/g) ?? [])];
+  let prose = found.text;
+  for (const l of found.literal) prose = prose.split(l).join(' ');
+  const placeholders = [...new Set(prose.match(/\{[a-zA-Z]\w*\}/g) ?? [])];
   if (placeholders.length) problems.push(`placeholders: ${placeholders.slice(0, 5).join(', ')}`);
   if (/Application error|Internal Server Error|Unhandled Runtime Error/.test(found.text))
     problems.push('error page');
-  if (found.overlay) problems.push('Next.js error overlay');
+  if (found.issues) problems.push(`Next.js issues: ${found.issues}`);
   if (found.sideways)
     problems.push(`scrolls sideways (${found.sideways}): ${found.wide.join('; ') || '?'}`);
   return { problems, links: found.links, origin: found.origin };

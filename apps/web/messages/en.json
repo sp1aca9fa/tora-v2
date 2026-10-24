@@ -1333,7 +1333,7 @@
     "removeConfirm": "Remove the token? Nobody can read the status from outside anymore."
   },
   "commands": {
-    "info": "Commands to run on the home PC, in a terminal in the Tora folder (WSL or Linux). Nothing runs from this page: copy a command, then fill in the parts in <angle brackets>.",
+    "info": "Commands to run on the home PC, in a terminal in the Tora folder (WSL or Linux). Nothing runs from this page: copy a command, then fill in the parts in '<'angle brackets'>'.",
     "guide": "Guide",
     "copy": "Copy",
     "copied": "Copied",
@@ -1586,9 +1586,9 @@
       "link": "Link to Tora"
     },
     "wording": "Wording",
-    "wordingInfo": "In your message language. Words in braces, like '{'store'}', are filled in: leave them as they are.",
+    "wordingInfo": "In your message language. Words in braces, like <c>'{'store'}'</c>, are filled in: leave them as they are.",
     "default": "Use default",
-    "placeholders": "Filled in: {list}",
+    "placeholders": "Filled in: <c>{list}</c>",
     "save": "Save",
     "saved": "Saved: your next messages of this kind look like this.",
     "reset": "Back to defaults",

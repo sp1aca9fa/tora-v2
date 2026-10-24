@@ -150,7 +150,9 @@ export function NoticeStyler({
 
         <section className="space-y-3">
           <h3 className="text-sm font-medium">{t('wording')}</h3>
-          <p className="text-xs text-muted-foreground">{t('wordingInfo')}</p>
+          <p className="text-xs text-muted-foreground">
+            {t.rich('wordingInfo', { c: (chunks) => <code>{chunks}</code> })}
+          </p>
           {NOTICE_TEXTS[kind].map((key) => {
             const params = [...new Set((base[key] ?? '').match(/\{\w+\}/g) ?? [])];
             return (
@@ -178,7 +180,10 @@ export function NoticeStyler({
                 />
                 {params.length > 0 && (
                   <span className="block text-xs text-muted-foreground">
-                    {t('placeholders', { list: params.join(' ') })}
+                    {t.rich('placeholders', {
+                      list: params.join(' '),
+                      c: (chunks) => <code>{chunks}</code>,
+                    })}
                   </span>
                 )}
               </label>

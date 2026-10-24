@@ -2,6 +2,7 @@
 // the code asks for exists. Run after adding or translating a language.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
 import { LOCALES } from './locale';
 
@@ -80,6 +81,21 @@ describe('translation files', () => {
       ).toEqual([]);
     },
   );
+
+  it.each(LOCALES)('%s: every text is a valid message (a literal "<" or "{" is quoted)', (code) => {
+    const messages = load(code);
+    const invalid: string[] = [];
+    const t = createTranslator({
+      locale: code,
+      messages,
+      onError: (e) => {
+        if (e.code === 'INVALID_MESSAGE') invalid.push(e.message.slice(0, 120));
+      },
+    });
+    // Values and tags are not given: only texts that do not parse count.
+    for (const key of keys(messages)) t(key as never);
+    expect(invalid).toEqual([]);
+  });
 
   it('has every text the code asks for', () => {
     const used = usedKeys();

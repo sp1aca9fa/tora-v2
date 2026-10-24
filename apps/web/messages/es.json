@@ -1333,7 +1333,7 @@
     "removeConfirm": "¿Eliminar el token? Nadie podrá leer el estado desde fuera."
   },
   "commands": {
-    "info": "Comandos para ejecutar en el PC de casa, en un terminal dentro de la carpeta de Tora (WSL o Linux). Nada se ejecuta desde esta página: copia un comando y rellena las partes entre <corchetes angulares>.",
+    "info": "Comandos para ejecutar en el PC de casa, en un terminal dentro de la carpeta de Tora (WSL o Linux). Nada se ejecuta desde esta página: copia un comando y rellena las partes entre '<'corchetes angulares'>'.",
     "guide": "Guía",
     "copy": "Copiar",
     "copied": "Copiado",
@@ -1586,9 +1586,9 @@
       "link": "Enlace a Tora"
     },
     "wording": "Texto",
-    "wordingInfo": "En el idioma de tus mensajes. Las palabras entre llaves, como '{'store'}', se rellenan: déjalas tal cual.",
+    "wordingInfo": "En el idioma de tus mensajes. Las palabras entre llaves, como <c>'{'store'}'</c>, se rellenan: déjalas tal cual.",
     "default": "Usar el predeterminado",
-    "placeholders": "Se rellena: {list}",
+    "placeholders": "Se rellena: <c>{list}</c>",
     "save": "Guardar",
     "saved": "Guardado: tus próximos mensajes de este tipo se verán así.",
     "reset": "Volver a los valores por defecto",
