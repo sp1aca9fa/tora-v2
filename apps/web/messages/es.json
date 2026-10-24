@@ -1762,6 +1762,7 @@
       "storeAdded": "Tienda añadida",
       "storeRemoved": "Tienda eliminada",
       "storeCodes": "Códigos de la tienda",
+      "productMerged": "Artículo duplicado fusionado",
       "glossaryAdded": "Significado de código añadido",
       "glossaryRemoved": "Significado de código eliminado"
     },

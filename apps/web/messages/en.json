@@ -1762,6 +1762,7 @@
       "storeAdded": "Store added",
       "storeRemoved": "Store removed",
       "storeCodes": "Store codes",
+      "productMerged": "Duplicate item merged",
       "glossaryAdded": "Code meaning added",
       "glossaryRemoved": "Code meaning removed"
     },

@@ -1762,6 +1762,7 @@
       "storeAdded": "店舗を追加",
       "storeRemoved": "店舗を削除",
       "storeCodes": "店舗のコード",
+      "productMerged": "重複アイテムを統合",
       "glossaryAdded": "コードの意味を追加",
       "glossaryRemoved": "コードの意味を削除"
     },
