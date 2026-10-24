@@ -878,7 +878,7 @@ Efficiency:
 - Database: 271 MB for 180 items, 213 lots and 365k sales; the sales are 92 % of it (159 MB of rows, 88 MB of indexes, about 0.7 KB a sale; their raw JSON 35 MB). The compressed backup was 18 MB at 283k rows (2026-10-16).
 - Growth: 10k-25k new sales a day this month, mostly older history filled in for new and ranked items; it should slow once histories are complete. At today's pace about 5 GB a year: nothing for a home server's disk, a limit for a hosted free database plan.
 - Collect: about 65 minutes of collector time a night (SNKRDUNK about 29, Mercari 13, the rest under 6 each), well inside the 6-hour window. Closing steps and pages read little since S19 (about 16k rows a night, 1-3k a page).
-- Gone pages: until a listing is set aside (3 nights), the hourly retries of a partial run ask for it again every hour (today 9 SNKRDUNK and 6 駿河屋 pages answering "gone", about 15 requests an hour).
+- Gone pages: until a listing is set aside (3 nights), the hourly retries of a partial run ask for it again every hour (today 9 SNKRDUNK and 6 駿河屋 pages answering "gone", about 15 requests an hour). Fixed (user): a page that answered gone is asked again the next night only, and the retry is not partial over it.
 - Development: requirements.md is 254 KB (roughly 70k tokens); most of it is "Built" detail of finished phases that git and the docs also hold. Reading it whole is the largest fixed cost of a Claude session.
 
 Risks (with what covers them today):
@@ -886,7 +886,7 @@ Risks (with what covers them today):
 2. A self-hosted install is one machine: the app, the database, the collect, the store feed browser and the daily "nothing ran" check. When the machine or its network is down, nothing can say so, since the check runs on it too. Backups are copied off the box by another computer when it is on.
 3. Unattended deploys: a push updates the server and runs its migrations (add-only rule, a failed update goes back). A migration that changes data (like 0058) runs with nobody watching; the nightly backup before it is the way back.
 4. Internet exposure: the app is reachable from anywhere. Covered: password and authenticator, two devices per person, lockout, hashed tokens (feed, setup links, status), pictures behind sign-in, security releases followed through `.nvmrc` and the lockfile.
-5. Cross-cutting lists: features added after a phase can miss that phase's lists. Part B found three (base currency amounts, backup paging, the audit log). Nothing fails when a new table or admin action is left out.
+5. Cross-cutting lists: features added after a phase can miss that phase's lists. Part B found three (base currency amounts, backup paging, the audit log). Guard tests now (user): every `*_base` column is converted on a base change, every admin action writes to Activity (amounts inside JSON still need care).
 6. Store feed: depends on a board's page and its access check, read by a userscript in a browser; a change there breaks it. Covered: silence and per-board alerts, the page-turn and stale-copy fixes (userscript 1.11, 1.12).
 7. Data quality: listing matches on search sources (Mercari asks at 34-55 % of SNKRDUNK's are often other things: kept to the same site's asks), thin data (warned, never hidden), items registered twice (look-alike check, shared-listing check, merge).
 8. Texts: Spanish and Japanese drafted by Claude, not checked by native speakers.

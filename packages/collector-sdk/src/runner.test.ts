@@ -491,10 +491,20 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   expect((await link()).failure).toBeNull();
 
   error = new ListingGoneError('item X1 not found');
+  let calls = 0;
+  collector.collect = async () => {
+    calls++;
+    throw error;
+  };
   expect((await runCollector(db, collector, night(4))).status).toBe('partial');
   // A retry the same night does not count again.
   await runCollector(db, collector, night(4));
   expect((await link()).failure).toMatchObject({ nights: 1 });
+  // A same-day retry leaves the gone page until tomorrow, so it is no longer partial over it.
+  expect(calls).toBe(2);
+  const retry = await runCollector(db, collector, { ...night(4), skipCollectedToday: true });
+  expect(retry.status).toBe('ok');
+  expect(calls).toBe(2);
   await runCollector(db, collector, night(5));
   const third = await runCollector(db, collector, night(6));
   expect(third.status).toBe('ok');

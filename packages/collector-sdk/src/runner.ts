@@ -49,7 +49,8 @@ export interface RunOptions {
   /**
    * Leave out listings already collected today (the home PC's date, i.e. the admin's time zone):
    * a run started again the same day
-   * (a retry, a second task) only does what is left. Prices are daily.
+   * (a retry, a second task) only does what is left. Prices are daily. Listings whose page
+   * answered "gone" earlier today wait until tomorrow too.
    */
   skipCollectedToday?: boolean;
   /** The caller holds the source's lock (runs still marked running were cut off). */
@@ -227,13 +228,19 @@ export async function runCollector(
     if (!options.matchOnly) {
       const today = localDate(now);
       const all = await activeSources(db, collector.source, { productId: options.productId });
+      // A page that answered "gone" today is asked again tomorrow (counted once a night anyway).
+      const goneToday = ({ source: l }: (typeof all)[number]) => l.failure?.day === today;
       const sources = options.skipCollectedToday
         ? all.filter(
-            ({ source: l }) => !l.lastSuccessAt || localDate(new Date(l.lastSuccessAt)) !== today,
+            (s) =>
+              (!s.source.lastSuccessAt || localDate(new Date(s.source.lastSuccessAt)) !== today) &&
+              !goneToday(s),
           )
         : all;
-      if (sources.length < all.length)
-        log(`${all.length - sources.length} listing(s) already collected today, left out`);
+      const gone = options.skipCollectedToday ? all.filter(goneToday).length : 0;
+      if (sources.length + gone < all.length)
+        log(`${all.length - sources.length - gone} listing(s) already collected today, left out`);
+      if (gone) log(`${gone} listing(s) gone earlier today, left until tomorrow`);
       total += sources.length;
       // Listings whose older history is still to fill in (collectors with a history phase).
       const behind: {
