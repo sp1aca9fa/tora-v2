@@ -45,7 +45,7 @@
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
-| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs, collector faults and the first edge cases done (three fixes); next imports, layout and the crawler at more widths |
+| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs, collector faults, edge cases (input, imports) and layout at 7 views done (seven bugs fixed); `pnpm check:all` added; next the review of the bug log and Open issues with the user |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
 ### Decision log
@@ -898,7 +898,7 @@ Edge cases to try by hand or by script:
 - Database: Turso slow, down or timing out; a page should say so instead of breaking.
 
 Acceptance:
-- `pnpm check:all` passes; no severity 1 or 2 bug left open; the bug log and what is left for Open issues reviewed with the user.
+- `pnpm check:all` passes, and `pnpm crawl --views all` on a test install; no severity 1 or 2 bug left open; the bug log and what is left for Open issues reviewed with the user.
 
 ### Progress
 
@@ -919,6 +919,8 @@ Acceptance:
    - A failed page (database or server not answering, a save cut off) showed the framework's English error screen with no way back (bug 3).
    - Typed input (`edge-cases.test.ts`, `apps/web/src/lib/form.test.ts`): names and notes with markup, quotes, SQL, LIKE wildcards, emoji and 1,000 characters are kept as typed and found by search as plain text (pages escape them; no page writes raw HTML from data); quantities refuse 0, negatives, decimals and over 100,000, and now take full-width digits ("３"); amounts refuse negatives, over 10^11 and unreadable text; the import review's date can no longer be set in the future (the other date fields already stopped at today). A search for "mega" missed a name typed in full-width letters (bug 4).
    - Imports: an order cancelled after import is reported, never removed, and skipped on the next import (already tested); the same file twice adds nothing (already tested). A sheet saved by Excel in Spanish and other languages (semicolons), as "Unicode text" (UTF-16, tabs) or copied cells (tabs) was refused as having no column names; the first row's separator is now used. A binary file named .csv finds no columns and is refused. A 5,000-row sheet (the limit, 1.2 MB) took 211 s to import and 370 s to preview again (bug 5); now 21 s and 0.4 s.
+7. Layout (2026-10-25, `pnpm crawl --views all`): besides phone and wide, the crawler opens each page at 320 px, a 768 px tablet, 2560 px, 200 % zoom (a 1280 px window lays out like 640 px) and dark mode, and now also fails on text below WCAG AA contrast with its background (4.5:1, 3:1 when large; disabled controls and previews drawn in another app's colors left out) and names text that runs out of its box. First run on the Spanish test copy: 12 of 64 pages with problems (bugs 6 and 7); after the fixes none at any of the 7 views.
+8. `pnpm check:all` (2026-10-25): typecheck, lint, format check and tests in one command. The crawler and load runs need a running test install, so they stay separate (`pnpm crawl --views all`, `pnpm perf --load`). Lint had three old errors (two unused values, a state set straight from an effect) and read the local test installs; both fixed.
 
 ### Bug log
 
@@ -929,6 +931,8 @@ Acceptance:
 | 3 | No error pages: a database or server that did not answer, or a save cut off (offline), showed the framework's "Application error" screen in English, with no way back but reloading. Now a page says so in the person's language with Try again and a way home (the menu stays); if even the app's frame fails, a short page in the browser's language (English, Japanese, Spanish). | Edge cases (database down, offline) | 3 | 6ac242e |
 | 4 | A search for "mega" did not find a name typed in full-width letters ("ＭＥＧＡ", common in Japanese input): the database lowercases plain letters only and the stored name is kept as typed. The search now also tries each term's full-width forms. | Input edge-case test | 4 | 6a321b3 |
 | 5 | A sheet import looked each new row's item up by reading every item of that kind (and card number), so time grew with the square of the rows: 5,000 rows took 211 s to import and 370 s to preview a second time, past the browser's patience. Each group of items is now read once per file and found by name. | 5,000-row sheet test | 3 | fdbbeb3 |
+| 6 | At 320 px the page scrolled sideways: the portfolio summary's amounts did not fit two tiles side by side, and two long Spanish buttons did not wrap. The bottom bar's longer labels ("Seguimiento", "ポートフォリオ") overlapped their neighbours on every phone. Now the tiles stack below 360 px, the buttons wrap, and the bar has short labels and cuts what still does not fit. | Crawler at 320 px | 3 | (this commit) |
+| 7 | Text below the readable contrast: the selected reference tab on an item's details (3.7:1), red buttons in dark mode (2.9:1), the missing-backup warning (4.4:1). | Crawler's contrast check | 4 | (this commit) |
 
 ---
 

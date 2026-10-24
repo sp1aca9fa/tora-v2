@@ -19,6 +19,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:all": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
     "db:generate": "pnpm --filter @tora/db generate",
     "db:migrate": "pnpm --filter @tora/db migrate",
     "db:seed": "pnpm --filter @tora/db seed",

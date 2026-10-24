@@ -1033,7 +1033,6 @@ export async function sendWatchAlerts(
     const signal = stats.get(`${product.id}|${watch.bucket}`);
     const fresh = signal?.day === today ? (signal.stats as SignalStats) : null;
     const items: BuyAlertData[] = [];
-    const t = await textsFor(db, user, ctx);
     const money = await moneyFor(db, user);
     const name =
       product.name +

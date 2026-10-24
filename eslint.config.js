@@ -10,6 +10,7 @@ export default defineConfig([
     '**/next-env.d.ts',
     'packages/db/drizzle/',
     'collectors/',
+    '.setup-test/',
   ]),
   {
     files: ['apps/web/**/*.{ts,tsx}'],

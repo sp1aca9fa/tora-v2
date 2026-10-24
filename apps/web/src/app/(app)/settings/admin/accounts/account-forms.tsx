@@ -65,7 +65,7 @@ function WithCode({
         type="button"
         variant={variant}
         size="sm"
-        className="h-auto min-h-8 whitespace-normal"
+        className="h-auto min-h-8 shrink whitespace-normal"
         onClick={() => setOpen(true)}
       >
         {label}

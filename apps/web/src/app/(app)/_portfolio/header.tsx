@@ -47,7 +47,8 @@ export async function PortfolioHeader({
         </Button>
       </header>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* One column on the smallest phones: amounts need about 130 px. */}
+      <section className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-3">
         <div className={tile}>
           <p className="text-xs text-muted-foreground">{t('portfolio.marketValue')}</p>
           <p className="text-xl font-semibold tabular-nums">{money(totals.valueBase)}</p>
@@ -67,7 +68,7 @@ export async function PortfolioHeader({
               : '-'}
           </p>
         </div>
-        <div className={cn(tile, 'col-span-2 sm:col-span-1')}>
+        <div className={cn(tile, 'min-[360px]:col-span-2 sm:col-span-1')}>
           <p className="text-xs text-muted-foreground">{t('portfolio.spent')}</p>
           <p className="text-xl font-semibold tabular-nums">{money(totals.spentBase)}</p>
           <p className="text-xs text-muted-foreground">

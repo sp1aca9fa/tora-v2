@@ -11,10 +11,15 @@ import { cn } from '@/lib/utils';
 export function Since({ at, time }: { at: string; time: string }) {
   const t = useTranslations('stores');
   const [now, setNow] = useState<number | null>(null);
+  // Known only in the browser (the server's page has no "ago"), so set after the first paint.
   useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 30_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
   }, []);
   const minutes = now === null ? null : Math.max(0, Math.floor((now - Date.parse(at)) / 60_000));
   const tone =

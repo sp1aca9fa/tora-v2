@@ -149,7 +149,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
               href={href}
               aria-current={isActive(pathname, href) ? 'page' : undefined}
               className={cn(
-                'relative flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground',
+                'relative flex min-w-0 flex-col items-center gap-1 overflow-hidden py-2.5 text-[11px] text-muted-foreground',
                 isActive(pathname, href) && 'font-medium text-foreground',
               )}
             >

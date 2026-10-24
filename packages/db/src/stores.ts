@@ -598,10 +598,6 @@ export async function receivePush(
 
 const fill = (text: string, params: Record<string, string | number>) =>
   text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? ''));
-const short = (text: string) => {
-  const t = text.replace(/\s+/g, ' ').trim();
-  return t.length > 140 ? `${t.slice(0, 140)}…` : t;
-};
 
 /**
  * What the feed's own person is told about a push (no silent failures): the feed speaks again

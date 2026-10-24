@@ -1,4 +1,4 @@
-/* global console, process, document, window, getComputedStyle, URL */
+/* global console, process, document, window, getComputedStyle, NodeFilter, URL */
 // The page crawler (S15, built before S10 part B): signs in, follows every in-app link from the
 // home page and opens each page at phone and wide widths, then reports pages with a server error,
 // a console error, a raw text key or {placeholder}, that scroll sideways, or with text too faint
@@ -69,6 +69,8 @@ async function inspect(page, keys) {
       for (const el of document.body.querySelectorAll('*')) {
         const r = el.getBoundingClientRect();
         if (r.right <= width + 1 || r.width === 0) continue;
+        // A fixed bar stretches with a page made wider by something else; name that instead.
+        if (el.closest('.fixed')) continue;
         let p = el.parentElement;
         let clipped = false;
         while (p && p !== document.body) {
@@ -79,6 +81,18 @@ async function inspect(page, keys) {
         }
         if (!clipped) wide.push(el);
         if (wide.length >= 3) break;
+      }
+      // Else text running out of its box (a long word or number): its element.
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let n = walker.nextNode(); n && !wide.length; n = walker.nextNode()) {
+        if (!n.textContent.trim()) continue;
+        range.selectNodeContents(n);
+        if (range.getBoundingClientRect().right <= width + 1) continue;
+        let clipped = false;
+        for (let p = n.parentElement; p && p !== document.body && !clipped; p = p.parentElement)
+          clipped = /(auto|scroll|hidden|clip)/.test(getComputedStyle(p).overflowX);
+        if (!clipped) wide.push(n.parentElement);
       }
     }
     const describe = (el) =>

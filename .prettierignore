@@ -5,6 +5,10 @@ packages/db/drizzle/
 requirements.md
 docs/history.md
 collectors/
+# Generated catalog data and local test installs
+collectors-public/catalog/data/
+.setup-test/
+.claude/
 
 # Official license text, kept verbatim
 LICENSE.md
