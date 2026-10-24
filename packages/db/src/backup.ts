@@ -11,6 +11,8 @@ import { createGunzip, createGzip } from 'node:zlib';
 
 /** Rows read (and written) per request. */
 const PAGE = 2000;
+/** Rows per request for tables holding files (pictures of up to a few MB each). */
+export const BLOB_PAGE = 10;
 
 /** The backups folder: `BACKUP_DIR`, else `~/.local/share/tora/backups`. */
 export function backupDir(env: Record<string, string | undefined> = process.env): string {
@@ -84,13 +86,13 @@ async function count(c: Client, table: string): Promise<number> {
 }
 
 /** Copies a table's rows in pages, oldest first (a lot before the lots split from it). */
-async function copyRows(from: Client, to: Client, table: string): Promise<number> {
+async function copyRows(from: Client, to: Client, table: string, page = PAGE): Promise<number> {
   let last: number | null = null;
   let copied = 0;
   for (;;) {
     const rs: ResultSet = await from.execute({
       sql: `SELECT rowid AS "__rowid", * FROM ${quote(table)}
-        ${last === null ? '' : 'WHERE rowid > ?'} ORDER BY rowid LIMIT ${PAGE}`,
+        ${last === null ? '' : 'WHERE rowid > ?'} ORDER BY rowid LIMIT ${page}`,
       args: last === null ? [] : [last],
     });
     if (rs.rows.length === 0) return copied;
@@ -105,7 +107,7 @@ async function copyRows(from: Client, to: Client, table: string): Promise<number
     await to.batch(['PRAGMA defer_foreign_keys = ON', ...statements], 'write');
     copied += rs.rows.length;
     last = Number(rs.rows[rs.rows.length - 1]![0]);
-    if (rs.rows.length < PAGE) return copied;
+    if (rs.rows.length < page) return copied;
   }
 }
 
@@ -115,7 +117,7 @@ async function copyDatabase(from: Client, to: Client): Promise<{ tables: number;
   let rows = 0;
   for (const t of tables) {
     await to.execute(t.sql);
-    const copied = await copyRows(from, to, t.name);
+    const copied = await copyRows(from, to, t.name, /\bblob\b/i.test(t.sql) ? BLOB_PAGE : PAGE);
     const expected = await count(from, t.name);
     const now = await count(to, t.name);
     if (copied !== expected || now !== expected) {

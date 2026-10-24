@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import {
+  BLOB_PAGE,
   backupDatabase,
   backupName,
   backupsToKeep,
@@ -65,6 +66,16 @@ it('restores a backup into an empty database exactly (scenario 8)', async () => 
       raw: { title: 'ﾃｽﾄ "quoted"', n: 1.5 },
     },
   ]);
+  // Pictures, over more than one page of rows holding files.
+  const at = '2026-10-01T12:00:00.000+09:00';
+  await db.run(sql`INSERT INTO stores (id, source, source_key, chain, name, codes, created_at, updated_at)
+    VALUES ('s', 'board', 'k', 'megastore', 'Megastore', '[]', ${at}, ${at})`);
+  await db.run(sql`INSERT INTO store_posts (id, source, external_id, text, posted_at, received_at, store_ids)
+    VALUES ('p', 'board', '1', 'In stock', ${at}, ${at}, '["s"]')`);
+  for (let i = 0; i < BLOB_PAGE * 2 + 1; i++) {
+    await db.run(sql`INSERT INTO store_post_images (id, post_id, position, bytes, content_type, created_at)
+      VALUES (${`i${i}`}, 'p', ${i}, ${Buffer.from([0xff, 0xd8, i])}, 'image/jpeg', ${at})`);
+  }
   const file = join(dir, backupName('2026-10-16'));
   const backup = await backupDatabase(createClient({ url: `file:${join(dir, 'live.db')}` }), file);
   expect(backup.rows).toBeGreaterThan(10);
