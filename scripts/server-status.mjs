@@ -1,4 +1,4 @@
-/* global console, process, fetch */
+/* global console, process, fetch, URLSearchParams, AbortSignal */
 // Reads a self-hosted Tora's status from another machine (S10): `TORA_STATUS_URL` (the app's
 // address) and `TORA_STATUS_TOKEN` (the read-only token from Settings > Admin > Server), from the
 // environment or `.env`. Prints the summary and the end of each log; never the token.
