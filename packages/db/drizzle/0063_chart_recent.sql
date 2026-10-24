@@ -1,0 +1,1 @@
+ALTER TABLE `portfolio_charts` ADD `recent` text;

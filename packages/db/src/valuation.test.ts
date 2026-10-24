@@ -1,4 +1,4 @@
-import { localDate } from '@tora/core';
+import { INSIGHT_PERIODS, localDate } from '@tora/core';
 import { saveSourceInfos } from './registry';
 import { TEST_SOURCES } from './testing';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -22,6 +22,7 @@ import {
   estimatedPullCosts,
   clearManualPrice,
   loadMarketData,
+  moversByPeriod,
   tradeCounts,
   portfolioSeries,
   portfolioValuation,
@@ -195,6 +196,13 @@ describe('portfolio (scenario 7)', () => {
     });
     // 40 days ago only the pulls (box opened 59 days ago) were held; ピカチュウ sold for 2,000 then.
     expect(on(39)?.valueBase).toBe(2_000);
+    // The movers read the values the run saved for the days they compare; the same as read out
+    // of the lots' histories.
+    const movers = await moversByPeriod(db, uid, INSIGHT_PERIODS);
+    expect([...movers.mine.values()].flat().length).toBeGreaterThan(0);
+    expect((await db.select().from(portfolioCharts))[0]?.recent?.day).toBe(localDate(now));
+    await db.update(portfolioCharts).set({ recent: null });
+    expect(await moversByPeriod(db, uid, INSIGHT_PERIODS)).toEqual(movers);
     // The run saved the chart; summed again from the snapshots, it is the same.
     await db.delete(portfolioCharts);
     expect(await portfolioSeries(db, uid, 365, now)).toEqual(series);

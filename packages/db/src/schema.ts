@@ -995,6 +995,13 @@ export const dbUsage = sqliteTable(
 );
 
 /** A day of a person's value-over-time chart. */
+/** Lots' values on `day` and `periods` days before it (by lot id, in that order). */
+export interface RecentValues {
+  day: string;
+  periods: number[];
+  lots: Record<string, (number | null)[]>;
+}
+
 export interface PortfolioPoint {
   date: string;
   valueBase: number;
@@ -1012,6 +1019,8 @@ export const portfolioCharts = sqliteTable('portfolio_charts', {
   /** The lots the series was summed over (ids, costs, tracking switches). */
   fingerprint: text('fingerprint').notNull(),
   series: text('series', { mode: 'json' }).notNull().$type<PortfolioPoint[]>(),
+  /** Each lot's value on the snapshot day and the insight periods before it (the movers, S14). */
+  recent: text('recent', { mode: 'json' }).$type<RecentValues>(),
   ...timestamps,
 });
 

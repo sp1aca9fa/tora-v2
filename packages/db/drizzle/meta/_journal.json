@@ -442,6 +442,13 @@
       "when": 1792850468736,
       "tag": "0062_listing_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "6",
+      "when": 1792851064404,
+      "tag": "0063_chart_recent",
+      "breakpoints": true
     }
   ]
 }

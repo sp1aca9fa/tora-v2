@@ -28,7 +28,7 @@ import {
   itemTypes,
   resolveTaxonomy,
 } from '@tora/core';
-import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
+import { type SQL, and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import type { Db } from './client';
 import { daysBack, loadItemSales, soldDays, unpackSales } from './item-sales';
@@ -38,6 +38,7 @@ import {
   type HoldingEvent,
   type DayValue,
   type PortfolioPoint,
+  type RecentValues,
   type Product,
   appSettings,
   bucketValues,
@@ -955,7 +956,18 @@ export async function runSnapshots(db: Db, now = new Date()) {
     if (!lot) wanted.set(holdingId, (lot = {}));
     lot[day] = value;
   };
-  for (const { holding, product } of rows) {
+  // By person and item: an item's sales and day values are kept only while its lots are valued
+  // (S14: kept for every item at once, a large install ran out of memory).
+  let current = '';
+  for (const { holding, product } of rows.toSorted(
+    (a, b) =>
+      a.holding.userId.localeCompare(b.holding.userId) || a.product.id.localeCompare(b.product.id),
+  )) {
+    if (`${holding.userId}|${product.id}` !== current) {
+      current = `${holding.userId}|${product.id}`;
+      series.clear();
+      unitCache.clear();
+    }
     const events = eventsBy.get(holding.id) ?? [];
     const bucket = holdingBucket(holding, product);
     const openedDay = openedOn(events);
@@ -984,24 +996,33 @@ export async function runSnapshots(db: Db, now = new Date()) {
   let changedDays = 0;
   let removedDays = 0;
   const known = new Set<string>();
-  for (const e of await db.select().from(holdingValues)) {
-    known.add(e.holdingId);
-    const lot = wanted.get(e.holdingId);
-    if (!lot) {
-      gone.push(e.holdingId);
-      removedDays += Object.keys(e.days).length;
-      continue;
-    }
-    let changed = 0;
-    let removed = 0;
-    for (const [day, v] of Object.entries(lot)) {
-      if (JSON.stringify(e.days[day]) !== JSON.stringify(v)) changed++;
-    }
-    for (const day of Object.keys(e.days)) if (!(day in lot)) removed++;
-    changedDays += changed;
-    removedDays += removed;
-    if (changed || removed) {
-      writes.push({ holdingId: e.holdingId, userId: byId.get(e.holdingId)!.userId, days: lot });
+  // The saved histories compared a page at a time (all at once, they filled the memory).
+  const saved = (await db.select({ id: holdingValues.holdingId }).from(holdingValues)).map(
+    (r) => r.id,
+  );
+  for (let i = 0; i < saved.length; i += 500) {
+    for (const e of await db
+      .select()
+      .from(holdingValues)
+      .where(inArray(holdingValues.holdingId, saved.slice(i, i + 500)))) {
+      known.add(e.holdingId);
+      const lot = wanted.get(e.holdingId);
+      if (!lot) {
+        gone.push(e.holdingId);
+        removedDays += Object.keys(e.days).length;
+        continue;
+      }
+      let changed = 0;
+      let removed = 0;
+      for (const [day, v] of Object.entries(lot)) {
+        if (JSON.stringify(e.days[day]) !== JSON.stringify(v)) changed++;
+      }
+      for (const day of Object.keys(e.days)) if (!(day in lot)) removed++;
+      changedDays += changed;
+      removedDays += removed;
+      if (changed || removed) {
+        writes.push({ holdingId: e.holdingId, userId: byId.get(e.holdingId)!.userId, days: lot });
+      }
     }
   }
   for (const [holdingId, lot] of wanted) {
@@ -1044,7 +1065,19 @@ export async function runSnapshots(db: Db, now = new Date()) {
         })),
       ),
     );
-    await retried(() => savePortfolioChart(db, userId, holdingsFingerprint(lots), series));
+    // The days the Portfolio's movers compare, saved apart so it does not read the histories.
+    const compared = [today, ...INSIGHT_PERIODS.map((p) => daysBefore(today, p))];
+    const recent: RecentValues = {
+      day: today,
+      periods: [...INSIGHT_PERIODS],
+      lots: Object.fromEntries(
+        lots.flatMap((h) => {
+          const lot = wanted.get(h.id);
+          return lot ? [[h.id, compared.map((d) => lot[d]?.[0] ?? null)]] : [];
+        }),
+      ),
+    };
+    await retried(() => savePortfolioChart(db, userId, holdingsFingerprint(lots), series, recent));
   }
 
   // The market movers of the Portfolio's insights (every item anyone holds), saved once a night.
@@ -1110,13 +1143,15 @@ async function savePortfolioChart(
   userId: string,
   fingerprint: string,
   series: PortfolioPoint[],
+  /** Given by the snapshot run; kept otherwise. */
+  recent?: RecentValues,
 ) {
   await db
     .insert(portfolioCharts)
-    .values({ userId, fingerprint, series })
+    .values({ userId, fingerprint, series, recent })
     .onConflictDoUpdate({
       target: portfolioCharts.userId,
-      set: { fingerprint, series, updatedAt: toLocalIso() },
+      set: { fingerprint, series, ...(recent ? { recent } : {}), updatedAt: toLocalIso() },
     });
 }
 
@@ -1407,6 +1442,26 @@ function marketMovers(lots: MoverLot[], day: string, days: number): Mover[] {
   );
 }
 
+/** The lots' values on these days, read out of each one's history (a year of days per lot). */
+async function valuesOn(db: Db, lots: SQL | undefined, days: string[]) {
+  const rows = await db
+    .select({
+      productId: holdings.productId,
+      // Several paths: the history is parsed once, the values come back as a JSON array.
+      values: sql<string>`json_extract(${holdingValues.days}, ${sql.join(
+        days.map((d) => sql`${`$."${d}"[0]`}`),
+        sql`, `,
+      )})`,
+    })
+    .from(holdings)
+    .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
+    .where(lots);
+  return rows.map((r) => ({
+    productId: r.productId,
+    value: JSON.parse(r.values) as (number | null)[],
+  }));
+}
+
 /**
  * How items' market values moved over each period (requirements S8, Summary insights), from the
  * value history: the latest day against the day `days` before.
@@ -1439,24 +1494,25 @@ export async function moversByPeriod(
         .where(counted)
     )[0]?.day;
   if (!day) return { mine, market };
-  // Only the days compared are read out of each lot's history (a year of days per lot).
-  const wanted = [day, ...periods.map((days) => daysBefore(day, days))];
-  const rows = await db
-    .select({
-      productId: holdings.productId,
-      // Several paths: the history is parsed once, the values come back as a JSON array.
-      values: sql<string>`json_extract(${holdingValues.days}, ${sql.join(
-        wanted.map((d) => sql`${`$."${d}"[0]`}`),
-        sql`, `,
-      )})`,
-    })
-    .from(holdings)
-    .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
-    .where(counted);
-  const lots = rows.map((r) => ({
-    productId: r.productId,
-    value: JSON.parse(r.values) as (number | null)[],
-  }));
+  // The values the snapshot run saved for these days; else read out of each lot's history.
+  const [chart] = await db
+    .select({ recent: portfolioCharts.recent })
+    .from(portfolioCharts)
+    .where(eq(portfolioCharts.userId, userId));
+  const recent =
+    chart?.recent?.day === day && chart.recent.periods.join() === periods.join()
+      ? chart.recent
+      : null;
+  const lots = recent
+    ? (
+        await db
+          .select({ id: holdings.id, productId: holdings.productId })
+          .from(holdings)
+          .where(counted)
+      ).flatMap((h) =>
+        recent.lots[h.id] ? [{ productId: h.productId, value: recent.lots[h.id]! }] : [],
+      )
+    : await valuesOn(db, counted, [day, ...periods.map((days) => daysBefore(day, days))]);
   // Per item and period, the same lots' values on both days; whole items read for the movers.
   const sums = periods.map((_, p) => {
     const own = new Map<string, { nowBase: number; thenBase: number }>();
