@@ -37,6 +37,7 @@
     "alerts": "pnpm --silent --filter @tora/db alerts",
     "backup": "pnpm --silent --filter @tora/db backup",
     "restore": "pnpm --silent --filter @tora/db restore",
+    "stress-data": "pnpm --silent --filter @tora/db stress-data",
     "demo": "pnpm --silent --filter @tora/collector-sdk demo",
     "mcp": "pnpm --silent --filter @tora/mcp start",
     "plugins": "pnpm --silent --filter @tora/collector-sdk plugins"

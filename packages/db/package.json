@@ -26,7 +26,8 @@
     "alerts": "tsx src/scripts/alerts.ts",
     "backup": "tsx src/scripts/backup.ts",
     "collect-request": "tsx src/scripts/collect-request.ts",
-    "restore": "tsx src/scripts/restore.ts"
+    "restore": "tsx src/scripts/restore.ts",
+    "stress-data": "tsx src/scripts/stress-data.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

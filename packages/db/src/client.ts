@@ -13,16 +13,38 @@ const LOCAL_BUSY_MS = 60_000;
 export interface DbTimings {
   calls: number;
   ms: number;
+  /** The costliest statements since the last reset, the costliest first. */
+  statements: { sql: string; calls: number; ms: number }[];
 }
 
-const timings: DbTimings = ((globalThis as { __toraDbTimings?: DbTimings }).__toraDbTimings ??= {
+const kept = ((globalThis as { __toraDbTimings?: unknown }).__toraDbTimings ??= {
   calls: 0,
   ms: 0,
-});
+  bySql: new Map<string, { calls: number; ms: number }>(),
+}) as { calls: number; ms: number; bySql: Map<string, { calls: number; ms: number }> };
 
 /** The round trips since the process started; counted only with TORA_PERF set. */
-export function dbTimings(): DbTimings {
-  return { ...timings };
+export function dbTimings(top = 15): DbTimings {
+  return {
+    calls: kept.calls,
+    ms: kept.ms,
+    statements: [...kept.bySql]
+      .map(([sql, t]) => ({ sql, ...t }))
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, top),
+  };
+}
+
+/** Starts the statement list afresh (the totals keep counting). */
+export function resetDbStatements(): void {
+  kept.bySql.clear();
+}
+
+/** A statement's text, short: a batch by its first statement. */
+function sqlOf(name: string, args: unknown[]): string {
+  const first = name === 'batch' ? (args[0] as unknown[])[0] : args[0];
+  const sql = typeof first === 'string' ? first : ((first as { sql?: string })?.sql ?? '?');
+  return `${name === 'batch' ? 'batch: ' : ''}${sql.replace(/\s+/g, ' ').slice(0, 300)}`;
 }
 
 /** Counts each statement or batch sent, when TORA_PERF is set. */
@@ -36,8 +58,12 @@ function timed(client: Client): Client {
         try {
           return await run(...args);
         } finally {
-          timings.calls += 1;
-          timings.ms += performance.now() - start;
+          const ms = performance.now() - start;
+          kept.calls += 1;
+          kept.ms += ms;
+          const sql = sqlOf(name, args);
+          const t = kept.bySql.get(sql) ?? { calls: 0, ms: 0 };
+          kept.bySql.set(sql, { calls: t.calls + 1, ms: t.ms + ms });
         }
       },
     });

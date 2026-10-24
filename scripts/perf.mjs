@@ -93,7 +93,7 @@ async function visit(context, path, width) {
     (r) => r.abort(),
   );
   const before = await dbNow(context);
-  await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120_000 });
+  const res = await page.goto(`${BASE}${path}`, { waitUntil: 'load', timeout: 120_000 });
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
   const m = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
@@ -114,6 +114,7 @@ async function visit(context, path, width) {
   const after = await dbNow(context);
   await page.close();
   if (!m.shown) throw new Error(`${path} sent to sign-in`);
+  if (!res || res.status() >= 400) throw new Error(`${path} answered HTTP ${res?.status()}`);
   return {
     ...m,
     dbCalls: before && after ? after.calls - before.calls : null,
