@@ -2289,6 +2289,7 @@
     "otherBoards": "Otros tablones",
     "allOfChain": "Todas sus tiendas",
     "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}",
+    "unread": "{n, plural, one {# mensaje nuevo} other {# mensajes nuevos}}",
     "unknownStoreTitle": "Tienda no reconocida"
   },
   "accounts": {

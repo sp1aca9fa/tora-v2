@@ -61,6 +61,23 @@ export async function saveStoreAreaAction(area: StoreArea): Promise<{ error?: st
   return {};
 }
 
+/** Days a Now row's last opening is kept (the page shows today and yesterday). */
+const SEEN_DAYS = 3;
+
+/** A Now row opened: its messages up to `at` are read (S25). */
+export async function markLocationSeenAction(locationId: string, at: string) {
+  const { db, user } = await authed();
+  if (!Date.parse(at)) return;
+  const keep = new Date(Date.now() - SEEN_DAYS * 86_400_000).toISOString();
+  const seen = Object.fromEntries(
+    Object.entries(user.preferences?.storesSeen ?? {}).filter(
+      ([, when]) => new Date(when).toISOString() > keep,
+    ),
+  );
+  if ((seen[locationId] ?? '') >= at) return;
+  await setPreferences(db, user.id, { storesSeen: { ...seen, [String(locationId)]: at } });
+}
+
 /** A new feed token, shown once (the old one stops working). */
 export async function newFeedTokenAction(): Promise<string> {
   const { db, user } = await authed();

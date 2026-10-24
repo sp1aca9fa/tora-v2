@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
+import { NowRow } from './now-row';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
@@ -20,9 +21,10 @@ type Thread = ReturnType<typeof threads>[number];
 
 /**
  * Store notices, the main sub page (S25): what is going on now, one closed row per location
- * (an area and the stores in it), the newest first, each with its time, how long ago and its
- * latest post; opened, the posts of each of its stores. Today's (from 5:00); yesterday's folded.
- * The area's stores, or every store. Before an area is set, the Area page comes first.
+ * (an area and the stores in it), the newest first, each with its time, how long ago, its latest
+ * post and how many came since it was last opened; opened, the posts of each of its stores.
+ * Today's (from 5:00); yesterday's folded. The area's stores, or every store. Before an area is
+ * set, the Area page comes first.
  */
 export default async function NowPage({
   searchParams,
@@ -88,7 +90,7 @@ export default async function NowPage({
           location: locations.get(id) ?? unknownRow,
           stores: [...stores].sort(([, a], [, b]) => newest(b).localeCompare(newest(a))),
           latest: messages[0]!,
-          n: messages.length,
+          messages,
         };
       })
       .sort((a, b) => b.latest.postedAt.localeCompare(a.latest.postedAt));
@@ -112,13 +114,16 @@ export default async function NowPage({
     stores.find(([, list]) =>
       list.some((th) => th.post === latest || th.replies.includes(latest)),
     )?.[0] ?? '';
-  const row = ({ location, stores, latest, n }: (typeof todays)[number]) => (
-    <details
+  const seen = user.preferences?.storesSeen ?? {};
+  const row = ({ location, stores, latest, messages }: (typeof todays)[number]) => (
+    <NowRow
       key={location.id}
-      className={cn('group rounded-xl border bg-card', location.id === UNKNOWN && 'border-dashed')}
-    >
-      <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-        <div className="min-w-0 flex-1 space-y-0.5">
+      id={location.id}
+      latest={latest.postedAt}
+      unread={messages.filter((m) => m.postedAt > (seen[location.id] ?? '')).length}
+      dashed={location.id === UNKNOWN}
+      summary={
+        <>
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-semibold">{location.label}</h2>
             {location.km !== null && (
@@ -129,18 +134,19 @@ export default async function NowPage({
           </div>
           <p className="text-xs">
             <Since at={latest.postedAt} time={latest.at.slice(6)} />
-            <span className="text-muted-foreground"> · {t('postCount', { n })}</span>
+            <span className="text-muted-foreground">
+              {' '}
+              · {t('postCount', { n: messages.length })}
+            </span>
           </p>
           <p className="truncate text-sm text-muted-foreground">
             {latest.text}
             {latestStore(stores, latest) !== location.id &&
               ` · ${storeName(latestStore(stores, latest))}`}
           </p>
-        </div>
-        <span className="pt-1 text-xs text-muted-foreground group-open:rotate-90" aria-hidden>
-          ▸
-        </span>
-      </summary>
+        </>
+      }
+    >
       <div className="space-y-3 border-t px-4 pt-2 pb-3">
         {stores.map(([id, list]) => (
           <section key={id}>
@@ -153,7 +159,7 @@ export default async function NowPage({
           </section>
         ))}
       </div>
-    </details>
+    </NowRow>
   );
 
   return (

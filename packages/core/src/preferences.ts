@@ -42,6 +42,8 @@ export interface UserPreferences {
   };
   /** The stores watched for store notices (S25). */
   storeArea?: StoreArea;
+  /** When each Now row (a location) was last opened, for its unread count (S25). */
+  storesSeen?: Record<string, string>;
   /** Alerts about the store feed itself (S25). */
   storeFeed?: StoreFeedPrefs;
   /** How the person's notices look and read (Settings > Alerts > Customize notices). */

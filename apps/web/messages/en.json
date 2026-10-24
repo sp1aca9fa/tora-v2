@@ -2289,6 +2289,7 @@
     "otherBoards": "Other boards",
     "allOfChain": "All its stores",
     "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
+    "unread": "{n, plural, one {# new message} other {# new messages}}",
     "unknownStoreTitle": "Store not recognised"
   },
   "accounts": {
