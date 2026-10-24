@@ -824,6 +824,8 @@ A copy of the analysis database with eBay rows, alert channels and devices remov
 6. A corrected purchase date left the lot's Acquired history entry on the day it was entered (19 lots): it moves now; migration 0058 moves the old ones.
 7. The Opportunities card's price (30-day median) read like the market value: labelled.
 8. Small display: axis years, the P/L arrow wrapping on phones, the Top movers title cut, the 180-day position text.
+9. Changing the base currency (S16) left amounts of tables added later in the old currency: watch targets, shops' asks, imported rows, the saved daily numbers (the sharp-drop alert would have compared old with new), buy plan budgets and data review evidence. Now converted too.
+Chapters checked against the code: S8, S11, S16.
 Noted for later: Opportunities numbers come from the last collect while other pages are live, so they drift within a day.
 
 ### Part C: the Spain + Brazil setup (2026-10-23)

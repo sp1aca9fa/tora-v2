@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { baseCurrency } from '@tora/core';
+import { type SignalStats, baseCurrency } from '@tora/core';
 import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { pendingActions } from './actions';
@@ -11,7 +11,15 @@ import { fxRateOn, saveFxRates } from './fx';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
 import { loadSourceRegistry, saveSetting, setCurrencySettings } from './registry';
-import { holdings, priceObservations } from './schema';
+import {
+  holdings,
+  priceObservations,
+  signals,
+  suggestions,
+  supply,
+  users,
+  watches,
+} from './schema';
 import { insertObservations } from './sources';
 import { changeTimeZone } from './time-zone';
 import { createUser } from './users';
@@ -136,4 +144,67 @@ it('asks admins to finish the setup until the currency and time zone are chosen,
   expect(await setup()).toMatchObject({ missing: ['timeZone'] });
   await changeTimeZone(db, 'Asia/Tokyo');
   expect(await setup()).toBeUndefined();
+});
+
+it('converts the amounts of watches, asks, daily numbers, buy plans and review suggestions', async () => {
+  await saveFxRates(db, 'EURJPY', [
+    { date: '2026-10-01', rate: 160 },
+    { date: '2026-10-05', rate: 200 },
+  ]);
+  const { product } = await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+    { quantity: 1, costTotalBase: 16_000, acquiredAt: '2026-10-02T12:00:00.000+09:00' },
+  );
+  const at = '2026-10-02T12:00:00.000+09:00';
+  await db.insert(watches).values({
+    userId,
+    productId: product.id,
+    bucket: 'sealed:shrink',
+    targetPriceBase: 20_000,
+  });
+  await db.insert(supply).values({
+    productId: product.id,
+    source: 'shop',
+    bucket: 'sealed:shrink',
+    day: '2026-10-02',
+    lowestAskBase: 16_000,
+    fetchedAt: at,
+  });
+  await db.insert(signals).values({
+    productId: product.id,
+    bucket: 'sealed:shrink',
+    day: '2026-10-02',
+    stats: { fair: 32_000, usual180: null, ask: 16_000 } as unknown as SignalStats,
+  });
+  await db
+    .update(users)
+    .set({ preferences: { buyPlan: { budget: 40_000, until: '2026-12-01', items: [] } } })
+    .where(eq(users.id, userId));
+  await db.insert(suggestions).values({
+    userId,
+    kind: 'fix_value',
+    targetKey: 'x',
+    payload: {},
+    reason: 'r',
+    evidence: { sale: { priceBase: 16_000 } },
+    createdAt: at,
+  });
+
+  await changeBaseCurrency(db, 'EUR', new Date('2026-10-07T03:00:00Z'));
+
+  // Today's rate (200) for the target and the budget; the day's (160) for the rest.
+  expect((await db.select().from(watches))[0]!.targetPriceBase).toBe(10_000);
+  expect((await db.select().from(supply))[0]!.lowestAskBase).toBe(10_000);
+  expect((await db.select().from(signals))[0]!.stats).toMatchObject({
+    fair: 20_000,
+    usual180: null,
+    ask: 10_000,
+  });
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  expect(user!.preferences?.buyPlan?.budget).toBe(20_000);
+  expect((await db.select().from(suggestions))[0]!.evidence).toEqual({
+    sale: { priceBase: 10_000 },
+  });
 });

@@ -8,14 +8,14 @@ import {
   ratePair,
   localDate,
 } from '@tora/core';
-import { type SQL, eq, like, sql } from 'drizzle-orm';
+import { type SQL, eq, like, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
 import { fxRateOn } from './fx';
 import { refreshItemSales } from './item-sales';
 import { runSnapshots } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting, setCurrencySettings } from './registry';
-import { fxRates, holdingEvents, productSources } from './schema';
+import { fxRates, holdingEvents, productSources, suggestions } from './schema';
 
 /** Tables and columns holding amounts in the base, with the date each amount belongs to. */
 const AMOUNTS = [
@@ -28,9 +28,19 @@ const AMOUNTS = [
   { table: 'price_observations', columns: ['price_base'], date: 'substr(observed_at, 1, 10)' },
   { table: 'manual_prices', columns: ['price_base'], date: 'substr(set_at, 1, 10)' },
   { table: 'source_candidates', columns: ['price_base'], date: 'substr(created_at, 1, 10)' },
-  // No date of its own: today's rate.
+  {
+    table: 'import_rows',
+    columns: ['cost_base'],
+    date: 'coalesce(substr(day, 1, 10), substr(created_at, 1, 10))',
+  },
+  { table: 'supply', columns: ['lowest_ask_base'], date: 'day' },
+  // No date of their own: today's rate.
   { table: 'products', columns: ['retail_price_base'], date: null },
+  { table: 'watches', columns: ['target_price_base'], date: null },
 ] as const;
+
+/** Amounts inside a day's saved numbers (`signals.stats`, see core `SignalStats`). */
+const SIGNAL_AMOUNTS = ['fair', 'usual180', 'q25d180', 'q75d180', 'q10d365', 'ask'] as const;
 
 /** How many stored amounts a change of base converts. */
 export async function storedAmounts(db: Db): Promise<number> {
@@ -121,6 +131,21 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
     );
     return db.run(sql`UPDATE ${sql.raw(table)} SET ${sets}`);
   });
+  // A day's numbers at that day's rate (the sharp-drop alert compares them across days), and a
+  // buy plan's budget at today's.
+  const inJson = (doc: string, path: string, date: SQL | string) =>
+    sql`CAST(round(json_extract(${sql.raw(doc)}, ${path}) * ${scale} / ${rateOn(date)}) AS INTEGER)`;
+  statements.push(
+    db.run(
+      sql`UPDATE signals SET stats = json_set(stats, ${sql.join(
+        SIGNAL_AMOUNTS.map((k) => sql`${`$.${k}`}, ${inJson('stats', `$.${k}`, sql.raw('day'))}`),
+        sql`, `,
+      )})`,
+    ),
+    db.run(sql`UPDATE users SET preferences = json_set(preferences, '$.buyPlan.budget',
+      ${inJson('preferences', '$.buyPlan.budget', today)})
+      WHERE json_extract(preferences, '$.buyPlan.budget') IS NOT NULL`),
+  );
   // A price's rate is to the base: a price in the new base needs none, one in the old base now has
   // one (the inverse), others are divided by the new base's rate.
   statements.push(
@@ -161,23 +186,41 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
       .set({ recentSales: sales })
       .where(eq(productSources.id, link.id));
   }
+  const walk = (v: unknown, f: number, key = ''): unknown =>
+    Array.isArray(v)
+      ? v.map((x) => walk(x, f))
+      : v && typeof v === 'object'
+        ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, f, k)]))
+        : typeof v === 'number' && key.endsWith('Base')
+          ? Math.round(v * f)
+          : v;
   for (const e of await db
     .select({ id: holdingEvents.id, payload: holdingEvents.payload, at: holdingEvents.occurredAt })
     .from(holdingEvents)
     .where(like(holdingEvents.payload, '%Base%'))) {
-    const f = await factor(e.at);
-    const walk = (v: unknown, key = ''): unknown =>
-      Array.isArray(v)
-        ? v.map((x) => walk(x))
-        : v && typeof v === 'object'
-          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, k)]))
-          : typeof v === 'number' && key.endsWith('Base')
-            ? Math.round(v * f)
-            : v;
     await db
       .update(holdingEvents)
-      .set({ payload: walk(e.payload) as Record<string, unknown> })
+      .set({ payload: walk(e.payload, await factor(e.at)) as Record<string, unknown> })
       .where(eq(holdingEvents.id, e.id));
+  }
+  // Data review suggestions (the sale and values they cite), at the rate of the day they were made.
+  for (const s of await db
+    .select({
+      id: suggestions.id,
+      payload: suggestions.payload,
+      evidence: suggestions.evidence,
+      at: suggestions.createdAt,
+    })
+    .from(suggestions)
+    .where(or(like(suggestions.payload, '%Base%'), like(suggestions.evidence, '%Base%')))) {
+    const f = await factor(s.at);
+    await db
+      .update(suggestions)
+      .set({
+        payload: walk(s.payload, f) as typeof s.payload,
+        evidence: walk(s.evidence, f) as typeof s.evidence,
+      })
+      .where(eq(suggestions.id, s.id));
   }
 
   // Where rates come from: the new base needs none; the old base's comes from the same source
