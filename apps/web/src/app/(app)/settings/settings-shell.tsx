@@ -13,7 +13,7 @@ const ADMIN = SETTINGS_SECTIONS.find((s) => s.key === 'admin')!;
  * A settings page's header. Phones: the menus (Settings, Admin preferences) are pages of their
  * own, and a section has a way back. From half-screen widths there is no menu page: a menu path
  * shows its first section, and the sections are a row of links on top; a group's pages
- * (Admin preferences) are a second row of tabs under it.
+ * (Admin preferences, Alerts, Collectors) are a second row of tabs under it.
  */
 export function SettingsShell({
   titles,
@@ -35,6 +35,7 @@ export function SettingsShell({
       : at?.entry.key === 'admin'
         ? { entry: ADMIN.children![0]!, parent: ADMIN }
         : at!;
+  const group = wide.parent ?? (wide.entry.children ? wide.entry : null);
   const phoneTitle = at ? titles[at.entry.key] : titles.title;
   return (
     <div className="space-y-4">
@@ -69,10 +70,16 @@ export function SettingsShell({
             );
           })}
         </nav>
-        {/* A group's own pages (Admin preferences): a second, tab-like row under the first. */}
-        {wide.parent && (
-          <nav className="flex flex-wrap gap-x-5 border-b" aria-label={titles[wide.parent.key]}>
-            {wide.parent.children!.map(({ key, href, icon: Icon }) => (
+      </div>
+      {/* A group's pages: a second, tab-like row under the first. A group that is a page itself
+          (Alerts, Collectors) is its first tab, and the row shows on phones too (no menu page). */}
+      {group && (
+        <nav
+          className={cn('flex flex-wrap gap-x-5 border-b', group === ADMIN && 'hidden md:flex')}
+          aria-label={titles[group.key]}
+        >
+          {(group === ADMIN ? group.children! : [group, ...group.children!]).map(
+            ({ key, href, icon: Icon }) => (
               <Link
                 key={key}
                 href={href}
@@ -87,10 +94,10 @@ export function SettingsShell({
                 <Icon className="size-3.5" />
                 {titles[key]}
               </Link>
-            ))}
-          </nav>
-        )}
-      </div>
+            ),
+          )}
+        </nav>
+      )}
       <h1 className="text-2xl font-semibold tracking-tight">
         <span className="md:hidden">{phoneTitle}</span>
         <span className="hidden md:inline">{titles[wide.entry.key]}</span>
