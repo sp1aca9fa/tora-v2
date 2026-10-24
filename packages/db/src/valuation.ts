@@ -713,6 +713,8 @@ export async function portfolioValuation(db: Db, userId: string, now = new Date(
   }
   return {
     rows: valued,
+    /** Opened lots counted in cost: their cost stays in the totals (the value lives on in pulls). */
+    opened: opened.filter((o) => o.holding.countInCost),
     totals: { ...totals, unrealizedBase: totals.plValueBase - totals.valuedCostBase },
     breakdown: [...breakdown.values()].sort(
       (a, b) => b.valueBase + b.costBase - (a.valueBase + a.costBase),

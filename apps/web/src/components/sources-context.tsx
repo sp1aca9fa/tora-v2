@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, createContext, useContext } from 'react';
+import { type ReactNode, createContext, useCallback, useContext } from 'react';
 
 /** What client components need of each source: its name, badge and colour slot. */
 export interface SourceDisplay {
@@ -26,5 +26,5 @@ export function SourcesProvider({
 /** A source's display, falling back to its key for sources not described. */
 export function useSourceDisplay(): (key: string) => SourceDisplay | undefined {
   const sources = useContext(SourcesContext);
-  return (key) => sources[key];
+  return useCallback((key) => sources[key], [sources]);
 }

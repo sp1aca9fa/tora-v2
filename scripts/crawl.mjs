@@ -211,6 +211,9 @@ const contexts = await Promise.all(
     }),
   ),
 );
+// Amounts shown (hidden by default): real widths for the sideways check, numbers in screenshots.
+for (const context of contexts)
+  await context.addCookies([{ name: 'tora_amounts', value: 'shown', url: BASE }]);
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const queue = [ONLY ?? '/'];

@@ -32,7 +32,7 @@ export default async function SummaryPage() {
     1,
     ...portfolio.breakdown.map((b) => Math.max(b.valueBase, b.costBase)),
   );
-  // Per category: units, value and P/L of the valued lots.
+  // Per category: units, value and P/L of the valued lots, as the header counts them.
   const categories = new Map<
     Category,
     {
@@ -60,6 +60,19 @@ export default async function SummaryPage() {
       c.valuedCostBase += holding.costTotalBase;
     }
     categories.set(product.category, c);
+  }
+  // Opened lots: their cost, as in the header's spent and P/L.
+  for (const { holding, product } of portfolio.opened) {
+    const c = categories.get(product.category) ?? {
+      units: 0,
+      valueBase: 0,
+      costBase: 0,
+      plValueBase: 0,
+      valuedCostBase: 0,
+    };
+    categories.set(product.category, c);
+    c.costBase += holding.costTotalBase;
+    if (holding.countInValue) c.valuedCostBase += holding.costTotalBase;
   }
 
   return (

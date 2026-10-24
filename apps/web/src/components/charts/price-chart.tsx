@@ -79,7 +79,13 @@ export function PriceChart({
   }, [points]);
   const sources = useMemo(() => [...new Set(points.map((p) => p.source))].sort(), [points]);
   const display = useSourceDisplay();
-  const colorOf = (s: string) => sourceColor(theme, s, sources, display(s)?.slot);
+  // Each source's fixed colour; if two on this chart would share one (more sources than colours),
+  // their place among the chart's sources instead.
+  const fixed =
+    new Set(sources.map((s) => (display(s)?.slot ?? -1) % theme.series.length)).size ===
+      sources.length && sources.every((s) => display(s));
+  const colorOf = (s: string) =>
+    fixed ? sourceColor(theme, s, sources, display(s)?.slot) : sourceColor(theme, s, sources);
 
   const [bucket, setBucket] = useState<string | null>(
     defaultBucket && buckets.includes(defaultBucket) ? defaultBucket : (buckets[0] ?? null),

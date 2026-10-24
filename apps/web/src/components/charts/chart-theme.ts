@@ -3,18 +3,19 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Chart colors by role. Categorical slots 1-3 of the validated reference palette (light and
- * dark steps, all-pairs CVD-safe); text and grid stay neutral. Aqua is under 3:1 on white, so
- * every chart has a legend and a table view.
+ * Chart colors by role. The eight categorical slots of the validated reference palette in its
+ * order (light and dark steps; CVD-safe for neighbours, as lines and bars need); text and grid
+ * stay neutral. Aqua, yellow and magenta are under 3:1 on white, so every chart has a legend and
+ * a table view.
  */
 const LIGHT = {
-  series: ['#2a78d6', '#eb6834', '#1baf7a'],
+  series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
   text: '#52514e',
   grid: 'rgba(0,0,0,0.06)',
   surface: '#ffffff',
 };
 const DARK = {
-  series: ['#3987e5', '#d95926', '#199e70'],
+  series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
   text: '#c3c2b7',
   grid: 'rgba(255,255,255,0.08)',
   surface: '#1c1c1c',
