@@ -1,11 +1,17 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { morePostsAction } from './actions';
 import type { PostView, PostsFilter } from './post-views';
 import { threads } from './threads';
+
+/**
+ * Messages posted after this are new to the reader (a Now row's last opening, S25): tinted for a
+ * moment when shown, their replies unfolded. Null elsewhere.
+ */
+export const FreshSince = createContext<string | null>(null);
 
 /**
  * One post: the stores it names first (left out under a store's own heading), then who, the
@@ -21,57 +27,63 @@ export function PostItem({
   stores?: boolean;
 }) {
   const t = useTranslations('stores');
+  const since = useContext(FreshSince);
+  const fresh = (v: PostView) => since !== null && v.postedAt > since;
   const meta = [p.author, p.reply && t('comment')].filter(Boolean).join(' · ');
   return (
     <li className={cn('space-y-1 py-2.5', stores && !p.mine && 'opacity-70')}>
-      <div className="flex items-baseline justify-between gap-3">
-        {stores ? (
-          <p className={cn('text-sm', p.names.length ? 'font-semibold' : 'text-muted-foreground')}>
-            {p.names.length ? p.names.join(', ') : t('unknownStore')}
-          </p>
-        ) : (
-          <p className="min-w-0 truncate text-xs text-muted-foreground">{meta}</p>
-        )}
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{p.at}</span>
-      </div>
-      {stores && meta && <p className="text-xs text-muted-foreground">{meta}</p>}
-      <p className="text-sm break-words">
-        {p.url ? (
-          <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
-            {p.text}
-          </a>
-        ) : (
-          p.text
-        )}
-      </p>
-      {p.decoded.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {p.decoded.map((d, i) => (
-            <span key={`${d.code}|${d.meaning}`}>
-              {i > 0 && ' · '}
-              <span className="text-foreground">{d.code}</span> {d.meaning}
-            </span>
-          ))}
-        </p>
-      )}
-      {p.images.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {p.images.map((src) => (
-            <a key={src} href={src} target="_blank" rel="noreferrer">
-              {/* A picture stored by the app; next/image optimisation is not needed. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={src}
-                alt=""
-                loading="lazy"
-                className="h-24 max-w-40 rounded border object-cover"
-              />
-            </a>
-          ))}
+      <div className={cn('-mx-2 space-y-1 rounded-md px-2', fresh(p) && 'fresh')}>
+        <div className="flex items-baseline justify-between gap-3">
+          {stores ? (
+            <p
+              className={cn('text-sm', p.names.length ? 'font-semibold' : 'text-muted-foreground')}
+            >
+              {p.names.length ? p.names.join(', ') : t('unknownStore')}
+            </p>
+          ) : (
+            <p className="min-w-0 truncate text-xs text-muted-foreground">{meta}</p>
+          )}
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{p.at}</span>
         </div>
-      )}
+        {stores && meta && <p className="text-xs text-muted-foreground">{meta}</p>}
+        <p className="text-sm break-words">
+          {p.url ? (
+            <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
+              {p.text}
+            </a>
+          ) : (
+            p.text
+          )}
+        </p>
+        {p.decoded.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {p.decoded.map((d, i) => (
+              <span key={`${d.code}|${d.meaning}`}>
+                {i > 0 && ' · '}
+                <span className="text-foreground">{d.code}</span> {d.meaning}
+              </span>
+            ))}
+          </p>
+        )}
+        {p.images.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {p.images.map((src) => (
+              <a key={src} href={src} target="_blank" rel="noreferrer">
+                {/* A picture stored by the app; next/image optimisation is not needed. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={src}
+                  alt=""
+                  loading="lazy"
+                  className="h-24 max-w-40 rounded border object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
       {replies.length > 0 && (
-        <details className="pt-1">
+        <details className="pt-1" open={replies.some(fresh) || undefined}>
           <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
             {t('replies', { n: replies.length })}
           </summary>

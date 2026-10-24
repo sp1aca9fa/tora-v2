@@ -5,6 +5,9 @@
 
 :root {
   --radius: 0.625rem;
+  /* A message new to the reader, tinted for a moment (Stores > Now). */
+  --fresh: oklch(0.95 0.08 90);
+  --fresh-edge: oklch(0.77 0.16 75);
   --background: oklch(0.985 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -42,6 +45,8 @@
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
     --ring: oklch(0.556 0 0);
+    --fresh: oklch(0.4 0.08 80);
+    --fresh-edge: oklch(0.72 0.15 75);
   }
 }
 
@@ -91,4 +96,26 @@
 [data-amounts='hidden'] :is(.tabular-nums, .amount) {
   filter: blur(7px);
   user-select: none;
+}
+
+/* A message new since its Now row was last opened (S25): tinted when shown, then fading out. */
+.fresh {
+  animation: fresh 3s ease-out;
+}
+@keyframes fresh {
+  0%,
+  40% {
+    background-color: var(--fresh);
+    box-shadow: inset 3px 0 0 var(--fresh-edge);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fresh {
+    animation: none;
+    box-shadow: inset 3px 0 0 var(--fresh-edge);
+  }
 }

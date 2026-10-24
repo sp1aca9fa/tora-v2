@@ -120,6 +120,7 @@ export default async function NowPage({
       key={location.id}
       id={location.id}
       latest={latest.postedAt}
+      seenAt={seen[location.id] ?? ''}
       unread={messages.filter((m) => m.postedAt > (seen[location.id] ?? '')).length}
       dashed={location.id === UNKNOWN}
       summary={
