@@ -218,7 +218,13 @@ export default async function OpportunitiesPage() {
           </div>
           <div className="max-w-[45%] shrink-0 space-y-0.5 text-right text-sm">
             {o.numbers.price !== null && (
-              <p className="font-medium tabular-nums">{money(o.numbers.price)}</p>
+              <p className="font-medium tabular-nums">
+                {money(o.numbers.price)}
+                {/* Not the market value: the signals' fair value. */}
+                <span className="block text-xs font-normal text-muted-foreground">
+                  {t('opportunities.priceLabel')}
+                </span>
+              </p>
             )}
             {o.askUnder && o.ask && o.numbers.price && (
               <p className="text-xs font-medium text-emerald-700 tabular-nums dark:text-emerald-400">

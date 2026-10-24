@@ -1810,6 +1810,7 @@
     "alertLimited": "Alert on Good price even with limited data"
   },
   "opportunities": {
+    "priceLabel": "30-day median",
     "title": "Opportunities",
     "intro": "Items worth a look within their group of similar items, from the prices Tora collects. Only signals that worked on past prices rank items: each shows how often the price was higher 90 days later. Never a sure thing.",
     "updated": "Worked out after the collect of {day}.",
@@ -1997,7 +1998,7 @@
     },
     "reason": {
       "fair": "Market value <n>{amount}</n> ({count, plural, one {# sale} other {# sales}} in 30 days)",
-      "position": "At or under {pct}% of the last 180 days' daily prices",
+      "position": "At or below the price on {pct}% of the last 180 days",
       "trend": "Trend: {list}",
       "weeks": "{pct} in {weeks} weeks",
       "ask": "Lowest ask <n>{amount}</n> ({pct} against market value)",

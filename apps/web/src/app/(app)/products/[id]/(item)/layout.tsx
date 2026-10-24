@@ -36,7 +36,7 @@ export default async function ItemLayout({ params, children }: Params & { childr
   ]);
   const line = lines.get(product.id);
   const release = released.get(product.id);
-  const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${money(n)}`;
+  const signed = (n: number) => `${n > 0 ? '▲\u00a0+' : n < 0 ? '▼\u00a0' : ''}${money(n)}`;
   const numbers: [string, string][] = totals
     ? [
         [t('product.unitsOwned'), String(totals.units)],

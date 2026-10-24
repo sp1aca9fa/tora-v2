@@ -35,7 +35,7 @@ export async function BoxCard({
     },
     {
       label: t('box.net'),
-      value: `${view.netBase > 0 ? '▲ +' : view.netBase < 0 ? '▼ ' : ''}${money(view.netBase)}`,
+      value: `${view.netBase > 0 ? '▲\u00a0+' : view.netBase < 0 ? '▼\u00a0' : ''}${money(view.netBase)}`,
     },
   ];
 

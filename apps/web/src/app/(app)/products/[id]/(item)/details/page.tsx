@@ -41,7 +41,7 @@ export default async function DetailsPage({ params }: Params) {
   const line = lines.get(product.id);
   const release = released.get(product.id);
   const date = (iso: string) => format.dateTime(new Date(iso), { dateStyle: 'medium' });
-  const signed = (n: number) => `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${money(n)}`;
+  const signed = (n: number) => `${n > 0 ? '▲\u00a0+' : n < 0 ? '▼\u00a0' : ''}${money(n)}`;
   const details: [string, string | null | undefined][] = [
     [t('fields.kind'), t(`kind.${product.kind}`)],
     [t('fields.franchise'), franchiseLabel(product.franchise, t)],

@@ -11,10 +11,9 @@ import { getMoney } from '@/lib/money-server';
 
 type Totals = Awaited<ReturnType<typeof portfolioValuation>>['totals'];
 
-/** "▲ +¥1,200" / "▼ ¥300" */
-/** A gain or loss with its arrow ("▲ +¥1,200"). */
+/** A gain or loss with its arrow ("▲ +¥1,200"); a no-break space keeps them on one line. */
 export const signedAmount = (money: Money, n: number) =>
-  `${n > 0 ? '▲ +' : n < 0 ? '▼ ' : ''}${money(n)}`;
+  `${n > 0 ? '▲\u00a0+' : n < 0 ? '▼\u00a0' : ''}${money(n)}`;
 
 /**
  * The top of both Portfolio tabs (requirements S8): the totals, the Actions line, and the

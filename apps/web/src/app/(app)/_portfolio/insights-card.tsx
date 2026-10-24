@@ -97,8 +97,9 @@ export function InsightsCard({
     'rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground';
   return (
     <section className={cn(card, 'space-y-3')} aria-roledescription="carousel">
-      <div className="flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium" aria-live="polite">
+      {/* On phones the chips and buttons move under a title that would not fit beside them. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="min-w-[9rem] flex-1 truncate text-sm font-medium" aria-live="polite">
           {title(panels[current]!)}
         </h2>
         {panels[current]!.bodies && periodChips}

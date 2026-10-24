@@ -64,7 +64,7 @@ export async function ValuationCard({
             <div className="text-right">
               <p className="text-xs text-muted-foreground">{t('pl')}</p>
               <p className="font-medium tabular-nums">
-                {pl > 0 ? '▲ +' : pl < 0 ? '▼ ' : ''}
+                {pl > 0 ? '▲\u00a0+' : pl < 0 ? '▼\u00a0' : ''}
                 {money(pl)}
               </p>
             </div>

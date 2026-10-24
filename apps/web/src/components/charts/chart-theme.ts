@@ -38,10 +38,14 @@ export function useChartTheme(): ChartTheme {
   return dark ? DARK : LIGHT;
 }
 
-/** Axis labels as M/D (the library default rendered a stray "0" at the year boundary). */
-export const tickMarkFormatter = (time: unknown) => {
+/**
+ * Axis labels as M/D, and the year where one starts, so a chart over years says which (the
+ * library default rendered a stray "0" there). `tickMarkType` 0 is the library's Year mark.
+ */
+export const tickMarkFormatter = (time: unknown, tickMarkType?: number) => {
   if (typeof time !== 'number') return '';
   const d = new Date(time * 1000);
+  if (tickMarkType === 0) return String(d.getUTCFullYear());
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 };
 
