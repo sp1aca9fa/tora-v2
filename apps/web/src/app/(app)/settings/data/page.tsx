@@ -20,8 +20,8 @@ export default async function DataSettingsPage() {
   const { db, user } = await authed();
   const [t, empty] = await Promise.all([getTranslations('myData'), accountIsEmpty(db, user.id)]);
   const download = (href: string, label: string) => (
-    <Button asChild size="sm" variant="outline">
-      {/* A file, not a page: a plain link the browser downloads. */}
+    <Button asChild size="sm" variant="outline" className="h-auto min-h-8 whitespace-normal">
+      {/* A file, not a page: a plain link the browser downloads. Long labels wrap on phones. */}
       <a href={href} download>
         <Download className="size-4" />
         {label}

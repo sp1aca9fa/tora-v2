@@ -2,7 +2,7 @@
 // The page crawler (S15, built before S10 part B): signs in, follows every in-app link from the
 // home page and opens each page at phone and wide widths, then reports pages with a server error,
 // a console error, a raw text key or {placeholder}, that scroll sideways, or with text too faint
-// to read on its background. Only opens pages (GET); presses nothing. Run it against a test copy,
+// to read on its background (WCAG AA). Only opens pages (GET); presses nothing. Run it against a test copy,
 // not the real app. `--views all` adds the smallest phone (320 px), a tablet, a 2560 px screen,
 // 200 % zoom and dark mode; a comma list picks some (`--views phone,dark`).
 //   pnpm crawl [--base http://localhost:3200] [--max 150] [--per-pattern 2] [--only /settings]
@@ -108,7 +108,14 @@ async function inspect(page, keys) {
     for (const el of document.body.querySelectorAll('*')) {
       if (faint.length >= 3) break;
       const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-      if (!own || el.closest('[aria-hidden="true"], [disabled], [inert], nextjs-portal')) continue;
+      // Not checked: hidden or disabled controls and their labels (greyed out on purpose), and
+      // previews drawn in another app's colors (data-other-app).
+      if (
+        !own ||
+        el.closest('[aria-hidden="true"], [disabled], [inert], [data-other-app], nextjs-portal')
+      )
+        continue;
+      if (el.closest('label')?.querySelector(':disabled')) continue;
       const s = getComputedStyle(el);
       const r = el.getBoundingClientRect();
       if (s.visibility !== 'visible' || r.width === 0 || Number(s.opacity) < 1) continue;

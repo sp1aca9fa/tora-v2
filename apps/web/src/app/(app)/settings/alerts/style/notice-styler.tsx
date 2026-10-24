@@ -250,7 +250,10 @@ function kindWords(kind: NoticeKind, words: Texts, base: Texts): Texts {
 function DiscordPreview({ notice, style }: { notice: Notice; style: NoticeStyle }) {
   const m = styled(notice, style);
   return (
-    <div className="space-y-2 rounded-lg bg-[#313338] p-3 text-[13px] leading-snug text-[#dbdee1]">
+    <div
+      data-other-app
+      className="space-y-2 rounded-lg bg-[#313338] p-3 text-[13px] leading-snug text-[#dbdee1]"
+    >
       <div className="flex items-baseline gap-2">
         <span className="font-medium text-white">Tora</span>
         <span className="rounded bg-[#5865f2] px-1 text-[10px] font-medium text-white">APP</span>
@@ -300,7 +303,7 @@ function DiscordPreview({ notice, style }: { notice: Notice; style: NoticeStyle 
 function TelegramPreview({ notice, style }: { notice: Notice; style: NoticeStyle }) {
   const m = styled(notice, style);
   return (
-    <div className="rounded-lg bg-[#8eb6d3] p-3 dark:bg-[#0e1621]">
+    <div data-other-app className="rounded-lg bg-[#8eb6d3] p-3 dark:bg-[#0e1621]">
       <div className="max-w-md space-y-3 rounded-xl bg-white px-3 py-2 text-[13px] leading-snug text-black shadow-sm dark:bg-[#182533] dark:text-white">
         {style.format === 'plain' ? (
           <p className="whitespace-pre-wrap break-words">{plainText(notice, style)}</p>

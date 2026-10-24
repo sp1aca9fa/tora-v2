@@ -58,9 +58,16 @@ function WithCode({
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  // Long labels (Spanish) wrap on the smallest phones.
   if (!open)
     return (
-      <Button type="button" variant={variant} size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={variant}
+        size="sm"
+        className="h-auto min-h-8 whitespace-normal"
+        onClick={() => setOpen(true)}
+      >
         {label}
       </Button>
     );

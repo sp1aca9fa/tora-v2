@@ -113,7 +113,7 @@ export default async function CollectorSettingsPage() {
             <p
               className={
                 !backup || backupStale(backup.at)
-                  ? 'rounded-md bg-muted px-3 py-2.5 text-sm font-medium text-destructive'
+                  ? 'rounded-md border border-destructive/40 px-3 py-2.5 text-sm font-medium text-destructive'
                   : 'rounded-md bg-muted px-3 py-2.5 text-sm'
               }
             >
