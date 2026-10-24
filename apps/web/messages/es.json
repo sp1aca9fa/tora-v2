@@ -14,6 +14,13 @@
     "stores": "Tiendas",
     "opportunitiesShort": "Ideas"
   },
+  "errorPage": {
+    "title": "Esta página no pudo cargar",
+    "info": "El servidor o su base de datos no respondió, o se cortó la conexión. Lo que guardaste antes está a salvo; algo que estabas guardando justo ahora puede no haberse guardado.",
+    "retry": "Reintentar",
+    "home": "Cartera",
+    "code": "Código de error: {code}"
+  },
   "common": {
     "save": "Guardar",
     "cancel": "Cancelar",

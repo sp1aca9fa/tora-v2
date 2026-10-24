@@ -14,6 +14,13 @@
     "stores": "Stores",
     "opportunitiesShort": "Ideas"
   },
+  "errorPage": {
+    "title": "This page could not load",
+    "info": "The server or its database did not answer, or the connection dropped. What you saved before is safe; something you were saving just now may not have been saved.",
+    "retry": "Try again",
+    "home": "Portfolio",
+    "code": "Error code: {code}"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

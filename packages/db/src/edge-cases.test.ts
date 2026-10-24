@@ -9,7 +9,7 @@ import { createHolding } from './mutations';
 import { setMarketSettings, saveSourceInfos, setSourceRoles } from './registry';
 import { insertObservations } from './sources';
 import { TEST_SOURCES } from './testing';
-import { createUser } from './users';
+import { createUser, getActiveDevice, registerDevice, revokeDevice } from './users';
 import {
   clearAllBucketValues,
   portfolioSeries,
@@ -130,4 +130,21 @@ it('values nothing, without failing, from a market with no sources or a removed 
   p = await portfolioValuation(db, userId);
   expect(p.totals).toMatchObject({ valued: 0, total: 1, valueBase: 0 });
   expect((await portfolioSeries(db, userId)).length).toBeGreaterThan(0);
+});
+
+it('takes two devices per account, refuses a third, and forgets a revoked one', async () => {
+  const phone = await registerDevice(db, userId, 'phone');
+  const pc = await registerDevice(db, userId, 'pc');
+  expect(phone && pc).toBeTruthy();
+  expect(await registerDevice(db, userId, 'tablet')).toBeNull();
+  // Another person's slots are their own.
+  const other = (
+    await createUser(db, 'b', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
+  ).user.id;
+  expect(await revokeDevice(db, other, phone!.id)).toBe(false);
+  expect(await getActiveDevice(db, userId, phone!.id)).toBeTruthy();
+  expect(await revokeDevice(db, userId, phone!.id)).toBe(true);
+  // A signed-in session on the revoked device no longer finds it, and its slot is free.
+  expect(await getActiveDevice(db, userId, phone!.id)).toBeFalsy();
+  expect(await registerDevice(db, userId, 'tablet')).toBeTruthy();
 });
