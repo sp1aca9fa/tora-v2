@@ -2291,7 +2291,8 @@
     "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}",
     "unread": "{n, plural, one {# mensaje nuevo} other {# mensajes nuevos}}",
     "waiting": "{n, plural, one {# mensaje nuevo: ver} other {# mensajes nuevos: ver}}",
-    "unknownStoreTitle": "Tienda no reconocida"
+    "unknownAreaTitle": "Zona no reconocida",
+    "unknownStoreTitle": "Tienda y zona no reconocidas"
   },
   "accounts": {
     "newTitle": "Cuenta nueva",

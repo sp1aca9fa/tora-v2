@@ -41,6 +41,8 @@ export interface PostView {
   parent: string | null;
   /** The stores and places it names. */
   storeIds: string[];
+  /** The chain whose board it came from (null: a board mixing chains). */
+  chain: string | null;
   /** "MM-DD HH:mm", and the time itself. */
   at: string;
   postedAt: string;
@@ -129,6 +131,7 @@ export async function toViews(
     ref: `${p.source}|${p.externalId}`,
     parent: p.replyTo ? `${p.source}|${p.replyTo}` : null,
     storeIds: p.storeIds,
+    chain: p.chain,
     at: p.postedAt.slice(5, 16).replace('T', ' '),
     postedAt: p.postedAt,
     author: p.author,

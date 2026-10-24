@@ -12,8 +12,12 @@ import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
 
-/** The row of the posts naming no store Tora knows. */
+/** The row of the posts naming no store or place Tora knows, from boards mixing chains. */
 const UNKNOWN = 'unknown';
+/** The row of a chain's board posts naming none of its stores: the chain known, not where. */
+const UNKNOWN_AREA = 'unknown-area';
+/** Its sections, one per chain. */
+const BOARD = 'board:';
 /** Posts read at most (two busy days stay well under). */
 const MAX_POSTS = 1000;
 
@@ -58,7 +62,10 @@ export default async function NowPage({
     area,
     [...named.posts, ...unknown.posts].sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
   );
-  const unknownRow = { id: UNKNOWN, label: t('unknownStoreTitle'), storeIds: [], km: null };
+  const unknownRows = new Map([
+    [UNKNOWN, { id: UNKNOWN, label: t('unknownStoreTitle'), storeIds: [], km: null }],
+    [UNKNOWN_AREA, { id: UNKNOWN_AREA, label: t('unknownAreaTitle'), storeIds: [], km: null }],
+  ]);
 
   /** When a store's threads last had a message, replies included. */
   const newest = (list: Thread[]) =>
@@ -69,10 +76,12 @@ export default async function NowPage({
   const group = (list: Thread[]) => {
     const out = new Map<string, Map<string, Thread[]>>();
     for (const thread of list) {
-      const ids = thread.post.storeIds.length ? thread.post.storeIds : [UNKNOWN];
+      const { storeIds, chain } = thread.post;
+      const ids = storeIds.length ? storeIds : [chain ? `${BOARD}${chain}` : UNKNOWN];
       for (const id of ids) {
-        if (id !== UNKNOWN && !every && !inArea.has(id)) continue;
-        const at = id === UNKNOWN ? UNKNOWN : locationOf.get(id);
+        const unknown = id === UNKNOWN || id.startsWith(BOARD);
+        if (!unknown && !every && !inArea.has(id)) continue;
+        const at = id === UNKNOWN ? UNKNOWN : unknown ? UNKNOWN_AREA : locationOf.get(id);
         if (!at) continue;
         const stores = out.get(at) ?? new Map<string, Thread[]>();
         out.set(at, stores);
@@ -87,7 +96,7 @@ export default async function NowPage({
           .flatMap((th) => [th.post, ...th.replies])
           .sort((a, b) => b.postedAt.localeCompare(a.postedAt));
         return {
-          location: locations.get(id) ?? unknownRow,
+          location: locations.get(id) ?? unknownRows.get(id)!,
           stores: [...stores].sort(([, a], [, b]) => newest(b).localeCompare(newest(a))),
           latest: messages[0]!,
           messages,
@@ -100,7 +109,12 @@ export default async function NowPage({
   const todays = group(all.filter((th) => newest([th]) >= today));
   const earlier = group(all.filter((th) => newest([th]) < today));
 
+  const stores = [...byId.values()];
   const storeName = (id: string) => {
+    if (id.startsWith(BOARD)) {
+      const chain = id.slice(BOARD.length);
+      return stores.find((s) => s.chain === chain)?.chainLabel ?? chain;
+    }
     const s = byId.get(id);
     return s ? storeLabel(t, locale, s) : '';
   };
@@ -121,7 +135,7 @@ export default async function NowPage({
       id={location.id}
       times={messages.map((m) => m.postedAt)}
       seenAt={seen[location.id] ?? ''}
-      dashed={location.id === UNKNOWN}
+      dashed={unknownRows.has(location.id)}
       summary={
         <>
           <div className="flex items-baseline justify-between gap-3">

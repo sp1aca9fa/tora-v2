@@ -741,6 +741,7 @@ Risks (with what covers them today):
 5. Now: a row with several new messages looked the same as one with one until opened (user): each row shows how many messages came since the person last opened it, kept on the account so every device agrees; opening it clears the count.
 6. Now: opened, the new messages were hard to find among replies (user): those new since the last opening are tinted for a moment (amber, fading out over 3 s; a plain edge mark with reduced motion), and replies holding one are unfolded. A row open when a message comes in stays open, takes the message as read and tints it as it appears.
 7. Now while open (designed with the user): opening a row scrolls to its newest new message. A message for an open row closes it when the reader has left it (no scroll, tap or key for a minute; the count shows again, nothing missed); while they read, the row stays as it is and a banner at its top ("2 new messages: show") brings them in, tinted. While a row is open the others keep their order (rows new since then go on top); they catch up once all are closed.
+8. Now: posts naming no store were one row (user: a post on a chain's board is known to be at that chain): two rows now, "Area not recognised" (a chain's board, one section per chain) and "Store and area not recognised" (boards mixing chains).
 
 ## S17: Notifications and activity log
 
