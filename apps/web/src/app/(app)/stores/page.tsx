@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
-import { NowRow } from './now-row';
+import { NowList, NowRow } from './now-row';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
@@ -119,9 +119,8 @@ export default async function NowPage({
     <NowRow
       key={location.id}
       id={location.id}
-      latest={latest.postedAt}
+      times={messages.map((m) => m.postedAt)}
       seenAt={seen[location.id] ?? ''}
-      unread={messages.filter((m) => m.postedAt > (seen[location.id] ?? '')).length}
       dashed={location.id === UNKNOWN}
       summary={
         <>
@@ -182,14 +181,16 @@ export default async function NowPage({
           {t('noToday')}
         </p>
       ) : (
-        <div className="space-y-2">{todays.map(row)}</div>
+        <NowList rows={todays.map((r) => ({ id: r.location.id, node: row(r) }))} />
       )}
       {earlier.length > 0 && (
         <details className="space-y-2">
           <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
             {t('earlier', { n: earlier.length })}
           </summary>
-          <div className="space-y-2 pt-2">{earlier.map(row)}</div>
+          <div className="pt-2">
+            <NowList rows={earlier.map((r) => ({ id: r.location.id, node: row(r) }))} />
+          </div>
         </details>
       )}
     </div>

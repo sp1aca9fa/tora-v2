@@ -32,7 +32,10 @@ export function PostItem({
   const meta = [p.author, p.reply && t('comment')].filter(Boolean).join(' · ');
   return (
     <li className={cn('space-y-1 py-2.5', stores && !p.mine && 'opacity-70')}>
-      <div className={cn('-mx-2 space-y-1 rounded-md px-2', fresh(p) && 'fresh')}>
+      <div
+        className={cn('-mx-2 space-y-1 rounded-md px-2', fresh(p) && 'fresh')}
+        data-fresh={fresh(p) ? p.postedAt : undefined}
+      >
         <div className="flex items-baseline justify-between gap-3">
           {stores ? (
             <p

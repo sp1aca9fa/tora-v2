@@ -2290,6 +2290,7 @@
     "allOfChain": "全店舗",
     "quietLocations": "昨日以降投稿のないエリア: {n}",
     "unread": "新着 {n} 件",
+    "waiting": "新着 {n} 件: 表示",
     "unknownStoreTitle": "店舗不明"
   },
   "accounts": {
