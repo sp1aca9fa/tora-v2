@@ -827,7 +827,7 @@ A copy of the analysis database with eBay rows, alert channels and devices remov
 9. Changing the base currency (S16) left amounts of tables added later in the old currency: watch targets, shops' asks, imported rows, the saved daily numbers (the sharp-drop alert would have compared old with new), buy plan budgets and data review evidence. Now converted too.
 10. The backup read 2,000 rows per request from every table, the store post pictures too (up to 8 MB each): tables holding files are read 10 rows at a time.
 11. The store directory's admin changes (stores added or removed, store codes, code meanings; S25) were missing from the Activity log: recorded now.
-Chapters checked against the code (2026-10-24): S8, S11, S16, S6, S17, S9, S19, S22-S25, S20, S21, S13; what they say is built matches the code and its numbers, apart from fixes 9-11. Next: D, the risks and efficiency write-up.
+Chapters checked against the code (2026-10-24): S8, S11, S16, S6, S17, S9, S19, S22-S25, S20, S21, S13; what they say is built matches the code and its numbers, apart from fixes 9-11. D below.
 Noted for later: Opportunities numbers come from the last collect while other pages are live, so they drift within a day.
 
 ### Part C: the Spain + Brazil setup (2026-10-23)
@@ -869,6 +869,27 @@ Fixed (2026-10-24, user: 1 and 3-12; 2 not needed, 9 is Claude's sandbox):
 Follow-ups (user, 2026-10-24):
 - Set catalogs are plug-ins: the TCG set lists moved from the core (`packages/catalog`) to the public plug-in package (`collectors-public/catalog`, `catalogs` in a plug-in module); only the regions a set category lists are loaded (a watches-only setup loads none; the Spain test copy with English and Spanish prints kept 539 of 1,962 sets), and the collect loads them when they or the categories change (`pnpm catalog:sync` only to do it at once). Why (user): nothing particular to one setup in the core; a person tracking other things in Spain and Brazil needs no Pokemon sets.
 - Pages gone: SNKRDUNK deleted the nine 30th CELEBRATION カードセット(御三家) pages (HTTP 404 from 2026-10-20). Part A's set-aside covers it (3 nights gone, an Actions card); now admins are told too: one alert after the run (item, site, error), a line in their morning summary while any wait, and the Actions card even for items they do not hold.
+
+### Part D: risks and efficiency (2026-10-24)
+
+Measured on the analysis copy (2026-10-23) and the server's status page.
+
+Efficiency:
+- Database: 271 MB for 180 items, 213 lots and 365k sales; the sales are 92 % of it (159 MB of rows, 88 MB of indexes, about 0.7 KB a sale; their raw JSON 35 MB). The compressed backup was 18 MB at 283k rows (2026-10-16).
+- Growth: 10k-25k new sales a day this month, mostly older history filled in for new and ranked items; it should slow once histories are complete. At today's pace about 5 GB a year: nothing for a home server's disk, a limit for a hosted free database plan.
+- Collect: about 65 minutes of collector time a night (SNKRDUNK about 29, Mercari 13, the rest under 6 each), well inside the 6-hour window. Closing steps and pages read little since S19 (about 16k rows a night, 1-3k a page).
+- Gone pages: until a listing is set aside (3 nights), the hourly retries of a partial run ask for it again every hour (today 9 SNKRDUNK and 6 駿河屋 pages answering "gone", about 15 requests an hour).
+- Development: requirements.md is 254 KB (roughly 70k tokens); most of it is "Built" detail of finished phases that git and the docs also hold. Reading it whole is the largest fixed cost of a Claude session.
+
+Risks (with what covers them today):
+1. One site carries most values: 81 % of sales are SNKRDUNK's, the reference for cards and sealed. A block or a redesign stops most new prices. Covered: blocked sources are left alone for the day and reported, partial runs alert, values fall back to supporting sources by role, set-aside of gone pages. Not covered: no second reference with enough sales for cards (Mercari disagrees by about 15 % and stays comparison only).
+2. A self-hosted install is one machine: the app, the database, the collect, the store feed browser and the daily "nothing ran" check. When the machine or its network is down, nothing can say so, since the check runs on it too. Backups are copied off the box by another computer when it is on.
+3. Unattended deploys: a push updates the server and runs its migrations (add-only rule, a failed update goes back). A migration that changes data (like 0058) runs with nobody watching; the nightly backup before it is the way back.
+4. Internet exposure: the app is reachable from anywhere. Covered: password and authenticator, two devices per person, lockout, hashed tokens (feed, setup links, status), pictures behind sign-in, security releases followed through `.nvmrc` and the lockfile.
+5. Cross-cutting lists: features added after a phase can miss that phase's lists. Part B found three (base currency amounts, backup paging, the audit log). Nothing fails when a new table or admin action is left out.
+6. Store feed: depends on a board's page and its access check, read by a userscript in a browser; a change there breaks it. Covered: silence and per-board alerts, the page-turn and stale-copy fixes (userscript 1.11, 1.12).
+7. Data quality: listing matches on search sources (Mercari asks at 34-55 % of SNKRDUNK's are often other things: kept to the same site's asks), thin data (warned, never hidden), items registered twice (look-alike check, shared-listing check, merge).
+8. Texts: Spanish and Japanese drafted by Claude, not checked by native speakers.
 
 ## S17: Notifications and activity log
 
