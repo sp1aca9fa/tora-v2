@@ -44,7 +44,7 @@
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
-| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` built, baseline recorded (within targets at today's size); next the data generator |
+| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; five fixes measured on medium and large (nav badge, Portfolio movers, nightly snapshot memory, Items loads as you scroll, valuation reads); left over the target on large: Portfolio on a phone, Items on a phone (just), Opportunities on a PC |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
@@ -826,6 +826,25 @@ Progress:
 | Settings | wide | 40 / 32 | 384 / 376 | 46 | 175 | 16 | 28 |
 
   CLS 0.00 everywhere. Most round trips: Portfolio 89, Items 66 to 126, Actions 51; these are where growth will show first (step 2).
+- 2026-10-24, step 2: `pnpm stress-data <medium|large> --out <new.db> [--from <db>]` copies a local database (never a hosted one) and grows it: items cloned with their sources and sales (prices shifted per copy), lots cloned onto them, members added, and for large a third market (a made-up euro source with its sales and rates); the person with the most lots keeps 40 % of the new ones. Made from the owner's data copy: medium (5 users, 1,000 items, 2,000 lots, 1.03 million prices) and large (20 users, 5,000 items, 10,000 lots, 5.48 million prices; 4,100 lots and 1,680 items for the owner). A full `pnpm rebuild`: 3 min 12 s on medium, 18 min 22 s on large.
+- 2026-10-24, step 3 (each measured before and after; `pnpm perf --sql N` lists each page's costliest statements, and the LCP candidates are printed per page). Found and fixed:
+  - The nav badge works out every notice on each page: it read every owned item whole and every listing twice. Now only what the identity check needs, whole items only for cards, listings once; two indexes (migration 0062) for listings set aside and for listing pictures. Every page 10 to 20 ms faster on medium, about 50 ms on large.
+  - Portfolio's movers parsed every lot's value history (25 KB of JSON per lot) to compare five days. The nightly snapshot now saves those days' values per person (migration 0063); before its first run, only those days are read out of the histories. Medium: Portfolio HTML 426 -> 225 ms wide.
+  - The nightly snapshot ran out of memory on large (4 GB): it kept every item's daily values and loaded every saved history at once. It now keeps one item at a time and compares saved histories 500 lots at a time: 6 min 21 s on large, same values (checked on medium: nothing to rewrite).
+  - Items drew every item card with the page (2,000 on large: 3.6 s before the list showed on a phone). It now draws 60 cards and more as the end of the list comes near (the user's choice); the group headers' counts and values stay for the whole list. The default view reads the lots once (it read them twice).
+  - Valuation read lots joined to their items (each item's columns once per lot): read apart.
+
+  Large, warm (HTML / LCP ms), before -> after:
+
+| Page | Phone | Wide |
+|---|---|---|
+| Portfolio | 933 / 1,432 -> 607 / 1,180 | 821 / 1,204 -> 557 / 952 |
+| Items | 1,322 / 3,632 -> 466 / 1,044 | 980 / 1,744 -> 364 / 780 |
+| Opportunities | 911 / 840 -> 796 / 720 | 817 / 1,364 -> 602 / 1,112 |
+| Actions | 380 / 500 -> 279 / 396 | 263 / 744 -> 193 / 664 |
+| Other pages | about 200 / 750 -> 155 / 680 | about 145 / 500 -> 120 / 480 |
+
+  Still over the 1 s warm LCP on large: Portfolio on a phone, Items on a phone (just), Opportunities on a PC (714 items listed on large, all drawn with the page; 9 on the owner's data).
 
 Acceptance:
 - Targets met on production and on the large dataset; the baseline and after tables recorded here.
