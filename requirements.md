@@ -918,7 +918,7 @@ Acceptance:
 | # | What | How found | Severity | Commit |
 |---|---|---|---|---|
 | 1 | After an admin changed markets, source order, base currency or categories (and after a collect that changed a source's quality), every saved value was cleared and refilled only after the snapshots (6 min on large): meanwhile every page worked values out from the sales (9-10 s under load). Values are now refilled first (as the time zone change did); the window is the refill (22 s on large, about 1 s on the owner's data). | Load run while writing | 3 | 1310eee |
-| 2 | A site that took the connection and never answered held each request for Node's default (about 5 minutes), with no retry: a collect, and its lock (the server's updates wait for it), could run for hours. Requests now give up after 30 s, are tried again like a server error, then fail that item. | Collector faults | 2 | (next) |
+| 2 | A site that took the connection and never answered held each request for Node's default (about 5 minutes), with no retry: a collect, and its lock (the server's updates wait for it), could run for hours. Requests now give up after 30 s, are tried again like a server error, then fail that item. | Collector faults | 2 | a49f1af |
 
 ---
 
