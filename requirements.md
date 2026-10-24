@@ -918,6 +918,7 @@ Acceptance:
    - Items and lots: merges move lots, keep one watch per condition and one link per listing; cancelling an order with pulls taken from it is refused; selling or splitting more than a lot has is refused (the property tests).
    - A failed page (database or server not answering, a save cut off) showed the framework's English error screen with no way back (bug 3).
    - Typed input (`edge-cases.test.ts`, `apps/web/src/lib/form.test.ts`): names and notes with markup, quotes, SQL, LIKE wildcards, emoji and 1,000 characters are kept as typed and found by search as plain text (pages escape them; no page writes raw HTML from data); quantities refuse 0, negatives, decimals and over 100,000, and now take full-width digits ("３"); amounts refuse negatives, over 10^11 and unreadable text; the import review's date can no longer be set in the future (the other date fields already stopped at today). A search for "mega" missed a name typed in full-width letters (bug 4).
+   - Imports: an order cancelled after import is reported, never removed, and skipped on the next import (already tested); the same file twice adds nothing (already tested). A sheet saved by Excel in Spanish and other languages (semicolons), as "Unicode text" (UTF-16, tabs) or copied cells (tabs) was refused as having no column names; the first row's separator is now used. A binary file named .csv finds no columns and is refused. A 5,000-row sheet (the limit, 1.2 MB) took 211 s to import and 370 s to preview again (bug 5); now 21 s and 0.4 s.
 
 ### Bug log
 
@@ -927,6 +928,7 @@ Acceptance:
 | 2 | A site that took the connection and never answered held each request for Node's default (about 5 minutes), with no retry: a collect, and its lock (the server's updates wait for it), could run for hours. Requests now give up after 30 s, are tried again like a server error, then fail that item. | Collector faults | 2 | a49f1af |
 | 3 | No error pages: a database or server that did not answer, or a save cut off (offline), showed the framework's "Application error" screen in English, with no way back but reloading. Now a page says so in the person's language with Try again and a way home (the menu stays); if even the app's frame fails, a short page in the browser's language (English, Japanese, Spanish). | Edge cases (database down, offline) | 3 | 6ac242e |
 | 4 | A search for "mega" did not find a name typed in full-width letters ("ＭＥＧＡ", common in Japanese input): the database lowercases plain letters only and the stored name is kept as typed. The search now also tries each term's full-width forms. | Input edge-case test | 4 | 6a321b3 |
+| 5 | A sheet import looked each new row's item up by reading every item of that kind (and card number), so time grew with the square of the rows: 5,000 rows took 211 s to import and 370 s to preview a second time, past the browser's patience. Each group of items is now read once per file and found by name. | 5,000-row sheet test | 3 | (this commit) |
 
 ---
 

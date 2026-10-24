@@ -27,7 +27,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { type ImportRowLog, finishImportRun, saveImportRows, startImportRun } from './imports';
 import { type HoldingInput, type ProductRef, DomainError, createHolding } from './mutations';
-import { findSameProduct } from './purchases';
+import { sameProductFinder } from './purchases';
 import { loadSourceRegistry } from './registry';
 import { type Holding, type Product, holdingEvents, holdings, products } from './schema';
 import { portfolioValuation } from './valuation';
@@ -412,6 +412,7 @@ export async function planSheet(
   );
   // Orders already planned in this file (a second row of a one-item order is the same lot).
   const planned = new Set<string>();
+  const sameProduct = sameProductFinder(db);
 
   const entries: SheetEntry[] = [];
   for (const { line, cells } of read.rows) {
@@ -492,7 +493,7 @@ export async function planSheet(
         fail('missing_field');
         continue;
       }
-      product = await findSameProduct(db, fields);
+      product = await sameProduct.find(fields);
       ref = product ? { productId: product.id } : { product: fields };
     }
     const cls =
@@ -612,6 +613,7 @@ export async function applySheet(
   const counts: Record<string, number> = {};
   const add = (k: string) => (counts[k] = (counts[k] ?? 0) + 1);
   const log: ImportRowLog[] = [];
+  const sameProduct = sameProductFinder(db);
   for (const e of entries) {
     const row = { title: e.item, detail: `line:${e.line}` };
     const lot =
@@ -637,14 +639,15 @@ export async function applySheet(
     // A new item made by an earlier row is used again.
     let ref = lot.ref;
     if ('product' in ref) {
-      const same = await findSameProduct(db, ref.product);
+      const same = await sameProduct.find(ref.product);
       if (same) ref = { productId: same.id };
     }
     try {
-      const { holding } = await createHolding(db, userId, ref, {
+      const { holding, product } = await createHolding(db, userId, ref, {
         ...lot.input,
         importRunId: runId,
       });
+      if ('product' in ref) await sameProduct.add(product);
       add('imported');
       log.push({
         ...row,

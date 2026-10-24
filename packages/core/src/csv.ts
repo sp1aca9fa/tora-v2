@@ -15,8 +15,23 @@ export function toCsv(rows: readonly (readonly string[])[]): string {
   return rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
-/** Parses CSV text (quoted cells, `""` inside quotes, any line ends); drops empty rows. */
+/**
+ * The first row's separator: a comma, or the semicolon of Excel in many European languages, or
+ * the tab of Excel's "Unicode text" and of cells copied from a spreadsheet; the most common one,
+ * a comma on a tie.
+ */
+function separatorOf(text: string): string {
+  const first = (text.match(/^[^\r\n]*/)?.[0] ?? '').replace(/"[^"]*"/g, '');
+  const count = (c: string) => first.split(c).length - 1;
+  return [',', ';', '\t'].reduce((best, c) => (count(c) > count(best) ? c : best));
+}
+
+/**
+ * Parses CSV text (quoted cells, `""` inside quotes, any line ends, the separator of the first
+ * row); drops empty rows.
+ */
 export function parseCsv(text: string): string[][] {
+  const sep = separatorOf(text);
   const rows: string[][] = [];
   let row: string[] = [];
   let value = '';
@@ -41,7 +56,7 @@ export function parseCsv(text: string): string[][] {
       } else if (c === '"') quoted = false;
       else value += c;
     } else if (c === '"') quoted = true;
-    else if (c === ',') endCell();
+    else if (c === sep) endCell();
     else if (c === '\n') endRow();
     else if (c === '\r') {
       if (text[i + 1] === '\n') i++;
@@ -53,10 +68,12 @@ export function parseCsv(text: string): string[][] {
 }
 
 /**
- * A file's text: UTF-8, or Shift_JIS (what Japanese Excel saves as "CSV") when it is not valid
- * UTF-8.
+ * A file's text: UTF-16 when it starts with its byte order mark (Excel's "Unicode text"), UTF-8,
+ * or Shift_JIS (what Japanese Excel saves as "CSV") when it is not valid UTF-8.
  */
 export function decodeText(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {

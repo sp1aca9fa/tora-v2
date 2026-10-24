@@ -51,10 +51,19 @@ export const looseName = (name: string) =>
  * one with the same loose name, whatever its set code when the input has none (a shop's name
  * without the set code is still that product).
  */
-export async function findSameProduct(
-  db: Db,
-  input: Pick<Product, 'name' | 'kind'> & Partial<Pick<Product, 'setCode' | 'cardNumber'>>,
-): Promise<Product | null> {
+type SameInput = Pick<Product, 'name' | 'kind'> & Partial<Pick<Product, 'setCode' | 'cardNumber'>>;
+
+/** The first of `rows` (oldest first) that is the same item: the same name, else a loose match. */
+function pickSame(rows: Product[], input: SameInput): Product | null {
+  const loose = looseName(input.name);
+  return (
+    rows.find((p) => p.name === input.name && !p.setCode === !input.setCode) ??
+    rows.find((p) => looseName(p.name) === loose) ??
+    null
+  );
+}
+
+export async function findSameProduct(db: Db, input: SameInput): Promise<Product | null> {
   const same = (column: AnySQLiteColumn, value: string | null | undefined) =>
     value ? eq(column, value) : isNull(column);
   const rows = await db
@@ -68,10 +77,63 @@ export async function findSameProduct(
       ),
     )
     .orderBy(products.createdAt);
-  const loose = looseName(input.name);
-  return (
-    rows.find((p) => p.name === input.name && !p.setCode === !input.setCode) ??
-    rows.find((p) => looseName(p.name) === loose) ??
-    null
-  );
+  return pickSame(rows, input);
+}
+
+/**
+ * `findSameProduct` for many rows of one file (S15: a 5,000-row sheet read every item of a kind
+ * once per row): each kind and card number is read once and its items found by name; `add` takes
+ * the items the file creates.
+ */
+export function sameProductFinder(db: Db) {
+  const groups = new Map<string, Promise<Map<string, Product[]>>>();
+  const groupKey = (p: Pick<Product, 'kind'> & Partial<Pick<Product, 'cardNumber'>>) =>
+    `${p.kind}\u0000${p.cardNumber ?? ''}`;
+  const index = (byName: Map<string, Product[]>, p: Product) => {
+    for (const k of new Set([p.name, `\u0000${looseName(p.name)}`]))
+      byName.set(k, [...(byName.get(k) ?? []), p]);
+  };
+  const load = (input: SameInput) => {
+    const key = groupKey(input);
+    let group = groups.get(key);
+    if (!group) {
+      group = db
+        .select()
+        .from(products)
+        .where(
+          and(
+            eq(products.kind, input.kind),
+            input.cardNumber
+              ? eq(products.cardNumber, input.cardNumber)
+              : isNull(products.cardNumber),
+          ),
+        )
+        .orderBy(products.createdAt)
+        .then((rows) => {
+          const byName = new Map<string, Product[]>();
+          for (const p of rows) index(byName, p);
+          return byName;
+        });
+      groups.set(key, group);
+    }
+    return group;
+  };
+  return {
+    async find(input: SameInput): Promise<Product | null> {
+      const byName = await load(input);
+      const rows = [
+        ...new Set([
+          ...(byName.get(input.name) ?? []),
+          ...(byName.get(`\u0000${looseName(input.name)}`) ?? []),
+        ]),
+      ]
+        .filter((p) => !input.setCode || p.setCode === input.setCode)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return pickSame(rows, input);
+    },
+    async add(product: Product) {
+      const group = groups.get(groupKey(product));
+      if (group) index(await group, product);
+    },
+  };
 }
