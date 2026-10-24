@@ -2288,7 +2288,8 @@
     "byLocationInfo": "昨日(5:00)以降に投稿のあるエリアを近い順に、件数つきで表示します。選ぶとそのエリアの投稿を新しい順で表示します。",
     "otherBoards": "その他の掲示板",
     "allOfChain": "全店舗",
-    "quietLocations": "昨日以降投稿のないエリア: {n}"
+    "quietLocations": "昨日以降投稿のないエリア: {n}",
+    "unknownStoreTitle": "店舗不明"
   },
   "accounts": {
     "newTitle": "新しいアカウント",

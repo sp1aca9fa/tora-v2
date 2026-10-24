@@ -84,7 +84,7 @@ export async function postViews(
     offset: opts.offset,
     limit: POSTS_BATCH,
     storeIds: storeIds ?? (show === 'area' ? [...inArea] : undefined),
-    named: show === 'named',
+    named: show === 'named' || undefined,
     chain,
   });
   return { posts: await toViews(db, area, posts), more };

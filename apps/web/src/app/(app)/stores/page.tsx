@@ -11,6 +11,8 @@ import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
 
+/** The row of the posts naming no store Tora knows. */
+const UNKNOWN = 'unknown';
 /** Posts read at most (two busy days stay well under). */
 const MAX_POSTS = 1000;
 
@@ -38,14 +40,23 @@ export default async function NowPage({
   ]);
   const { byId, inArea, locationOf, locations } = places;
   const { today, yesterday: since } = postDays();
-  const { posts } = await postsPage(db, {
-    offset: 0,
-    limit: MAX_POSTS,
-    since,
-    storeIds: every ? undefined : [...inArea],
-    named: every,
-  });
-  const views = await toViews(db, area, posts);
+  // The stores' posts, and those naming no store Tora knows (one row of their own: none missed).
+  const [named, unknown] = await Promise.all([
+    postsPage(db, {
+      offset: 0,
+      limit: MAX_POSTS,
+      since,
+      storeIds: every ? undefined : [...inArea],
+      named: every || undefined,
+    }),
+    postsPage(db, { offset: 0, limit: MAX_POSTS, since, named: false }),
+  ]);
+  const views = await toViews(
+    db,
+    area,
+    [...named.posts, ...unknown.posts].sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
+  );
+  const unknownRow = { id: UNKNOWN, label: t('unknownStoreTitle'), storeIds: [], km: null };
 
   /** When a store's threads last had a message, replies included. */
   const newest = (list: Thread[]) =>
@@ -56,9 +67,10 @@ export default async function NowPage({
   const group = (list: Thread[]) => {
     const out = new Map<string, Map<string, Thread[]>>();
     for (const thread of list) {
-      for (const id of thread.post.storeIds) {
-        if (!every && !inArea.has(id)) continue;
-        const at = locationOf.get(id);
+      const ids = thread.post.storeIds.length ? thread.post.storeIds : [UNKNOWN];
+      for (const id of ids) {
+        if (id !== UNKNOWN && !every && !inArea.has(id)) continue;
+        const at = id === UNKNOWN ? UNKNOWN : locationOf.get(id);
         if (!at) continue;
         const stores = out.get(at) ?? new Map<string, Thread[]>();
         out.set(at, stores);
@@ -73,7 +85,7 @@ export default async function NowPage({
           .flatMap((th) => [th.post, ...th.replies])
           .sort((a, b) => b.postedAt.localeCompare(a.postedAt));
         return {
-          location: locations.get(id)!,
+          location: locations.get(id) ?? unknownRow,
           stores: [...stores].sort(([, a], [, b]) => newest(b).localeCompare(newest(a))),
           latest: messages[0]!,
           n: messages.length,
@@ -101,7 +113,10 @@ export default async function NowPage({
       list.some((th) => th.post === latest || th.replies.includes(latest)),
     )?.[0] ?? '';
   const row = ({ location, stores, latest, n }: (typeof todays)[number]) => (
-    <details key={location.id} className="group rounded-xl border bg-card">
+    <details
+      key={location.id}
+      className={cn('group rounded-xl border bg-card', location.id === UNKNOWN && 'border-dashed')}
+    >
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex items-baseline justify-between gap-3">
@@ -129,7 +144,7 @@ export default async function NowPage({
       <div className="space-y-3 border-t px-4 pt-2 pb-3">
         {stores.map(([id, list]) => (
           <section key={id}>
-            <h3 className="text-sm font-medium">{storeName(id)}</h3>
+            {storeName(id) && <h3 className="text-sm font-medium">{storeName(id)}</h3>}
             <ul className="divide-y border-l pl-3">
               {list.map(({ post, replies }) => (
                 <PostItem key={post.id} post={post} replies={replies} stores={false} />

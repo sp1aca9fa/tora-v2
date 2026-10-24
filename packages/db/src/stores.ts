@@ -1147,7 +1147,7 @@ export async function storesState(db: Db, userId: string) {
 
 /**
  * A page of posts, newest first: only those naming one of `storeIds` when given, any store
- * (`named`), posted since a time (`since`), on a chain's board (`chain`; null: boards mixing
+ * (`named`; false: those naming none), posted since a time (`since`), on a chain's board (`chain`; null: boards mixing
  * chains). One more than asked is read, to know whether an older
  * page follows (no count of every post).
  */
@@ -1175,7 +1175,11 @@ export async function postsPage(
               sql`, `,
             )}))`
           : undefined,
-        opts.named ? sql`${storePosts.storeIds} <> '[]'` : undefined,
+        opts.named === undefined
+          ? undefined
+          : opts.named
+            ? sql`${storePosts.storeIds} <> '[]'`
+            : sql`${storePosts.storeIds} = '[]'`,
         opts.since ? gte(storePosts.postedAt, opts.since) : undefined,
         opts.chain === undefined
           ? undefined

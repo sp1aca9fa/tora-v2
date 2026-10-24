@@ -2288,7 +2288,8 @@
     "byLocationInfo": "Zonas de tu área con publicaciones desde ayer (5:00), las más cercanas primero, con cuántas; elige una para ver sus publicaciones, primero las más recientes.",
     "otherBoards": "Otros tablones",
     "allOfChain": "Todas sus tiendas",
-    "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}"
+    "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}",
+    "unknownStoreTitle": "Tienda no reconocida"
   },
   "accounts": {
     "newTitle": "Cuenta nueva",

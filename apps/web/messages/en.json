@@ -2288,7 +2288,8 @@
     "byLocationInfo": "Locations of your area with posts since yesterday (5:00), nearest first, with how many; open one to see its posts, newest first.",
     "otherBoards": "Other boards",
     "allOfChain": "All its stores",
-    "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}"
+    "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
+    "unknownStoreTitle": "Store not recognised"
   },
   "accounts": {
     "newTitle": "New account",
