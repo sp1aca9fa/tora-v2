@@ -12,7 +12,11 @@
     "watchlist": "Seguimiento",
     "opportunities": "Oportunidades",
     "stores": "Tiendas",
-    "opportunitiesShort": "Ideas"
+    "opportunitiesShort": "Ideas",
+    "portfolioShort": "Cartera",
+    "watchlistShort": "Seguir",
+    "actionsShort": "Tareas",
+    "importsShort": "Importar"
   },
   "errorPage": {
     "title": "Esta página no pudo cargar",

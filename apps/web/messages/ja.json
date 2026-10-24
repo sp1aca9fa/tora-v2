@@ -12,7 +12,11 @@
     "watchlist": "ウォッチ",
     "opportunities": "狙い目",
     "stores": "店舗",
-    "opportunitiesShort": "狙い目"
+    "opportunitiesShort": "狙い目",
+    "portfolioShort": "資産",
+    "watchlistShort": "ウォッチ",
+    "actionsShort": "対応",
+    "importsShort": "取込"
   },
   "errorPage": {
     "title": "このページを読み込めませんでした",

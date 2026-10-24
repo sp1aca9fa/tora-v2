@@ -1,10 +1,12 @@
 /* global console, process, document, window, getComputedStyle, URL */
 // The page crawler (S15, built before S10 part B): signs in, follows every in-app link from the
 // home page and opens each page at phone and wide widths, then reports pages with a server error,
-// a console error, a raw text key or {placeholder}, or that scroll sideways. Only opens pages
-// (GET); presses nothing. Run it against a test copy, not the real app.
+// a console error, a raw text key or {placeholder}, that scroll sideways, or with text too faint
+// to read on its background. Only opens pages (GET); presses nothing. Run it against a test copy,
+// not the real app. `--views all` adds the smallest phone (320 px), a tablet, a 2560 px screen,
+// 200 % zoom and dark mode; a comma list picks some (`--views phone,dark`).
 //   pnpm crawl [--base http://localhost:3200] [--max 150] [--per-pattern 2] [--only /settings]
-//              [--shots <dir>] [--out <report.json>]
+//              [--views phone,wide|all] [--shots <dir>] [--out <report.json>]
 // Sign-in from the environment or `.env`: CRAWL_USER, CRAWL_PASSWORD, and CRAWL_TOTP_KEY (base32)
 // or CRAWL_TOTP_KEY_FILE.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -17,10 +19,18 @@ const PER_PATTERN = Number(arg('per-pattern', '2'));
 const ONLY = arg('only');
 const SHOTS = arg('shots');
 const OUT = arg('out');
-const WIDTHS = [
-  { name: 'phone', width: 390, height: 844 },
+const VIEWS = [
+  { name: 'small', width: 320, height: 640, phone: true },
+  { name: 'phone', width: 390, height: 844, phone: true },
+  { name: 'tablet', width: 768, height: 1024, phone: true },
   { name: 'wide', width: 1280, height: 900 },
+  { name: 'xl', width: 2560, height: 1440 },
+  // A 1280 px window at 200 % zoom lays out like a 640 px one.
+  { name: 'zoom', width: 640, height: 450, scale: 2 },
+  { name: 'dark', width: 1280, height: 900, dark: true },
 ];
+const VIEW_NAMES = arg('views', 'phone,wide');
+const WIDTHS = VIEWS.filter((v) => VIEW_NAMES === 'all' || VIEW_NAMES.split(',').includes(v.name));
 // Links that do something, download a file or leave the app's pages.
 const SKIP = /^\/(api|logout|_next)\b|\/(export|download)\b|\.(csv|json|xlsx|zip|png|jpg|webp)$/;
 
@@ -77,9 +87,57 @@ async function inspect(page, keys) {
           ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}`
           : ''
       } "${(el.innerText ?? '').trim().slice(0, 40)}"`;
+    // Text below WCAG's 4.5:1 contrast with the first solid background behind it (3:1 when large).
+    // Colors as sRGB 0-255 and alpha 0-1, through a canvas (pages give oklch() as well as rgb()).
+    const ctx = Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext(
+      '2d',
+      { willReadFrequently: true },
+    );
+    const rgb = (c) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = c;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+      return [r, g, b, a / 255];
+    };
+    const luminance = ([r, g, b]) => {
+      const lin = (v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    };
+    const faint = [];
+    for (const el of document.body.querySelectorAll('*')) {
+      if (faint.length >= 3) break;
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!own || el.closest('[aria-hidden="true"], [disabled], [inert], nextjs-portal')) continue;
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (s.visibility !== 'visible' || r.width === 0 || Number(s.opacity) < 1) continue;
+      const fg = rgb(s.color);
+      if (fg[3] === 0) continue;
+      let bg = null;
+      for (let p = el; p && !bg; p = p.parentElement) {
+        const ps = getComputedStyle(p);
+        if (ps.backgroundImage !== 'none') break;
+        const c = rgb(ps.backgroundColor);
+        if (c[3] === 1) bg = c;
+      }
+      if (!bg) continue;
+      // Translucent text (text-foreground/60) as it shows over its background.
+      const seen = fg.slice(0, 3).map((v, i) => v * fg[3] + bg[i] * (1 - fg[3]));
+      const [hi, lo] = [luminance(seen), luminance(bg)].sort((a, b) => b - a);
+      const ratio = (hi + 0.05) / (lo + 0.05);
+      const large =
+        parseFloat(s.fontSize) >= 24 ||
+        (parseFloat(s.fontSize) >= 18.6 && Number(s.fontWeight) >= 700);
+      if (ratio < (large ? 3 : 4.5))
+        faint.push(
+          `${ratio.toFixed(1)}:1 ${el.tagName.toLowerCase()}.${[...el.classList].slice(0, 4).join('.')} "${el.innerText.trim().slice(0, 30)}"`,
+        );
+    }
     return {
       text,
       literal,
+      faint,
       sideways: sideways ? `${document.documentElement.scrollWidth}px > ${width}px` : null,
       wide: wide.map(describe),
       // The dev server's tools are always on the page; only an error adds its issues badge or
@@ -110,6 +168,7 @@ async function inspect(page, keys) {
   if (found.issues) problems.push(`Next.js issues: ${found.issues}`);
   if (found.sideways)
     problems.push(`scrolls sideways (${found.sideways}): ${found.wide.join('; ') || '?'}`);
+  if (found.faint.length) problems.push(`faint text: ${found.faint.join('; ')}`);
   return { problems, links: found.links, origin: found.origin };
 }
 
@@ -121,8 +180,10 @@ const contexts = await Promise.all(
     browser.newContext({
       storageState: state,
       viewport: { width: w.width, height: w.height },
-      isMobile: w.name === 'phone',
-      hasTouch: w.name === 'phone',
+      deviceScaleFactor: w.scale ?? 1,
+      isMobile: !!w.phone,
+      hasTouch: !!w.phone,
+      colorScheme: w.dark ? 'dark' : 'light',
     }),
   ),
 );
@@ -190,7 +251,7 @@ await browser.close();
 
 const bad = report.filter((e) => e.problems.length);
 console.log(
-  `\n${report.length} pages at ${WIDTHS.map((w) => w.width).join(' and ')} px; ${bad.length} with problems${
+  `\n${report.length} pages (${WIDTHS.map((w) => w.name).join(', ')}); ${bad.length} with problems${
     queue.length ? `; ${queue.length} not opened (--max ${MAX})` : ''
   }.`,
 );

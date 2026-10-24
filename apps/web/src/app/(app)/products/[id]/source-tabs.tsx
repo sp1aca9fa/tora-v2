@@ -82,7 +82,7 @@ export function SourceTabs({
               // The reference comes first whatever the order: its own colour says why.
               s.main
                 ? s.key === source
-                  ? 'border-emerald-600 bg-emerald-600 text-white dark:border-emerald-500 dark:bg-emerald-500 dark:text-emerald-950'
+                  ? 'border-emerald-700 bg-emerald-700 text-white dark:border-emerald-500 dark:bg-emerald-500 dark:text-emerald-950'
                   : 'border-emerald-600/50 text-emerald-700 hover:bg-emerald-600/10 dark:border-emerald-400/50 dark:text-emerald-400'
                 : s.key === source
                   ? 'border-primary bg-primary text-primary-foreground'

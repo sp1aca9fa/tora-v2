@@ -12,7 +12,11 @@
     "watchlist": "Watchlist",
     "opportunities": "Opportunities",
     "stores": "Stores",
-    "opportunitiesShort": "Ideas"
+    "opportunitiesShort": "Ideas",
+    "portfolioShort": "Portfolio",
+    "watchlistShort": "Watchlist",
+    "actionsShort": "Actions",
+    "importsShort": "Imports"
   },
   "errorPage": {
     "title": "This page could not load",

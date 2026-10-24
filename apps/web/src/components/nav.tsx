@@ -30,6 +30,8 @@ const ITEMS = [
   { href: '/imports', key: 'imports', icon: Inbox },
   { href: '/settings', key: 'settings', icon: Settings },
 ] as const;
+/** Bottom bar labels with a shorter form (a phone has about 40-50 px per label). */
+const SHORT = new Set(['portfolio', 'watchlist', 'opportunities', 'actions', 'imports']);
 
 function isActive(pathname: string, href: string) {
   return href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -157,7 +159,9 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
                   <Badge counts={badges} item={key} />
                 </span>
               </span>
-              {t(key === 'opportunities' ? 'nav.opportunitiesShort' : `nav.${key}`)}
+              <span className="w-full truncate px-0.5 text-center">
+                {t(SHORT.has(key) ? `nav.${key}Short` : `nav.${key}`)}
+              </span>
               <Pending className="inset-x-3 top-0 h-0.5" />
             </Link>
           ))}
