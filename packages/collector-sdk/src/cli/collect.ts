@@ -38,6 +38,7 @@ import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
 import { updateRates } from '../rates';
+import { syncCatalogs } from '../catalog';
 import { loadAndRegister } from '../registry';
 import { defaultLockDir, lockSource } from '../lock';
 import { readOpeningCards } from '../opening';
@@ -86,8 +87,18 @@ try {
   // Without it the schedule counts days on the PC's clock.
 }
 // The plug-ins' source descriptions are saved first: the app reads them.
-const { collectors, importers, rates, sources, setCards, rankings, missing } =
+const { collectors, importers, rates, sources, setCards, rankings, catalogs, missing } =
   await loadAndRegister(db);
+// The plug-ins' set lists, when they or the admin's categories changed (S10).
+try {
+  const synced = await syncCatalogs(db, catalogs);
+  if (synced)
+    console.log(
+      `set catalog: ${synced.sets} sets in use loaded, ${synced.removed} no longer listed removed`,
+    );
+} catch (e) {
+  console.log(`set catalog: not loaded (${errorText(e)})`);
+}
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
 // Only the markets the admin uses, unless a market or source is asked for by name (S10).

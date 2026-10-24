@@ -144,7 +144,7 @@ export const PLATFORM_SUGGESTIONS = [
   'Game Boy',
 ];
 
-/** One set in the pre-registered catalog (packages/catalog/data/*.json). */
+/** One set of a plug-in's set catalog (`SetCatalog`; the public one: collectors-public/catalog). */
 export interface CatalogSetEntry {
   franchise: TcgFranchise;
   region: Region | null;

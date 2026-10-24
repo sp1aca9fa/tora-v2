@@ -16,3 +16,4 @@ export * from './rates';
 export * from './ai-import-run';
 export * from './money';
 export * from './opening';
+export * from './catalog';

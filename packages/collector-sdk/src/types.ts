@@ -1,4 +1,4 @@
-import type { CodeMeaning, SourceInfo, SuggestedRates } from '@tora/core';
+import type { CatalogSetEntry, CodeMeaning, SourceInfo, SuggestedRates } from '@tora/core';
 import type {
   CandidateInput,
   FoundSetCard,
@@ -258,6 +258,18 @@ export interface RateSource {
 
 /** Shape every collectors package (public or private) exports from its entry point. */
 /**
+ * A set catalog (S10): a list of sets (name, code, release date, region) for the set picker on
+ * Add and the set-based features (release dates, set lines, box opening). Only the regions the
+ * admin's set categories list are loaded; the collect loads it again when it changes.
+ */
+export interface SetCatalog {
+  /** Stable key (the sets' `source` field says where each one came from). */
+  key: string;
+  label: string;
+  sets(): Promise<CatalogSetEntry[]>;
+}
+
+/**
  * Lists a set's cards of one rarity with their prices, for the box opening value (S20). Run once a
  * week per set by the nightly collect.
  */
@@ -331,4 +343,5 @@ export interface CollectorModule {
   pullRates?: PullRateSource[];
   stores?: StoreDirectory[];
   rankings?: RankingSource[];
+  catalogs?: SetCatalog[];
 }

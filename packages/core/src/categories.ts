@@ -274,6 +274,22 @@ export function missingFields(
     .map((f) => f.key);
 }
 
+/**
+ * The catalog sets the admin's categories use (S10): those of a region a set category lists
+ * (`setCatalog`), and the ones without a region (the same everywhere, e.g. Magic). None when no
+ * category keeps a set catalog (a watches-only setup loads nothing).
+ */
+export function catalogInUse<T extends { region: string | null }>(
+  taxonomy: Taxonomy,
+  sets: T[],
+): T[] {
+  const regions = new Set(
+    taxonomy.categories.filter((c) => c.setCatalog && !c.hidden).flatMap((c) => c.regions ?? []),
+  );
+  const any = taxonomy.categories.some((c) => c.setCatalog && !c.hidden);
+  return any ? sets.filter((s) => s.region === null || regions.has(s.region)) : [];
+}
+
 /** A standard field's or custom field's value type. */
 export const fieldType = (f: FieldDef): FieldType | 'amount' =>
   f.standard ? STANDARD_TYPES[f.key as ProductField] : (f.type ?? 'text');

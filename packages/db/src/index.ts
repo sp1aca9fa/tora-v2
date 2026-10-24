@@ -38,3 +38,4 @@ export * from './opening';
 export * from './stores';
 export * from './accounts';
 export * from './collect-request';
+export * from './catalog';

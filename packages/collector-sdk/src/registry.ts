@@ -21,6 +21,7 @@ import type {
   SetCardSource,
   StoreDirectory,
   RankingSource,
+  SetCatalog,
 } from './types';
 
 /**
@@ -41,6 +42,7 @@ export interface LoadedCollectors {
   pullRates: PullRateSource[];
   stores: StoreDirectory[];
   rankings: RankingSource[];
+  catalogs: SetCatalog[];
   missing: string[];
 }
 
@@ -53,6 +55,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const pullRates: PullRateSource[] = [];
   const stores: StoreDirectory[] = [];
   const rankings: RankingSource[] = [];
+  const catalogs: SetCatalog[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -69,8 +72,20 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     pullRates.push(...(mod.pullRates ?? []));
     stores.push(...(mod.stores ?? []));
     rankings.push(...(mod.rankings ?? []));
+    catalogs.push(...(mod.catalogs ?? []));
   }
-  return { collectors, importers, rates, sources, setCards, pullRates, stores, rankings, missing };
+  return {
+    collectors,
+    importers,
+    rates,
+    sources,
+    setCards,
+    pullRates,
+    stores,
+    rankings,
+    catalogs,
+    missing,
+  };
 }
 
 /**

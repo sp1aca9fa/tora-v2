@@ -293,12 +293,6 @@ importers:
 
   packages/auth: {}
 
-  packages/catalog:
-    dependencies:
-      '@tora/core':
-        specifier: workspace:*
-        version: link:../core
-
   packages/collector-sdk:
     dependencies:
       '@anthropic-ai/sdk':

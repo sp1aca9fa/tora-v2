@@ -182,13 +182,20 @@ in WSL, `"command": "wsl"` and `pnpm ...` in `args`). Tools: `portfolio_summary`
 `product_detail`, `price_history`, `sales`, `watchlist`, `collector_status`, `review_queue`,
 `data_checks` (start here for "does anything look off?") and `query_sql` (one read-only SELECT).
 
-## TCG catalog
+## Set catalogs
 
-`packages/catalog/data/*.json` holds TCG sets with release dates (Pokemon, One Piece, Yu-Gi-Oh!
-OCG, Magic); sealed products are created from a set the first time someone registers one. Only set
-names, codes, types and dates are taken from the official lists, TCGdex, Yugipedia and Scryfall.
+Set lists come from plug-ins (`catalogs` in a plug-in package), like prices. The public package
+ships TCG sets with release dates (`collectors-public/catalog/data/*.json`: Pokemon in Japanese and
+English, One Piece, Yu-Gi-Oh! OCG, Magic); sealed products are created from a set the first time
+someone registers one. Only set names, codes, types and dates are taken from the official lists,
+TCGdex, Yugipedia and Scryfall.
+
+Only what your categories use is loaded: the sets of the regions a set category lists (the TCG
+category's print languages, Settings > Categories), plus sets that are the same everywhere. A
+setup without a set category loads none. The collect loads them again whenever the lists or your
+categories change.
 
 ```bash
 pnpm catalog:fetch [pokemon|one_piece|yugioh|mtg]   # refresh the JSON, review, commit
-pnpm catalog:sync                                   # load into the database
+pnpm catalog:sync                                   # load now instead of at the next collect
 ```

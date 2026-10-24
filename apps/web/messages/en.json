@@ -1352,7 +1352,7 @@
       "title": "Database and Claude",
       "migrate": "Applies new database migrations. Run it right after pushing a change that adds one.",
       "catalogFetch": "Refreshes the TCG set catalog files (then review and commit them).",
-      "catalogSync": "Loads the TCG set catalog into the database.",
+      "catalogSync": "Loads the plug-ins' set lists now (only the regions your set categories use); the collect does it by itself when they change.",
       "mcp": "Lets Claude Code read your data, read-only (sources marked no-AI are left out)."
     }
   },

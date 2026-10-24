@@ -25,7 +25,6 @@ apps/web                 Next.js app (UI, server actions, auth)
 packages/core            Domain logic: categories, sources and markets, valuation, buckets
 packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
-packages/catalog         TCG set catalog: fetch script + JSON data (Pokemon, One Piece, Yu-Gi-Oh!, Magic)
 packages/collector-sdk   Plug-in contract, polite HTTP, `pnpm collect` and the imports
 packages/mcp             Read-only MCP server (Claude reads your data on the home PC)
 collectors-public/       Publishable plug-ins (TCGCSV and eBay prices, ECB exchange rates) and the template

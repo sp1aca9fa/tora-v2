@@ -7,7 +7,8 @@ import type { Db } from './client';
 import { findRepoRoot } from './env';
 import { products, tcgSets } from './schema';
 
-export const CATALOG_DATA_DIR = join(findRepoRoot(), 'packages', 'catalog', 'data');
+/** The public plug-in's set lists (the demo seed and tests read them directly). */
+export const CATALOG_DATA_DIR = join(findRepoRoot(), 'collectors-public', 'catalog', 'data');
 
 export async function loadCatalogFiles(dir = CATALOG_DATA_DIR): Promise<CatalogSetEntry[]> {
   if (!existsSync(dir)) return [];

@@ -1352,7 +1352,7 @@
       "title": "Base de datos y Claude",
       "migrate": "Aplica las migraciones nuevas de la base de datos. Ejecútalo justo después de subir un cambio que añada una.",
       "catalogFetch": "Actualiza los archivos del catálogo de sets TCG (luego revísalos y haz commit).",
-      "catalogSync": "Carga el catálogo de sets TCG en la base de datos.",
+      "catalogSync": "Carga ahora las listas de sets de los plug-ins (solo las regiones que usan tus categorías con sets); la recogida lo hace sola cuando cambian.",
       "mcp": "Deja que Claude Code lea tus datos, solo lectura (las fuentes marcadas sin IA se dejan fuera)."
     }
   },

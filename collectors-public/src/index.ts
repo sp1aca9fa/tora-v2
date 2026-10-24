@@ -1,5 +1,6 @@
 import type { SourceInfo } from '@tora/core';
-import type { Collector, PullRateSource, RateSource } from '@tora/collector-sdk';
+import type { Collector, PullRateSource, RateSource, SetCatalog } from '@tora/collector-sdk';
+import { tcgSets } from './catalog';
 import { ebay as ebayCollector } from './ebay';
 import { frankfurter } from './fx';
 import { pullRateSuggestions } from './pull-rates';
@@ -18,6 +19,8 @@ export const collectors: Collector[] = [
 export const rates: RateSource[] = [frankfurter];
 // Community pull rates for the box opening value (S20).
 export const pullRates: PullRateSource[] = [pullRateSuggestions];
+// Set lists for the set picker and set-based features (loaded per the admin's categories).
+export const catalogs: SetCatalog[] = [tcgSets];
 
 /** eBay's official Browse API: US asking prices. */
 const ebay: SourceInfo = {

@@ -1,6 +1,6 @@
-// `pnpm catalog:fetch [franchise...]`: builds packages/catalog/data/<franchise>.json from public
-// sources. Run occasionally from a dev machine (not Vercel), review the diff, commit, then
-// `pnpm catalog:sync` to load it into the database.
+// `pnpm catalog:fetch [franchise...]`: builds collectors-public/catalog/data/<franchise>.json from public
+// sources. Run occasionally from a dev machine (not Vercel), review the diff, commit; the next
+// collect loads it (only the regions the admin's set categories use; `pnpm catalog:sync` at once).
 //
 // Sources (set names, codes, types and release dates are facts; nothing else is copied):
 //   Pokemon (JP)   Official product list https://www.pokemon-card.com/products/
@@ -14,7 +14,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data');
+const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), 'data');
 const UA = 'tora-catalog/0.1 (personal collection tracker; set list only)';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

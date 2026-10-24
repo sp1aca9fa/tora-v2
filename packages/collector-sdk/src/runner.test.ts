@@ -514,7 +514,7 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   ).user.id;
   expect(
     (await pendingActions(db, admin, null, { admin: true })).filter(
-      (c) => 'product' in c && c.product.id === product.id,
+      (c) => 'product' in c && c.product?.id === product.id,
     ),
   ).toEqual([
     expect.objectContaining({ kind: 'source', source: 'fake', broken: expect.anything() }),

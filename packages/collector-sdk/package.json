@@ -16,7 +16,8 @@
     "demo": "tsx src/cli/demo.ts",
     "import-ai": "tsx src/cli/import-ai.ts",
     "import-uploads": "tsx src/cli/import-uploads.ts",
-    "plugins": "tsx src/cli/plugins.ts"
+    "plugins": "tsx src/cli/plugins.ts",
+    "catalog-sync": "tsx src/cli/catalog-sync.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
