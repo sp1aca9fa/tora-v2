@@ -16,6 +16,7 @@ import { sourceLabels } from '@/lib/sources';
 import { getMoney } from '@/lib/money-server';
 import { ConfirmButton } from '../admin/accounts/account-forms';
 import { CollectWindowForm } from '../collect-window-form';
+import { bucketLabel } from '@/lib/product-display';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.collectors.title') };
@@ -192,7 +193,7 @@ export default async function CollectorSettingsPage() {
                       <ul className="text-xs text-muted-foreground">
                         {h.jumps.map((j) => (
                           <li key={`${j.product.id}-${j.bucket}`}>
-                            {j.product.name} <code>{j.bucket ?? '-'}</code>:{' '}
+                            {j.product.name} ({j.bucket ? bucketLabel(j.bucket, t) : '-'}):{' '}
                             {money(Math.round(j.before))} → {money(Math.round(j.recent))}
                           </li>
                         ))}

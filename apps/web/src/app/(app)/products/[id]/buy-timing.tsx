@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
-import { lineLabel } from '@/lib/product-display';
+import { bucketLabel, lineLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
 
 export const VERDICT_STYLE: Record<string, string> = {
@@ -95,7 +95,9 @@ export async function BuyVerdict({
             {t(`buy.verdict.${verdictKey(j)}`)}
           </span>
           {condition && (
-            <span className="font-mono text-xs font-normal text-muted-foreground">{condition}</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {bucketLabel(condition, t)}
+            </span>
           )}
         </CardTitle>
         {j.zone.top !== null && (

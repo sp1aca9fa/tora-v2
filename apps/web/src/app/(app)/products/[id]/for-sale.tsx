@@ -3,6 +3,7 @@ import { listingsIn, lowestAsk } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
+import { bucketLabel } from '@/lib/product-display';
 import { sourceLabels } from '@/lib/sources';
 
 type Raw = { more?: boolean; lotSize?: number; lotSuspect?: number } | null;
@@ -22,8 +23,9 @@ export async function ForSale({
   /** The buy zone's top in the main condition. */
   zoneTop?: number | null;
 }) {
-  const [t, format, money, sourceLabel] = await Promise.all([
+  const [t, tAll, format, money, sourceLabel] = await Promise.all([
     getTranslations('forSale'),
+    getTranslations(),
     getFormatter(),
     getMoney(),
     sourceLabels(),
@@ -58,8 +60,8 @@ export async function ForSale({
               return (
                 <li key={bucket} className="space-y-1 px-3 py-2.5 text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-mono text-xs">
-                      {bucket || t('anyCondition')}
+                    <span className="text-xs font-medium">
+                      {bucket ? bucketLabel(bucket, tAll) : t('anyCondition')}
                       {bucket === mainBucket && ` · ${t('yours')}`}
                     </span>
                     <span className="text-right">

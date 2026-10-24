@@ -7,6 +7,7 @@ import { Trend } from '@/components/trend';
 import { ValuationMeta } from '@/components/valuation-meta';
 import { ManualPriceForm } from './manual-price-form';
 import { clearManualPriceAction, setManualPriceAction } from './valuation-actions';
+import { bucketLabel } from '@/lib/product-display';
 import { sourceLabels } from '@/lib/sources';
 import { getMoney } from '@/lib/money-server';
 
@@ -26,8 +27,9 @@ export async function ValuationCard({
 }) {
   const money = await getMoney();
   const sourceLabel = await sourceLabels();
-  const [t, format, values] = await Promise.all([
+  const [t, tAll, format, values] = await Promise.all([
     getTranslations('valuation'),
+    getTranslations(),
     getFormatter(),
     valueHoldings(db, userId, [{ holding, product }]),
   ]);
@@ -123,7 +125,7 @@ export async function ValuationCard({
         )}
         {bucket && (
           <p className="text-xs text-muted-foreground">
-            {t('bucket')}: <code>{bucket}</code>
+            {t('bucket')}: {bucketLabel(bucket, tAll)}
           </p>
         )}
         {v.method === 'none' && <p className="text-sm text-muted-foreground">{t('noDataHint')}</p>}

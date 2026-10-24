@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { PriceChart } from '@/components/charts/price-chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
+import { bucketLabel } from '@/lib/product-display';
 import { sourceLabels } from '@/lib/sources';
 import { loadItem, loadSignal } from '../item-data';
 import { MarketCompare, compareBucket } from '../market-compare';
@@ -54,7 +55,7 @@ export default async function MarketPage({ params }: Params) {
         </dl>
         {mainBucket && (
           <p className="text-xs text-muted-foreground">
-            {t('product.market.condition', { condition: mainBucket })}
+            {t('product.market.condition', { condition: bucketLabel(mainBucket, t) })}
           </p>
         )}
       </section>

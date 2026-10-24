@@ -504,6 +504,9 @@
     "damaged": "Damaged",
     "poor": "Poor"
   },
+  "conditionPool": {
+    "fair": "Minor damage or worse"
+  },
   "packaging": {
     "sealed_shrink": "Sealed (shrink)",
     "sealed_no_shrink": "Sealed (no shrink)",

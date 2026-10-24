@@ -28,6 +28,7 @@ import {
 import { setSourceWarningAction } from '../../actions/actions';
 import { getRegistry, marketLabels, sourceLabels } from '@/lib/sources';
 import { getMoney } from '@/lib/money-server';
+import { bucketLabel } from '@/lib/product-display';
 
 /**
  * Where this product's market prices come from: linked listings, matches waiting for
@@ -324,7 +325,7 @@ export async function PriceSources({
               {myRecent.map((o) => (
                 <li key={o.id} className="flex justify-between gap-3 py-1.5">
                   <span className="text-muted-foreground">
-                    {date(o.observedAt)} · <code className="text-xs">{o.bucket ?? '-'}</code>
+                    {date(o.observedAt)} · {o.bucket ? bucketLabel(o.bucket, t) : '-'}
                   </span>
                   <span className="tabular-nums">{money(o.priceBase)}</span>
                 </li>

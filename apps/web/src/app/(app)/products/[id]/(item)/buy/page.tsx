@@ -13,7 +13,7 @@ import { getTranslations } from 'next-intl/server';
 import { PriceChart } from '@/components/charts/price-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { lotConditionLabel } from '@/lib/product-display';
+import { bucketLabel, lotConditionLabel } from '@/lib/product-display';
 import { sourceLabels } from '@/lib/sources';
 import { cn } from '@/lib/utils';
 import { BuyReasons, BuyVerdict, RuleTestCard } from '../../buy-timing';
@@ -75,13 +75,13 @@ export default async function BuyPage({ params, searchParams }: Props) {
                 }
                 aria-current={b === bucket ? 'page' : undefined}
                 className={cn(
-                  'rounded-full border px-2.5 py-1 font-mono text-xs',
+                  'rounded-full border px-2.5 py-1 text-xs',
                   b === bucket
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'text-muted-foreground',
                 )}
               >
-                {b}
+                {bucketLabel(b, t)}
               </Link>
             ))}
           </nav>

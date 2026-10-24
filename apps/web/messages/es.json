@@ -504,6 +504,9 @@
     "damaged": "Dañado",
     "poor": "Malo"
   },
+  "conditionPool": {
+    "fair": "Daños leves o peor"
+  },
   "packaging": {
     "sealed_shrink": "Sellado (con film)",
     "sealed_no_shrink": "Sellado (sin film)",

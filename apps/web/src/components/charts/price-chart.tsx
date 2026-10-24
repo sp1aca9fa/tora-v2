@@ -16,6 +16,7 @@ import { useAmountsHidden } from '@/components/amounts-toggle';
 import { useSourceDisplay } from '@/components/sources-context';
 import { sourceColor, tickMarkFormatter, useChartTheme } from './chart-theme';
 import { useMoney } from '@/components/money-context';
+import { bucketLabel } from '@/lib/product-display';
 
 export interface PriceChartPoint {
   day: string;
@@ -65,6 +66,7 @@ export function PriceChart({
   const money = useMoney();
   const locale = useLocale();
   const t = useTranslations('valuation');
+  const tAll = useTranslations();
   const tg = useTranslations('buy.chart');
   const theme = useChartTheme();
   // Amounts hidden: the lines stay, the yen axis and hover labels go.
@@ -207,13 +209,13 @@ export function PriceChart({
             aria-checked={b === bucket}
             onClick={() => setBucket(b)}
             className={cn(
-              'rounded-full border px-2.5 py-1 font-mono text-xs',
+              'rounded-full border px-2.5 py-1 text-xs',
               b === bucket
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'text-muted-foreground',
             )}
           >
-            {b}
+            {bucketLabel(b, tAll)}
             {b === defaultBucket && ` · ${t('yours')}`}
           </button>
         ))}

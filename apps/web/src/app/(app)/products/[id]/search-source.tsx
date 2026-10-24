@@ -12,6 +12,7 @@ import {
 } from './source-actions';
 import { getRegistry, sourceLabels } from '@/lib/sources';
 import { getMoney } from '@/lib/money-server';
+import { bucketLabel } from '@/lib/product-display';
 
 interface ReferenceInfo {
   name: string;
@@ -112,9 +113,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
             <tbody>
               {summary.map(({ bucket, v, latest }) => (
                 <tr key={bucket}>
-                  <td className="py-1">
-                    <code className="text-xs">{bucket}</code>
-                  </td>
+                  <td className="py-1">{bucketLabel(bucket, t)}</td>
                   <td className="py-1 text-right font-medium tabular-nums">
                     {v.unitBase === null ? '-' : money(v.unitBase)}
                   </td>
@@ -216,12 +215,7 @@ export async function SearchSource({ db, link }: { db: Db; link: ProductSource }
                         {money(s.priceBase)}
                       </span>{' '}
                       · {format.dateTime(new Date(s.observedAt), { dateStyle: 'medium' })}
-                      {s.bucket && (
-                        <>
-                          {' '}
-                          · <code>{s.bucket}</code>
-                        </>
-                      )}
+                      {s.bucket && <> · {bucketLabel(s.bucket, t)}</>}
                       {s.excluded && <> · {t('sources.search.left', { why: why ?? '-' })}</>}
                     </p>
                   </div>

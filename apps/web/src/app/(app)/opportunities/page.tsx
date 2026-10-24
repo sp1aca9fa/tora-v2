@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
-import { franchiseLabel } from '@/lib/product-display';
+import { bucketLabel, franchiseLabel } from '@/lib/product-display';
 import { PlanCard } from './plan-card';
 import { cn } from '@/lib/utils';
 
@@ -207,7 +207,7 @@ export default async function OpportunitiesPage() {
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="line-clamp-2 text-sm leading-snug font-medium">{o.product.name}</p>
             <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-              {o.bucket && <span className="font-mono">{o.bucket}</span>}
+              {o.bucket && <span>{bucketLabel(o.bucket, t)}</span>}
               {o.owned && <span>{t('opportunities.owned')}</span>}
               {o.watching && <span>{t('opportunities.watching')}</span>}
               {!o.product.createdBy && !o.owned && !o.watching && (

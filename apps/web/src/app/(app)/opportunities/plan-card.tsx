@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { savePlanAction } from './actions';
+import { bucketLabel } from '@/lib/product-display';
 
 export interface PlanRow {
   productId: string;
@@ -35,6 +36,7 @@ export function PlanCard({
   today: string;
 }) {
   const t = useTranslations('opportunities');
+  const tAll = useTranslations();
   const money = useMoney();
   const [budget, setBudget] = useState(money.input(savedBudget));
   const [until, setUntil] = useState(savedUntil ?? '');
@@ -147,7 +149,7 @@ export function PlanCard({
                     {r.name}
                   </Link>
                   <p className="text-xs text-muted-foreground">
-                    {r.bucket && <span className="font-mono">{r.bucket} · </span>}
+                    {r.bucket && <span>{bucketLabel(r.bucket, tAll)} · </span>}
                     {r.from.map((f) => t(`plan.fromKind.${f}`)).join(' · ')}
                   </p>
                 </div>

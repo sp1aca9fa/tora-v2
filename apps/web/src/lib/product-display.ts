@@ -72,6 +72,34 @@ export function lotConditionLabel(
   return holding.condition ? t(`condition.${holding.condition}`) : null;
 }
 
+/** Bucket codes of the ready-made lists and the conditions they stand for (see core's bucket.ts). */
+const CONDITION_OF_BUCKET: Record<string, string> = {
+  'cond:new': 'condition.new_unused',
+  'cond:like_new': 'condition.like_new',
+  'cond:good': 'condition.no_noticeable_damage',
+  'cond:fair': 'conditionPool.fair',
+};
+
+/**
+ * A price condition's name for people ("Sealed (shrink)", "PSA 10", "Raw A", the admin's own
+ * values), from its code (`sealed:shrink`, `graded:PSA:10`); an unknown code is shown as is.
+ */
+export function bucketLabel(bucket: string, t: T & { has?: (key: string) => boolean }): string {
+  const [list, ...rest] = bucket.split(':');
+  const value = rest.join(':');
+  if (list === 'graded') {
+    const [grader, grade] = rest;
+    return `${grader === 'OTHER' ? t('common.other') : grader} ${grade}`;
+  }
+  if (list === 'raw') return `Raw ${value}`;
+  const key =
+    CONDITION_OF_BUCKET[bucket] ??
+    (list === 'sealed'
+      ? `packaging.${value === 'shrink' || value === 'no_shrink' ? `sealed_${value}` : value}`
+      : `conditionValue.${list}.${value}`);
+  return !t.has || t.has(key) ? t(key) : bucket;
+}
+
 /** The item's custom fields with a value, shown on its page (S16; not those the admin hides). */
 export function customFieldLines(
   product: Pick<Product, 'category' | 'kind' | 'fields'>,

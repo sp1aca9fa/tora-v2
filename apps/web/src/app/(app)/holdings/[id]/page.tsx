@@ -8,7 +8,7 @@ import { getFormatter, getLocale, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
-import { customFieldLines, productMeta } from '@/lib/product-display';
+import { bucketLabel, customFieldLines, productMeta } from '@/lib/product-display';
 import { BoxCard } from './box-card';
 import { EventList } from './event-list';
 import { TrackingForm } from './tracking-form';
@@ -122,13 +122,7 @@ export default async function HoldingPage({ params }: Params) {
     ]);
     if (holding.certNumber) facts.push([t('fields.certNumber'), holding.certNumber]);
   }
-  if (bucket)
-    facts.push([
-      t('holding.bucket'),
-      <code key="b" className="text-xs">
-        {bucket}
-      </code>,
-    ]);
+  if (bucket) facts.push([t('holding.bucket'), bucketLabel(bucket, t)]);
 
   return (
     // Wide screens: the lot and what to do with it on the left, its value and history on the right.
