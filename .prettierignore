@@ -3,6 +3,7 @@ pnpm-lock.yaml
 node_modules/
 packages/db/drizzle/
 requirements.md
+docs/history.md
 collectors/
 
 # Official license text, kept verbatim
