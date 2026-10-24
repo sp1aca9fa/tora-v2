@@ -2250,7 +2250,9 @@
     "meaning": "意味",
     "areaOf": "{name}(エリア)",
     "tab": {
+      "now": "いま",
       "byStore": "店舗別",
+      "byLocation": "エリア別",
       "posts": "すべての投稿",
       "area": "エリア",
       "codes": "コード",
@@ -2272,13 +2274,20 @@
       "named": "店舗名あり",
       "all": "すべて"
     },
-    "byStoreInfo": "過去{hours}時間の投稿を店舗別に、新しい投稿のある店舗から表示します。届いた順のすべての投稿:",
+    "byStoreInfo": "チェーンの掲示板を投稿どおりに表示し、コードの意味を各投稿の下に添えます。店舗を選ぶとその店舗だけになります。",
     "areaStores": "エリア内({n})",
     "everyStore": "すべての店舗",
     "noRecent": "過去{hours}時間、これらの店舗の投稿はありません。",
     "postCount": "{n}件",
-    "olderPosts": "以前の投稿{n}件",
-    "storeCodesTitle": "店舗ごとのコード"
+    "storeCodesTitle": "店舗ごとのコード",
+    "agoMin": "{n}分前",
+    "agoHours": "{h}時間{m}分前",
+    "nowInfo": "今日の投稿をエリアごとに新しい順で表示します。開くと店舗ごとの投稿が見られます。",
+    "noToday": "今日はまだこれらの店舗の投稿はありません。",
+    "earlier": "それ以前(昨日): {n}エリア",
+    "byLocationInfo": "エリア(とその近くの店舗)の投稿をすべて新しい順で表示します。近いエリアから並びます。",
+    "otherBoards": "その他の掲示板",
+    "allOfChain": "全店舗"
   },
   "accounts": {
     "newTitle": "新しいアカウント",

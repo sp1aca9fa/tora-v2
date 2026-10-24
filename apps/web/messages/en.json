@@ -2250,7 +2250,9 @@
     "meaning": "Meaning",
     "areaOf": "{name} (area)",
     "tab": {
+      "now": "Now",
       "byStore": "By store",
+      "byLocation": "By location",
       "posts": "All posts",
       "area": "Area",
       "codes": "Codes",
@@ -2272,13 +2274,20 @@
       "named": "Naming a store",
       "all": "Everything"
     },
-    "byStoreInfo": "Posts of the last {hours} hours by store, the store with the newest post first. Every post as it came:",
+    "byStoreInfo": "A chain's board as posted, codes spelled out under each post; pick one of its stores to see only that store.",
     "areaStores": "Your area ({n})",
     "everyStore": "Every store",
     "noRecent": "No posts about these stores in the last {hours} hours.",
     "postCount": "{n, plural, one {# post} other {# posts}}",
-    "olderPosts": "{n, plural, one {# older post} other {# older posts}}",
-    "storeCodesTitle": "Each store's codes"
+    "storeCodesTitle": "Each store's codes",
+    "agoMin": "{n} min ago",
+    "agoHours": "{h} h {m} min ago",
+    "nowInfo": "Today's posts by location, the newest first; open one to see each store's posts.",
+    "noToday": "No posts about these stores today yet.",
+    "earlier": "{n, plural, one {Earlier (yesterday): # location} other {Earlier (yesterday): # locations}}",
+    "byLocationInfo": "Every post about a location (an area and the stores near it), newest first; the nearest locations first.",
+    "otherBoards": "Other boards",
+    "allOfChain": "All its stores"
   },
   "accounts": {
     "newTitle": "New account",

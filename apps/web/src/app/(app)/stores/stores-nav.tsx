@@ -7,14 +7,16 @@ import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 const TABS = [
-  ['byStore', '/stores'],
+  ['now', '/stores'],
+  ['byStore', '/stores/by-store'],
+  ['byLocation', '/stores/by-location'],
   ['posts', '/stores/posts'],
   ['area', '/stores/area'],
   ['codes', '/stores/codes'],
   ['feed', '/stores/feed'],
 ] as const;
 
-/** The Stores sub pages (S25): By store, All posts, Area, Codes, Feed. */
+/** The Stores sub pages (S25): Now, By store, By location, All posts, Area, Codes, Feed. */
 export function StoresNav() {
   const t = useTranslations('stores.tab');
   const pathname = usePathname();

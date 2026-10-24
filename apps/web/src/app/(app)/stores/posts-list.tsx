@@ -4,12 +4,12 @@ import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { morePostsAction } from './actions';
-import type { PostView, PostsShown } from './post-views';
+import type { PostView, PostsFilter } from './post-views';
 import { threads } from './threads';
 
 /**
- * One post: the stores it names first (left out under a store's own heading), then who and what,
- * the text, its pictures, and its replies folded.
+ * One post: the stores it names first (left out under a store's own heading), then who, the
+ * text, its codes spelled out, its pictures, and its replies folded.
  */
 export function PostItem({
   post: p,
@@ -34,13 +34,7 @@ export function PostItem({
         )}
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{p.at}</span>
       </div>
-      {((stores && meta) || p.products.length > 0) && (
-        <p className="text-xs text-muted-foreground">
-          {stores && meta}
-          {stores && meta && p.products.length > 0 && ' · '}
-          <span className="text-foreground">{p.products.join(', ')}</span>
-        </p>
-      )}
+      {stores && meta && <p className="text-xs text-muted-foreground">{meta}</p>}
       <p className="text-sm break-words">
         {p.url ? (
           <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
@@ -50,6 +44,16 @@ export function PostItem({
           p.text
         )}
       </p>
+      {p.decoded.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {p.decoded.map((d, i) => (
+            <span key={`${d.code}|${d.meaning}`}>
+              {i > 0 && ' · '}
+              <span className="text-foreground">{d.code}</span> {d.meaning}
+            </span>
+          ))}
+        </p>
+      )}
       {p.images.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
           {p.images.map((src) => (
@@ -86,11 +90,11 @@ export function PostItem({
 export function PostsList({
   initial,
   more: initialMore,
-  show,
+  filter,
 }: {
   initial: PostView[];
   more: boolean;
-  show: PostsShown;
+  filter: PostsFilter;
 }) {
   const t = useTranslations('stores');
   const [posts, setPosts] = useState(initial);
@@ -106,7 +110,7 @@ export function PostsList({
         if (!entry?.isIntersecting || loading) return;
         setLoading(true);
         try {
-          const next = await morePostsAction(posts.length, show);
+          const next = await morePostsAction(posts.length, filter);
           setPosts((had) => [...had, ...next.posts.filter((p) => !had.some((h) => h.id === p.id))]);
           setMore(next.more);
         } finally {
@@ -117,7 +121,7 @@ export function PostsList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [posts.length, more, loading, show]);
+  }, [posts.length, more, loading, filter]);
 
   if (!posts.length) return <p className="text-sm text-muted-foreground">{t('noPosts')}</p>;
   return (

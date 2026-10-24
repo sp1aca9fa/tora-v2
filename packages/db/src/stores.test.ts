@@ -522,4 +522,7 @@ it('pages the posts, newest first, all or those of some stores', async () => {
   const since = toLocalIso(new Date(now.getTime() - 8 * 60_000));
   const recent = await postsPage(db, { offset: 0, limit: 10, since });
   expect(recent.posts.map((p) => p.externalId)).toEqual(['p4', 'p3', 'p2']);
+  const board = await postsPage(db, { offset: 0, limit: 10, chain: 'megastore' });
+  expect(board.posts).toHaveLength(5);
+  expect((await postsPage(db, { offset: 0, limit: 10, chain: null })).posts).toEqual([]);
 });

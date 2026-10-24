@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   activeArea,
   codeIndex,
+  codesInPost,
+  locationsOf,
   distanceKm,
   roundPoint,
   storesInArea,
@@ -127,6 +129,28 @@ it("names a place when no store of the board's chain matched", () => {
   expect(storesInPost('◆■ 30th', list, 'arcade')).toEqual([ekimae]);
   // The board's own store wins over the place.
   expect(storesInPost('キタ 30th', list, 'megastore')).toEqual([kita]);
+});
+
+it('puts each store in the nearest place within 1.5 km, else on its own', () => {
+  const west = { id: 'w', chain: PLACE, name: '新宿', codes: [], lat: 35.6905, lon: 139.6995 };
+  const far = { id: 'f', chain: PLACE, name: '木場', codes: [], lat: 35.67, lon: 139.81 };
+  const at = locationsOf([...all, west, far]);
+  expect(Object.fromEntries(at)).toEqual({ u: 'u', a: 'a', s: 'w', b: 'w', w: 'w', f: 'f' });
+});
+
+it('spells out the codes of a post in the order written, the longer code first', () => {
+  const codes = [
+    { code: '🍐', meaning: 'none' },
+    { code: '🦏🥚', meaning: 'Saitama' },
+    { code: '🥚', meaning: 'Egg town' },
+    { code: 'KTA', meaning: 'Megastore Kita' },
+  ];
+  expect(codesInPost('KTA 🦏🥚 カードセット 🍐 KTA', codes)).toEqual([
+    codes[3],
+    codes[1],
+    codes[0],
+  ]);
+  expect(codesInPost('KTAX', codes)).toEqual([]);
 });
 
 it('lists the codes that are more than the name, with what they stand for', () => {

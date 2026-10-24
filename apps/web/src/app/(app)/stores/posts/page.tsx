@@ -25,7 +25,7 @@ export default async function AllPostsPage({
   const show = asked && SHOWN.includes(asked) ? asked : 'named';
   const [t, first] = await Promise.all([
     getTranslations('stores'),
-    postViews(db, area, { offset: 0, show }),
+    postViews(db, area, { offset: 0, filter: { show } }),
   ]);
   const chip = (active: boolean) =>
     cn(
@@ -53,7 +53,7 @@ export default async function AllPostsPage({
           key={`${show}|${first.posts[0]?.id ?? ''}`}
           initial={first.posts}
           more={first.more}
-          show={show}
+          filter={{ show }}
         />
       </div>
     </section>

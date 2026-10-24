@@ -2250,7 +2250,9 @@
     "meaning": "Significado",
     "areaOf": "{name} (zona)",
     "tab": {
+      "now": "Ahora",
       "byStore": "Por tienda",
+      "byLocation": "Por zona",
       "posts": "Todas las publicaciones",
       "area": "Zona",
       "codes": "Códigos",
@@ -2272,13 +2274,20 @@
       "named": "Nombran una tienda",
       "all": "Todo"
     },
-    "byStoreInfo": "Publicaciones de las últimas {hours} horas por tienda, primero la tienda con la más reciente. Todas las publicaciones según llegaron:",
+    "byStoreInfo": "El tablón de una cadena tal como se publica, con los códigos explicados bajo cada publicación; elige una de sus tiendas para ver solo esa.",
     "areaStores": "Tu zona ({n})",
     "everyStore": "Todas las tiendas",
     "noRecent": "Ninguna publicación sobre estas tiendas en las últimas {hours} horas.",
     "postCount": "{n, plural, one {# publicación} other {# publicaciones}}",
-    "olderPosts": "{n, plural, one {# publicación anterior} other {# publicaciones anteriores}}",
-    "storeCodesTitle": "Códigos de cada tienda"
+    "storeCodesTitle": "Códigos de cada tienda",
+    "agoMin": "hace {n} min",
+    "agoHours": "hace {h} h {m} min",
+    "nowInfo": "Las publicaciones de hoy por zona, primero la más reciente; abre una para ver las de cada tienda.",
+    "noToday": "Aún no hay publicaciones de estas tiendas hoy.",
+    "earlier": "{n, plural, one {Antes (ayer): # zona} other {Antes (ayer): # zonas}}",
+    "byLocationInfo": "Todas las publicaciones de una zona (un área y las tiendas cercanas), primero las más recientes; las zonas más cercanas primero.",
+    "otherBoards": "Otros tablones",
+    "allOfChain": "Todas sus tiendas"
   },
   "accounts": {
     "newTitle": "Cuenta nueva",

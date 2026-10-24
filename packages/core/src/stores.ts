@@ -207,6 +207,57 @@ export function codeIndex<T extends Pick<StoreEntry, 'name' | 'codes'>>(
     .sort((a, b) => b.stores.length - a.stores.length || a.code.localeCompare(b.code));
 }
 
+/** How far a store may be from a place to count as in it (the area "Ekimae" holds its stores). */
+export const LOCATION_KM = 1.5;
+
+/**
+ * Each store's location, by id: the nearest place within `km`, else the store itself (a place
+ * is its own; so is a store without a point).
+ */
+export function locationsOf(
+  stores: (Pick<StoreEntry, 'chain' | 'lat' | 'lon'> & { id: string })[],
+  km = LOCATION_KM,
+): Map<string, string> {
+  const places = stores.filter((s) => s.chain === PLACE && s.lat != null && s.lon != null);
+  const out = new Map<string, string>();
+  for (const s of stores) {
+    let best: { id: string; d: number } | null = null;
+    if (s.chain !== PLACE && s.lat != null && s.lon != null) {
+      for (const p of places) {
+        const d = distanceKm({ lat: s.lat, lon: s.lon }, { lat: p.lat!, lon: p.lon! });
+        if (d <= km && (!best || d < best.d)) best = { id: p.id, d };
+      }
+    }
+    out.set(s.id, best?.id ?? s.id);
+  }
+  return out;
+}
+
+/**
+ * The codes a post uses, spelled out, in the order written: stores' and places' codes (not the
+ * ones that are just their name) and other codes ("🍐": none). A code inside a longer one found
+ * counts once ("🦏🥚" over "🥚").
+ */
+export function codesInPost(text: string, codes: CodeMeaning[]): CodeMeaning[] {
+  const t = norm(text);
+  const found = codes.filter((c) => mentions(t, c.code));
+  const kept = found.filter(
+    (c) =>
+      !found.some(
+        (o) =>
+          o !== c &&
+          norm(o.code).length > norm(c.code).length &&
+          norm(o.code).includes(norm(c.code)),
+      ),
+  );
+  const seen = new Set<string>();
+  return kept
+    .map((c) => ({ c, at: t.indexOf(norm(c.code).trim()) }))
+    .sort((a, b) => a.at - b.at)
+    .map((x) => x.c)
+    .filter((c) => !seen.has(`${c.code}|${c.meaning}`) && seen.add(`${c.code}|${c.meaning}`));
+}
+
 /** Width and emoji variation marks aside, case kept (product codes "b" and "B" differ). */
 const plain = (s: string) => s.normalize('NFKC').replace(/[︎️]/g, '');
 /** What separates the runs of a post (spaces, brackets, punctuation; not the long vowel mark). */

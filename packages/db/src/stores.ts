@@ -1147,12 +1147,20 @@ export async function storesState(db: Db, userId: string) {
 
 /**
  * A page of posts, newest first: only those naming one of `storeIds` when given, any store
- * (`named`), posted since a time (`since`). One more than asked is read, to know whether an older
+ * (`named`), posted since a time (`since`), on a chain's board (`chain`; null: boards mixing
+ * chains). One more than asked is read, to know whether an older
  * page follows (no count of every post).
  */
 export async function postsPage(
   db: Db,
-  opts: { offset: number; limit: number; storeIds?: string[]; named?: boolean; since?: string },
+  opts: {
+    offset: number;
+    limit: number;
+    storeIds?: string[];
+    named?: boolean;
+    since?: string;
+    chain?: string | null;
+  },
 ): Promise<{ posts: StorePost[]; more: boolean }> {
   const ids = opts.storeIds;
   if (ids && !ids.length) return { posts: [], more: false };
@@ -1169,6 +1177,11 @@ export async function postsPage(
           : undefined,
         opts.named ? sql`${storePosts.storeIds} <> '[]'` : undefined,
         opts.since ? gte(storePosts.postedAt, opts.since) : undefined,
+        opts.chain === undefined
+          ? undefined
+          : opts.chain === null
+            ? isNull(storePosts.chain)
+            : eq(storePosts.chain, opts.chain),
       ),
     )
     .orderBy(desc(storePosts.postedAt))
