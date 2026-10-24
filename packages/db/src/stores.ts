@@ -16,7 +16,7 @@ import {
   toLocalIso,
   withinHours,
 } from '@tora/core';
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   type AlertContext,
@@ -1146,12 +1146,13 @@ export async function storesState(db: Db, userId: string) {
 }
 
 /**
- * A page of posts, newest first: only those naming one of `storeIds` when given. One more than
- * asked is read, to know whether an older page follows (no count of every post).
+ * A page of posts, newest first: only those naming one of `storeIds` when given, any store
+ * (`named`), posted since a time (`since`). One more than asked is read, to know whether an older
+ * page follows (no count of every post).
  */
 export async function postsPage(
   db: Db,
-  opts: { offset: number; limit: number; storeIds?: string[] },
+  opts: { offset: number; limit: number; storeIds?: string[]; named?: boolean; since?: string },
 ): Promise<{ posts: StorePost[]; more: boolean }> {
   const ids = opts.storeIds;
   if (ids && !ids.length) return { posts: [], more: false };
@@ -1159,12 +1160,16 @@ export async function postsPage(
     .select()
     .from(storePosts)
     .where(
-      ids
-        ? sql`exists (select 1 from json_each(${storePosts.storeIds}) where value in (${sql.join(
-            ids.map((id) => sql`${id}`),
-            sql`, `,
-          )}))`
-        : undefined,
+      and(
+        ids
+          ? sql`exists (select 1 from json_each(${storePosts.storeIds}) where value in (${sql.join(
+              ids.map((id) => sql`${id}`),
+              sql`, `,
+            )}))`
+          : undefined,
+        opts.named ? sql`${storePosts.storeIds} <> '[]'` : undefined,
+        opts.since ? gte(storePosts.postedAt, opts.since) : undefined,
+      ),
     )
     .orderBy(desc(storePosts.postedAt))
     .limit(opts.limit + 1)

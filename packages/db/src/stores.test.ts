@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { toLocalIso } from '@tora/core';
 import { beforeEach, expect, it } from 'vitest';
 import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
@@ -516,4 +517,9 @@ it('pages the posts, newest first, all or those of some stores', async () => {
   expect([last.posts.map((p) => p.externalId), last.more]).toEqual([['p0'], false]);
   const mine = await postsPage(db, { offset: 0, limit: 10, storeIds: [chuo!.id] });
   expect(mine.posts.map((p) => p.externalId)).toEqual(['p3', 'p1']);
+  const named = await postsPage(db, { offset: 0, limit: 10, named: true });
+  expect(named.posts.map((p) => p.externalId)).toEqual(['p3', 'p1']);
+  const since = toLocalIso(new Date(now.getTime() - 8 * 60_000));
+  const recent = await postsPage(db, { offset: 0, limit: 10, since });
+  expect(recent.posts.map((p) => p.externalId)).toEqual(['p4', 'p3', 'p2']);
 });

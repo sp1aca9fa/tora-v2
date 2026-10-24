@@ -2181,7 +2181,6 @@
     "tokenRenew": "Make a new feed token",
     "tokenOnce": "Copy it now: it is shown only once. The old token stops working.",
     "feedHelp": "A feed (for example a userscript in your own browser on the board page) sends new posts with this token. See docs/store-feeds.md.",
-    "posts": "Latest posts",
     "postsInfo": "Posts about your area's stores first.",
     "noPosts": "No posts yet.",
     "unknownStore": "store not recognised",
@@ -2250,23 +2249,35 @@
     "meaning": "Meaning",
     "areaOf": "{name} (area)",
     "tab": {
-      "posts": "Posts",
-      "feed": "Feed",
-      "area": "Area"
+      "byStore": "By store",
+      "posts": "All posts",
+      "area": "Area",
+      "codes": "Codes",
+      "feed": "Feed"
     },
-    "inYourArea": "{n, plural, one {# store or place} other {# stores and places}} in your area.",
     "feedSettings": "Alerts and token",
     "boardsToWatch": "Boards to watch",
     "watchAll": "All",
     "feedDecides": "Let the feed decide",
     "boardsChosen": "Chosen here: the feed follows at its next visit and says which boards it tracks.",
     "boardsByFeed": "Ticked: what the feed watches now (set in its menu). Changing it here makes Tora's choice win.",
-    "allPosts": "All posts",
-    "areaPosts": "Your area",
     "loading": "Loading...",
     "noMore": "No older posts.",
     "showMore": "Show more",
-    "postsInfoPaged": "Newest first; more load as you scroll."
+    "postsInfoPaged": "Newest first; more load as you scroll.",
+    "replies": "{n, plural, one {# reply} other {# replies}}",
+    "shown": {
+      "area": "Your area",
+      "named": "Naming a store",
+      "all": "Everything"
+    },
+    "byStoreInfo": "Posts of the last {hours} hours by store, the store with the newest post first. Every post as it came:",
+    "areaStores": "Your area ({n})",
+    "everyStore": "Every store",
+    "noRecent": "No posts about these stores in the last {hours} hours.",
+    "postCount": "{n, plural, one {# post} other {# posts}}",
+    "olderPosts": "{n, plural, one {# older post} other {# older posts}}",
+    "storeCodesTitle": "Each store's codes"
   },
   "accounts": {
     "newTitle": "New account",

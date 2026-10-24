@@ -2181,7 +2181,6 @@
     "tokenRenew": "新しいフィード用トークンを作成",
     "tokenOnce": "今コピーしてください:表示は一度だけです。古いトークンは使えなくなります。",
     "feedHelp": "フィード(例:掲示板ページを開いた自分のブラウザのユーザースクリプト)がこのトークンで新しい投稿を送ります。docs/store-feeds.md を参照。",
-    "posts": "最新の投稿",
     "postsInfo": "エリア内の店舗の投稿が先頭。",
     "noPosts": "投稿はまだありません。",
     "unknownStore": "店舗不明",
@@ -2250,23 +2249,35 @@
     "meaning": "意味",
     "areaOf": "{name}(エリア)",
     "tab": {
-      "posts": "投稿",
-      "feed": "フィード",
-      "area": "エリア"
+      "byStore": "店舗別",
+      "posts": "すべての投稿",
+      "area": "エリア",
+      "codes": "コード",
+      "feed": "フィード"
     },
-    "inYourArea": "エリア内の店舗・場所:{n}件。",
     "feedSettings": "通知とトークン",
     "boardsToWatch": "監視する掲示板",
     "watchAll": "すべて",
     "feedDecides": "フィードに任せる",
     "boardsChosen": "ここで選択:フィードは次の訪問で従い、追跡中の掲示板を通知します。",
     "boardsByFeed": "チェック:フィードが現在監視中の掲示板(フィードのメニューで設定)。ここで変更するとToraの選択が優先されます。",
-    "allPosts": "すべての投稿",
-    "areaPosts": "エリア内",
     "loading": "読み込み中...",
     "noMore": "これより古い投稿はありません。",
     "showMore": "さらに表示",
-    "postsInfoPaged": "新しい順。スクロールすると続きを読み込みます。"
+    "postsInfoPaged": "新しい順。スクロールすると続きを読み込みます。",
+    "replies": "返信{n}件",
+    "shown": {
+      "area": "エリア内",
+      "named": "店舗名あり",
+      "all": "すべて"
+    },
+    "byStoreInfo": "過去{hours}時間の投稿を店舗別に、新しい投稿のある店舗から表示します。届いた順のすべての投稿:",
+    "areaStores": "エリア内({n})",
+    "everyStore": "すべての店舗",
+    "noRecent": "過去{hours}時間、これらの店舗の投稿はありません。",
+    "postCount": "{n}件",
+    "olderPosts": "以前の投稿{n}件",
+    "storeCodesTitle": "店舗ごとのコード"
   },
   "accounts": {
     "newTitle": "新しいアカウント",

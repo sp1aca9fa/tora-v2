@@ -13,6 +13,7 @@ import {
   postImageIds,
   postsPage,
   storeCodes,
+  type StorePost,
   storeGlossary,
 } from '@tora/db';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -22,6 +23,11 @@ export const POSTS_BATCH = 20;
 
 export interface PostView {
   id: string;
+  /** The post's key on its board, and the one it answers (a reply). */
+  ref: string;
+  parent: string | null;
+  /** The stores and places it names. */
+  storeIds: string[];
   /** "MM-DD HH:mm". */
   at: string;
   author: string | null;
@@ -39,12 +45,31 @@ export interface PostView {
   images: string[];
 }
 
-/** A batch of posts, newest first (only the area's when asked), ready to show. */
+/** Which posts the All posts list shows: the area's, those naming any store, or every one. */
+export type PostsShown = 'area' | 'named' | 'all';
+
+/** A batch of posts, newest first, ready to show. */
 export async function postViews(
   db: Db,
   area: StoreArea | null,
-  opts: { offset: number; onlyArea: boolean },
+  opts: { offset: number; show: PostsShown },
 ): Promise<{ posts: PostView[]; more: boolean }> {
+  const inArea = storesInArea(area, await cachedStores(db), localDate());
+  const { posts, more } = await postsPage(db, {
+    offset: opts.offset,
+    limit: POSTS_BATCH,
+    storeIds: opts.show === 'area' ? [...inArea] : undefined,
+    named: opts.show === 'named',
+  });
+  return { posts: await toViews(db, area, posts), more };
+}
+
+/** Posts ready to show: the stores they name, their products and pictures. */
+export async function toViews(
+  db: Db,
+  area: StoreArea | null,
+  posts: StorePost[],
+): Promise<PostView[]> {
   const [t, locale, all, glossary] = await Promise.all([
     getTranslations('stores'),
     getLocale(),
@@ -56,39 +81,34 @@ export async function postViews(
     ...glossary.filter((g) => !g.product).map((g) => g.code),
   ];
   const inArea = storesInArea(area, all, localDate());
-  const { posts, more } = await postsPage(db, {
-    offset: opts.offset,
-    limit: POSTS_BATCH,
-    storeIds: opts.onlyArea ? [...inArea] : undefined,
-  });
   const byId = new Map(all.map((s) => [s.id, s]));
   const images = await postImageIds(
     db,
     posts.map((p) => p.id),
   );
-  return {
-    more,
-    posts: posts.map((p) => ({
-      id: p.id,
-      at: p.postedAt.slice(5, 16).replace('T', ' '),
-      author: p.author,
-      names: p.storeIds.flatMap((id) => {
-        const s = byId.get(id);
-        if (!s) return [];
-        // The label in the reader's language, else the name as written.
-        const label = storeLabelIn(s, locale);
-        return [
-          s.chain === PLACE
-            ? t('areaOf', { name: label ?? s.name })
-            : (label ?? [s.chainLabel, s.name].filter(Boolean).join(' ')),
-        ];
-      }),
-      mine: p.storeIds.some((id) => inArea.has(id)),
-      products: productsInPost(p.text, glossary, others).map((g) => g.meaning),
-      reply: !!p.replyTo,
-      text: p.text,
-      url: p.url,
-      images: (images.get(p.id) ?? []).map((id) => `/img/posts/${id}`),
-    })),
-  };
+  return posts.map((p) => ({
+    id: p.id,
+    ref: `${p.source}|${p.externalId}`,
+    parent: p.replyTo ? `${p.source}|${p.replyTo}` : null,
+    storeIds: p.storeIds,
+    at: p.postedAt.slice(5, 16).replace('T', ' '),
+    author: p.author,
+    names: p.storeIds.flatMap((id) => {
+      const s = byId.get(id);
+      if (!s) return [];
+      // The label in the reader's language, else the name as written.
+      const label = storeLabelIn(s, locale);
+      return [
+        s.chain === PLACE
+          ? t('areaOf', { name: label ?? s.name })
+          : (label ?? [s.chainLabel, s.name].filter(Boolean).join(' ')),
+      ];
+    }),
+    mine: p.storeIds.some((id) => inArea.has(id)),
+    products: productsInPost(p.text, glossary, others).map((g) => g.meaning),
+    reply: !!p.replyTo,
+    text: p.text,
+    url: p.url,
+    images: (images.get(p.id) ?? []).map((id) => `/img/posts/${id}`),
+  }));
 }

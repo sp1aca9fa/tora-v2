@@ -42,7 +42,6 @@ export interface StoreView {
   chain: string;
   name: string;
   codes: string[];
-  /** Codes an admin added. */
   /** Added by an admin (can be removed). */
   byHand: boolean;
   region: string | null;
@@ -59,12 +58,10 @@ export function StoreAreaForm({
   stores,
   area: saved,
   today,
-  admin,
 }: {
   stores: StoreView[];
   area: StoreArea | null;
   today: string;
-  admin: boolean;
 }) {
   const t = useTranslations('stores');
   const [area, setArea] = useState<StoreArea>(saved ?? EMPTY);
@@ -373,14 +370,9 @@ export function StoreAreaForm({
                             .join(' · ')}
                         </span>
                       </p>
-                      {admin ? (
-                        <StoreCodes store={s} />
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {t('codes')}: {s.codes.join(', ') || '-'}
-                        </p>
-                      )}
-                      {admin && s.byHand && <RemoveStore id={s.id} />}
+                      <p className="text-xs text-muted-foreground">
+                        {t('codes')}: {s.codes.join(', ') || '-'}
+                      </p>
                     </div>
                   </li>
                 );
@@ -391,6 +383,44 @@ export function StoreAreaForm({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Every store with its codes, to change them (admins); stores added by hand can be removed. */
+export function StoreCodesList({ stores }: { stores: StoreView[] }) {
+  const t = useTranslations('stores');
+  const [filter, setFilter] = useState('');
+  const [shownBy, setShownBy] = useState({ filter, limit: STORES_BATCH });
+  const limit = shownBy.filter === filter ? shownBy.limit : STORES_BATCH;
+  const q = filter.normalize('NFKC').toLowerCase().trim();
+  const shown = stores.filter(
+    (s) =>
+      !q ||
+      [s.name, s.chain, s.region ?? '', ...s.codes].some((x) =>
+        x.normalize('NFKC').toLowerCase().includes(q),
+      ),
+  );
+  return (
+    <div className="space-y-2">
+      <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t('filter')} />
+      <ul className="divide-y text-sm">
+        {shown.slice(0, limit).map((s) => (
+          <li key={s.id} className="py-2">
+            <p>
+              {s.name}{' '}
+              <span className="text-xs text-muted-foreground">
+                {[s.chain, s.region].filter(Boolean).join(' · ')}
+              </span>
+            </p>
+            <StoreCodes key={s.codes.join('|')} store={s} />
+            {s.byHand && <RemoveStore id={s.id} />}
+          </li>
+        ))}
+      </ul>
+      {limit < shown.length && (
+        <ShowMore onShow={() => setShownBy({ filter, limit: limit + STORES_BATCH })} />
+      )}
+    </div>
   );
 }
 

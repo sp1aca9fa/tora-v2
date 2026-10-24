@@ -2181,7 +2181,6 @@
     "tokenRenew": "Crear un token de canal nuevo",
     "tokenOnce": "Cópialo ahora: solo se muestra una vez. El token anterior deja de funcionar.",
     "feedHelp": "Un canal (por ejemplo un userscript en tu propio navegador en la página del tablón) envía las publicaciones nuevas con este token. Ver docs/store-feeds.md.",
-    "posts": "Últimas publicaciones",
     "postsInfo": "Primero las publicaciones sobre las tiendas de tu zona.",
     "noPosts": "Aún no hay publicaciones.",
     "unknownStore": "tienda no reconocida",
@@ -2250,23 +2249,35 @@
     "meaning": "Significado",
     "areaOf": "{name} (zona)",
     "tab": {
-      "posts": "Publicaciones",
-      "feed": "Canal",
-      "area": "Zona"
+      "byStore": "Por tienda",
+      "posts": "Todas las publicaciones",
+      "area": "Zona",
+      "codes": "Códigos",
+      "feed": "Canal"
     },
-    "inYourArea": "{n, plural, one {# tienda o lugar} other {# tiendas y lugares}} en tu zona.",
     "feedSettings": "Alertas y token",
     "boardsToWatch": "Tablones a seguir",
     "watchAll": "Todos",
     "feedDecides": "Que decida el canal",
     "boardsChosen": "Elegido aquí: el canal lo sigue en su próxima visita y dice qué tablones sigue.",
     "boardsByFeed": "Marcado: lo que el canal sigue ahora (fijado en su menú). Cambiarlo aquí hace que gane la elección de Tora.",
-    "allPosts": "Todas las publicaciones",
-    "areaPosts": "Tu zona",
     "loading": "Cargando...",
     "noMore": "No hay publicaciones anteriores.",
     "showMore": "Mostrar más",
-    "postsInfoPaged": "Lo más reciente primero; se cargan más al desplazarte."
+    "postsInfoPaged": "Lo más reciente primero; se cargan más al desplazarte.",
+    "replies": "{n, plural, one {# respuesta} other {# respuestas}}",
+    "shown": {
+      "area": "Tu zona",
+      "named": "Nombran una tienda",
+      "all": "Todo"
+    },
+    "byStoreInfo": "Publicaciones de las últimas {hours} horas por tienda, primero la tienda con la más reciente. Todas las publicaciones según llegaron:",
+    "areaStores": "Tu zona ({n})",
+    "everyStore": "Todas las tiendas",
+    "noRecent": "Ninguna publicación sobre estas tiendas en las últimas {hours} horas.",
+    "postCount": "{n, plural, one {# publicación} other {# publicaciones}}",
+    "olderPosts": "{n, plural, one {# publicación anterior} other {# publicaciones anteriores}}",
+    "storeCodesTitle": "Códigos de cada tienda"
   },
   "accounts": {
     "newTitle": "Cuenta nueva",
