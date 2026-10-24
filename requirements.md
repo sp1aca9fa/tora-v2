@@ -862,7 +862,7 @@ Progress:
 | Stores | 103 / 264 | 35 / 88 | 161 / 312 | 116 / 160 |
 | Settings | 107 / 276 | 42 / 92 | 161 / 312 | 114 / 156 |
 
-  Not measured by : INP and the save times (step 1's other targets), and cold starts on the server; for S15 and the user's check.
+  Not measured by `pnpm perf`: INP and the save times (step 1's other targets), and cold starts on the server; for S15 and the user's check.
 
 Acceptance:
 - Targets met on production and on the large dataset; the baseline and after tables recorded here.
