@@ -34,7 +34,7 @@ export default async function AllPostsPage({
     );
 
   return (
-    <section className="max-w-3xl space-y-3">
+    <section className="space-y-3">
       <AutoRefresh on="post" />
       <p className="text-sm text-muted-foreground">{t('postsInfoPaged')}</p>
       <div className="flex flex-wrap gap-1.5">
