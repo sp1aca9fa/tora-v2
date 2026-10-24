@@ -496,7 +496,11 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   await runCollector(db, collector, night(4));
   expect((await link()).failure).toMatchObject({ nights: 1 });
   await runCollector(db, collector, night(5));
-  expect((await runCollector(db, collector, night(6))).status).toBe('ok');
+  const third = await runCollector(db, collector, night(6));
+  expect(third.status).toBe('ok');
+  expect(third.setAside).toEqual([
+    expect.objectContaining({ error: expect.stringContaining('X1') }),
+  ]);
   expect(await link()).toMatchObject({ active: false, failure: { nights: 3 } });
   const cards = await pendingActions(db, userId);
   expect(cards).toEqual(
@@ -504,6 +508,18 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
       expect.objectContaining({ kind: 'source', source: 'fake', broken: expect.anything() }),
     ]),
   );
+  // An admin who does not hold the item sees only that card for it.
+  const admin = (
+    await createUser(db, 'bob', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
+  ).user.id;
+  expect(
+    (await pendingActions(db, admin, null, { admin: true })).filter(
+      (c) => 'product' in c && c.product.id === product.id,
+    ),
+  ).toEqual([
+    expect.objectContaining({ kind: 'source', source: 'fake', broken: expect.anything() }),
+  ]);
+  expect(await pendingActions(db, admin)).toEqual([]);
   // Linked again: collected as before.
   await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
   expect(await link()).toMatchObject({ active: true, failure: null });

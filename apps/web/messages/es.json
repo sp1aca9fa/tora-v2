@@ -1444,7 +1444,10 @@
     "feedConnected": "Tora: conectado al canal del navegador ({source}), siguiendo estos tablones: {boards}",
     "boardBack": "Tora: el tablón {board} vuelve a dar publicaciones.",
     "boardSilent": "Tora: el tablón {board} no ha dado publicaciones desde {since} (última visita {at}, {posts} publicaciones leídas), mientras el canal funciona: no habrá avisos de él hasta que lo haga.",
-    "updateFailed": "Tora: el servidor no pudo actualizarse a {to} (paso: {step}). Volvió a {from} y sigue funcionando. El registro del servidor: ~/.local/state/tora/update.log"
+    "updateFailed": "Tora: el servidor no pudo actualizarse a {to} (paso: {step}). Volvió a {from} y sigue funcionando. El registro del servidor: ~/.local/state/tora/update.log",
+    "listingsGone": "Tora: {count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}: el sitio dice que la página ya no existe 3 noches seguidas. Esos artículos no reciben precios nuevos de él hasta que alguien enlace su página nueva (Pendientes).",
+    "listingGoneLine": "{source}: {name} ({error})",
+    "summaryGone": "{count, plural, one {# artículo espera} other {# artículos esperan}} un enlace a su página nueva (la anterior ya no existe)"
   },
   "alerts": {
     "title": "Alertas",
@@ -1699,7 +1702,8 @@
       "both": "contraseña y autenticador",
       "password": "contraseña",
       "2fa": "autenticador"
-    }
+    },
+    "listingsGone": "{count, plural, one {# anuncio apartado} other {# anuncios apartados}}: página inexistente 3 noches seguidas"
   },
   "watchlist": {
     "intro": "Artículos que quieres comprar, en el estado que quieres, con el precio de mercado de hoy. Los que están en tu objetivo o por debajo van primero.",

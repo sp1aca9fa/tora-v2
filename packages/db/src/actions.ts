@@ -31,7 +31,12 @@ import {
   sourceCandidates,
 } from './schema';
 import { loadSourceRegistry, readSetting } from './registry';
-import { brokenListings, dismissedSourceWarnings, identityFor } from './sources';
+import {
+  brokenListings,
+  dismissedSourceWarnings,
+  identityFor,
+  productsWithBrokenListings,
+} from './sources';
 import { openSuggestions } from './suggestions';
 
 export interface ListingSuggestion {
@@ -144,7 +149,12 @@ export async function pendingActions(
     dismissedSourceWarnings(db, userId),
   ]);
 
-  const ids = owned.map((o) => o.product.id);
+  // Admins also see listings set aside on items they do not hold (S10): someone must relink them.
+  const ownedIds = new Set(owned.map((o) => o.product.id));
+  const extra = options.admin
+    ? (await productsWithBrokenListings(db)).filter((p) => !ownedIds.has(p.id))
+    : [];
+  const ids = [...ownedIds, ...extra.map((p) => p.id)];
   const [linked, pending] =
     ids.length === 0
       ? [[], []]
@@ -183,7 +193,11 @@ export async function pendingActions(
 
   const items: ActionItem[] = [];
   const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
-  for (const { product, cost, units } of owned) {
+  for (const { product, cost, units } of [
+    ...owned,
+    ...extra.map((product) => ({ product, cost: 0, units: 0 })),
+  ]) {
+    const mine = ownedIds.has(product.id);
     const costBase = Number(cost);
     const identity = identityFor(product, costBase, registry);
     // No identity link yet: the preferred identity source is the one asked for.
@@ -195,13 +209,18 @@ export async function pendingActions(
     // on the item page).
     const bySource = new Map<string, typeof pending>();
     for (const c of pending) {
-      if (c.productId !== product.id || has.has(`${product.id}|${c.source}`) || !shown(c.source))
+      if (
+        !mine ||
+        c.productId !== product.id ||
+        has.has(`${product.id}|${c.source}`) ||
+        !shown(c.source)
+      )
         continue;
       bySource.set(c.source, [...(bySource.get(c.source) ?? []), c]);
     }
     // No identity link: a card even without suggestions, unless the user said not to warn
     // about it.
-    if (main && !dismissed.has(product.id)) {
+    if (main && mine && !dismissed.has(product.id)) {
       bySource.set(main, bySource.get(main) ?? []);
     }
     // The same in the secondary market (S11), as its own notice type.
@@ -212,7 +231,7 @@ export async function pendingActions(
       !abroad.accepted.some((source) => has.has(`${product.id}|${source}`))
         ? abroad.preferred
         : null;
-    if (second && !dismissed.has(product.id)) {
+    if (second && mine && !dismissed.has(product.id)) {
       bySource.set(second, bySource.get(second) ?? []);
     }
     // A listing that stopped working: asks for a new one, whatever its role.

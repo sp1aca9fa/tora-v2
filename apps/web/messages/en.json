@@ -1444,7 +1444,10 @@
     "feedConnected": "Tora: connected to the browser feed ({source}), tracking these boards: {boards}",
     "boardBack": "Tora: the {board} board gives posts again.",
     "boardSilent": "Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.",
-    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log"
+    "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log",
+    "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone 3 nights in a row. Those items get no new prices from it until someone links their new page (Actions).",
+    "listingGoneLine": "{source}: {name} ({error})",
+    "summaryGone": "{count, plural, one {# item waits} other {# items wait}} for a new page link (its old one is gone)"
   },
   "alerts": {
     "title": "Alerts",
@@ -1699,7 +1702,8 @@
       "both": "password and authenticator",
       "password": "password",
       "2fa": "authenticator"
-    }
+    },
+    "listingsGone": "{count, plural, one {# listing set aside} other {# listings set aside}}: page gone 3 nights in a row"
   },
   "watchlist": {
     "intro": "Items you want to buy, in the condition you want, with today's market price. Items at or under your target come first.",

@@ -1444,7 +1444,10 @@
     "feedConnected": "Tora:ブラウザのフィード({source})に接続しました。追跡中の掲示板:{boards}",
     "boardBack": "Tora:{board}掲示板から投稿が再び届いています。",
     "boardSilent": "Tora:{board}掲示板から{since}以降投稿が届いていません(最終訪問 {at}、{posts}件)。フィードは動作中:届くまでこの掲示板の通知はありません。",
-    "updateFailed": "Tora: サーバーを{to}に更新できませんでした（段階: {step}）。{from}に戻して動作を続けています。サーバーのログ: ~/.local/state/tora/update.log"
+    "updateFailed": "Tora: サーバーを{to}に更新できませんでした（段階: {step}）。{from}に戻して動作を続けています。サーバーのログ: ~/.local/state/tora/update.log",
+    "listingsGone": "Tora: {count}件の掲載ページを外しました。サイトが3晩続けて「ページがない」と返しています。新しいページをリンクするまで、これらのアイテムの価格は取得されません（アクション）。",
+    "listingGoneLine": "{source}: {name}（{error}）",
+    "summaryGone": "新しいページのリンク待ちのアイテム: {count}件（以前のページは削除済み）"
   },
   "alerts": {
     "title": "アラート",
@@ -1699,7 +1702,8 @@
       "both": "パスワードと認証アプリ",
       "password": "パスワード",
       "2fa": "認証アプリ"
-    }
+    },
+    "listingsGone": "{count}件の掲載ページを外しました: 3晩続けてページなし"
   },
   "watchlist": {
     "intro": "買いたい商品を、欲しい状態で、今日の相場とともに一覧に。目標価格以下のものが先頭に来ます。",

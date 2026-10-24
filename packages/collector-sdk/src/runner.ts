@@ -70,6 +70,8 @@ export interface RunSummary {
   candidates: number;
   observationsAdded: number;
   errors: string[];
+  /** Listings set aside this run, their page gone night after night (S10: admins are told). */
+  setAside: { productId: string; name: string; error: string }[];
 }
 
 /** The closest two requests to one site may be. */
@@ -153,6 +155,7 @@ export async function runCollector(
     candidates: 0,
     observationsAdded: 0,
     errors: [],
+    setAside: [],
   };
   const fail = (what: string, e: unknown) => {
     summary.errors.push(`${what}: ${errorText(e)}`);
@@ -327,11 +330,16 @@ export async function runCollector(
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
           // A listing failing night after night is set aside (its item asks for a new link on
           // Actions), so a run is not partial forever over a page that is gone.
-          if (listingGone(e) && (await recordListingFailure(db, listing, errorText(e), now)))
+          if (listingGone(e) && (await recordListingFailure(db, listing, errorText(e), now))) {
             log(
               `collect "${product.name}": failed ${LISTING_BROKEN_NIGHTS} nights in a row, set aside until relinked (${errorText(e)})`,
             );
-          else fail(`collect ${product.name}`, e);
+            summary.setAside.push({
+              productId: product.id,
+              name: product.name,
+              error: errorText(e),
+            });
+          } else fail(`collect ${product.name}`, e);
         }
       }
       // Older history with the requests left once every listing had its new sales; running out

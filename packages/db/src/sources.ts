@@ -606,6 +606,21 @@ export async function recordListingFailure(
   return broken;
 }
 
+/** Items with a listing set aside as broken (S10: admins relink them even when not held). */
+export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
+  const rows = await db
+    .selectDistinct({ product: products })
+    .from(productSources)
+    .innerJoin(products, eq(products.id, productSources.productId))
+    .where(
+      and(
+        eq(productSources.active, false),
+        sql`json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL`,
+      ),
+    );
+  return rows.map((r) => r.product);
+}
+
 /**
  * Listings set aside as broken, per item (`productId|source`), where the item has no other
  * active listing of that source.

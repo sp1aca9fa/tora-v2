@@ -116,6 +116,8 @@ if (values.market && selected.length === 0) {
 let exitCode = 0;
 // Each collector's result, for the activity log (S17).
 const results: { source: string; status: string; requests: number; observations: number }[] = [];
+// Listings set aside tonight (their page gone night after night): admins are told (S10).
+const setAside: { source: string; productId: string; name: string; error: string }[] = [];
 const withLinks = !values.product && importers.some((i) => i.readLink);
 // A run per market keeps the rates, purchase links and uploads (each does only what is waiting).
 const withRates = !values.product && !values.source && rates.length > 0;
@@ -231,6 +233,7 @@ for (const collector of selected) {
     requests: s.requests,
     observations: s.observationsAdded,
   });
+  for (const l of s.setAside) setAside.push({ source: s.source, ...l });
 }
 if (withOpening) {
   progress.next('box opening cards');
@@ -404,5 +407,13 @@ await recordActivity(db, {
   },
   href: '/settings/collectors',
 });
+if (setAside.length)
+  await recordActivity(db, {
+    kind: 'check',
+    action: 'listings_gone',
+    level: 'problem',
+    detail: { listings: setAside },
+    href: '/actions',
+  });
 await saveUsage(db);
 process.exit(exitCode);

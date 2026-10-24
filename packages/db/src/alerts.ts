@@ -53,6 +53,7 @@ import {
   users,
   watches,
 } from './schema';
+import { productsWithBrokenListings } from './sources';
 import { latestSignals } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
@@ -515,7 +516,12 @@ function failureCard(
   } else if (entry.kind === 'backup') {
     lines.push(fill(t.backupFailed!, { error: String(d.error ?? '') }));
   } else if (entry.kind === 'check') {
-    if (entry.action === 'self_check') {
+    if (entry.action === 'listings_gone') {
+      const listings = (d.listings as { source: string; name: string; error: string }[]) ?? [];
+      lines.push(fill(t.listingsGone!, { count: listings.length }));
+      for (const l of listings.slice(0, 20))
+        lines.push(fill(t.listingGoneLine!, { source: l.source, name: l.name, error: l.error }));
+    } else if (entry.action === 'self_check') {
       lines.push(fill(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'db_budget') {
       const millions = (n: unknown) => (Number(n ?? 0) / 1e6).toFixed(1);
@@ -554,7 +560,8 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     )
   )
     .flat()
-    .filter((e) => e.level === 'failed');
+    // Listings set aside are not a failure of the run, but someone must relink them (S10).
+    .filter((e) => e.level === 'failed' || e.action === 'listings_gone');
   if (entries.length === 0) return 0;
   const today = localDate();
   const sentToday = (await readSetting<Record<string, string>>(db, 'alertsSentToday')) ?? {};
@@ -788,6 +795,15 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         cards.push({
           text: fill(t.summaryActions!, { count }),
           role: 'info',
+          url: linkUrl(base, '/actions'),
+        });
+      }
+      // Admins: items whose page is gone, until someone links a new one (S10).
+      const gone = user.role === 'admin' ? (await productsWithBrokenListings(db)).length : 0;
+      if (gone) {
+        cards.push({
+          text: fill(t.summaryGone!, { count: gone }),
+          role: 'warning',
           url: linkUrl(base, '/actions'),
         });
       }

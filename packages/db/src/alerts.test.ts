@@ -77,6 +77,8 @@ const TEXTS: Record<string, Record<string, string>> = {
     test: 'test',
     connected: 'connected',
     collectFailed: 'collect failed',
+    listingsGone: '{count} set aside',
+    listingGoneLine: '{source}: {name}',
     collectStopped: 'collect stopped {code}',
     sourceLine: '{source}: {status}',
     status_failed: 'failed',
@@ -155,6 +157,19 @@ it('sends a failed run to admins once a day, never to members', async () => {
   expect(sent).toHaveLength(1);
   const entries = await db.select().from(activity);
   expect(entries.every((e) => e.alertedAt)).toBe(true);
+});
+
+it('tells admins about listings set aside, though the run did not fail', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const since = toLocalIso(new Date(Date.now() - 60_000));
+  await recordActivity(db, {
+    kind: 'check',
+    action: 'listings_gone',
+    level: 'problem',
+    detail: { listings: [{ source: 'snkrdunk', productId: 'p1', name: 'Box', error: 'HTTP 404' }] },
+  });
+  expect(await alertFailures(db, ctx, since)).toBe(1);
+  expect(sent.at(-1)!.text).toBe('1 set aside\nsnkrdunk: Box');
 });
 
 it('says so when nothing ran for over a day, once', async () => {
