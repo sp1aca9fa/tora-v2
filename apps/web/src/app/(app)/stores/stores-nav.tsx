@@ -42,8 +42,9 @@ export function StoresNav() {
 }
 
 /**
- * Reloads the page when what it shows changed: asks every 20 s for the newest post (`post`) or
- * the feed's last push (`feed`), a few rows read, and refreshes only on a change.
+ * Reloads the page when what it shows changed: asks every 20 s, and at once when the page is
+ * looked at again (back to the tab, phone unlocked), for the newest post (`post`) or the feed's
+ * last push (`feed`), a few rows read, and refreshes only on a change.
  */
 export function AutoRefresh({ on }: { on: 'post' | 'feed' }) {
   const router = useRouter();
@@ -64,7 +65,11 @@ export function AutoRefresh({ on }: { on: 'post' | 'feed' }) {
     };
     void check();
     const timer = setInterval(check, 20_000);
-    return () => clearInterval(timer);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
   }, [router, on]);
   return null;
 }

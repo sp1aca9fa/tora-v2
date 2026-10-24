@@ -1135,10 +1135,12 @@ export async function boardsToWatch(db: Db, userId: string): Promise<string[] | 
  */
 export async function storesState(db: Db, userId: string) {
   const [[post], [token]] = await Promise.all([
+    // When the last post arrived (a push's time to the millisecond): posts carry only the minute
+    // they were posted, so a second post in the same minute would go unnoticed.
     db
-      .select({ at: storePosts.postedAt })
+      .select({ at: storePosts.receivedAt })
       .from(storePosts)
-      .orderBy(desc(storePosts.postedAt))
+      .orderBy(desc(storePosts.receivedAt))
       .limit(1),
     db.select({ at: feedTokens.lastSeenAt }).from(feedTokens).where(eq(feedTokens.userId, userId)),
   ]);
