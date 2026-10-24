@@ -827,7 +827,7 @@ A copy of the analysis database with eBay rows, alert channels and devices remov
 9. Changing the base currency (S16) left amounts of tables added later in the old currency: watch targets, shops' asks, imported rows, the saved daily numbers (the sharp-drop alert would have compared old with new), buy plan budgets and data review evidence. Now converted too.
 10. The backup read 2,000 rows per request from every table, the store post pictures too (up to 8 MB each): tables holding files are read 10 rows at a time.
 11. The store directory's admin changes (stores added or removed, store codes, code meanings; S25) were missing from the Activity log: recorded now.
-Chapters checked against the code: S8, S11, S16, S6, S17.
+Chapters checked against the code (2026-10-24): S8, S11, S16, S6, S17, S9, S19, S22-S25, S20, S21, S13; what they say is built matches the code and its numbers, apart from fixes 9-11. Next: D, the risks and efficiency write-up.
 Noted for later: Opportunities numbers come from the last collect while other pages are live, so they drift within a day.
 
 ### Part C: the Spain + Brazil setup (2026-10-23)
