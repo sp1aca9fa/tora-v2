@@ -43,7 +43,7 @@ export default async function StoreCodesPage() {
               <tbody>
                 {codes.map((c) => (
                   <tr key={c.code} className="border-t align-top">
-                    <td className="py-1.5 pr-3 whitespace-nowrap">{c.code}</td>
+                    <td className="w-px py-1.5 pr-3 whitespace-nowrap">{c.code}</td>
                     <td className="py-1.5 text-xs text-muted-foreground">
                       {c.stores.map(label).join(', ')}
                     </td>
@@ -63,7 +63,7 @@ export default async function StoreCodesPage() {
                   <tbody>
                     {products.map((g) => (
                       <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
-                        <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                        <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
                         <td className="py-1.5 text-xs text-muted-foreground">
                           {g.meaning}
                           {!g.byHand && ` · ${t('fromFeed')}`}
@@ -87,7 +87,7 @@ export default async function StoreCodesPage() {
                 <tbody>
                   {glossary.map((g) => (
                     <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
-                      <td className="py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                      <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
                       <td className="py-1.5 text-xs text-muted-foreground">{g.meaning}</td>
                       <td className="py-1.5 text-right">
                         {admin && g.byHand && <RemoveGlossary code={g.code} />}

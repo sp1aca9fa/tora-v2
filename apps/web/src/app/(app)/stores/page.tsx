@@ -104,13 +104,13 @@ export default async function ByStorePage({
                   !inArea.has(id) && 'opacity-80',
                 )}
               >
-                <header className="flex items-baseline justify-between gap-3 border-b pb-2">
-                  <h2 className="min-w-0 font-semibold">
-                    {name}{' '}
-                    <span className="text-xs font-normal text-muted-foreground">
+                <header className="flex items-start justify-between gap-3 border-b pb-2">
+                  <div className="min-w-0">
+                    <h2 className="font-semibold">{name}</h2>
+                    <p className="text-xs text-muted-foreground">
                       {[chain, s.region].filter(Boolean).join(' · ')}
-                    </span>
-                  </h2>
+                    </p>
+                  </div>
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                     {t('postCount', { n: list.length })} · {latest.at}
                   </span>
