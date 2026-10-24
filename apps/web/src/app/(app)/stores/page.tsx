@@ -1,19 +1,16 @@
-import { localDate, toLocalIso } from '@tora/core';
 import { postsPage } from '@tora/db';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { areaLocations } from './locations';
+import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
 
-/** A day of posts starts at this hour (a late night's posts belong to the day before). */
-const DAY_STARTS = '05:00';
 /** Posts read at most (two busy days stay well under). */
 const MAX_POSTS = 1000;
 
@@ -40,13 +37,7 @@ export default async function NowPage({
     areaLocations(db, area),
   ]);
   const { byId, inArea, locationOf, locations } = places;
-  // Today from 5:00 in the app's time zone (before 5:00, still yesterday's day).
-  const now = new Date();
-  const offset = toLocalIso(now).slice(-6);
-  const startOf = (date: string) => toLocalIso(new Date(`${date}T${DAY_STARTS}:00${offset}`));
-  let today = startOf(localDate(now));
-  if (toLocalIso(now) < today) today = startOf(localDate(new Date(now.getTime() - 86_400_000)));
-  const since = toLocalIso(new Date(Date.parse(today) - 86_400_000));
+  const { today, yesterday: since } = postDays();
   const { posts } = await postsPage(db, {
     offset: 0,
     limit: MAX_POSTS,

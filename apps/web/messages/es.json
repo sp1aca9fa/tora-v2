@@ -2285,9 +2285,10 @@
     "nowInfo": "Las publicaciones de hoy por zona, primero la más reciente; abre una para ver las de cada tienda.",
     "noToday": "Aún no hay publicaciones de estas tiendas hoy.",
     "earlier": "{n, plural, one {Antes (ayer): # zona} other {Antes (ayer): # zonas}}",
-    "byLocationInfo": "Todas las publicaciones de una zona (un área y las tiendas cercanas), primero las más recientes; las zonas más cercanas primero.",
+    "byLocationInfo": "Zonas de tu área con publicaciones desde ayer (5:00), las más cercanas primero, con cuántas; elige una para ver sus publicaciones, primero las más recientes.",
     "otherBoards": "Otros tablones",
-    "allOfChain": "Todas sus tiendas"
+    "allOfChain": "Todas sus tiendas",
+    "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}"
   },
   "accounts": {
     "newTitle": "Cuenta nueva",

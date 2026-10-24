@@ -2285,9 +2285,10 @@
     "nowInfo": "Today's posts by location, the newest first; open one to see each store's posts.",
     "noToday": "No posts about these stores today yet.",
     "earlier": "{n, plural, one {Earlier (yesterday): # location} other {Earlier (yesterday): # locations}}",
-    "byLocationInfo": "Every post about a location (an area and the stores near it), newest first; the nearest locations first.",
+    "byLocationInfo": "Locations of your area with posts since yesterday (5:00), nearest first, with how many; open one to see its posts, newest first.",
     "otherBoards": "Other boards",
-    "allOfChain": "All its stores"
+    "allOfChain": "All its stores",
+    "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}"
   },
   "accounts": {
     "newTitle": "New account",
