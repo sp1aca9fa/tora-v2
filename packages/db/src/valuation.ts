@@ -1344,7 +1344,12 @@ interface SavedMarketMovers {
 }
 const MARKET_MOVERS_KEY = 'marketMovers';
 
-type MoverLot = { holding: Holding; product: Product; days: Record<string, DayValue> };
+/** A lot with its values by day (only the value, `[0]`, is read). */
+type MoverLot = {
+  holding: Holding;
+  product: Product;
+  days: Record<string, Pick<DayValue, 0>>;
+};
 
 /** Items worth under ¥1,000 then, and items that did not move, are left out (noise). */
 function finishMovers(list: Mover[]): Mover[] {
@@ -1406,42 +1411,70 @@ export async function moversByPeriod(
   const mine = new Map<number, Mover[]>();
   const market = new Map<number, Mover[]>();
   const saved = await readSetting<SavedMarketMovers>(db, MARKET_MOVERS_KEY);
-  const lots = await db
-    .select({ holding: holdings, product: products, days: holdingValues.days })
-    .from(holdings)
-    .innerJoin(products, eq(products.id, holdings.productId))
-    .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
-    .where(
-      and(
-        eq(holdings.userId, userId),
-        eq(holdings.status, 'owned'),
-        eq(holdings.countInValue, true),
-      ),
-    );
+  const counted = and(
+    eq(holdings.userId, userId),
+    eq(holdings.status, 'owned'),
+    eq(holdings.countInValue, true),
+  );
+  // Before the first snapshot run saved its movers: the lots' latest day.
   const day =
     saved?.day ??
-    lots
-      .flatMap((l) => Object.keys(l.days))
-      .sort()
-      .at(-1);
+    (
+      await db
+        .select({ day: sql<string | null>`max(j.key)` })
+        .from(holdings)
+        .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
+        .innerJoin(sql`json_each(${holdingValues.days}) j`, sql`1`)
+        .where(counted)
+    )[0]?.day;
   if (!day) return { mine, market };
-  for (const days of periods) {
-    const own = new Map<string, Mover>();
-    for (const lot of bothDays(lots, day, days)) {
-      const m = own.get(lot.product.id) ?? {
-        product: lot.product,
-        nowBase: 0,
-        thenBase: 0,
-        changeBase: 0,
-        pct: 0,
-      };
-      m.nowBase += lot.now;
-      m.thenBase += lot.before;
-      own.set(lot.product.id, m);
+  // Only the days compared are read out of each lot's history (a year of days per lot).
+  const wanted = [day, ...periods.map((days) => daysBefore(day, days))];
+  const rows = await db
+    .select({
+      productId: holdings.productId,
+      // Several paths: the history is parsed once, the values come back as a JSON array.
+      values: sql<string>`json_extract(${holdingValues.days}, ${sql.join(
+        wanted.map((d) => sql`${`$."${d}"[0]`}`),
+        sql`, `,
+      )})`,
+    })
+    .from(holdings)
+    .innerJoin(holdingValues, eq(holdingValues.holdingId, holdings.id))
+    .where(counted);
+  const lots = rows.map((r) => ({
+    productId: r.productId,
+    value: JSON.parse(r.values) as (number | null)[],
+  }));
+  // Per item and period, the same lots' values on both days; whole items read for the movers.
+  const sums = periods.map((_, p) => {
+    const own = new Map<string, { nowBase: number; thenBase: number }>();
+    for (const { productId, value } of lots) {
+      const now = value[0];
+      const before = value[p + 1];
+      if (now == null || before == null) continue;
+      const m = own.get(productId) ?? { nowBase: 0, thenBase: 0 };
+      m.nowBase += now;
+      m.thenBase += before;
+      own.set(productId, m);
     }
-    mine.set(days, finishMovers([...own.values()]));
+    return own;
+  });
+  const ids = [...new Set(sums.flatMap((own) => [...own.keys()]))];
+  const items = new Map(
+    (ids.length ? await db.select().from(products).where(inArray(products.id, ids)) : []).map(
+      (p) => [p.id, p],
+    ),
+  );
+  periods.forEach((days, p) => {
+    mine.set(
+      days,
+      finishMovers(
+        [...sums[p]!].map(([id, m]) => ({ product: items.get(id)!, ...m, changeBase: 0, pct: 0 })),
+      ),
+    );
     market.set(days, saved?.movers[days] ?? []);
-  }
+  });
   return { mine, market };
 }
 

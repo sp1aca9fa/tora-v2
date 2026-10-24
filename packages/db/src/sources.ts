@@ -624,23 +624,12 @@ export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
 
 /**
  * Listings set aside as broken, per item (`productId|source`), where the item has no other
- * active listing of that source.
+ * active listing of that source; from the items' listings (all of them, active or not).
  */
-export async function brokenListings(
-  db: Db,
-  productIds: string[],
-): Promise<Map<string, ListingFailure>> {
+export function brokenListings(
+  rows: Pick<ProductSource, 'productId' | 'source' | 'active' | 'failure'>[],
+): Map<string, ListingFailure> {
   const out = new Map<string, ListingFailure>();
-  if (productIds.length === 0) return out;
-  const rows = await db
-    .select({
-      productId: productSources.productId,
-      source: productSources.source,
-      active: productSources.active,
-      failure: productSources.failure,
-    })
-    .from(productSources)
-    .where(inArray(productSources.productId, productIds));
   const linked = new Set(rows.filter((r) => r.active).map((r) => `${r.productId}|${r.source}`));
   for (const r of rows) {
     const key = `${r.productId}|${r.source}`;

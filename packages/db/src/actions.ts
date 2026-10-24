@@ -99,9 +99,16 @@ export async function pendingActions(
   const levels = noticeLevelsFor(chosen);
   const level = (type: NoticeType) => levels[type];
   const [owned, lots, toReview, failedLinks, dataReview, dismissed] = await Promise.all([
+    // What the identity check needs of every owned item; whole rows only for items with a card
+    // (read below): the nav badge counts these on every page.
     db
       .select({
-        product: products,
+        product: {
+          id: products.id,
+          category: products.category,
+          kind: products.kind,
+          itemType: products.itemType,
+        },
         cost: sql<number>`sum(${holdings.costTotalBase})`,
         units: sql<number>`sum(${holdings.quantity})`,
       })
@@ -155,14 +162,19 @@ export async function pendingActions(
     ? (await productsWithBrokenListings(db)).filter((p) => !ownedIds.has(p.id))
     : [];
   const ids = [...ownedIds, ...extra.map((p) => p.id)];
-  const [linked, pending] =
+  const [listings, pending] =
     ids.length === 0
       ? [[], []]
       : await Promise.all([
           db
-            .select({ productId: productSources.productId, source: productSources.source })
+            .select({
+              productId: productSources.productId,
+              source: productSources.source,
+              active: productSources.active,
+              failure: productSources.failure,
+            })
             .from(productSources)
-            .where(and(inArray(productSources.productId, ids), eq(productSources.active, true))),
+            .where(inArray(productSources.productId, ids)),
           db
             .select()
             .from(sourceCandidates)
@@ -170,8 +182,8 @@ export async function pendingActions(
               and(inArray(sourceCandidates.productId, ids), eq(sourceCandidates.status, 'pending')),
             ),
         ]);
-  const has = new Set(linked.map((l) => `${l.productId}|${l.source}`));
-  const broken = await brokenListings(db, ids);
+  const has = new Set(listings.filter((l) => l.active).map((l) => `${l.productId}|${l.source}`));
+  const broken = brokenListings(listings);
   const registry = await loadSourceRegistry(db);
   const known = await linkedListingImages(
     db,
@@ -192,7 +204,9 @@ export async function pendingActions(
   };
 
   const items: ActionItem[] = [];
-  const sourceItems: Extract<ActionItem, { kind: 'source' }>[] = [];
+  const sourceItems: (Omit<Extract<ActionItem, { kind: 'source' }>, 'product'> & {
+    product: { id: string };
+  })[] = [];
   for (const { product, cost, units } of [
     ...owned,
     ...extra.map((product) => ({ product, cost: 0, units: 0 })),
@@ -277,7 +291,18 @@ export async function pendingActions(
       });
     }
   }
-  items.push(...sourceItems);
+  const whole = new Map(
+    [
+      ...extra,
+      ...(sourceItems.length
+        ? await db
+            .select()
+            .from(products)
+            .where(inArray(products.id, [...new Set(sourceItems.map((i) => i.product.id))]))
+        : []),
+    ].map((p) => [p.id, p]),
+  );
+  items.push(...sourceItems.map((i) => ({ ...i, product: whole.get(i.product.id)! })));
   for (const { holding, product } of lots) {
     const type: NoticeType = product.category === 'tcg' ? 'card_grade' : 'game_condition';
     items.push({
