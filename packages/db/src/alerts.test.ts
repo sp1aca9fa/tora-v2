@@ -15,6 +15,8 @@ import {
   checkMissedRuns,
   morningCheck,
   connectTelegram,
+  listAlertLog,
+  pruneAlertLog,
   sendSummaries,
   sendWatchAlerts,
   setTelegramBot,
@@ -26,7 +28,7 @@ import { finishImportRun, saveImportRows, startImportRun } from './imports';
 import { migrateDb } from './migrate';
 import { saveSetting, saveSourceInfos } from './registry';
 import { createProduct } from './mutations';
-import { activity, alertChannels, signals, supply, watches } from './schema';
+import { activity, alertChannels, alertLog, signals, supply, watches } from './schema';
 import { addWatch } from './watches';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -354,4 +356,39 @@ it("logs a server's own events, and tells admins only when asked", async () => {
       ['failed', { event: 'Address down', text: 'check its network' }],
     ]),
   );
+});
+
+it('keeps a history of every delivery, per channel, with filters', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  await setTelegramBot(db, '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ', SECRET, fakeFetch);
+  telegramUpdates = [
+    {
+      message: { text: `/start ${telegramCode(admin, SECRET)}`, chat: { id: 42, username: 'me' } },
+    },
+  ];
+  await connectTelegram(db, admin, ctx);
+  await recordActivity(db, { kind: 'backup', level: 'failed', detail: { error: 'disk full' } });
+  failDiscord = true;
+  await alertFailures(db, ctx, toLocalIso(new Date(Date.now() - 60_000)));
+
+  const all = await listAlertLog(db, admin, { kind: 'admin' });
+  expect(all.map((e) => [e.channelKind, e.status])).toEqual(
+    expect.arrayContaining([
+      ['discord', 'failed'],
+      ['telegram', 'sent'],
+    ]),
+  );
+  expect(all.find((e) => e.channelKind === 'telegram')!.text).toContain('backup failed: disk full');
+  expect(all.find((e) => e.status === 'failed')!.error).toMatch(/404/);
+  expect(await listAlertLog(db, admin, { channel: 'discord', status: 'sent' })).toEqual([]);
+  expect(await listAlertLog(db, member)).toEqual([]);
+  const today = toLocalIso().slice(0, 10);
+  expect(await listAlertLog(db, admin, { from: today, to: today, kind: 'admin' })).toHaveLength(2);
+  expect(await listAlertLog(db, admin, { to: '2020-01-01' })).toEqual([]);
+
+  // Removing a channel keeps its history; old rows go after 180 days.
+  await db.delete(alertChannels);
+  expect((await listAlertLog(db, admin, { kind: 'admin' }))[0]!.channelId).toBeNull();
+  expect(await pruneAlertLog(db, new Date(Date.now() + 181 * 86_400_000))).toBeGreaterThan(0);
+  expect(await db.select().from(alertLog)).toEqual([]);
 });

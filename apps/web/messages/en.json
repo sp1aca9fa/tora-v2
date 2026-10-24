@@ -390,6 +390,10 @@
         "title": "Message style",
         "info": "How each kind of message looks on Discord and Telegram, and its wording."
       },
+      "alertHistory": {
+        "title": "Alert history",
+        "info": "Every alert Tora sent you, on which channel, and whether it arrived."
+      },
       "schedule": {
         "title": "Schedule",
         "info": "When the collectors and the other timers run."
@@ -1559,6 +1563,30 @@
     "sent": "Sent to {count, plural, one {# channel} other {# channels}} (as saved).",
     "noChannels": "No channel to send to (Alerts).",
     "error": "Could not do that."
+  },
+  "alertHistory": {
+    "title": "Alert history",
+    "info": "Every message Tora sent you on Telegram or Discord, newest first, as plain text. Kept {days} days.",
+    "kind": "Kind",
+    "channel": "Channel",
+    "status": "Outcome",
+    "from": "From",
+    "to": "To",
+    "all": "All",
+    "apply": "Filter",
+    "clear": "Clear",
+    "statusName": {
+      "sent": "Sent",
+      "failed": "Failed"
+    },
+    "message": "Message",
+    "via": "via {channel} {label}",
+    "removed": "channel removed",
+    "error": "Error: {error}",
+    "empty": "No alert sent yet.",
+    "noMatch": "No alert matches these filters.",
+    "older": "Older",
+    "newest": "Newest"
   },
   "schedule": {
     "title": "Schedule",

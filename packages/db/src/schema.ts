@@ -1037,6 +1037,39 @@ export const alertChannels = sqliteTable(
   ],
 );
 
+export const ALERT_LOG_STATUSES = ['sent', 'failed'] as const;
+export type AlertLogStatus = (typeof ALERT_LOG_STATUSES)[number];
+
+/**
+ * Every alert delivery (S17, 2026-10-24): one row per message and channel, sent or failed, with
+ * the message as plain text. Settings > Alerts > History lists them; rows go after 180 days.
+ */
+export const alertLog = sqliteTable(
+  'alert_log',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The channel; its kind and label are kept for when it is removed. */
+    channelId: text('channel_id').references(() => alertChannels.id, { onDelete: 'set null' }),
+    channelKind: text('channel_kind', { enum: ALERT_CHANNEL_KINDS }).notNull(),
+    channelLabel: text('channel_label'),
+    /** The notice's kind (store, buy, summary, admin, ...). */
+    kind: text('kind'),
+    text: text('text').notNull(),
+    status: text('status', { enum: ALERT_LOG_STATUSES }).notNull(),
+    error: text('error'),
+    sentAt: text('sent_at').notNull(),
+  },
+  (t) => [
+    check('alert_log_channel_kind_check', oneOf(t.channelKind, ALERT_CHANNEL_KINDS)),
+    check('alert_log_status_check', oneOf(t.status, ALERT_LOG_STATUSES)),
+    index('alert_log_user_idx').on(t.userId, t.sentAt),
+    index('alert_log_time_idx').on(t.sentAt),
+  ],
+);
+
 /**
  * A set's pull rates for the box opening value (S20), entered by the admin (shared). A set
  * without a row uses the suggested rates shipped with Tora, if any.
@@ -1249,6 +1282,7 @@ export type PriceObservation = typeof priceObservations.$inferSelect;
 export type CollectorRun = typeof collectorRuns.$inferSelect;
 export type Activity = typeof activity.$inferSelect;
 export type AlertChannel = typeof alertChannels.$inferSelect;
+export type AlertLogEntry = typeof alertLog.$inferSelect;
 export type Watch = typeof watches.$inferSelect;
 export type Signal = typeof signals.$inferSelect;
 export type Supply = typeof supply.$inferSelect;

@@ -14,6 +14,7 @@ import {
   Palette,
   Shapes,
   Plug,
+  Send,
   ShieldCheck,
   Store,
   Terminal,
@@ -39,7 +40,10 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
     key: 'alerts',
     href: '/settings/alerts',
     icon: BellRing,
-    children: [{ key: 'alertStyle', href: '/settings/alerts/style', icon: Palette }],
+    children: [
+      { key: 'alertStyle', href: '/settings/alerts/style', icon: Palette },
+      { key: 'alertHistory', href: '/settings/alerts/history', icon: Send },
+    ],
   },
   { key: 'activity', href: '/settings/activity', icon: History },
   {

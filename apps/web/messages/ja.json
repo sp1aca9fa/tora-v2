@@ -390,6 +390,10 @@
         "title": "メッセージの見た目",
         "info": "DiscordとTelegramでの各メッセージの見た目と文言。"
       },
+      "alertHistory": {
+        "title": "アラート履歴",
+        "info": "Toraが送ったすべてのアラートと、送信先、届いたかどうか。"
+      },
       "schedule": {
         "title": "スケジュール",
         "info": "コレクターとその他のタイマーがいつ動くか。"
@@ -1559,6 +1563,30 @@
     "sent": "{count}件のチャンネルに送信しました(保存済みの見た目)。",
     "noChannels": "送信先のチャンネルがありません(通知)。",
     "error": "できませんでした。"
+  },
+  "alertHistory": {
+    "title": "アラート履歴",
+    "info": "ToraがTelegramやDiscordに送ったすべてのメッセージ（新しい順、テキスト）。{days}日間保存されます。",
+    "kind": "種類",
+    "channel": "送信先",
+    "status": "結果",
+    "from": "開始日",
+    "to": "終了日",
+    "all": "すべて",
+    "apply": "絞り込む",
+    "clear": "クリア",
+    "statusName": {
+      "sent": "送信済み",
+      "failed": "失敗"
+    },
+    "message": "メッセージ",
+    "via": "{channel} {label}",
+    "removed": "削除された送信先",
+    "error": "エラー: {error}",
+    "empty": "まだアラートは送られていません。",
+    "noMatch": "条件に合うアラートはありません。",
+    "older": "古い順へ",
+    "newest": "最新"
   },
   "schedule": {
     "title": "スケジュール",

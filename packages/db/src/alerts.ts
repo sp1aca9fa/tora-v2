@@ -31,7 +31,7 @@ import {
   strategyOf,
   toLocalIso,
 } from '@tora/core';
-import { and, eq, gte, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { actionTotal, pendingActions } from './actions';
 import { lastActivity, markAlerted, recordActivity, unalerted } from './activity';
 import type { Db } from './client';
@@ -42,10 +42,13 @@ import {
   type Activity,
   type AlertChannel,
   type AlertChannelKind,
+  type AlertLogEntry,
+  type AlertLogStatus,
   type Product,
   type User,
   activity,
   alertChannels,
+  alertLog,
   appSettings,
   holdings,
   products,
@@ -56,6 +59,8 @@ import {
 import { productsWithBrokenListings } from './sources';
 import { latestSignals } from './signals';
 import { currentSupply, lowestAsk } from './supply';
+
+export { ALERT_CHANNEL_KINDS, ALERT_LOG_STATUSES } from './schema';
 
 /** The `alertText` messages of one language (flat keys, `{name}` placeholders). */
 export type AlertTexts = Record<string, string>;
@@ -359,21 +364,92 @@ async function deliverTo(
   if (!channel) return false;
   const token = channel.kind === 'telegram' ? await telegramToken(db, ctx.secret) : null;
   const now = toLocalIso();
+  // The history keeps what was sent as plain text, in the person's style.
+  const log = (status: AlertLogStatus, error: string | null) =>
+    db.insert(alertLog).values({
+      userId: channel.userId,
+      channelId: channel.id,
+      channelKind: channel.kind,
+      channelLabel: channel.label,
+      kind: typeof text === 'string' ? null : text.kind,
+      text: typeof text === 'string' ? text : plainText(text, style),
+      status,
+      error,
+      sentAt: now,
+    });
   try {
     await deliver(channel, text, ctx, token, style);
     await db
       .update(alertChannels)
       .set({ lastSentAt: now, lastError: null, updatedAt: now })
       .where(eq(alertChannels.id, channel.id));
+    await log('sent', null);
     return true;
   } catch (error) {
     await db
       .update(alertChannels)
       .set({ lastError: errorText(error), updatedAt: now })
       .where(eq(alertChannels.id, channel.id));
+    await log('failed', errorText(error));
     ctx.log?.(`alerts: ${channel.kind} of a user failed: ${errorText(error)}`);
     return false;
   }
+}
+
+export interface AlertLogFilter {
+  kind?: NoticeKind | null;
+  channel?: AlertChannelKind | null;
+  status?: AlertLogStatus | null;
+  /** Local dates (YYYY-MM-DD), both included. */
+  from?: string | null;
+  to?: string | null;
+  /** Older than this time (the next page). */
+  before?: string | null;
+  limit?: number;
+}
+
+/** A person's alert history (Settings > Alerts > History), newest first. */
+export async function listAlertLog(
+  db: Db,
+  userId: string,
+  filter: AlertLogFilter = {},
+): Promise<AlertLogEntry[]> {
+  return db
+    .select()
+    .from(alertLog)
+    .where(
+      and(
+        eq(alertLog.userId, userId),
+        filter.kind ? eq(alertLog.kind, filter.kind) : undefined,
+        filter.channel ? eq(alertLog.channelKind, filter.channel) : undefined,
+        filter.status ? eq(alertLog.status, filter.status) : undefined,
+        filter.from ? gte(alertLog.sentAt, filter.from) : undefined,
+        // The whole last day: every time on it sorts before the next day.
+        filter.to ? lt(alertLog.sentAt, nextDay(filter.to)) : undefined,
+        filter.before ? lt(alertLog.sentAt, filter.before) : undefined,
+      ),
+    )
+    .orderBy(desc(alertLog.sentAt), desc(alertLog.id))
+    .limit(filter.limit ?? 50);
+}
+
+const nextDay = (date: string) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Days the alert history keeps. */
+export const ALERT_LOG_DAYS = 180;
+
+/** Drops history rows older than `ALERT_LOG_DAYS` (the morning check); how many. */
+export async function pruneAlertLog(db: Db, now = new Date()): Promise<number> {
+  const cut = toLocalIso(new Date(now.getTime() - ALERT_LOG_DAYS * 86_400_000));
+  const gone = await db
+    .delete(alertLog)
+    .where(lt(alertLog.sentAt, cut))
+    .returning({ id: alertLog.id });
+  return gone.length;
 }
 
 /** A person's style for a kind of notice (Settings > Alerts > Customize notices). */
@@ -721,6 +797,7 @@ export async function morningCheck(db: Db, ctx: AlertContext, now = new Date()):
   await saveSetting(db, 'morningCheckDay', day);
   await checkMissedRuns(db, ctx, now);
   await sendSummaries(db, ctx, now);
+  await pruneAlertLog(db, now);
   return true;
 }
 

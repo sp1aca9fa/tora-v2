@@ -390,6 +390,10 @@
         "title": "Estilo de mensajes",
         "info": "Cómo se ve cada tipo de mensaje en Discord y Telegram, y su texto."
       },
+      "alertHistory": {
+        "title": "Historial de alertas",
+        "info": "Cada alerta que Tora te envió, por qué canal y si llegó."
+      },
       "schedule": {
         "title": "Horario",
         "info": "Cuándo se ejecutan los recolectores y los demás temporizadores."
@@ -1559,6 +1563,30 @@
     "sent": "Enviado a {count, plural, one {# canal} other {# canales}} (tal como se guardó).",
     "noChannels": "No hay canal al que enviar (Alertas).",
     "error": "No se pudo hacer."
+  },
+  "alertHistory": {
+    "title": "Historial de alertas",
+    "info": "Cada mensaje que Tora te envió por Telegram o Discord, del más reciente al más antiguo, como texto. Se guarda {days} días.",
+    "kind": "Tipo",
+    "channel": "Canal",
+    "status": "Resultado",
+    "from": "Desde",
+    "to": "Hasta",
+    "all": "Todos",
+    "apply": "Filtrar",
+    "clear": "Quitar filtros",
+    "statusName": {
+      "sent": "Enviada",
+      "failed": "Fallida"
+    },
+    "message": "Mensaje",
+    "via": "por {channel} {label}",
+    "removed": "canal eliminado",
+    "error": "Error: {error}",
+    "empty": "Aún no se ha enviado ninguna alerta.",
+    "noMatch": "Ninguna alerta coincide con estos filtros.",
+    "older": "Más antiguas",
+    "newest": "Más recientes"
   },
   "schedule": {
     "title": "Horario",
