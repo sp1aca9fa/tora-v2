@@ -11,7 +11,7 @@ import {
   Settings,
   Store,
 } from 'lucide-react';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { Suspense, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -57,6 +57,17 @@ function Count({ counts, item }: { counts: Promise<Counts>; item: keyof Counts }
 }
 
 /** Bottom tab bar on mobile, side nav on desktop. `badges`: counts per item key. */
+/**
+ * Shown at once in the tapped menu link while its page loads (S14: in place of a page skeleton,
+ * which held every first paint back).
+ */
+function Pending({ className }: { className: string }) {
+  const { pending } = useLinkStatus();
+  return pending ? (
+    <span aria-hidden className={cn('absolute animate-pulse rounded-full bg-primary', className)} />
+  ) : null;
+}
+
 export function Nav({ badges }: { badges: Promise<Counts> }) {
   const t = useTranslations();
   const pathname = usePathname();
@@ -89,6 +100,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
               <span className="absolute top-0.5 right-0.5 xl:static">
                 <Badge counts={badges} item={key} />
               </span>
+              <Pending className="inset-y-2 left-0 w-0.5" />
             </Link>
           ))}
         </nav>
@@ -135,7 +147,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
               href={href}
               aria-current={isActive(pathname, href) ? 'page' : undefined}
               className={cn(
-                'flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground',
+                'relative flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground',
                 isActive(pathname, href) && 'font-medium text-foreground',
               )}
             >
@@ -146,6 +158,7 @@ export function Nav({ badges }: { badges: Promise<Counts> }) {
                 </span>
               </span>
               {t(key === 'opportunities' ? 'nav.opportunitiesShort' : `nav.${key}`)}
+              <Pending className="inset-x-3 top-0 h-0.5" />
             </Link>
           ))}
         </div>

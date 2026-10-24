@@ -115,11 +115,9 @@ export default async function SummaryPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Suspense
-            fallback={<div className="h-72 animate-pulse rounded-xl border bg-card" aria-hidden />}
-          >
-            <ValueOverTime db={db} userId={user.id} portfolio={portfolio} />
-          </Suspense>
+          {/* With the page: the saved series is quick to read, and a streamed card shows a
+              moment after the rest (S14). */}
+          <ValueOverTime db={db} userId={user.id} portfolio={portfolio} />
         </div>
         {portfolio.breakdown.length > 0 && (
           // On wide screens the row takes the chart's height; a long list scrolls inside.
@@ -167,10 +165,7 @@ export default async function SummaryPage() {
   );
 }
 
-/**
- * The value-over-time chart, loaded after the rest of the page (it reads every snapshot); today's
- * point from the header's values.
- */
+/** The value-over-time chart from the saved series; today's point from the header's values. */
 async function ValueOverTime({
   db,
   userId,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useInParts } from '@/components/use-in-parts';
 import { ItemCard, type ItemCardData } from './item-card';
 
 /** Cards drawn with the page, and added each time the end of the list comes near. */
@@ -43,21 +43,8 @@ function upTo(modes: Mode[], limit: number): Mode[] {
  */
 export function ItemList({ modes }: { modes: Mode[] }) {
   const t = useTranslations('inventory');
-  const [limit, setLimit] = useState(FIRST);
-  const end = useRef<HTMLDivElement>(null);
   const total = modes.reduce((n, m) => n + m.groups.reduce((k, g) => k + g.cards.length, 0), 0);
-  useEffect(() => {
-    if (limit >= total || !end.current) return;
-    const seen = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setLimit((n) => n + MORE);
-      },
-      { rootMargin: '1500px 0px' },
-    );
-    seen.observe(end.current);
-    return () => seen.disconnect();
-  }, [limit, total]);
-
+  const { limit, end } = useInParts(total, FIRST, MORE);
   const shown = upTo(modes, limit);
   return (
     <div className="space-y-8">

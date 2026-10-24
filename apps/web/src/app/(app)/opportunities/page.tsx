@@ -15,17 +15,16 @@ import {
   opportunitiesFor,
   rankingBoards,
 } from '@tora/db';
-import { Binoculars, ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { AmountsToggle } from '@/components/amounts-toggle';
-import { ProductImage } from '@/components/product-image';
-import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
 import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
 import { bucketLabel, franchiseLabel } from '@/lib/product-display';
+import { OpportunityList } from './opportunity-list';
+import { CHIP, type OpportunityRowData } from './opportunity-row';
 import { PlanCard } from './plan-card';
 import { cn } from '@/lib/utils';
 
@@ -37,12 +36,6 @@ type Item = Opportunity & { product: Product; owned: boolean; watching: boolean 
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
-
-const CHIP = {
-  proven: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
-  warning: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
-  unproven: 'bg-muted text-muted-foreground',
-} as const;
 
 /**
  * Opportunities (requirements S13): items worth a look within their group of similar items, from
@@ -189,85 +182,54 @@ export default async function OpportunitiesPage() {
     </section>
   );
 
-  const row = (o: Item) => {
+  /** An item worth a look, as its row's texts (drawn in parts on the client, S14). */
+  const rowData = (o: Item): OpportunityRowData => {
     const signals = [
       ...o.proven.map((key) => ({ key, style: 'proven' as const })),
       ...o.warnings.map((key) => ({ key, style: 'warning' as const })),
       ...o.unproven.map((key) => ({ key, style: 'unproven' as const })),
     ];
-    const href = `/products/${o.productId}${o.bucket ? `?condition=${encodeURIComponent(o.bucket)}` : ''}`;
-    return (
-      <li key={o.productId} className="rounded-xl border bg-card px-3 py-3">
-        <Link href={href} className="flex items-center gap-3 rounded-md hover:bg-accent/50">
-          <ProductImage
-            product={o.product}
-            version={images.get(o.productId)}
-            className="size-14 shrink-0"
-          />
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="line-clamp-2 text-sm leading-snug font-medium">{o.product.name}</p>
-            <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-              {o.bucket && <span>{bucketLabel(o.bucket, t)}</span>}
-              {o.owned && <span>{t('opportunities.owned')}</span>}
-              {o.watching && <span>{t('opportunities.watching')}</span>}
-              {!o.product.createdBy && !o.owned && !o.watching && (
-                <span>{t('opportunities.candidate')}</span>
-              )}
-              {rankOf(o.productId) && <span>{rankOf(o.productId)}</span>}
-            </p>
-          </div>
-          <div className="max-w-[45%] shrink-0 space-y-0.5 text-right text-sm">
-            {o.numbers.price !== null && (
-              <p className="font-medium tabular-nums">
-                {money(o.numbers.price)}
-                {/* Not the market value: the signals' fair value. */}
-                <span className="block text-xs font-normal text-muted-foreground">
-                  {t('opportunities.priceLabel')}
-                </span>
-              </p>
-            )}
-            {o.askUnder && o.ask && o.numbers.price && (
-              <p className="text-xs font-medium text-emerald-700 tabular-nums dark:text-emerald-400">
-                {t('opportunities.askUnder', {
-                  amount: money(o.ask.price),
-                  pct: pct(1 - o.ask.price / o.numbers.price),
-                })}
-              </p>
-            )}
-            {o.buylistNear && o.buylist && (
-              <p className="text-xs text-muted-foreground tabular-nums">
-                {t('opportunities.buylistNear', { amount: money(o.buylist.price) })}
-              </p>
-            )}
-          </div>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-        </Link>
-        <ul className="mt-2 space-y-1.5 text-xs sm:pl-[68px]">
-          {signals.map(({ key, style }) => (
-            <li key={key} className="space-y-0.5">
-              <span className={cn('rounded px-1.5 py-0.5 font-medium', CHIP[style])}>
-                {t(`opportunities.signal.${key}`)}
-                {style === 'unproven' && ` (${t('opportunities.notProven')})`}
-              </span>{' '}
-              <span className="text-muted-foreground">{why(o, key)}</span>
-              {style !== 'unproven' && (
-                <p className="text-muted-foreground">{record(o.tests, key)}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-        {!o.watching && (
-          <div className="mt-2 sm:pl-[68px]">
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/watchlist/add?product=${o.productId}`}>
-                <Binoculars /> {t('opportunities.watch')}
-              </Link>
-            </Button>
-          </div>
-        )}
-      </li>
-    );
+    const rank = rankOf(o.productId);
+    return {
+      productId: o.productId,
+      href: `/products/${o.productId}${o.bucket ? `?condition=${encodeURIComponent(o.bucket)}` : ''}`,
+      product: {
+        id: o.product.id,
+        name: o.product.name,
+        category: o.product.category,
+        kind: o.product.kind,
+      },
+      version: images.get(o.productId) ?? null,
+      meta: [
+        o.bucket && bucketLabel(o.bucket, t),
+        o.owned && t('opportunities.owned'),
+        o.watching && t('opportunities.watching'),
+        !o.product.createdBy && !o.owned && !o.watching && t('opportunities.candidate'),
+        rank,
+      ].filter((m): m is string => Boolean(m)),
+      price: o.numbers.price !== null ? money(o.numbers.price) : null,
+      askUnder:
+        o.askUnder && o.ask && o.numbers.price
+          ? t('opportunities.askUnder', {
+              amount: money(o.ask.price),
+              pct: pct(1 - o.ask.price / o.numbers.price),
+            })
+          : null,
+      buylistNear:
+        o.buylistNear && o.buylist
+          ? t('opportunities.buylistNear', { amount: money(o.buylist.price) })
+          : null,
+      signals: signals.map(({ key, style }) => ({
+        key,
+        style,
+        label: `${t(`opportunities.signal.${key}`)}${style === 'unproven' ? ` (${t('opportunities.notProven')})` : ''}`,
+        why: why(o, key),
+        record: style !== 'unproven' ? record(o.tests, key) : null,
+      })),
+      watching: o.watching,
+    };
   };
+  const labels = { price: t('opportunities.priceLabel'), watch: t('opportunities.watch') };
 
   /** Each group's signals with their record (proven ones first). */
   const records = (type: string) => {
@@ -375,9 +337,7 @@ export default async function OpportunitiesPage() {
           <section className="space-y-2">
             <h2 className="font-semibold">{t('opportunities.worthALook')}</h2>
             {list.length ? (
-              <ul className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                {list.map(row)}
-              </ul>
+              <OpportunityList rows={list.map(rowData)} labels={labels} />
             ) : (
               <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
                 {t('opportunities.noneProven')}

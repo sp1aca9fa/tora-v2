@@ -1087,10 +1087,12 @@ export async function runSnapshots(db: Db, now = new Date()) {
     movers: Object.fromEntries(
       INSIGHT_PERIODS.map((p) => [
         p,
-        marketMovers(
-          owned.map((r) => ({ ...r, days: wanted.get(r.holding.id) ?? {} })),
-          today,
-          p,
+        shownMovers(
+          marketMovers(
+            owned.map((r) => ({ ...r, days: wanted.get(r.holding.id) ?? {} })),
+            today,
+            p,
+          ),
         ),
       ]),
     ),
@@ -1408,6 +1410,22 @@ function finishMovers(list: Mover[]): Mover[] {
     }));
 }
 
+/**
+ * The movers the market panel can show: the 3 biggest risers and fallers by share, in the list's
+ * order (every held item ran to megabytes, read on each Portfolio visit; S14).
+ */
+function shownMovers(list: Mover[]): Mover[] {
+  const up = list
+    .filter((m) => m.pct > 0)
+    .toSorted((a, b) => b.pct - a.pct)
+    .slice(0, 3);
+  const down = list
+    .filter((m) => m.pct < 0)
+    .toSorted((a, b) => a.pct - b.pct)
+    .slice(0, 3);
+  return list.filter((m) => up.includes(m) || down.includes(m));
+}
+
 /** The day `days` before `day` (both the app's local dates). */
 const daysBefore = (day: string, days: number) =>
   localDate(new Date(localTime(day, '12:00:00.000').getTime() - days * DAY));
@@ -1599,7 +1617,13 @@ export async function refreshTradeCounts(
  * Sales per period of the owned items (the Portfolio's most traded panels), from the counts the
  * last collect saved; worked out here only when none were saved in the last 2 days.
  */
-export async function tradeCounts(db: Db, userId: string, periods: readonly number[]) {
+export async function tradeCounts(
+  db: Db,
+  userId: string,
+  periods: readonly number[],
+  /** Items per period a panel shows: only those are returned (S14). */
+  shown = 6,
+) {
   const [row] = await db.select().from(appSettings).where(eq(appSettings.key, 'tradeCounts'));
   let saved = row?.value as SavedTradeCounts | undefined;
   const fresh =
@@ -1609,14 +1633,31 @@ export async function tradeCounts(db: Db, userId: string, periods: readonly numb
   if (!fresh) saved = await refreshTradeCounts(db, periods);
   const ids = Object.keys(saved!.counts);
   if (ids.length === 0) return [];
-  const [items, mine] = await Promise.all([
-    db.select().from(products).where(inArray(products.id, ids)),
-    db
-      .selectDistinct({ productId: holdings.productId })
-      .from(holdings)
-      .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned'))),
-  ]);
+  const mine = await db
+    .selectDistinct({ productId: holdings.productId })
+    .from(holdings)
+    .where(and(eq(holdings.userId, userId), eq(holdings.status, 'owned')));
   const own = new Set(mine.map((m) => m.productId));
+  // The most traded per period, among all items and among the person's (ties in the order the
+  // items come from the database: by id).
+  const counts = saved!.counts;
+  const byId = ids.toSorted();
+  const top = new Set<string>();
+  periods.forEach((_, i) => {
+    for (const pool of [byId, byId.filter((id) => own.has(id))]) {
+      for (const id of pool
+        .filter((id) => (counts[id]?.[i] ?? 0) > 0)
+        .toSorted((a, b) => counts[b]![i]! - counts[a]![i]!)
+        .slice(0, shown))
+        top.add(id);
+    }
+  });
+  const items = top.size
+    ? await db
+        .select()
+        .from(products)
+        .where(inArray(products.id, [...top]))
+    : [];
   return items.map((product) => ({
     product,
     mine: own.has(product.id),
