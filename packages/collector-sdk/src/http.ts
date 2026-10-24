@@ -61,6 +61,8 @@ export interface PoliteHttpOptions {
   maxDelayMs?: number;
   maxRequests?: number;
   retries?: number;
+  /** A request with no answer by then is tried again like a server error (S15). */
+  timeoutMs?: number;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -76,6 +78,7 @@ export class PoliteHttp {
       maxDelayMs: 5000,
       maxRequests: 500,
       retries: 3,
+      timeoutMs: 30_000,
       fetchImpl: fetch,
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
       ...options,
@@ -142,10 +145,23 @@ export class PoliteHttp {
       if (this.requests >= this.o.maxRequests) throw new RequestCapError();
       await this.pace();
       this.requests++;
-      const res = await this.o.fetchImpl(url, {
-        ...init,
-        headers: { ...BROWSER_HEADERS, ...headers },
-      });
+      let res: Response;
+      try {
+        res = await this.o.fetchImpl(url, {
+          ...init,
+          headers: { ...BROWSER_HEADERS, ...headers },
+          signal: AbortSignal.timeout(this.o.timeoutMs),
+        });
+      } catch (e) {
+        // A site that took the connection and went silent would hold the run (and its lock) for
+        // minutes per request.
+        if (!(e instanceof Error && e.name === 'TimeoutError')) throw e;
+        if (attempt < this.o.retries) {
+          await this.o.sleep(2 ** attempt * 5000);
+          continue;
+        }
+        throw new Error(`no answer within ${this.o.timeoutMs / 1000} s from ${url}`);
+      }
       if (res.status === 403 || res.status === 429) {
         const body = await res.text().catch(() => '');
         throw new BlockedError(`HTTP ${res.status} for ${url}`, body.slice(0, 500));

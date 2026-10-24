@@ -45,7 +45,7 @@
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
-| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs done (one fix); next collector faults and the edge cases |
+| S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs and collector faults done (two fixes); next the edge cases |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
 ### Decision log
@@ -911,12 +911,14 @@ Acceptance:
    - 20 people: about 10 pages a second, medians 1.3-2.1 s, slowest 10.7 s; the one Node process is the limit (a household opening a page every few seconds is far below it).
    - While writing: the nightly snapshot, a full rewrite of every item's saved sales (45 s) and an edit saved every 2 s, with 10 people browsing: no page or save failed, saves at most 0.65 s; pages stayed as fast except while all saved values were cleared and refilled (slowest 9-10 s, bug 1). WAL journal mode tried on the copy: no change (the waits were not locks), so the database keeps its default.
    - One request in about 5,000 had its connection reset by the test's client (nothing in the server's log): an idle kept-alive connection closed as it was reused, which browsers retry on their own.
+5. Collector faults (2026-10-25): the framework's tests already covered server errors retried with backoff, 403 / 429 and challenge pages stopping the run at once (blocked), the request cap, one item failing (the run partial, the rest kept), a run interrupted and continued, and a listing set aside only after an explicit "gone" (404 / 410 or the plug-in saying so) 3 nights in a row, so a changed site never unlinks listings. Added: a site that takes the connection and never answers (bug 2). Not covered by a check: a changed site whose page still parses but yields nothing looks like a quiet night (Open issues).
 
 ### Bug log
 
 | # | What | How found | Severity | Commit |
 |---|---|---|---|---|
 | 1 | After an admin changed markets, source order, base currency or categories (and after a collect that changed a source's quality), every saved value was cleared and refilled only after the snapshots (6 min on large): meanwhile every page worked values out from the sales (9-10 s under load). Values are now refilled first (as the time zone change did); the window is the refill (22 s on large, about 1 s on the owner's data). | Load run while writing | 3 | 1310eee |
+| 2 | A site that took the connection and never answered held each request for Node's default (about 5 minutes), with no retry: a collect, and its lock (the server's updates wait for it), could run for hours. Requests now give up after 30 s, are tried again like a server error, then fail that item. | Collector faults | 2 | (next) |
 
 ---
 
@@ -999,6 +1001,7 @@ The user does not know yet what to do with these (2026-10-17): analyse before an
 
 ### Optional features
 
+- A source gone quiet (S15, 2026-10-25): a site that changed so its pages still load but yield nothing looks like a night with no sales; nothing tells the admin. Idea: after a few nights in which a source brought nothing from any of its listings while it usually does, an admin notice ("the site may have changed").
 - Automatic purchase import from Gmail (from S6, user 2026-10-16): the daily job on the home PC checks Gmail for new SNKRDUNK receipts (and cancellations) and imports them with the S5b rules. Needs a read-only Gmail token kept on the home PC only; until then, a Google Takeout export and `pnpm purchases` do it.
 
 ## Out of scope for v1 (future ideas, do not build)

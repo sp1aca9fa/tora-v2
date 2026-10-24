@@ -43,6 +43,20 @@ describe('PoliteHttp', () => {
     }
   });
 
+  it('gives up on a site that does not answer, after retrying (S15)', async () => {
+    let calls = 0;
+    // Answers only when asked to stop, as a site that took the connection and went silent.
+    const silent = (async (_url: string, init: RequestInit) => {
+      calls++;
+      return new Promise<Response>((_, reject) =>
+        init.signal?.addEventListener('abort', () => reject(init.signal!.reason)),
+      );
+    }) as unknown as typeof fetch;
+    const http = new PoliteHttp({ ...fast, timeoutMs: 20, fetchImpl: silent });
+    await expect(http.text('https://x/a')).rejects.toThrow(/no answer/);
+    expect(calls).toBe(4);
+  });
+
   it('enforces the request cap and reports other errors', async () => {
     const http = new PoliteHttp({
       ...fast,
