@@ -496,7 +496,8 @@
     "tooManyLinks": "Up to 200 links at a time.",
     "nonePicked": "Pick at least one panel.",
     "invalid_time_zone": "That time zone is not known.",
-    "duplicate_watch": "You already watch this item in that condition."
+    "duplicate_watch": "You already watch this item in that condition.",
+    "changedElsewhere": "This lot was changed in another tab or on another device after you opened this page. Reload to see the change, then try again."
   },
   "acquisitionType": {
     "purchase": "Purchase",
@@ -1481,6 +1482,7 @@
     "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
     "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
     "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan 500 million). See Settings > Admin > Database.",
+    "sourceQuiet": "Tora: {sources} found no new sales on its last 3 days of runs, though it usually finds some. Its site may have changed: look at the collect log, or open one of its listings (Settings > Collectors).",
     "selfCheck": "Tora: the nightly self-check found saved prices that did not match the collected sales, and rebuilt them: {items}. If this repeats, tell the developer.",
     "summaryTitle": "Tora: daily summary",
     "summaryImport": "{method}: {imported} added, {existing} already in Tora, {skipped} left out, {problem} with a problem",
@@ -1748,6 +1750,7 @@
     "noCollect": "No collect for {hours} hours (last {last})",
     "noBackup": "No backup for {hours} hours (last {last})",
     "dbBudget": "Database: {read} million rows read this month, {projected} million at this pace (budget {budget} million)",
+    "sourceQuiet": "{sources}: no new sales on the last 3 days of runs (usually some)",
     "selfCheck": "Self-check: saved prices differed from the sales and were rebuilt ({items})",
     "fromTo": "{from} to {to}",
     "none": "none",

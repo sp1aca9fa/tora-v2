@@ -496,7 +496,8 @@
     "tooManyLinks": "Hasta 200 enlaces a la vez.",
     "nonePicked": "Elige al menos un panel.",
     "invalid_time_zone": "Esa zona horaria no se conoce.",
-    "duplicate_watch": "Ya sigues este artículo en ese estado."
+    "duplicate_watch": "Ya sigues este artículo en ese estado.",
+    "changedElsewhere": "Este lote se ha cambiado en otra pestaña u otro dispositivo después de abrir esta página. Recarga para ver el cambio y vuelve a intentarlo."
   },
   "acquisitionType": {
     "purchase": "Compra",
@@ -1481,6 +1482,7 @@
     "noCollect": "Tora: no se ha ejecutado ninguna recogida en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
     "noBackup": "Tora: ninguna copia de seguridad en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
     "dbBudget": "Tora: la base de datos leyó {read} millones de filas este mes; a este ritmo, {projected} millones a fin de mes (presupuesto {budget} millones, plan gratuito 500 millones). Ver Ajustes > Administración > Base de datos.",
+    "sourceQuiet": "Tora: {sources} no ha encontrado ventas nuevas en sus últimos 3 días de recogida, aunque normalmente sí encuentra. Puede que su web haya cambiado: mira el registro de recogida o abre uno de sus anuncios (Ajustes > Recolectores).",
     "selfCheck": "Tora: la autocomprobación nocturna encontró precios guardados que no coincidían con las ventas recogidas, y los reconstruyó: {items}. Si se repite, avisa al desarrollador.",
     "summaryTitle": "Tora: resumen diario",
     "summaryImport": "{method}: {imported} añadidos, {existing} ya en Tora, {skipped} descartados, {problem} con un problema",
@@ -1748,6 +1750,7 @@
     "noCollect": "Ninguna recogida en {hours} horas (última {last})",
     "noBackup": "Ninguna copia en {hours} horas (última {last})",
     "dbBudget": "Base de datos: {read} millones de filas leídas este mes, {projected} millones a este ritmo (presupuesto {budget} millones)",
+    "sourceQuiet": "{sources}: sin ventas nuevas en los últimos 3 días de recogida (normalmente hay)",
     "selfCheck": "Autocomprobación: los precios guardados no coincidían con las ventas y se reconstruyeron ({items})",
     "fromTo": "de {from} a {to}",
     "none": "ninguno",

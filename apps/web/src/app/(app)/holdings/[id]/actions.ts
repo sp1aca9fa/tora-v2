@@ -16,6 +16,7 @@ import {
   changeCondition,
   deleteHolding,
   editHolding,
+  holdingVersion,
   markOrderCancelled,
   markOpened,
   productLots,
@@ -69,8 +70,29 @@ async function handle<S extends z.ZodType, T>(
   redirect(to(result.value));
 }
 
+/**
+ * `handle` for a lot's forms: refused when the lot changed after the form was opened (another tab
+ * or device saved first), instead of the last save silently winning.
+ */
+async function handleLot<S extends z.ZodType, T>(
+  id: string,
+  formData: FormData,
+  schema: S,
+  run: (data: z.infer<S>, ctx: { db: Db; userId: string; session: Session }) => Promise<T>,
+  to: (value: T) => string,
+): Promise<FormState> {
+  const version = formData.get('version');
+  if (typeof version === 'string' && version) {
+    const { db, user } = await authed();
+    const current = await holdingVersion(db, user.id, id);
+    if (current && current !== version) return { error: 'changedElsewhere' };
+  }
+  return handle(formData, schema, run, to);
+}
+
 export async function editAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({
       acquiredAt: dateText,
@@ -97,7 +119,8 @@ export async function editAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function splitAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({ quantity: qty, date: dateText }),
     (d, { db, userId }) => splitOff(db, userId, id, d.quantity, at(d.date)),
@@ -106,7 +129,8 @@ export async function splitAction(id: string, _prev: FormState, formData: FormDa
 }
 
 export async function openAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({ quantity: qty, packagingState: reqEnum(PACKAGING_STATES), date: dateText }),
     (d, { db, userId }) =>
@@ -120,7 +144,8 @@ export async function openAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function gradeSubmitAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({
       quantity: qty,
@@ -142,7 +167,8 @@ export async function gradeSubmitAction(id: string, _prev: FormState, formData: 
 }
 
 export async function gradeReturnAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({
       grader: reqEnum(GRADERS),
@@ -164,7 +190,8 @@ export async function gradeReturnAction(id: string, _prev: FormState, formData: 
 }
 
 export async function sellAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({
       quantity: qty,
@@ -186,7 +213,8 @@ export async function sellAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function conditionAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({
       quantity: qty,
@@ -202,7 +230,8 @@ export async function conditionAction(id: string, _prev: FormState, formData: Fo
 }
 
 export async function noteAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({ text: reqText, date: dateText }),
     (d, { db, userId }) => addNote(db, userId, id, { text: d.text, occurredAt: at(d.date) }),
@@ -211,7 +240,8 @@ export async function noteAction(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function deleteAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({ confirm: z.literal('on') }),
     (_d, { db, userId }) => deleteHolding(db, userId, id),
@@ -221,7 +251,8 @@ export async function deleteAction(id: string, _prev: FormState, formData: FormD
 
 /** The whole order was cancelled: removes its lots and makes imports skip the order ID. */
 export async function cancelOrderAction(id: string, _prev: FormState, formData: FormData) {
-  return handle(
+  return handleLot(
+    id,
     formData,
     z.object({ confirm: z.literal('on') }),
     async (_d, { db, userId }) => {

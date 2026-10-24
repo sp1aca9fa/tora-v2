@@ -133,6 +133,15 @@ export async function getHoldingDetail(db: Db, userId: string, id: string) {
   return { ...row, events, children, parent };
 }
 
+/** When a lot last changed: its forms send it back, so a save from an older copy is refused (S15). */
+export async function holdingVersion(db: Db, userId: string, id: string): Promise<string | null> {
+  const [row] = await db
+    .select({ updatedAt: holdings.updatedAt })
+    .from(holdings)
+    .where(and(eq(holdings.id, id), eq(holdings.userId, userId)));
+  return row?.updatedAt ?? null;
+}
+
 export async function getProduct(db: Db, id: string) {
   const [product] = await db.select().from(products).where(eq(products.id, id));
   return product ?? null;

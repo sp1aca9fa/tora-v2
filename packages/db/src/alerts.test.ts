@@ -28,7 +28,15 @@ import { finishImportRun, saveImportRows, startImportRun } from './imports';
 import { migrateDb } from './migrate';
 import { saveSetting, saveSourceInfos } from './registry';
 import { createProduct } from './mutations';
-import { activity, alertChannels, alertLog, signals, supply, watches } from './schema';
+import {
+  activity,
+  alertChannels,
+  alertLog,
+  collectorRuns,
+  signals,
+  supply,
+  watches,
+} from './schema';
 import { addWatch } from './watches';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
@@ -87,6 +95,7 @@ const TEXTS: Record<string, Record<string, string>> = {
     backupFailed: 'backup failed: {error}',
     noCollect: 'no collect for {hours} h',
     noBackup: 'no backup for {hours} h',
+    sourceQuiet: 'quiet: {sources}',
     summaryTitle: 'summary',
     summaryImport:
       '{method}: {imported} added, {existing} existing, {skipped} skipped, {problem} problems',
@@ -187,6 +196,35 @@ it('says so when nothing ran for over a day, once', async () => {
   });
   expect(await checkMissedRuns(db, ctx, now)).toEqual(['collect']);
   expect(sent.map((s) => s.text)).toEqual(['no collect for 30 h\n'.trim()]);
+  expect(await checkMissedRuns(db, ctx, new Date(now.getTime() + 60_000))).toEqual([]);
+  expect(sent).toHaveLength(1);
+});
+
+it('says once a day when a source that usually finds sales finds none for 3 days (S15)', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const now = new Date();
+  const day = 86_400_000;
+  // 12 nights: a source that found sales most nights, then nothing for the last 3; another that
+  // rarely finds any; a third whose last nights failed (alerted as failures instead).
+  const run = (source: string, daysAgo: number, added: number, status = 'ok' as const) => ({
+    source,
+    startedAt: toLocalIso(new Date(now.getTime() - daysAgo * day - 3_600_000)),
+    status,
+    observationsAdded: added,
+  });
+  await recordActivity(db, { kind: 'collect', occurredAt: toLocalIso(now) });
+  await recordActivity(db, { kind: 'backup', occurredAt: toLocalIso(now) });
+  await db.insert(collectorRuns).values([
+    ...[...Array(12).keys()].map((d) => run('changed', d, d < 3 ? 0 : d === 7 ? 0 : 40)),
+    // A second run the same day for one item adds none; the day still counts as finding some.
+    run('changed', 5, 0),
+    ...[...Array(12).keys()].map((d) => run('rare', d, d % 4 === 0 ? 2 : 0)),
+    ...[...Array(12).keys()].map((d) =>
+      d < 3 ? run('broken', d, 0, 'failed' as never) : run('broken', d, 30),
+    ),
+  ]);
+  expect(await checkMissedRuns(db, ctx, now)).toEqual(['quiet_source']);
+  expect(sent.map((s) => s.text)).toEqual(['quiet: changed']);
   expect(await checkMissedRuns(db, ctx, new Date(now.getTime() + 60_000))).toEqual([]);
   expect(sent).toHaveLength(1);
 });

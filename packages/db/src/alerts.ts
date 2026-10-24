@@ -57,7 +57,7 @@ import {
   users,
   watches,
 } from './schema';
-import { productsWithBrokenListings } from './sources';
+import { productsWithBrokenListings, quietSources } from './sources';
 import { latestSignals } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
@@ -661,6 +661,8 @@ function failureCard(
       lines.push(fill(t.listingsGone!, { count: listings.length }));
       for (const l of listings.slice(0, 20))
         lines.push(fill(t.listingGoneLine!, { source: l.source, name: l.name, error: l.error }));
+    } else if (entry.action === 'quiet_source') {
+      lines.push(fill(t.sourceQuiet!, { sources: ((d.sources as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'self_check') {
       lines.push(fill(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'db_budget') {
@@ -700,8 +702,10 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     )
   )
     .flat()
-    // Listings set aside are not a failure of the run, but someone must relink them (S10).
-    .filter((e) => e.level === 'failed' || e.action === 'listings_gone');
+    // Listings set aside and quiet sources are not a failure of a run, but someone must look.
+    .filter(
+      (e) => e.level === 'failed' || e.action === 'listings_gone' || e.action === 'quiet_source',
+    );
   if (entries.length === 0) return 0;
   const today = localDate();
   const sentToday = (await readSetting<Record<string, string>>(db, 'alertsSentToday')) ?? {};
@@ -813,8 +817,8 @@ const MISSED_HOURS = 26;
 
 /**
  * The app's daily check: when no collect or no backup was recorded for over a day (the PC is
- * off, or its schedule stopped), or the database's month heads past its budget, records it and
- * alerts admins. Nothing before the first run.
+ * off, or its schedule stopped), the database's month heads past its budget, or a source's runs
+ * suddenly find nothing, records it and alerts admins. Nothing before the first run.
  */
 export async function checkMissedRuns(
   db: Db,
@@ -841,6 +845,19 @@ export async function checkMissedRuns(
   }
   // The hosted database's rows read this month against the admin's budget (S19).
   if (await checkDbBudget(db, now)) missed.push('db_budget');
+  // Sources whose runs suddenly find nothing (S15), once a day while they stay quiet.
+  const quiet = await quietSources(db, now);
+  const said = quiet.length ? await lastActivity(db, 'check', { action: 'quiet_source' }) : null;
+  if (quiet.length && !(said && now.getTime() - Date.parse(said.occurredAt) < 20 * 3_600_000)) {
+    await recordActivity(db, {
+      kind: 'check',
+      action: 'quiet_source',
+      level: 'problem',
+      detail: { sources: quiet },
+      href: '/settings/collectors',
+    });
+    missed.push('quiet_source');
+  }
   await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)));
   return missed;
 }

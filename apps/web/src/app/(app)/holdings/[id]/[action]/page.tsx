@@ -453,6 +453,7 @@ export default async function HoldingActionPage({
         cancelHref={back}
         destructive={key === 'delete' || key === 'cancel-order'}
       >
+        <input type="hidden" name="version" value={holding.updatedAt} />
         {body}
       </ActionForm>
     </div>

@@ -78,6 +78,7 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'noCollect',
     'noBackup',
     'dbBudget',
+    'sourceQuiet',
     'selfCheck',
     'updateFailed',
     'logHint',

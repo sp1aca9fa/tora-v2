@@ -760,6 +760,47 @@ export async function collectorTimes(db: Db): Promise<CollectorTimes> {
   return { sources, night, windowHours, over: night > windowHours * 3_600_000 };
 }
 
+/** A source's last days with runs that must find nothing, and the run days before them looked at. */
+const QUIET_DAYS = 3;
+const USUAL_DAYS = 14;
+
+/**
+ * Sources gone quiet (S15): a site that changed so its pages still load but yield nothing looks
+ * like nights without sales. A source is quiet when its runs added no sales on its last 3 days
+ * with runs, while on at least 80 % of its run days before (14 at most, 7 at least) they added
+ * some. Failed and blocked runs are left out: they are alerted already.
+ */
+export async function quietSources(db: Db, now = new Date()): Promise<string[]> {
+  const since = toLocalIso(new Date(now.getTime() - (QUIET_DAYS + USUAL_DAYS + 7) * 86_400_000));
+  const runs = await db
+    .select({
+      source: collectorRuns.source,
+      startedAt: collectorRuns.startedAt,
+      added: collectorRuns.observationsAdded,
+    })
+    .from(collectorRuns)
+    .where(
+      and(gte(collectorRuns.startedAt, since), inArray(collectorRuns.status, ['ok', 'partial'])),
+    );
+  // Sales added per source and day: a run for one item or market often adds none.
+  const days = new Map<string, Map<string, number>>();
+  for (const r of runs) {
+    const byDay = days.get(r.source) ?? new Map<string, number>();
+    const day = r.startedAt.slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + r.added);
+    days.set(r.source, byDay);
+  }
+  const quiet: string[] = [];
+  for (const [source, byDay] of days) {
+    const added = [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([, n]) => n);
+    const last = added.slice(-QUIET_DAYS);
+    const before = added.slice(-QUIET_DAYS - USUAL_DAYS, -QUIET_DAYS);
+    if (last.length < QUIET_DAYS || last.some((n) => n > 0) || before.length < 7) continue;
+    if (before.filter((n) => n > 0).length >= 0.8 * before.length) quiet.push(source);
+  }
+  return quiet.sort();
+}
+
 // ---------------------------------------------------------------------------------------------
 // health (Settings)
 
