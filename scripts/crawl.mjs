@@ -170,7 +170,8 @@ async function inspect(page, keys) {
     if (keys.has(m[0])) raw.add(m[0]);
   if (raw.size) problems.push(`raw text keys: ${[...raw].slice(0, 5).join(', ')}`);
   let prose = found.text;
-  for (const l of found.literal) prose = prose.split(l).join(' ');
+  // An empty code element would split the text into single characters.
+  for (const l of found.literal) if (l.trim()) prose = prose.split(l).join(' ');
   const placeholders = [...new Set(prose.match(/\{[a-zA-Z]\w*\}/g) ?? [])];
   if (placeholders.length) problems.push(`placeholders: ${placeholders.slice(0, 5).join(', ')}`);
   if (/Application error|Internal Server Error|Unhandled Runtime Error/.test(found.text))
