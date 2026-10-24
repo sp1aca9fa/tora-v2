@@ -17,10 +17,20 @@ import { type AnySQLiteColumn, alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from './client';
 import { collectorRuns, holdingEvents, holdings, products, tcgSets } from './schema';
 
-/** Case-insensitive substring match, with LIKE wildcards in the user's text escaped. */
+const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+/** Plain letters and digits in their full-width forms ("mega" to "ｍｅｇａ"). */
+const fullWidth = (text: string) =>
+  text.replace(/[!-~]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0));
+
+/**
+ * Case-insensitive substring match, with LIKE wildcards in the user's text escaped. Names typed
+ * in full-width letters ("ＭＥＧＡ") match too; the database lowercases plain letters only.
+ */
 function contains(column: AnySQLiteColumn, text: string): SQL {
-  const pattern = `%${text.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  return sql`lower(${column}) LIKE ${pattern} ESCAPE '\\'`;
+  const lower = text.toLowerCase();
+  const like = (t: string) => sql`lower(${column}) LIKE ${likePattern(t)} ESCAPE '\\'`;
+  if (!/[0-9a-z]/.test(lower)) return like(lower);
+  return or(like(lower), like(fullWidth(lower)), like(fullWidth(text.toUpperCase())))!;
 }
 
 /** Every whitespace-separated term must appear in at least one of the columns. */

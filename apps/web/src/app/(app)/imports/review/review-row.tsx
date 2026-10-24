@@ -1,6 +1,6 @@
 'use client';
 
-import { GRADERS, RAW_GRADES } from '@tora/core';
+import { GRADERS, RAW_GRADES, localDate } from '@tora/core';
 import { useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
@@ -96,6 +96,7 @@ export function ReviewRowFields({
               <Input
                 type="date"
                 value={row.acquiredAt}
+                max={localDate()}
                 onChange={(e) => update(item.id, { acquiredAt: e.target.value })}
                 className="w-40"
               />

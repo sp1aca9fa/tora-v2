@@ -7,6 +7,7 @@ import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
 import { setMarketSettings, saveSourceInfos, setSourceRoles } from './registry';
+import { getHoldingDetail, listInventory, searchProducts } from './queries';
 import { insertObservations } from './sources';
 import { TEST_SOURCES } from './testing';
 import { createUser, getActiveDevice, registerDevice, revokeDevice } from './users';
@@ -147,4 +148,44 @@ it('takes two devices per account, refuses a third, and forgets a revoked one', 
   // A signed-in session on the revoked device no longer finds it, and its slot is free.
   expect(await getActiveDevice(db, userId, phone!.id)).toBeFalsy();
   expect(await registerDevice(db, userId, 'tablet')).toBeTruthy();
+});
+
+it('keeps names and notes with markup, quotes, wildcards and emoji as typed, and finds them', async () => {
+  const names = [
+    '<script>alert(1)</script> Box',
+    "Robert'); DROP TABLE holdings;--",
+    '100% Pack_A \\ 50%',
+    'ピカチュウ🎴 ＭＥＧＡ ex',
+    'L'.repeat(1000),
+  ];
+  for (const name of names)
+    await createHolding(
+      db,
+      userId,
+      { product: { category: 'tcg', kind: 'single', name, cardNumber: '1' } },
+      {
+        quantity: 1,
+        costTotalBase: 0,
+        acquiredAt: new Date().toISOString(),
+        notes: `${name}\n"quoted" & <b>`,
+      },
+    );
+  const lots = await listInventory(db, userId);
+  expect(lots.map((l) => l.product.name).toSorted()).toEqual(names.toSorted());
+  for (const { holding, product } of lots) {
+    const detail = await getHoldingDetail(db, userId, holding.id);
+    expect(detail?.holding.notes).toBe(`${product.name}\n"quoted" & <b>`);
+  }
+  // Wildcards and quotes in a search are plain text; full-width letters match their plain forms.
+  const found = async (q: string) =>
+    (await listInventory(db, userId, { q })).map((l) => l.product.name);
+  expect(await found('%')).toEqual(['100% Pack_A \\ 50%']);
+  expect(await found('_')).toEqual(['100% Pack_A \\ 50%']);
+  expect(await found('\\')).toEqual(['100% Pack_A \\ 50%']);
+  expect(await found("'); DROP")).toEqual(["Robert'); DROP TABLE holdings;--"]);
+  expect(await found('🎴')).toEqual(['ピカチュウ🎴 ＭＥＧＡ ex']);
+  expect(await found('<script>')).toHaveLength(1);
+  expect((await searchProducts(db, 'mega')).map((p) => p.name)).toEqual([
+    'ピカチュウ🎴 ＭＥＧＡ ex',
+  ]);
 });

@@ -35,7 +35,12 @@ export const amount = z
 export const optAmount = z
   .preprocess(amountText, z.coerce.number().min(0).max(1e11).optional())
   .transform((n) => (n === undefined ? undefined : inBase(n)));
-export const qty = z.preprocess(trimmed, z.coerce.number().int().min(1).max(100_000));
+/** Full-width digits ("３") read as their plain forms. */
+const wholeText = (v: unknown) => {
+  const t = trimmed(v);
+  return typeof t === 'string' ? t.normalize('NFKC') : t;
+};
+export const qty = z.preprocess(wholeText, z.coerce.number().int().min(1).max(100_000));
 export const dateText = z.preprocess(trimmed, z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
 export const optDateText = z.preprocess(
   trimmed,
