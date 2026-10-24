@@ -42,7 +42,7 @@
 | S20 part 2 | Pull rates as a plug-in kind (suggested rates come from plug-ins, the built-in list moves to the public plug-in package) | built 2026-10-20 (no migration; suggestions appear after the next collect or `pnpm plugins`) |
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
-| S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | in progress (2026-10-23): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); next B the deep dive, D the write-up |
+| S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | in progress (2026-10-23): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B in progress (2026-10-24: pages on a scrubbed copy of the owner's data reviewed and fixed, see Part B; next the phase-by-phase check of the chapters), then D the write-up |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | todo (user, 2026-10-14; infinite scroll added 2026-10-20) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
@@ -812,6 +812,19 @@ On the analysis copy (2026-10-23 morning), read only. No lot imported twice (sam
 2. One item twice: ブラッキーVMAX HR registered twice and both linked to one SNKRDUNK listing; a sale is stored once per site, so the held item had 15 sales and its empty twin 2,224. The look-alike check compared only the person's own items. Now it compares every item (shown when one is the person's), a new check lists listings linked to several items (MCP `shared_listings`), and picking or pasting a listing already linked to another item opens the merge page instead (with why). The user merges the pair in the app.
 3. Dead links: SNKRDUNK pages answering 404, 駿河屋 items and TCGplayer products not found made three sources "partial" every night, hiding new failures. A listing reported gone (HTTP 404 / 410, or `ListingGoneError` from the plug-in; other errors never count) 3 nights in a row is set aside (`product_sources.failure`, migration 0055): no longer collected, the run is not partial for it, and its item gets an Actions card saying since when and why, until a new link is picked or pasted (linking resets it).
 4. Small mismatches: the Portfolio total and the chart's point for today differed by about ¥20k (0.7 %): today's point counted a window up to the end of the day, the total one up to the collect; today's point is now valued as of the run. 4 PSA 10 sales stored twice on 2026-10-12 and 10-14 under SNKRDUNK's two sales lists (probably from merging two items that each had the listing): excluded by a one-off command on the server. Buy timing's listing in the zone: see S13 part 1's note.
+
+### Part B: the deep dive (started 2026-10-24)
+
+A copy of the analysis database with eBay rows, alert channels and devices removed, run in the test copy and crawled at both widths (71 pages, none with problems), screenshots read for numbers that disagree. Found and fixed (user):
+1. The hourly retry kept asking a shop that answered 429 all day (a blocked source failed the run): a source blocked today is left until tomorrow.
+2. The crawler crashed on an empty code element (split the page text into characters); it now shows amounts too.
+3. Portfolio category tiles left out opened lots' cost, so their P/L summed ¥11k off the header's.
+4. Price chart lines shared colours (three colours by position among all sources): the palette's eight colours.
+5. Conditions shown as codes (sealed:shrink, cond:good) on item, lot, Buy timing, Opportunities and source pages: shown by name.
+6. A corrected purchase date left the lot's Acquired history entry on the day it was entered (19 lots): it moves now; migration 0058 moves the old ones.
+7. The Opportunities card's price (30-day median) read like the market value: labelled.
+8. Small display: axis years, the P/L arrow wrapping on phones, the Top movers title cut, the 180-day position text.
+Noted for later: Opportunities numbers come from the last collect while other pages are live, so they drift within a day.
 
 ### Part C: the Spain + Brazil setup (2026-10-23)
 
