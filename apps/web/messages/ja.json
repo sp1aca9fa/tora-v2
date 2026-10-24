@@ -1758,7 +1758,12 @@
       "serverEvent": "サーバー",
       "setupKept": "初期設定を確定",
       "statusTokenNew": "ステータストークンを作成",
-      "statusTokenRemoved": "ステータストークンを削除"
+      "statusTokenRemoved": "ステータストークンを削除",
+      "storeAdded": "店舗を追加",
+      "storeRemoved": "店舗を削除",
+      "storeCodes": "店舗のコード",
+      "glossaryAdded": "コードの意味を追加",
+      "glossaryRemoved": "コードの意味を削除"
     },
     "role": {
       "admin": "管理者",

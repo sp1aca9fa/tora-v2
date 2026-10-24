@@ -826,7 +826,8 @@ A copy of the analysis database with eBay rows, alert channels and devices remov
 8. Small display: axis years, the P/L arrow wrapping on phones, the Top movers title cut, the 180-day position text.
 9. Changing the base currency (S16) left amounts of tables added later in the old currency: watch targets, shops' asks, imported rows, the saved daily numbers (the sharp-drop alert would have compared old with new), buy plan budgets and data review evidence. Now converted too.
 10. The backup read 2,000 rows per request from every table, the store post pictures too (up to 8 MB each): tables holding files are read 10 rows at a time.
-Chapters checked against the code: S8, S11, S16, S6.
+11. The store directory's admin changes (stores added or removed, store codes, code meanings; S25) were missing from the Activity log: recorded now.
+Chapters checked against the code: S8, S11, S16, S6, S17.
 Noted for later: Opportunities numbers come from the last collect while other pages are live, so they drift within a day.
 
 ### Part C: the Spain + Brazil setup (2026-10-23)
@@ -868,6 +869,7 @@ Fixed (2026-10-24, user: 1 and 3-12; 2 not needed, 9 is Claude's sandbox):
 Follow-ups (user, 2026-10-24):
 - Set catalogs are plug-ins: the TCG set lists moved from the core (`packages/catalog`) to the public plug-in package (`collectors-public/catalog`, `catalogs` in a plug-in module); only the regions a set category lists are loaded (a watches-only setup loads none; the Spain test copy with English and Spanish prints kept 539 of 1,962 sets), and the collect loads them when they or the categories change (`pnpm catalog:sync` only to do it at once). Why (user): nothing particular to one setup in the core; a person tracking other things in Spain and Brazil needs no Pokemon sets.
 - Pages gone: SNKRDUNK deleted the nine 30th CELEBRATION カードセット(御三家) pages (HTTP 404 from 2026-10-20). Part A's set-aside covers it (3 nights gone, an Actions card); now admins are told too: one alert after the run (item, site, error), a line in their morning summary while any wait, and the Actions card even for items they do not hold.
+
 ## S17: Notifications and activity log
 
 Idea (user, 2026-10-16): alerts that reach the user outside the app, and a log of what happened. The user first planned alerts by email, Telegram or Discord; "price alerts" went into S9 without a channel. Placed after S6 and before S9, so S9's price alerts have somewhere to go.

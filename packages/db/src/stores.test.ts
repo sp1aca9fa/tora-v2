@@ -345,8 +345,8 @@ it('adds and removes stores by hand, never a plug-in one', async () => {
   });
   expect((await listStores(db)).some((s) => s.id === added.id)).toBe(true);
   const [plugin] = (await listStores(db)).filter((s) => s.source === 'test');
-  expect(await removeStore(db, plugin!.id)).toBe(false);
-  expect(await removeStore(db, added.id)).toBe(true);
+  expect(await removeStore(db, plugin!.id)).toBeNull();
+  expect(await removeStore(db, added.id)).toBe(added.name);
 });
 
 it('keeps each board apart: a board giving no posts while the feed runs is told once', async () => {

@@ -1758,7 +1758,12 @@
       "serverEvent": "Servidor",
       "setupKept": "Valores iniciales confirmados",
       "statusTokenNew": "Token de estado creado",
-      "statusTokenRemoved": "Token de estado eliminado"
+      "statusTokenRemoved": "Token de estado eliminado",
+      "storeAdded": "Tienda añadida",
+      "storeRemoved": "Tienda eliminada",
+      "storeCodes": "Códigos de la tienda",
+      "glossaryAdded": "Significado de código añadido",
+      "glossaryRemoved": "Significado de código eliminado"
     },
     "role": {
       "admin": "administrador",

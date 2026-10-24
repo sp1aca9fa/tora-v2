@@ -133,13 +133,20 @@ export async function cachedStores(db: Pick<Db, 'select'>, now = Date.now()): Pr
 export const storeCodes = (s: Store) => [...s.codes, ...(s.extraCodes ?? [])];
 
 /** Codes the admin adds to a store (posters' nicknames the plug-in does not know). */
-export async function setStoreCodes(db: Db, storeId: string, codes: string[]) {
+/** Returns the store's name (null: no such store). */
+export async function setStoreCodes(
+  db: Db,
+  storeId: string,
+  codes: string[],
+): Promise<string | null> {
   forgetStores();
   const clean = [...new Set(codes.map((c) => c.normalize('NFKC').trim()).filter(Boolean))];
-  await db
+  const [row] = await db
     .update(stores)
     .set({ extraCodes: clean.length ? clean : null })
-    .where(eq(stores.id, storeId));
+    .where(eq(stores.id, storeId))
+    .returning({ name: stores.name });
+  return row?.name ?? null;
 }
 
 // ---- Feed tokens ----
@@ -996,13 +1003,13 @@ export async function addStore(db: Db, entry: StoreEntry): Promise<Store> {
 }
 
 /** Removes a store an admin added (plug-in stores come back with their plug-in). */
-export async function removeStore(db: Db, storeId: string): Promise<boolean> {
+export async function removeStore(db: Db, storeId: string): Promise<string | null> {
   forgetStores();
-  const gone = await db
+  const [gone] = await db
     .delete(stores)
     .where(and(eq(stores.id, storeId), eq(stores.source, ADMIN_STORES)))
-    .returning({ id: stores.id });
-  return gone.length > 0;
+    .returning({ name: stores.name });
+  return gone?.name ?? null;
 }
 
 // ---- Codes that are no store ----

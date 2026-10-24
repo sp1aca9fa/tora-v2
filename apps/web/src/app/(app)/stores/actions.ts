@@ -14,6 +14,7 @@ import {
   addStore,
   forgetBoard,
   newFeedToken,
+  recordAdminChange,
   removeGlossary,
   removeStore,
   setPreferences,
@@ -72,7 +73,10 @@ export async function newFeedTokenAction(): Promise<string> {
 export async function setStoreCodesAction(storeId: string, codes: string[]) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
-  await setStoreCodes(db, storeId, codes.map(String).slice(0, 30));
+  const clean = codes.map(String).slice(0, 30);
+  const store = await setStoreCodes(db, storeId, clean);
+  if (store)
+    await recordAdminChange(db, user.id, 'storeCodes', { store, to: clean }, '/stores/area');
   revalidatePath('/stores');
 }
 
@@ -120,7 +124,7 @@ export async function addStoreAction(input: {
     lon = m ? Number(m[2]) : NaN;
     if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) return { error: 'location' };
   }
-  await addStore(db, {
+  const store = await addStore(db, {
     chain,
     chainLabel: input.chainLabel.trim() || null,
     name,
@@ -136,6 +140,7 @@ export async function addStoreAction(input: {
     lat,
     lon,
   });
+  await recordAdminChange(db, user.id, 'storeAdded', { store: store.name }, '/stores/area');
   revalidatePath('/stores');
   return {};
 }
@@ -144,7 +149,8 @@ export async function addStoreAction(input: {
 export async function removeStoreAction(storeId: string) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
-  await removeStore(db, storeId);
+  const store = await removeStore(db, storeId);
+  if (store) await recordAdminChange(db, user.id, 'storeRemoved', { store }, '/stores/area');
   revalidatePath('/stores');
 }
 
@@ -167,6 +173,7 @@ export async function addGlossaryAction(
   const m = meaning.trim();
   if (!c || !m || c.length > 20 || m.length > 200) return { error: 'glossary' };
   await addGlossary(db, { code: c, meaning: m, ...(product === true ? { product: true } : {}) });
+  await recordAdminChange(db, user.id, 'glossaryAdded', { code: c, meaning: m }, '/stores/area');
   revalidatePath('/stores');
   return {};
 }
@@ -175,6 +182,7 @@ export async function removeGlossaryAction(code: string) {
   const { db, user } = await authed();
   if (user.role !== 'admin') return;
   await removeGlossary(db, String(code));
+  await recordAdminChange(db, user.id, 'glossaryRemoved', { code: String(code) }, '/stores/area');
   revalidatePath('/stores');
 }
 

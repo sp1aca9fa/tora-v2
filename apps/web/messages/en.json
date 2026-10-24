@@ -1758,7 +1758,12 @@
       "serverEvent": "Server",
       "setupKept": "Setup defaults kept",
       "statusTokenNew": "Status token made",
-      "statusTokenRemoved": "Status token removed"
+      "statusTokenRemoved": "Status token removed",
+      "storeAdded": "Store added",
+      "storeRemoved": "Store removed",
+      "storeCodes": "Store codes",
+      "glossaryAdded": "Code meaning added",
+      "glossaryRemoved": "Code meaning removed"
     },
     "role": {
       "admin": "admin",
