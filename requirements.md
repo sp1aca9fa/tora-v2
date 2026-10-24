@@ -44,7 +44,7 @@
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
-| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; five fixes measured on medium and large (nav badge, Portfolio movers, nightly snapshot memory, Items loads as you scroll, valuation reads); left over the target on large: Portfolio on a phone, Items on a phone (just), Opportunities on a PC |
+| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
@@ -846,6 +846,23 @@ Progress:
 | Other pages | about 200 / 750 -> 155 / 680 | about 145 / 500 -> 120 / 480 |
 
   Still over the 1 s warm LCP on large: Portfolio on a phone, Items on a phone (just), Opportunities on a PC (714 items listed on large, all drawn with the page; 9 on the owner's data).
+- 2026-10-25, step 3 continued (user: fix all three): Opportunities loads as you scroll like Items (714 items on large); saved market movers keep the 3 up and 3 down per period a panel shows (5.2 MB read on every Portfolio visit -> 16 KB) and trade counts read only the items a panel shows; the Portfolio chart comes with the page (a saved series, quick to read). The page skeleton held every first paint back about 350 ms (React reveals a streamed page in timed batches): removed, the tapped menu link shows a loading mark instead (user's choice).
+- After (2026-10-25, warm HTML / LCP ms; the same machine and copies as the baseline). Every page within the targets on both; CLS 0.02 at most.
+
+| Page | Owner data, phone | Owner data, wide | Large, phone | Large, wide |
+|---|---|---|---|---|
+| Portfolio | 147 / 300 | 85 / 140 | 491 / 628 | 397 / 452 |
+| Items | 119 / 400 | 49 / 200 | 468 / 692 | 374 / 520 |
+| Item | 110 / 288 | 45 / 120 | 162 / 340 | 144 / 204 |
+| Lot | 109 / 296 | 34 / 96 | 179 / 384 | 118 / 184 |
+| Actions | 111 / 308 | 37 / 96 | 281 / 768 | 196 / 316 |
+| Imports | 112 / 284 | 33 / 96 | 160 / 328 | 114 / 168 |
+| Opportunities | 118 / 384 | 49 / 136 | 455 / 980 | 384 / 512 |
+| Watchlist | 105 / 288 | 39 / 96 | 157 / 332 | 141 / 192 |
+| Stores | 103 / 264 | 35 / 88 | 161 / 312 | 116 / 160 |
+| Settings | 107 / 276 | 42 / 92 | 161 / 312 | 114 / 156 |
+
+  Not measured by : INP and the save times (step 1's other targets), and cold starts on the server; for S15 and the user's check.
 
 Acceptance:
 - Targets met on production and on the large dataset; the baseline and after tables recorded here.
