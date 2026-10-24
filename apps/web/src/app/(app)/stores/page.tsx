@@ -47,6 +47,11 @@ export default async function NowPage({
   });
   const views = await toViews(db, area, posts);
 
+  /** When a store's threads last had a message, replies included. */
+  const newest = (list: Thread[]) =>
+    list
+      .flatMap((th) => [th.post, ...th.replies])
+      .reduce((at, p) => (p.postedAt > at ? p.postedAt : at), '');
   /** Threads by location, then by store, the newest first. */
   const group = (list: Thread[]) => {
     const out = new Map<string, Map<string, Thread[]>>();
@@ -61,21 +66,25 @@ export default async function NowPage({
         if (!had.includes(thread)) stores.set(id, [...had, thread]);
       }
     }
-    return [...out].map(([id, stores]) => {
-      const all = [...new Set([...stores.values()].flat())].sort((a, b) =>
-        b.post.postedAt.localeCompare(a.post.postedAt),
-      );
-      return {
-        location: locations.get(id)!,
-        stores: [...stores],
-        latest: all[0]!.post,
-        n: all.length,
-      };
-    });
+    // The latest message counts a reply too ("終了", "並び600" often come as comments).
+    return [...out]
+      .map(([id, stores]) => {
+        const messages = [...new Set([...stores.values()].flat())]
+          .flatMap((th) => [th.post, ...th.replies])
+          .sort((a, b) => b.postedAt.localeCompare(a.postedAt));
+        return {
+          location: locations.get(id)!,
+          stores: [...stores].sort(([, a], [, b]) => newest(b).localeCompare(newest(a))),
+          latest: messages[0]!,
+          n: messages.length,
+        };
+      })
+      .sort((a, b) => b.latest.postedAt.localeCompare(a.latest.postedAt));
   };
   const all = threads(views);
-  const todays = group(all.filter((th) => th.post.postedAt >= today));
-  const earlier = group(all.filter((th) => th.post.postedAt < today));
+  // A thread is today's when its post or a reply is.
+  const todays = group(all.filter((th) => newest([th]) >= today));
+  const earlier = group(all.filter((th) => newest([th]) < today));
 
   const storeName = (id: string) => {
     const s = byId.get(id);
@@ -88,7 +97,9 @@ export default async function NowPage({
     );
   /** The store of a location's latest post. */
   const latestStore = (stores: [string, Thread[]][], latest: PostView) =>
-    stores.find(([, list]) => list.some((th) => th.post === latest))?.[0] ?? '';
+    stores.find(([, list]) =>
+      list.some((th) => th.post === latest || th.replies.includes(latest)),
+    )?.[0] ?? '';
   const row = ({ location, stores, latest, n }: (typeof todays)[number]) => (
     <details key={location.id} className="group rounded-xl border bg-card">
       <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
@@ -116,18 +127,16 @@ export default async function NowPage({
         </span>
       </summary>
       <div className="space-y-3 border-t px-4 pt-2 pb-3">
-        {stores
-          .sort(([, a], [, b]) => b[0]!.post.postedAt.localeCompare(a[0]!.post.postedAt))
-          .map(([id, list]) => (
-            <section key={id}>
-              <h3 className="text-sm font-medium">{storeName(id)}</h3>
-              <ul className="divide-y border-l pl-3">
-                {list.map(({ post, replies }) => (
-                  <PostItem key={post.id} post={post} replies={replies} stores={false} />
-                ))}
-              </ul>
-            </section>
-          ))}
+        {stores.map(([id, list]) => (
+          <section key={id}>
+            <h3 className="text-sm font-medium">{storeName(id)}</h3>
+            <ul className="divide-y border-l pl-3">
+              {list.map(({ post, replies }) => (
+                <PostItem key={post.id} post={post} replies={replies} stores={false} />
+              ))}
+            </ul>
+          </section>
+        ))}
       </div>
     </details>
   );
