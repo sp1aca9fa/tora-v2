@@ -366,6 +366,10 @@
         "title": "データベース",
         "info": "今月、ホスト型データベースが読み書きした行数と無料プランの上限。"
       },
+      "server": {
+        "title": "サーバー",
+        "info": "サーバーのバージョン、サービス、ディスク、ログ（閲覧のみ）。"
+      },
       "commands": {
         "title": "コマンド",
         "info": "自宅PCのコマンドとその説明。"
@@ -1298,6 +1302,36 @@
       "migrate": "マイグレーション"
     }
   },
+  "server": {
+    "title": "サーバーの状態",
+    "info": "サーバーで動いているものとその状態（閲覧のみ）。秘密の設定値と、AIモデルに渡さないソースに関する行は省かれます。",
+    "version": "バージョン {commit}（{date}）: {subject}",
+    "noVersion": "バージョン不明（gitのチェックアウトなし）。",
+    "host": "{platform}、Node {node}。起動から {up} 時間、アプリは {app} 時間。",
+    "memory": "空きメモリ {free} / {total} MB、負荷 {load}。",
+    "disk": "ディスク（{name}）: 空き {free} GB / {total} GB。",
+    "diskName": {
+      "state": "ログとバックアップ",
+      "database": "データベース"
+    },
+    "last": "最後の収集 {collect}、最後のバックアップ {backup}。",
+    "units": "サービス",
+    "noUnits": "ここではサービスを読めません（{reason}）。",
+    "timers": "タイマー",
+    "timer": "次回 {next}、前回 {last}",
+    "logs": "ログ（最後の行）",
+    "noLogs": "状態フォルダーにログがありません。",
+    "token": "閲覧専用ステータストークン",
+    "tokenInfo": "アカウントなしで、補助ツール（Claude Code、監視ツール）が /api/server/status でこの状態を読めるようにします。何も変更できません。パスワードと同じように保管してください。",
+    "noToken": "トークンなし: 外部から状態は読めません。",
+    "tokenSince": "{date} に作成したトークンが有効です。",
+    "tokenOnce": "今コピーしてください。再表示されません。",
+    "create": "トークンを作成",
+    "replace": "新しいトークンを作成",
+    "replaceConfirm": "今のトークンは使えなくなります。新しく作成しますか？",
+    "remove": "削除",
+    "removeConfirm": "トークンを削除しますか？外部から状態を読めなくなります。"
+  },
   "commands": {
     "info": "自宅PCのターミナル（WSLまたはLinux）でToraのフォルダから実行するコマンドです。このページからは何も実行されません。コマンドをコピーし、<山かっこ>の部分を書き換えてください。",
     "guide": "ガイド",
@@ -1719,7 +1753,9 @@
       "serverUpdate": "サーバーを更新",
       "serverUpdateFailed": "サーバーの更新に失敗（元に戻しました）",
       "serverEvent": "サーバー",
-      "setupKept": "初期設定を確定"
+      "setupKept": "初期設定を確定",
+      "statusTokenNew": "ステータストークンを作成",
+      "statusTokenRemoved": "ステータストークンを削除"
     },
     "role": {
       "admin": "管理者",

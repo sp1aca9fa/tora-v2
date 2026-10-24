@@ -182,3 +182,15 @@ are better answered from the analysis copy (see [Backups](backups.md)). The Tora
 the exception (its tools read a few hundred rows; `query_sql` reads the analysis copy). To run a
 command against Turso from a Claude Code session anyway, prefix it yourself:
 `TORA_ALLOW_TURSO=1 pnpm ...`. A database server on this machine (localhost) is always allowed.
+
+## The server's status (Settings > Admin > Server)
+
+On a self-hosted server, admins see what it runs without a terminal: the version (git commit),
+uptime, memory, disk, the systemd services and timers named `tora-*` (`TORA_UNITS` for another
+pattern), the last collect and backup, and the end of each log in the state folder. Read-only.
+
+For a helper on another machine (Claude Code, a monitoring tool), make a read-only token there:
+it reads the same at `/api/server/status` (`Authorization: Bearer <token>`; `?lines=` per log,
+`?log=collect` for one log) and can change nothing. Values of secret settings and lines naming a
+source kept from AI models are left out. With `TORA_STATUS_URL` (the app's address) and
+`TORA_STATUS_TOKEN` in `.env`, `node scripts/server-status.mjs` prints it.

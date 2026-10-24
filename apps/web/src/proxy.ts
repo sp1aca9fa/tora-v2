@@ -38,8 +38,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Everything except the login pages and public static assets (PWA manifest and icons must
   // load without credentials). A hosting platform's cron job checks its own secret (api/cron), store notice
-  // feeds their token (api/feed).
+  // feeds their token (api/feed), the server's status its read-only token (api/server).
   matcher: [
-    '/((?!login|api/cron/|api/feed/|_next/static|_next/image|icons/|manifest\\.webmanifest|favicon\\.ico|icon\\.svg|apple-icon).*)',
+    '/((?!login|api/cron/|api/feed/|api/server/|_next/static|_next/image|icons/|manifest\\.webmanifest|favicon\\.ico|icon\\.svg|apple-icon).*)',
   ],
 };

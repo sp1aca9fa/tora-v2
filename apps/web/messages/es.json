@@ -366,6 +366,10 @@
         "title": "Base de datos",
         "info": "Filas que la base de datos alojada leyó y escribió este mes, frente al plan gratuito."
       },
+      "server": {
+        "title": "Servidor",
+        "info": "El servidor: versión, servicios, disco y registros, solo lectura."
+      },
       "commands": {
         "title": "Comandos",
         "info": "Los comandos del PC de casa y qué hace cada uno."
@@ -1298,6 +1302,36 @@
       "migrate": "Migración"
     }
   },
+  "server": {
+    "title": "Estado del servidor",
+    "info": "Qué ejecuta el servidor y cómo va, solo lectura. Se omiten los valores de ajustes secretos y las líneas sobre fuentes excluidas de modelos de IA.",
+    "version": "Versión {commit} del {date}: {subject}",
+    "noVersion": "Versión desconocida (sin copia de git).",
+    "host": "{platform}, Node {node}. Encendido {up} h; la app {app} h.",
+    "memory": "Memoria libre {free} de {total} MB; carga {load}.",
+    "disk": "Disco ({name}): {free} GB libres de {total} GB.",
+    "diskName": {
+      "state": "registros y copias",
+      "database": "base de datos"
+    },
+    "last": "Última recogida {collect}; última copia {backup}.",
+    "units": "Servicios",
+    "noUnits": "Los servicios no se pueden leer aquí ({reason}).",
+    "timers": "Temporizadores",
+    "timer": "próximo {next}, último {last}",
+    "logs": "Registros (últimas líneas)",
+    "noLogs": "No hay registros en la carpeta de estado.",
+    "token": "Token de estado de solo lectura",
+    "tokenInfo": "Permite a un asistente (Claude Code, una herramienta de monitorización) leer este estado en /api/server/status sin cuenta. No puede cambiar nada. Guárdalo como una contraseña.",
+    "noToken": "Sin token: nadie puede leer el estado desde fuera.",
+    "tokenSince": "Hay un token creado el {date} en uso.",
+    "tokenOnce": "Cópialo ahora: no se vuelve a mostrar.",
+    "create": "Crear un token",
+    "replace": "Crear un token nuevo",
+    "replaceConfirm": "El token actual dejará de funcionar. ¿Crear uno nuevo?",
+    "remove": "Eliminar",
+    "removeConfirm": "¿Eliminar el token? Nadie podrá leer el estado desde fuera."
+  },
   "commands": {
     "info": "Comandos para ejecutar en el PC de casa, en un terminal dentro de la carpeta de Tora (WSL o Linux). Nada se ejecuta desde esta página: copia un comando y rellena las partes entre <corchetes angulares>.",
     "guide": "Guía",
@@ -1719,7 +1753,9 @@
       "serverUpdate": "Servidor actualizado",
       "serverUpdateFailed": "Fallo al actualizar el servidor (volvió atrás)",
       "serverEvent": "Servidor",
-      "setupKept": "Valores iniciales confirmados"
+      "setupKept": "Valores iniciales confirmados",
+      "statusTokenNew": "Token de estado creado",
+      "statusTokenRemoved": "Token de estado eliminado"
     },
     "role": {
       "admin": "administrador",

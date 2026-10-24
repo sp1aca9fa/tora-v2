@@ -37,6 +37,12 @@ watch's "Alert on Good price even with limited data" is off. Tora remembers each
 an item that slips out of its zone and back within 14 days does not alert twice; changing a
 watch's condition or target starts over.
 
+### What was sent (Settings > Alerts > History)
+
+Every message Tora sent you, newest first: its kind, the channel (Telegram or Discord, and its
+name), the text as it went out, and whether it arrived (with the error when it did not). Filter by
+kind, channel, outcome and dates. Kept 180 days; a removed channel's messages stay.
+
 ## Setting up (admin, once)
 
 1. **The morning check.** On your own server, nothing to do: the app runs it itself from 08:00

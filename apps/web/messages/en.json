@@ -366,6 +366,10 @@
         "title": "Database",
         "info": "Rows the hosted database read and wrote this month, against the free plan."
       },
+      "server": {
+        "title": "Server",
+        "info": "The server: version, services, disk and logs, read-only."
+      },
       "commands": {
         "title": "Commands",
         "info": "The home PC's commands and what each does."
@@ -1298,6 +1302,36 @@
       "migrate": "Migrate"
     }
   },
+  "server": {
+    "title": "Server status",
+    "info": "What the server runs and how it is doing, read-only. Values of secret settings and lines about sources kept from AI models are left out.",
+    "version": "Version {commit} of {date}: {subject}",
+    "noVersion": "Version unknown (no git checkout).",
+    "host": "{platform}, Node {node}. Up {up} h; the app {app} h.",
+    "memory": "Memory free {free} of {total} MB; load {load}.",
+    "disk": "Disk ({name}): {free} GB free of {total} GB.",
+    "diskName": {
+      "state": "logs and backups",
+      "database": "database"
+    },
+    "last": "Last collect {collect}; last backup {backup}.",
+    "units": "Services",
+    "noUnits": "Services cannot be read here ({reason}).",
+    "timers": "Timers",
+    "timer": "next {next}, last {last}",
+    "logs": "Logs (last lines)",
+    "noLogs": "No logs in the state folder.",
+    "token": "Read-only status token",
+    "tokenInfo": "Lets a helper (Claude Code, a monitoring tool) read this status at /api/server/status without an account. It can change nothing. Keep it like a password.",
+    "noToken": "No token: nobody can read the status from outside.",
+    "tokenSince": "A token made {date} is in use.",
+    "tokenOnce": "Copy it now: it is not shown again.",
+    "create": "Make a token",
+    "replace": "Make a new token",
+    "replaceConfirm": "The current token stops working. Make a new one?",
+    "remove": "Remove",
+    "removeConfirm": "Remove the token? Nobody can read the status from outside anymore."
+  },
   "commands": {
     "info": "Commands to run on the home PC, in a terminal in the Tora folder (WSL or Linux). Nothing runs from this page: copy a command, then fill in the parts in <angle brackets>.",
     "guide": "Guide",
@@ -1719,7 +1753,9 @@
       "serverUpdate": "Server updated",
       "serverUpdateFailed": "Server update failed (went back)",
       "serverEvent": "Server",
-      "setupKept": "Setup defaults kept"
+      "setupKept": "Setup defaults kept",
+      "statusTokenNew": "Status token made",
+      "statusTokenRemoved": "Status token removed"
     },
     "role": {
       "admin": "admin",
