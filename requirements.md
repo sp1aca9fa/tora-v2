@@ -44,7 +44,7 @@
 | S21 | Admin account tasks in the app (create users, reset password or 2FA, devices, disable) | built 2026-10-20 (migration 0050), awaiting the user's check |
 | S13 | Opportunities and buy suggestions: signals that find opportunities within a category (from current data, then ranking plugins), then what to buy and when within a budget and a target date | built 2026-10-21 (parts 1-4: signals and their tests, MCP, the Opportunities page, ranking plug-ins and candidates, budget and date), awaiting the user's check; later: rank changes as signals, a Claude digest if an API key comes |
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | in progress (2026-10-23): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built); awaiting the user's check |
-| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | todo (user, 2026-10-14; infinite scroll added 2026-10-20) |
+| S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` built, a first look on the dev server; the baseline waits for a production build |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | todo (user, 2026-10-14) |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
 
@@ -796,6 +796,10 @@ Steps:
    - A role or market change clears every saved value and rebuilds them (about 10 s today); at large size, rebuild only what changed.
    - Collector writes: batch inserts and per-source timings at large size.
 4. Guard: `pnpm perf` runs before each release; a page more than 30 % slower than the baseline, or over a target, is reported.
+
+Progress:
+- 2026-10-24, step 1's tool: `pnpm perf` (scripts/perf.mjs; sign-in shared with the crawler in scripts/session.mjs) opens Portfolio, Items, an item, a lot, Actions, Imports, Opportunities, Watchlist, Stores and Settings at phone width (Chrome's Fast 4G, a 4x slower CPU) and wide width, once with an empty browser cache ("first") and then 3 more times ("warm", the median), and prints when the HTML finished streaming, LCP, CLS, HTML and JavaScript sizes, and database round trips and their time per page (counted when the server runs with `TORA_PERF=1`, read from `/api/perf`). `--out` saves a run; `--baseline` marks pages over 30 % slower (step 4's guard); a page over a target fails the run. Tora is self-hosted since this chapter was written: "cold" now means an empty browser cache, not the hosted database waking up.
+- First look on the dev server with the owner's data (sizes and times are dev's, not a build's; round trips are real): Portfolio 91 round trips, Items 68 to 128 (about 200 ms in the database), Actions 55 (about 250 ms), Opportunities 40 to 52, the item and lot pages 26 to 33, the rest under 30; every page loads about 900 KB of JavaScript in dev. The baseline table waits for a production build.
 
 Acceptance:
 - Targets met on production and on the large dataset; the baseline and after tables recorded here.

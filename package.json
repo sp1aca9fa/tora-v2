@@ -13,6 +13,7 @@
     "build": "pnpm -r --workspace-concurrency=1 build",
     "test": "vitest run",
     "crawl": "node scripts/crawl.mjs",
+    "perf": "node scripts/perf.mjs",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck && node scripts/typecheck-collectors.mjs",
     "lint": "eslint .",
