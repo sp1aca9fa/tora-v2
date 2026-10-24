@@ -1,8 +1,8 @@
 // "Download my data" (requirements S6): an account's own data as one JSON file. Collected sale
 // prices are left out (other sites' terms, eBay's among them, do not allow passing them on); each
 // lot carries its current value instead. Sign-in secrets are never included.
-import { appTimeZone, baseCurrency } from '@tora/core';
-import { asc, eq, inArray } from 'drizzle-orm';
+import { appTimeZone, baseCurrency, newId } from '@tora/core';
+import { type Table, asc, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadSourceRegistry } from './registry';
 import {
@@ -14,6 +14,7 @@ import {
   productSources,
   products,
   purchaseLinks,
+  tcgSets,
   users,
   watches,
 } from './schema';
@@ -106,5 +107,215 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
       .select()
       .from(cancelledOrders)
       .where(eq(cancelledOrders.userId, userId)),
+  };
+}
+
+/** No lots, watches or manual prices: a download can be loaded into it. */
+export async function accountIsEmpty(db: Db, userId: string): Promise<boolean> {
+  for (const table of [holdings, watches, manualPrices]) {
+    const [any] = await db
+      .select({ id: table.id })
+      .from(table)
+      .where(eq(table.userId, userId))
+      .limit(1);
+    if (any) return false;
+  }
+  return true;
+}
+
+export type AccountLoadError = 'format' | 'version' | 'currency' | 'notEmpty';
+
+export interface AccountLoadResult {
+  /** Items in the file, and those this install did not have (added). */
+  items: number;
+  itemsAdded: number;
+  lots: number;
+  history: number;
+  watches: number;
+  manualPrices: number;
+}
+
+type Row = Record<string, unknown>;
+
+/** The rows of `key` in the file (an array of objects with an id, else none). */
+const rowsOf = (data: Row, key: string): Row[] =>
+  Array.isArray(data[key])
+    ? (data[key] as unknown[]).filter(
+        (r): r is Row => !!r && typeof r === 'object' && typeof (r as Row).id === 'string',
+      )
+    : [];
+
+/** Only the table's own columns (the file adds a lot's value, which is worked out again). */
+function columnsOf(table: Table, row: Row): Row {
+  const out: Row = {};
+  for (const key of Object.keys(getTableColumns(table))) if (key in row) out[key] = row[key];
+  return out;
+}
+
+/**
+ * Loads a "Download my data" file into an empty account (requirements S15, S6's "later"): moving
+ * an account to another install, or back after a reset. The person's rows get new ids (the same
+ * install may still hold the originals), every id inside them is renamed to match; items this
+ * install has are used as they are, others are added with their listings (the next collect fetches
+ * their sales). Amounts are in the file's base currency, so it must be this install's. All or
+ * nothing.
+ */
+export async function loadAccountData(
+  db: Db,
+  userId: string,
+  file: unknown,
+): Promise<AccountLoadResult | { error: AccountLoadError }> {
+  if (!file || typeof file !== 'object') return { error: 'format' };
+  const data = file as Row;
+  if (data.format !== ACCOUNT_DATA_FORMAT) return { error: 'format' };
+  if (data.version !== ACCOUNT_DATA_VERSION) return { error: 'version' };
+  const registry = await loadSourceRegistry(db);
+  const app = data.app as { baseCurrency?: unknown } | undefined;
+  if (app?.baseCurrency !== baseCurrency(registry)) return { error: 'currency' };
+  for (const table of [holdings, watches, manualPrices]) {
+    const [any] = await db
+      .select({ id: table.id })
+      .from(table)
+      .where(eq(table.userId, userId))
+      .limit(1);
+    if (any) return { error: 'notEmpty' };
+  }
+
+  const items = rowsOf(data, 'items');
+  const lots = rowsOf(data, 'lots');
+  const history = rowsOf(data, 'history');
+  const manual = rowsOf(data, 'manualPrices');
+  const watched = rowsOf(data, 'watches');
+  const runs = rowsOf(data, 'importRuns');
+  const links = rowsOf(data, 'purchaseLinks');
+  const cancelled = rowsOf(data, 'cancelledOrders');
+
+  // New ids for the person's rows; any string equal to an old one (a lot's box, a split's other
+  // side in its history) is renamed with it.
+  const ids = new Map<string, string>();
+  for (const r of [...lots, ...history, ...manual, ...watched, ...runs, ...links, ...cancelled]) {
+    ids.set(r.id as string, newId());
+  }
+  const rename = (value: unknown): unknown => {
+    if (typeof value === 'string') return ids.get(value) ?? value;
+    if (Array.isArray(value)) return value.map(rename);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, rename(v)]));
+    }
+    return value;
+  };
+  const own = (table: Table, row: Row) => ({ ...columnsOf(table, rename(row) as Row), userId });
+
+  const itemIds = items.map((i) => i.id as string);
+  const present = new Set<string>();
+  for (let i = 0; i < itemIds.length; i += 500) {
+    const chunk = itemIds.slice(i, i + 500);
+    for (const p of await db
+      .select({ id: products.id })
+      .from(products)
+      .where(inArray(products.id, chunk))) {
+      present.add(p.id);
+    }
+  }
+  const setIds = new Set((await db.select({ id: tcgSets.id }).from(tcgSets)).map((s) => s.id));
+  const added = items.filter((i) => !present.has(i.id as string));
+  const addedIds = new Set(added.map((i) => i.id as string));
+  const listings = rowsOf(data, 'listings').filter((l) => addedIds.has(l.productId as string));
+
+  // Boxes before the pulls taken from them.
+  const order = (rows: Row[]) => {
+    const done = new Set<string>();
+    const out: Row[] = [];
+    let left = rows;
+    while (left.length) {
+      const ready = left.filter(
+        (r) =>
+          !r.parentHoldingId ||
+          done.has(r.parentHoldingId as string) ||
+          !lots.some((l) => l.id === r.parentHoldingId),
+      );
+      if (!ready.length) break;
+      for (const r of ready) done.add(r.id as string);
+      out.push(...ready);
+      left = left.filter((r) => !done.has(r.id as string));
+    }
+    return [...out, ...left];
+  };
+
+  const insert = async (tx: Pick<Db, 'insert'>, table: Table, rows: Row[]) => {
+    for (let i = 0; i < rows.length; i += 50) {
+      await tx.insert(table).values(rows.slice(i, i + 50) as never);
+    }
+  };
+  await db.transaction(async (tx) => {
+    await insert(
+      tx,
+      products,
+      added.map((p) => ({
+        ...columnsOf(products, p),
+        createdBy: userId,
+        setId: p.setId && setIds.has(p.setId as string) ? p.setId : null,
+      })),
+    );
+    await insert(
+      tx,
+      productSources,
+      listings.map((l) => ({ ...columnsOf(productSources, l), id: newId() })),
+    );
+    await insert(
+      tx,
+      importRuns,
+      runs.map((r) => own(importRuns, r)),
+    );
+    await insert(
+      tx,
+      holdings,
+      order(lots).map((l) => own(holdings, l)),
+    );
+    await insert(
+      tx,
+      holdingEvents,
+      history.map((e) => columnsOf(holdingEvents, rename(e) as Row)),
+    );
+    await insert(
+      tx,
+      manualPrices,
+      manual.map((m) => own(manualPrices, m)),
+    );
+    await insert(
+      tx,
+      watches,
+      watched.map((w) => own(watches, w)),
+    );
+    await insert(
+      tx,
+      purchaseLinks,
+      links.map((l) => own(purchaseLinks, l)),
+    );
+    await insert(
+      tx,
+      cancelledOrders,
+      cancelled.map((c) => own(cancelledOrders, c)),
+    );
+    const account = data.account as { preferences?: unknown; noticeLevels?: unknown } | null;
+    if (account) {
+      await tx
+        .update(users)
+        .set(
+          columnsOf(users, {
+            preferences: rename(account.preferences ?? null),
+            noticeLevels: account.noticeLevels ?? null,
+          }),
+        )
+        .where(eq(users.id, userId));
+    }
+  });
+  return {
+    items: items.length,
+    itemsAdded: added.length,
+    lots: lots.length,
+    history: history.length,
+    watches: watched.length,
+    manualPrices: manual.length,
   };
 }

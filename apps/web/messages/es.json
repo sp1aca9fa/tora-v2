@@ -1406,6 +1406,19 @@
     "allTitle": "Todos tus datos",
     "allInfo": "Un archivo JSON con tus artículos, lotes, su historial, precios manuales, seguimiento, anuncios enlazados e importaciones: para guardar una copia, o para otro programa.",
     "allDownload": "Descargar todo (JSON)",
+    "loadTitle": "Cargar un archivo descargado",
+    "loadInfo": "Esta cuenta está vacía: un archivo descargado aquí (de otra instalación o de esta) recupera sus artículos, lotes, historial, precios manuales, seguimiento e importaciones. Los artículos que esta instalación no tiene se añaden; sus precios llegan con la próxima recogida.",
+    "load": "Cargar el archivo",
+    "loading": "Cargando…",
+    "loaded": "Cargado: {lots} lotes, {history} entradas de historial, {watches} artículos seguidos y {items} artículos ({itemsAdded} nuevos en esta instalación).",
+    "loadError": {
+      "format": "No es un archivo descargado de Tora (Todos tus datos).",
+      "version": "Este archivo es de otra versión de Tora y no se puede cargar.",
+      "currency": "Los importes del archivo están en otra moneda base que la de esta instalación.",
+      "notEmpty": "Esta cuenta ya tiene datos: un archivo solo se carga en una cuenta vacía.",
+      "tooBig": "El archivo es demasiado grande.",
+      "failed": "No se pudo enviar el archivo. Inténtalo de nuevo."
+    },
     "noPrices": "No se incluyen los precios recogidos de otros sitios (sus condiciones no permiten pasarlos); cada lote lleva en su lugar su valor actual.",
     "adminBackups": "Toda la base de datos se copia cada día en el PC de casa (Preferencias de administración > Comandos)."
   },

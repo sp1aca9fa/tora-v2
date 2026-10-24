@@ -1406,6 +1406,19 @@
     "allTitle": "All your data",
     "allInfo": "One JSON file with your items, lots, their history, manual prices, watchlist, linked listings and imports: for keeping a copy, or for another program.",
     "allDownload": "Download all (JSON)",
+    "loadTitle": "Load a downloaded file",
+    "loadInfo": "This account is empty: a file downloaded here (from another install, or from this one) brings back its items, lots, history, manual prices, watchlist and imports. Items this install does not have are added; their prices come with the next collect.",
+    "load": "Load the file",
+    "loading": "Loading…",
+    "loaded": "Loaded: {lots} lots, {history} history entries, {watches} watched items and {items} items ({itemsAdded} new to this install).",
+    "loadError": {
+      "format": "This is not a file downloaded from Tora (All your data).",
+      "version": "This file comes from another version of Tora and cannot be loaded.",
+      "currency": "The file’s amounts are in another base currency than this install’s.",
+      "notEmpty": "This account already has data: a file loads into an empty account only.",
+      "tooBig": "The file is too big.",
+      "failed": "The file could not be sent. Try again."
+    },
     "noPrices": "Prices collected from other sites are not included (their terms do not allow passing them on); each lot carries its value now instead.",
     "adminBackups": "The whole database is backed up every day on the home PC (Admin preferences > Commands)."
   },
