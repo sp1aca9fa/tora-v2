@@ -59,6 +59,8 @@ export function FeedPill() {
 
   let tone: 'ok' | 'reading' | 'late' | 'silent' | 'none';
   let text: string;
+  // "Online" goes on wide screens only (the green dot says it on a phone).
+  let lead: string | null = null;
   if (!feed) {
     tone = 'none';
     text = t('none');
@@ -82,9 +84,10 @@ export function FeedPill() {
       text = `${t('reading', { board: nextBoard })} · ${last}`;
     } else {
       tone = quiet.length ? 'late' : 'ok';
+      if (!quiet.length) lead = t('online');
       const s = next === null ? null : Math.ceil(next / 1000);
       text = [
-        quiet.length ? t('quiet', { boards: quiet.map((b) => b.key).join(', ') }) : t('online'),
+        quiet.length ? t('quiet', { boards: quiet.map((b) => b.key).join(', ') }) : null,
         last,
         s === null
           ? null
@@ -102,7 +105,7 @@ export function FeedPill() {
       href="/stores/feed"
       aria-live="polite"
       className={cn(
-        'fixed right-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-20 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full border bg-card/95 px-3 py-1.5 text-xs tabular-nums shadow-md backdrop-blur md:right-4 md:bottom-4',
+        'fixed right-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-20 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-2xl border sm:rounded-full bg-card/95 px-3 py-1.5 text-xs tabular-nums shadow-md backdrop-blur md:right-4 md:bottom-4',
         tone === 'late' && 'border-amber-500/60',
         tone === 'silent' && 'border-destructive/60 text-destructive',
       )}
@@ -118,7 +121,8 @@ export function FeedPill() {
           tone === 'none' && 'bg-muted-foreground/40',
         )}
       />
-      <span className="truncate">
+      <span className="line-clamp-2 sm:truncate">
+        {lead && <span className="max-sm:hidden">{lead} · </span>}
         {text}
         {tone === 'reading' && <span className="feed-dots" aria-hidden />}
       </span>
