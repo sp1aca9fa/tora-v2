@@ -20,7 +20,7 @@ export function ItemNav({ productId, opening }: { productId: string; opening: bo
   const t = useTranslations('product.tab');
   const pathname = usePathname();
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b">
+    <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {TABS.filter(([name]) => opening || name !== 'opening').map(([name, path]) => {
         const href = `/products/${productId}${path}`;
         const current = pathname === href;

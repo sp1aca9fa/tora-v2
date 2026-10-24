@@ -21,7 +21,7 @@ export function StoresNav() {
   const t = useTranslations('stores.tab');
   const pathname = usePathname();
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b">
+    <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {TABS.map(([name, href]) => (
         <Link
           key={name}
