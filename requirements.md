@@ -46,7 +46,7 @@
 | S10 | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24, the user's check passed: "I love how it works" for Now): A data checks done; C the Spain + Brazil setup, the two-category test and their fixes done (2026-10-24); the status page and the page crawler done (2026-10-24, the pages crawled clean); B done (2026-10-24: pages on a scrubbed copy of the owner's data and every chapter against the code, 11 fixes, see Part B); D done (2026-10-24: risks and efficiency, its four follow-ups built) |
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs, collector faults, edge cases (input, imports) and layout at 7 views done (seven bugs fixed, an eighth from the owner's use); `pnpm check:all` added; bug log reviewed with the user (quiet-source warning and two-tab protection built); next the user's check |
-| S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | todo, the last phase (user, 2026-10-16) |
+| S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress (2026-10-25): first pass done (every guide read against the app, links and commands checked); left: the guide for running Tora on your own server, the Japanese documentation |
 
 ### Decision log
 
@@ -998,6 +998,11 @@ From Open issues (user, 2026-10-14; planned 2026-10-17). Admin preferences so th
 ## S18: Documentation pass
 
 The last phase (user, 2026-10-16): nothing to build, so it comes after everything else. Each phase keeps its guide current as it goes; this pass reads `docs/` and the README from start to finish against the app as it is then (S17, S9, S13, S10's France + China setup, S14, S15 all change what a newcomer sees), fixes what drifted, fills gaps, and checks every command and link. To consider then: the Japanese documentation for the portfolio (Open issues).
+
+### Progress
+
+1. First pass (2026-10-25): every guide read against the app; a script checked every relative link, every `pnpm` command named and every repo path (all resolve). Fixed: the README's guide table (five guides missing), its collectors line (Turso only) and the public plug-ins; setup's checks (`pnpm check:all`), `pnpm app` for your own server, five settings missing from the environment table, the MCP tool `opportunities`; running's crawl views and contrast check, the quiet-source warning, a new speed section (`pnpm perf`, `--load`, `pnpm stress-data`); alerts' admin messages (listings set aside, quiet source, self-check, read budget, failed server update), store notices, `pnpm alerts update` and `server`; the account file loaded into an empty account (backups); `stores` in a plug-in's entry point; whole threads on the Stores pages; the later TCG shops in the author's setup.
+2. Gaps found, not written yet: running Tora on your own server as a service (start on boot, the schedule, updates from pushes): the guides give it one paragraph, the owner's own guide is private; the Japanese documentation.
 
 ## Open issues (to plan later)
 

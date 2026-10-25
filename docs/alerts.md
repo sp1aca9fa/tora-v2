@@ -9,10 +9,14 @@ happened (Settings > Activity).
 | ------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------- | ------------------------------- |
 | The collect or the backup failed                                          | Admins      | Right after the run (at most once a day per kind)                            | The home PC (`collect-cron.sh`) |
 | No collect or no backup for over 26 hours (the PC is off)                 | Admins      | The morning check                                                            | The app's morning check         |
+| Listings set aside (gone 3 nights), a quiet source, a self-check fix      | Admins      | Right after the run, or the morning check (a quiet source: once a day)       | Both                            |
+| The database's month heading past its read budget (hosted database)       | Admins      | The morning check                                                            | The app's morning check         |
+| A server's update that failed and was rolled back                         | Admins      | At once                                                                      | The server's update script      |
 | Imports that did not add every row (already in Tora, left out, a problem) | Each person | The morning summary (at most one a day, only when there is something to say) | The app's morning check         |
 | How many things wait on Actions                                           | Each person | The morning summary                                                          | The app's morning check         |
 | A watched item turned Good price, or its lowest ask went under the target | Each person | Right after the nightly collect (again only after 14 days out)               | The home PC (`collect-cron.sh`) |
 | Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app's morning check         |
+| Store posts and comments for your area, a store feed gone silent          | Each person | At once ([Store notices](store-feeds.md))                                    | The app                         |
 
 Each person picks their channels, switches each kind on or off and chooses the language of the
 messages in **Settings > Alerts**. A failure at night arrives at night; Telegram and Discord can
@@ -77,7 +81,8 @@ Settings > Activity lists, newest first, each linked to its page:
 
 - collects (each run of `pnpm collect`, with the sources that did not finish) and backups;
 - imports (what happened to their rows; members see their own);
-- the morning check's "nothing ran";
+- the morning check's "nothing ran" and quiet sources;
+- a self-hosted server's updates and what its own scripts report (`pnpm alerts update`, `server`);
 - admin changes: markets, sources and roles, identity pages, categories, languages, time zone,
   currency and rates, the night window, the Telegram bot, accounts (Settings > Admin > Accounts, or `pnpm user`:
   shown as done from the terminal), setup links used, and collects requested.
@@ -89,4 +94,6 @@ Admins see everything; others see their own imports.
 ```bash
 pnpm alerts after-run --since <time> --collect-exit <n> --backup-exit <n>  # what collect-cron.sh runs
 pnpm alerts check   # the morning check, run from the PC (e.g. to try it)
+pnpm alerts update --from <rev> --to <rev> [--failed <step>]   # a server's update script: logs it, a failure to admins
+pnpm alerts server <title> [--text <details>] [--level ok|problem|failed] [--tell]   # a server script's own event
 ```

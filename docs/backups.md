@@ -73,3 +73,8 @@ Or restore it into a local file and run the app against it (`DATABASE_URL=file:.
 Every account can also download its own data in the app (Settings > Your data): a spreadsheet of
 its lots and a JSON file. That is for the person, not a backup of the app; see
 the spreadsheet import in [Running collectors](running.md#imports) for bringing a spreadsheet back.
+
+An **empty** account can load the JSON file on the same page, from this install or another one
+with the same base currency and version: its items, lots, history, manual prices, watchlist and
+imports come back. Items the install does not have are added, and their prices come with the next
+collect. An account that already has data cannot load one.

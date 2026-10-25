@@ -110,7 +110,8 @@ Content-Type: application/json
   line" or "sold out". A reply naming no store takes the stores of the post it answers; replies
   are sent to the people whose area holds the store at once, marked as a comment to their post,
   even within the store's quiet time (a new post about a store makes at most one notice every 30
-  minutes).
+  minutes). On the Stores pages a post shows every reply in its thread under it, answers to
+  replies included, oldest first.
 - `images` (per post, optional): its pictures, `[{ "url": "<where it was found>", "data": "<base64>" }]`,
   up to 4, 8 MB each (JPEG, PNG, WebP or GIF). Kept a week, attached to the post's notices and
   shown on the Posts page. Send a post's pictures with its first push only (a post sent again is

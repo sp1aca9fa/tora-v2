@@ -36,7 +36,9 @@ The seed prints the demo login (`demo` / `local-dev-password`, authenticator key
 `JBSWY3DPEHPK3PXP`, backup codes). Everything reads the single `.env` at the repo root; a relative
 `file:` `DATABASE_URL` resolves from the repo root.
 
-Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`.
+Checks: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (all four:
+`pnpm check:all`), `pnpm build`. Checking the running app (every page, speed, many people at
+once): see [Running collectors](running.md#checking-every-page-pnpm-crawl).
 After editing `packages/db/src/schema.ts`: `pnpm db:generate`, then `pnpm db:migrate`.
 
 ### Environment variables
@@ -50,6 +52,10 @@ After editing `packages/db/src/schema.ts`: `pnpm db:generate`, then `pnpm db:mig
 | Keys a plug-in needs (e.g. `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`) | `.env` on the home PC only      | Never on Vercel: collectors run only at home                                               |
 | `BACKUP_DIR`                                                       | `.env` on the home PC, optional | Where the daily database copies go ([backups](backups.md))                                 |
 | `CRON_SECRET`                                                      | Vercel                          | Lets Vercel run the morning check of [alerts](alerts.md)                                   |
+| `TORA_STATE_DIR`                                                   | `.env` on the home PC, optional | A second Tora on the same PC: its own log, locks and daily stamps ([running](running.md))  |
+| `TORA_LOCAL_HTTP=1`                                                | `.env` on your server, optional | The app opened over plain `http` from the home network (sign-in cookies without `Secure`)  |
+| `TORA_DEV_ALERTS=1`                                                | `.env`, optional                | A dev server (`pnpm dev`) also runs the morning check and store feed checks                |
+| `ENABLE_CARDMARKET=1`                                              | `.env` on the home PC, optional | Turns on the public Cardmarket plug-in ([sources](sources.md))                             |
 
 `AUTH_SECRET` signs sessions and encrypts the authenticator secrets that `pnpm user` writes (and
 the alert channels), which is why the home PC and Vercel must share it. Changing it signs everyone out and needs
@@ -84,8 +90,8 @@ migrated. For UI work against a throwaway database, point `DATABASE_URL` back at
 ## 3. Web app (Vercel)
 
 This guide hosts the app on Vercel and the database on Turso: both free, nothing to keep running.
-The app also runs on any always-on machine of your own with Node: `pnpm build`, then
-`pnpm --filter @tora/web start`, with `DATABASE_URL=file:/path/to/tora.db` in `.env` (no Turso, no
+The app also runs on any always-on machine of your own with Node: `pnpm app` (builds, then
+serves on port 3000 to the network), with `DATABASE_URL=file:/path/to/tora.db` in `.env` (no Turso, no
 read quota) and the collect and backups on the same machine. There the app runs the morning check
 of [alerts](alerts.md) itself (no `CRON_SECRET`), and reaching it from your phone is up to you (a
 tunnel such as Tailscale Funnel or Cloudflare Tunnel, or your own domain).
@@ -179,7 +185,7 @@ claude mcp add tora -- pnpm --silent --dir /path/to/tora-v2 mcp --user <username
 For Claude Desktop, put the same command in `claude_desktop_config.json` (`"command": "pnpm"`,
 `"args": ["--silent", "--dir", "/path/to/tora-v2", "mcp", "--user", "<username>"]`; with the repo
 in WSL, `"command": "wsl"` and `pnpm ...` in `args`). Tools: `portfolio_summary`, `list_products`,
-`product_detail`, `price_history`, `sales`, `watchlist`, `collector_status`, `review_queue`,
+`product_detail`, `price_history`, `sales`, `watchlist`, `opportunities`, `collector_status`, `review_queue`,
 `data_checks` (start here for "does anything look off?") and `query_sql` (one read-only SELECT).
 
 ## Set catalogs

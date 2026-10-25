@@ -16,7 +16,7 @@ Spain setup, not yet checked by a native speaker).
 ## Adding a language
 
 1. Copy `apps/web/messages/en.json` to `apps/web/messages/{code}.json` (`fr`, `zh`, ... as BCP 47
-   codes) and translate the values, never the keys. About 1,900 texts; Claude can draft it ("translate
+   codes) and translate the values, never the keys. About 2,000 texts; Claude can draft it ("translate
    this file's values into French, keep the keys, the `{placeholders}` and the ICU plural and select
    syntax as they are"), then read it through.
 2. Add the code to `LANGUAGES` in `apps/web/src/i18n/locale.ts`, with the toggle's short label:

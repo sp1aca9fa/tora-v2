@@ -119,6 +119,9 @@ secondary US):
 | TCGplayer (TCGCSV) | US     | reference  | reference  | -             | cards, sealed | US market prices (one a day)                                |
 | eBay               | US     | supporting | supporting | -             | -             | US asking prices (official API; `noAi`)                     |
 
+Three Japanese TCG shops were added later (private plug-ins): their asking prices, what is in stock
+and their buy-back prices, plus identity pages for shops with one page per card.
+
 Only TCGCSV, eBay and Cardmarket are public (`collectors-public/`); the others are private plug-ins.
 
 - **TCGCSV**: TCGplayer's catalog and daily market prices as public files, for Japanese and English

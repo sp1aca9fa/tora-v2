@@ -90,6 +90,7 @@ export const sources: SourceInfo[] = [/* one per collector, and per shop purchas
 export const setCards: SetCardSource[] = []; // optional: a set's hit cards for the box opening value
 export const pullRates: PullRateSource[] = []; // optional: suggested pull rates per set
 export const rankings: RankingSource[] = []; // optional: a site's popularity ranking (S13)
+export const stores: StoreDirectory[] = []; // optional: physical stores for store notices (store-feeds.md)
 export const catalogs: SetCatalog[] = []; // optional: set lists (name, code, date, region) for set categories
 ```
 

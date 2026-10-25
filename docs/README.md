@@ -16,6 +16,7 @@ this order the first time.
 | [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
 | [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
 | [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |
+| [Store notices](store-feeds.md)       | Posts about cards on sale in stores near you: store lists, feeds, the notices        |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

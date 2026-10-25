@@ -88,6 +88,10 @@ confirmation, listings not collected for 3+ days, big median moves, and its **wo
 the PC slept is not counted) against its usual time; a run over twice its usual time is flagged.
 The last night's total is compared with a **night window** the admin sets (6 hours by default).
 
+A source whose runs suddenly add no sales on its last 3 days with runs, while they usually did (a
+site that changed so its pages still load but yield nothing), is **quiet**: admins get an alert
+once a day while it stays so.
+
 ## Many collectors
 
 Measure first on Settings > Collectors, then:
@@ -201,9 +205,30 @@ source kept from AI models are left out. With `TORA_STATUS_URL` (the app's addre
 
 Signs in, follows every link from the home page and opens each page at phone (390 px) and wide
 (1280 px) widths, then lists pages with an HTTP error, a console or page error, a raw text key, an
-unfilled `{placeholder}` or sideways scrolling; it exits with 1 when any has one. It only opens
+unfilled `{placeholder}`, sideways scrolling or text too faint to read on its background (WCAG
+AA); it exits with 1 when any has one. `--views all` adds the smallest phone (320 px), a tablet, a
+2560 px screen, 200 % zoom and dark mode; a comma list picks some (`--views phone,dark`). It only opens
 pages. Run it against a test copy with a dev server running (`--base`, default
 `http://localhost:3200`), with `CRAWL_USER`, `CRAWL_PASSWORD` and `CRAWL_TOTP_KEY` (or
 `CRAWL_TOTP_KEY_FILE`) in `.env`. Options: `--max 150` pages, `--per-pattern 2` pages per address
 shape (items, lots), `--only /settings`, `--shots <dir>` for screenshots, `--out <file>` for a
 JSON report.
+
+## Speed: `pnpm perf`
+
+Opens each main page at phone width (a slow 4G connection and CPU) and wide width, first with an
+empty cache, then `--runs` more times, and prints when the page finished arriving, its largest
+paint, layout shift, page sizes and database round trips; values over a target, or over 30 %
+slower than `--baseline <former --out>`, fail the run. Run it against a production build started
+with `TORA_PERF=1` on a test copy, never the real app. Options: `--only Item`, `--sql 3` (each
+page's costliest statements), `--out <file>`.
+
+`pnpm perf --load <people> [--seconds 60]` has that many accounts open pages over and over at once,
+and prints requests per second, failures and the slowest pages. It signs them in by adding a
+device to each (removed at the end), so run it only from a test copy whose `.env` names a local
+database file.
+
+`pnpm stress-data <medium|large> --out <new.db> [--from <db>]` makes a copy of a local database
+grown to a larger size (items cloned with their sales, lots and members added; large adds a third
+market) to measure on. It only reads the database it copies and refuses a hosted one; then run
+`pnpm rebuild` with `DATABASE_URL` set to the copy.
