@@ -1,0 +1,123 @@
+import {
+  type OpportunitySignal,
+  type OpportunityTests,
+  OPPORTUNITY_WARNINGS,
+  provenEdge,
+} from '@tora/core';
+import { type Product, opportunitiesFor } from '@tora/db';
+import { getTranslations } from 'next-intl/server';
+import { authed } from '@/lib/auth/guard';
+import { cn } from '@/lib/utils';
+import { groupLabel, typeLabel } from '../cards';
+import { CHIP } from '../opportunity-row';
+
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
+
+/**
+ * Signals and their record (S13, as a sub page S26): per item type, each group's signals tested
+ * on its past prices against buying on any day.
+ */
+export default async function SignalsPage() {
+  const { db, user } = await authed();
+  const [data, t] = await Promise.all([opportunitiesFor(db, user.id), getTranslations()]);
+  const items = data?.items ?? [];
+  const types = [...new Set(items.map((o) => o.itemType))];
+
+  /** Each group of a type with its tests. */
+  const groups = (type: string) => {
+    const out = new Map<string, { tests: OpportunityTests; product: Product }>();
+    for (const o of items) {
+      if (o.itemType === type && o.tests && !out.has(o.group)) {
+        out.set(o.group, { tests: o.tests, product: o.product });
+      }
+    }
+    return [...out.values()].filter((g) => g.tests.any.checked > 0);
+  };
+  const higher = (h: number, c: number) => (c ? pct(h / c) : '-');
+  const table = ({ tests, product }: { tests: OpportunityTests; product: Product }) => {
+    const keys = (Object.keys(tests.signals) as OpportunitySignal[]).sort();
+    return (
+      <div key={groupLabel(t, product)} className="space-y-2">
+        <h3 className="text-sm font-medium">
+          {groupLabel(t, product)}{' '}
+          <span className="font-normal text-muted-foreground">
+            {t('opportunities.group', { items: tests.items })}
+          </span>
+        </h3>
+        <div className="overflow-x-auto rounded-xl border bg-card">
+          <table className="w-full text-xs">
+            <thead className="text-muted-foreground">
+              <tr className="border-b text-left">
+                <th className="px-3 py-2 font-medium">{t('opportunities.colSignal')}</th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t('opportunities.colChecked')}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">{t('opportunities.colHigher')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('opportunities.colChange')}</th>
+              </tr>
+            </thead>
+            <tbody className="tabular-nums">
+              <tr className="border-b bg-muted/40">
+                <td className="px-3 py-1.5">{t('opportunities.anyDay')}</td>
+                <td className="px-3 py-1.5 text-right">{tests.any.checked}</td>
+                <td className="px-3 py-1.5 text-right">
+                  {higher(tests.any.higher, tests.any.checked)}
+                </td>
+                <td className="px-3 py-1.5 text-right">
+                  {tests.any.change !== null ? signed(tests.any.change) : '-'}
+                </td>
+              </tr>
+              {keys.map((key) => {
+                const r = tests.signals[key]!;
+                const proven =
+                  provenEdge(tests, key) === null
+                    ? null
+                    : (OPPORTUNITY_WARNINGS as readonly string[]).includes(key)
+                      ? 'warning'
+                      : 'proven';
+                return (
+                  <tr key={key} className="border-b last:border-0">
+                    <td className="px-3 py-1.5">
+                      {t(`opportunities.signal.${key}`)}
+                      {proven && (
+                        <span
+                          className={cn(
+                            'ml-2 rounded px-1.5 py-0.5',
+                            CHIP[proven === 'warning' ? 'warning' : 'proven'],
+                          )}
+                        >
+                          {t(`opportunities.${proven}`)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">{r.checked}</td>
+                    <td className="px-3 py-1.5 text-right">{higher(r.higher, r.checked)}</td>
+                    <td className="px-3 py-1.5 text-right">
+                      {r.change !== null ? signed(r.change) : '-'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <p className="max-w-3xl text-xs text-muted-foreground">{t('opportunities.recordsIntro')}</p>
+      {types.map((type) => {
+        const list = groups(type);
+        return list.length ? (
+          <section key={type} className="space-y-3">
+            <h2 className="font-semibold">{typeLabel(t, type)}</h2>
+            <div className="grid items-start gap-4 xl:grid-cols-2">{list.map(table)}</div>
+          </section>
+        ) : null;
+      })}
+    </div>
+  );
+}

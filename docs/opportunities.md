@@ -7,15 +7,26 @@ past prices only and is never a sure thing.
 
 ## Where it shows
 
-- **Opportunities** (menu, after Watchlist): tabs per item type. "Worth a look" lists the items
-  with a proven signal today, best first, each with its signals, why they are on, their record,
-  the recent price, a listing well under it and a shop buy price near it, and Watch. Under it,
-  each group's signals and their record against buying on any day.
+- **Opportunities** (menu, after Watchlist), four sub pages with their own address:
+  - **Worth a look** (`/opportunities`): chips per item type and per signal proven in it (a tap
+    filters the list and shows the signal's record per group), then every item of the type best
+    first: those with a proven signal (by score), then apart those without (by their signals not
+    proven yet); equal scores nearest their target first. 20 items come from the server at a time
+    as the list is scrolled. A card shows the picture, the name, owned / watching / suggested, its
+    ranks and signals as tags (a tap opens why a signal is on and its record), the price now
+    against a target (the top of the person's buy zone from [Buy timing](buy-timing.md), else
+    their watch's target) and how far, a listing well under the price, a shop buy price near it,
+    and Watch.
+  - **Popular now** (`/opportunities/popular`): each ranking with pictures and links, the first
+    10 shown, the rest on demand.
+  - **Signals** (`/opportunities/signals`): each group's signals and their record against buying
+    on any day, per item type.
+  - **Buy plan** (`/opportunities/plan`): the budget and date below.
 - **MCP** (`opportunities`): the same list for a Claude chat.
 
 ## Budget and date
 
-At the top of the Opportunities page: a budget and a date, and the items to choose from (those
+On the Buy plan sub page: a budget and a date, and the items to choose from (those
 with a proven signal, the person's watches, and what their plan already holds). Each says when to
 buy and at what price, from its buy timing ([Buy timing](buy-timing.md)) and the person's
 strategy for its type: buy now (a good price; a listing in the zone when cheaper), from a day (a
@@ -23,17 +34,19 @@ new release waits until similar items' usual first-year low), or once under a pr
 its market falling, or above its buy zone: the zone's top). The person ticks items; the card adds
 their prices and says what is left of the budget, which come after the date and which wait for a
 price (no day). Saved in the person's preferences (`buyPlan`). Buy timing numbers are saved each
-night for these items too (besides those owned or watched), and for ranked candidates.
+night for these items too (besides those owned or watched), and for every item with signal
+numbers (their cards' target).
 
 ## Rankings
 
 Ranking plug-ins ([Collectors](collectors.md#ranking-sources)) read a site's popularity ranking
-once a day (the private package reads SNKRDUNK's Pokemon sealed products sorted by popularity,
-boxes only: three pages, about 34 boxes). Each ranked item is matched to an item Tora knows; the
-top 30 nobody tracks become candidates, created and collected like watched items while they stay
-in the top 30 (within 30 days). The Opportunities page shows each ranking ("Popular now": rank,
-the change in a week, price, listings, favorites, owned / watching / candidate) in its item type's
-tab, and a ranked item's rank on its row; MCP `opportunities` gives the ranks too. Candidates
+once a day (the private package reads SNKRDUNK's Pokemon rankings sorted by popularity: boxes
+from the sealed category, singles from all of Pokemon, pages until 60 of each). Each ranked item
+is matched to an item Tora knows; the top 60 nobody tracks become candidates ("suggested" in the
+app), created and collected like
+watched items while they stay in the top 60 (within 30 days). Popular now shows each ranking
+(rank, the change in a week, price, listings, favorites, owned / watching / suggested), and a
+ranked item's card its rank; MCP `opportunities` gives the ranks too. Candidates
 join the signals once their prices are collected. Rank changes as a signal are tested once enough
 days are saved (ranks partly follow price moves).
 

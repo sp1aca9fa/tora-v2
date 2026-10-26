@@ -6,23 +6,28 @@ import {
   type OpportunityNumbers,
   type OpportunitySignal,
   type OpportunityTests,
+  type Verdict,
   ASK_FLOOR,
   ASK_UNDER,
   BUYLIST_NEAR,
   OpportunityGroup,
+  judge,
   localDate,
   productClass,
   rankOpportunity,
   signalsOn,
+  strategyOf,
   toLocalIso,
 } from '@tora/core';
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import type { Db } from './client';
+import { imageVersions } from './images';
 import { refreshItemSales } from './item-sales';
+import { type RankView, latestRanks, rankingLabels } from './rankings';
 import { readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
-import { type Product, holdings, priceObservations, products, watches } from './schema';
-import { dailySeries, pickSeries } from './signals';
+import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
+import { dailySeries, latestSignals, pickSeries } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
 const DAY = 86_400_000;
@@ -265,6 +270,164 @@ export async function opportunitiesFor(
       return product
         ? [{ ...o, product, owned: own.has(o.productId), watching: watching.has(o.productId) }]
         : [];
+    }),
+  };
+}
+
+/** An item on the Worth a look list (S26): its opportunity, the item, and the person's target. */
+export interface OpportunityCard extends Opportunity {
+  product: Product;
+  owned: boolean;
+  watching: boolean;
+  /** The price now (buy timing's fair value, else the 30-day median). */
+  now: number | null;
+  /** The top of the person's buy zone (buy timing, their strategy), else their watch's target. */
+  target: number | null;
+  verdict: Verdict | null;
+  imageVersion: string | null;
+  ranks: (RankView & { label: string })[];
+}
+
+/** The types and the signals proven in each, for the page's chips. */
+export interface OpportunitySummary {
+  types: { type: string; items: number; proven: number }[];
+  /** Per type, each signal proven in one of its groups (warnings aside), with those groups. */
+  signals: Record<
+    string,
+    {
+      key: OpportunitySignal;
+      groups: { group: string; tests: OpportunityTests; sample: string }[];
+    }[]
+  >;
+}
+
+/** How far over its target an item is (0 at or under it); unknown last. */
+const gap = (c: { now: number | null; target: number | null }) =>
+  c.now !== null && c.target ? Math.max(0, c.now / c.target - 1) : Infinity;
+
+/**
+ * The Worth a look list of an item type (S26), `limit` items from `offset`: those with a proven
+ * signal first, by score, then the rest by score; equal scores nearest their target first. With a
+ * signal, only the items it is proven on. The summary counts every type.
+ */
+export async function opportunityCards(
+  db: Db,
+  user: Pick<User, 'id' | 'preferences'>,
+  filter: { type: string | null; signal?: OpportunitySignal | null },
+  offset: number,
+  limit: number,
+  now = new Date(),
+): Promise<{
+  day: string;
+  type: string | null;
+  summary: OpportunitySummary;
+  total: number;
+  /** Of the list, how many have a proven signal (they come first). */
+  proven: number;
+  items: OpportunityCard[];
+  /** An item of each group of the type's signals, to name the group. */
+  groupItems: Record<string, Product>;
+} | null> {
+  const saved = await loadOpportunities(db);
+  if (!saved) return null;
+  const summary: OpportunitySummary = { types: [], signals: {} };
+  for (const o of saved.items) {
+    let t = summary.types.find((x) => x.type === o.itemType);
+    if (!t) summary.types.push((t = { type: o.itemType, items: 0, proven: 0 }));
+    t.items++;
+    if (o.proven.length) t.proven++;
+    if (!o.tests) continue;
+    const list = (summary.signals[o.itemType] ??= []);
+    for (const key of o.proven) {
+      let sig = list.find((x) => x.key === key);
+      if (!sig) list.push((sig = { key, groups: [] }));
+      if (!sig.groups.some((g) => g.group === o.group)) {
+        sig.groups.push({ group: o.group, tests: o.tests, sample: o.productId });
+      }
+    }
+  }
+  // The type with the most items worth a look first.
+  summary.types.sort((a, b) => b.proven - a.proven || b.items - a.items);
+  const type = summary.types.some((t) => t.type === filter.type)
+    ? filter.type
+    : (summary.types[0]?.type ?? null);
+  const list = saved.items.filter(
+    (o) => o.itemType === type && (!filter.signal || o.proven.includes(filter.signal)),
+  );
+  const [owned, watched] = await Promise.all([
+    db
+      .selectDistinct({ id: holdings.productId })
+      .from(holdings)
+      .where(and(eq(holdings.userId, user.id), eq(holdings.status, 'owned'))),
+    db
+      .select({ id: watches.productId, bucket: watches.bucket, target: watches.targetPriceBase })
+      .from(watches)
+      .where(eq(watches.userId, user.id)),
+  ]);
+  const own = new Set(owned.map((r) => r.id));
+  const stats = await latestSignals(
+    db,
+    list.map((o) => ({ productId: o.productId, bucket: o.bucket })),
+    now,
+  );
+  const choice = strategyOf(user.preferences, type ?? '');
+  const ordered = list.map((o) => {
+    const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
+    const j = s ? judge(s, choice) : null;
+    const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
+    return {
+      o,
+      now: s?.fair ?? o.numbers.price,
+      target: j?.zone.top ?? watch?.target ?? null,
+      verdict: j?.verdict ?? null,
+      watching: watched.some((w) => w.id === o.productId),
+    };
+  });
+  ordered.sort(
+    (a, b) =>
+      Number(b.o.proven.length > 0) - Number(a.o.proven.length > 0) ||
+      b.o.score - a.o.score ||
+      gap(a) - gap(b) ||
+      a.o.productId.localeCompare(b.o.productId),
+  );
+  const page = ordered.slice(offset, offset + limit);
+  const ids = page.map((c) => c.o.productId);
+  const samples = new Map(
+    (summary.signals[type ?? ''] ?? []).flatMap((x) => x.groups.map((g) => [g.group, g.sample])),
+  );
+  const wanted = [...new Set([...ids, ...samples.values()])];
+  const [items, images, ranks, labels] = await Promise.all([
+    wanted.length ? db.select().from(products).where(inArray(products.id, wanted)) : [],
+    imageVersions(db, ids),
+    latestRanks(db, ids, now),
+    rankingLabels(db),
+  ]);
+  const byId = new Map(items.map((p) => [p.id, p]));
+  return {
+    day: saved.day,
+    type,
+    summary,
+    groupItems: Object.fromEntries(
+      [...samples].flatMap(([group, id]) => (byId.has(id) ? [[group, byId.get(id)!]] : [])),
+    ),
+    total: ordered.length,
+    proven: ordered.filter((c) => c.o.proven.length > 0).length,
+    items: page.flatMap(({ o, ...c }) => {
+      const product = byId.get(o.productId);
+      if (!product) return [];
+      return [
+        {
+          ...o,
+          ...c,
+          product,
+          owned: own.has(o.productId),
+          imageVersion: images.get(o.productId) ?? null,
+          ranks: (ranks.get(o.productId) ?? []).map((r) => ({
+            ...r,
+            label: labels.get(r.ranking) ?? r.ranking,
+          })),
+        },
+      ];
     }),
   };
 }

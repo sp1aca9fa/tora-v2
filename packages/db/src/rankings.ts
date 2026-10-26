@@ -20,7 +20,7 @@ import {
 import { linkSource } from './sources';
 
 /** Ranked this high, an item nobody tracks becomes a candidate. */
-export const CANDIDATE_TOP = 30;
+export const CANDIDATE_TOP = 60;
 /** A candidate is collected while it was in the top within this many days. */
 export const CANDIDATE_DAYS = 30;
 
@@ -292,6 +292,7 @@ export interface RankingBoard {
   items: (RankView & {
     productId: string | null;
     title: string;
+    category: string | null;
     kind: string | null;
     itemType: string | null;
     owned: boolean;
@@ -352,6 +353,7 @@ export async function rankingBoards(
           numbers: row.numbers,
           productId: row.productId,
           title: product?.name ?? row.title,
+          category: product?.category ?? null,
           kind: product?.kind ?? null,
           itemType: product?.itemType ?? null,
           owned: !!row.productId && own.has(row.productId),

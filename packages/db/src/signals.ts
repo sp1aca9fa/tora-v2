@@ -17,7 +17,6 @@ import {
   median,
   newSetPattern,
   productClass,
-  rankOpportunity,
   ruleTests,
   seriesStats,
   strategyKey,
@@ -29,7 +28,6 @@ import type { Db } from './client';
 import { refreshItemSales, soldDays } from './item-sales';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import type { SavedOpportunities } from './opportunities';
-import { rankedProductIds } from './rankings';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, holdings, products, signals, users, watches } from './schema';
 import { fileSuggestion } from './suggestions';
@@ -119,8 +117,8 @@ async function valuedPairs(db: Db): Promise<{ product: Product; bucket: string |
 }
 
 /**
- * Items and conditions worth buy timing numbers besides those held or watched (S13): the ones
- * with a proven opportunity signal (last saved opportunities), ranked candidates, and the ones in
+ * Items and conditions worth buy timing numbers besides those held or watched (S13): every one
+ * in the last saved opportunities (their cards show a target price, S26) and the ones in
  * someone's budget plan.
  */
 async function plannedPairs(
@@ -134,11 +132,7 @@ async function plannedPairs(
     if (!known.has(key)) wanted.set(key, { productId, bucket });
   };
   const saved = await readSetting<SavedOpportunities>(db, 'opportunities');
-  const ranked = new Set(await rankedProductIds(db));
-  for (const o of saved?.items ?? []) {
-    const proven = rankOpportunity(o.on, saved!.tests[o.group]).proven.length > 0;
-    if (proven || ranked.has(o.productId)) add(o.productId, o.bucket);
-  }
+  for (const o of saved?.items ?? []) add(o.productId, o.bucket);
   for (const u of await db.select({ preferences: users.preferences }).from(users)) {
     for (const i of u.preferences?.buyPlan?.items ?? []) add(i.productId, i.bucket);
   }

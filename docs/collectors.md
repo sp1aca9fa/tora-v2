@@ -314,9 +314,9 @@ the collectors, so what it adds is collected the same night): its items in rank 
 its id on the plug-in's `source` (the id that source's collector links items by), its kind, its
 page, and any price and activity numbers the site shows (`numbers`, e.g. listings, favorites).
 Tora saves each day's ranks and matches every item: by its id on the source, else an item of the
-same kind from the same catalog set or with the same name. The top 30 that match nothing become
+same kind from the same catalog set or with the same name. The top 60 that match nothing become
 candidates: Tora creates them (no creator), links them to the source and collects them like
-watched items while they were in the top 30 within the last 30 days. They show on the
+watched items while they were in the top 60 within the last 30 days. They show on the
 Opportunities page ([Opportunities](opportunities.md)) with their rank and the site's numbers;
 how a rank change does as a signal is tested once enough days are saved.
 

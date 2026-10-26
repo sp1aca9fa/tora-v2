@@ -1,35 +1,81 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useInParts } from '@/components/use-in-parts';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { moreOpportunitiesAction } from './actions';
+import type { CardsFilter } from './cards';
 import { type OpportunityLabels, OpportunityRow, type OpportunityRowData } from './opportunity-row';
 
-/** Rows drawn with the page, and added each time the end of the list comes near. */
-const FIRST = 30;
-const MORE = 60;
-
-/** The items worth a look of one type (S13), in parts when there are many (S14). */
+/**
+ * The Worth a look list of a type (S26): the items with a proven signal, then apart those
+ * without; more rows asked from the server as the end of the list comes near.
+ */
 export function OpportunityList({
-  rows,
+  initial,
+  total,
+  proven,
+  filter,
   labels,
 }: {
-  rows: OpportunityRowData[];
+  initial: OpportunityRowData[];
+  total: number;
+  proven: number;
+  filter: CardsFilter;
   labels: OpportunityLabels;
 }) {
-  const t = useTranslations('inventory');
-  const { limit, end } = useInParts(rows.length, FIRST, MORE);
+  const t = useTranslations('opportunities');
+  const [rows, setRows] = useState(initial);
+  const [loading, setLoading] = useState(false);
+  const end = useRef<HTMLDivElement>(null);
+  const more = rows.length < total;
+
+  useEffect(() => {
+    const el = end.current;
+    if (!el || !more) return;
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry?.isIntersecting || loading) return;
+        setLoading(true);
+        try {
+          const next = await moreOpportunitiesAction(filter, rows.length);
+          setRows((had) => [
+            ...had,
+            ...next.filter((r) => !had.some((h) => h.productId === r.productId)),
+          ]);
+        } finally {
+          setLoading(false);
+        }
+      },
+      { rootMargin: '800px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rows.length, more, loading, filter]);
+
+  const heading = (title: string, note?: string) => (
+    <li className="space-y-0.5 pt-2 first:pt-0 lg:col-span-2 2xl:col-span-3">
+      <h2 className="font-semibold">{title}</h2>
+      {note && <p className="max-w-3xl text-xs text-muted-foreground">{note}</p>}
+    </li>
+  );
   return (
     <>
       <ul className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {rows.slice(0, limit).map((o) => (
-          <OpportunityRow key={o.productId} o={o} labels={labels} />
+        {proven > 0 && heading(t('provenTitle', { count: proven }))}
+        {rows.map((o, i) => (
+          <Fragment key={o.productId}>
+            {i === proven &&
+              heading(
+                t('restTitle', { count: total - proven }),
+                proven ? t('restNote') : `${t('noneProven')} ${t('restNote')}`,
+              )}
+            <OpportunityRow o={o} labels={labels} />
+          </Fragment>
         ))}
       </ul>
-      {limit < rows.length && (
-        <div ref={end} className="py-4 text-center text-sm text-muted-foreground">
-          {t('more', { count: rows.length - limit })}
-        </div>
-      )}
+      <div ref={end} className="py-4 text-center text-sm text-muted-foreground">
+        {more ? (loading ? t('loading') : t('more', { count: total - rows.length })) : ''}
+      </div>
     </>
   );
 }
