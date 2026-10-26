@@ -102,7 +102,7 @@ per shop purchases come from that is not a price source (`shopOnly`).
 | Field                     | What it says                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `key`                     | Stored with every price; **never change it** once data exists                                                                                                                  |
-| `label`, `badge`, `color` | How it is shown (badge: one or two characters; chart colour)                                                                                                                   |
+| `label`, `badge`, `color` | How it is shown (badge: one or two characters; chart color)                                                                                                                    |
 | `market`                  | ISO 3166 country of its prices (`jp`, `us`, `fr`)                                                                                                                              |
 | `currency`                | ISO 4217 currency of its prices (`JPY`, `USD`, `EUR`)                                                                                                                          |
 | `priceKinds`              | `sold` (real sales), `market` (a daily market price the site works out from its sales, saved as one `sold` row a day), `listing` (asking prices), `buylist` (what a shop pays) |

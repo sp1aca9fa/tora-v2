@@ -1,7 +1,7 @@
 # Store notices: feeds and store lists
 
 Tora can tell you when people post that cards are on sale in a physical store near you
-(requirements S25). Two kinds of plug-in feed it, and Tora does the rest: it recognises the store
+(requirements S25). Two kinds of plug-in feed it, and Tora does the rest: it recognizes the store
 in each post, keeps the stores of your area (stores you pick, or a distance from where you are,
 with a travel mode) and sends a notice to your Discord or Telegram (Settings > Alerts).
 

@@ -2346,7 +2346,7 @@
     "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}",
     "unread": "{n, plural, one {# mensaje nuevo} other {# mensajes nuevos}}",
     "waiting": "{n, plural, one {# mensaje nuevo: ver} other {# mensajes nuevos: ver}}",
-    "unknownAreaTitle": "Tienda y zona no reconocidas (cadena conocida)",
+    "unknownAreaTitle": "Zona no reconocida (tienda conocida)",
     "unknownStoreTitle": "Tienda y zona no reconocidas",
     "unknownShopTitle": "Tienda no reconocida (zona conocida)",
     "pill": {

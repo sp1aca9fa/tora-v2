@@ -190,7 +190,7 @@
       "condition": "Change condition",
       "note": "Add note",
       "delete": "Delete entry",
-      "cancel-order": "Mark order cancelled"
+      "cancel-order": "Mark order canceled"
     },
     "allLots": "All lots of this product",
     "marketData": "Market prices, chart and price sources",
@@ -273,9 +273,9 @@
       "sell": "Partial sales split the lot automatically.",
       "condition": "Only the fields you change are recorded.",
       "editProduct": "Applies to every entry of this item.",
-      "cancel-order": "For orders you cancelled yourself: shops often send no email for that, so the import cannot tell."
+      "cancel-order": "For orders you canceled yourself: shops often send no email for that, so the import cannot tell."
     },
-    "cancelOrderConfirm": "The order #{order} ({from}) was cancelled: remove all of its lots. Future imports will skip this order."
+    "cancelOrderConfirm": "The order #{order} ({from}) was canceled: remove all of its lots. Future imports will skip this order."
   },
   "pulls": {
     "mode": {
@@ -736,11 +736,11 @@
     "confirmAll": "{count, plural, one {Confirm # card without grade} other {Confirm # cards without grade}}",
     "done": "{count, plural, one {Confirmed # item} other {Confirmed # items}}",
     "banner": "{count, plural, one {# imported purchase to review} other {# imported purchases to review}}",
-    "cancelled": "This order was cancelled (remove it)",
-    "doneCancelled": "{count, plural, one {# cancelled order removed} other {# cancelled orders removed}}",
+    "cancelled": "This order was canceled (remove it)",
+    "doneCancelled": "{count, plural, one {# canceled order removed} other {# canceled orders removed}}",
     "reason": {
-      "deadline_missed": "The seller missed the shipping deadline: if you cancelled this order, tick the box below.",
-      "no_delivery": "Some purchases of this item have no delivery email: if this was one you cancelled, tick the box below.",
+      "deadline_missed": "The seller missed the shipping deadline: if you canceled this order, tick the box below.",
+      "no_delivery": "Some purchases of this item have no delivery email: if this was one you canceled, tick the box below.",
       "date_approx": "Date read from the listing (its last update, usually a few days after the purchase): correct it if you know the day.",
       "new_product": "New item made from the listing title: check its name and details on its page.",
       "price_far": "The price is far from what this item sells for: check the item and the price.",
@@ -804,7 +804,7 @@
         "failed": "{count, plural, one {# failed} other {# failed}}",
         "corrected": "{count, plural, one {# corrected} other {# corrected}}",
         "flagged": "{count, plural, one {# flagged for review} other {# flagged for review}}",
-        "cancelled": "{count, plural, one {# cancelled} other {# cancelled}}",
+        "cancelled": "{count, plural, one {# canceled} other {# canceled}}",
         "unclassified": "{count, plural, one {# unclassified} other {# unclassified}}",
         "left": "{count, plural, one {# left for next time} other {# left for next time}}"
       },
@@ -916,9 +916,9 @@
         "like_entry_by_hand": "looks like an entry you added; you chose to skip it",
         "differs_kept": "registered with different details; kept as registered",
         "unclassified": "could not tell which item it is: add it by hand",
-        "cancelled": "cancelled",
-        "cancelled_in_app": "marked as cancelled in the app",
-        "cancelled_registered": "cancelled per the emails, but registered: check it",
+        "cancelled": "canceled",
+        "cancelled_in_app": "marked as canceled in the app",
+        "cancelled_registered": "canceled per the emails, but registered: check it",
         "not_purchase": "not a purchase",
         "not_collectible": "not a collectible",
         "corrected": "corrected: {fields}"
@@ -2239,7 +2239,7 @@
     "feedHelp": "A feed (for example a userscript in your own browser on the board page) sends new posts with this token. See docs/store-feeds.md.",
     "postsInfo": "Posts about your area's stores first.",
     "noPosts": "No posts yet.",
-    "unknownStore": "store not recognised",
+    "unknownStore": "store not recognized",
     "comment": "Comment",
     "error": {
       "area": "That area could not be saved.",
@@ -2346,9 +2346,9 @@
     "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
     "unread": "{n, plural, one {# new message} other {# new messages}}",
     "waiting": "{n, plural, one {# new message: show} other {# new messages: show}}",
-    "unknownAreaTitle": "Store and area not recognised (chain known)",
-    "unknownStoreTitle": "Store and area not recognised",
-    "unknownShopTitle": "Store not recognised (area known)",
+    "unknownAreaTitle": "Area not recognized (store known)",
+    "unknownStoreTitle": "Store and area not recognized",
+    "unknownShopTitle": "Store not recognized (area known)",
     "pill": {
       "none": "Feed not connected: set it up",
       "online": "Online",

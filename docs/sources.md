@@ -49,7 +49,7 @@ comparison only for cards, while for sealed product it agreed and kept supportin
 The reference decides what everything is worth, so it needs:
 
 - **Real sales, not asks.** Sold prices with their dates. An asking price says what a seller hopes
-  for; sources whose prices are asks (`priceKinds: ['listing']`) are labelled as asks in the app
+  for; sources whose prices are asks (`priceKinds: ['listing']`) are labeled as asks in the app
   and are best kept as supporting or comparison.
 - **The condition of each sale**, so each lot is valued from prices in its own bucket (a graded
   card is not a raw one; a box without shrink wrap is not one with it).

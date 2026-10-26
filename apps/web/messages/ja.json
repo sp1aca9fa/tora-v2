@@ -2346,7 +2346,7 @@
     "quietLocations": "昨日以降投稿のないエリア: {n}",
     "unread": "新着 {n} 件",
     "waiting": "新着 {n} 件: 表示",
-    "unknownAreaTitle": "店舗・エリア不明（チェーンは判明）",
+    "unknownAreaTitle": "エリア不明（店舗は判明）",
     "unknownStoreTitle": "店舗・エリア不明",
     "unknownShopTitle": "店舗不明（エリアは判明）",
     "pill": {
