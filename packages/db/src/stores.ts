@@ -13,7 +13,12 @@ import {
   storeUnknownNotice,
   storesInArea,
   storesInPost,
+  type TrackingHours,
+  type TrackingOverride,
+  type TrackingSettings,
   toLocalIso,
+  trackingOverride,
+  trackingState,
   withinHours,
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
@@ -780,7 +785,13 @@ export async function checkFeeds(
     await pruneStorePosts(db, now);
   }
   const time = toLocalIso(now).slice(11, 16);
-  const startedAt = opts.startedAt?.getTime() ?? 0;
+  // Outside the tracking hours feeds rest: no silence then, and none counted from before the start.
+  const tracking = trackingState(await readTracking(db), now);
+  if (!tracking.on) return 0;
+  const startedAt = Math.max(
+    opts.startedAt?.getTime() ?? 0,
+    tracking.since ? Date.parse(tracking.since) : 0,
+  );
   let told = 0;
   for (const { token, user } of rows) {
     if (!token.lastSeenAt) continue;
@@ -815,17 +826,23 @@ export async function checkFeeds(
               'Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).',
             { since: sinceText, hours: Math.floor(minutes / 60) },
           )
-        : startedAt > lastSeen
+        : startedAt > lastSeen && tracking.since && Date.parse(tracking.since) === startedAt
           ? fill(
-              t.feedSilentStart ??
-                'Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
+              t.feedSilentTracking ??
+                'Tora: the store feed has sent nothing since tracking started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
               { started: sinceText, minutes, last: shortAt(token.lastSeenAt) },
             )
-          : fill(
-              t.feedSilent ??
-                'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
-              { source: token.lastSource ?? '-', since: sinceText, minutes },
-            );
+          : startedAt > lastSeen
+            ? fill(
+                t.feedSilentStart ??
+                  'Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
+                { started: sinceText, minutes, last: shortAt(token.lastSeenAt) },
+              )
+            : fill(
+                t.feedSilent ??
+                  'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
+                { source: token.lastSource ?? '-', since: sinceText, minutes },
+              );
     await db
       .update(feedTokens)
       .set({ silenceAlertedAt: toLocalIso(now) })
@@ -1144,12 +1161,48 @@ export async function boardsToWatch(db: Db, userId: string): Promise<string[] | 
   return boards.length ? boards : null;
 }
 
+// ---- The board tracker's working hours ----
+
+const TRACKING_KEY = 'boardTracking';
+
+/** The tracking hours an admin set (none: around the clock) and an admin's tracking outside them. */
+export async function readTracking(db: Pick<Db, 'select'>): Promise<TrackingSettings> {
+  return (await readSetting<TrackingSettings>(db, TRACKING_KEY)) ?? { hours: null };
+}
+
+/** New tracking hours (null: around the clock); tracking an admin asked for goes on. */
+export async function saveTrackingHours(db: Db, hours: TrackingHours | null): Promise<void> {
+  await saveSetting(db, TRACKING_KEY, { ...(await readTracking(db)), hours });
+}
+
+/**
+ * Tracks outside the hours once, as an admin asked (for an hour, or until the next start); null
+ * while the feed already tracks.
+ */
+export async function trackNow(
+  db: Db,
+  kind: TrackingOverride['kind'],
+  now = new Date(),
+): Promise<TrackingOverride | null> {
+  const settings = await readTracking(db);
+  const override = trackingOverride(settings, kind, now);
+  if (override) await saveSetting(db, TRACKING_KEY, { ...settings, override });
+  return override;
+}
+
+/** What a feed is told: whether to read now, until when, or when to start again. */
+export async function feedTracking(db: Pick<Db, 'select'>, now = new Date()) {
+  const { on, until, resumeAt } = trackingState(await readTracking(db), now);
+  return { on, until, resumeAt };
+}
+
 /**
  * What changes the Stores pages (S25): the newest post and the person's feed's last push, two
- * rows read, so an open page asks this and reloads only when something changed.
+ * rows read, so an open page asks this and reloads only when something changed. With them, the
+ * tracking hours and whether the feed tracks now.
  */
 export async function storesState(db: Db, userId: string) {
-  const [[post], [token]] = await Promise.all([
+  const [[post], [token], tracking] = await Promise.all([
     // When the last post arrived (a push's time to the millisecond): posts carry only the minute
     // they were posted, so a second post in the same minute would go unnoticed.
     db
@@ -1167,6 +1220,7 @@ export async function storesState(db: Db, userId: string) {
       })
       .from(feedTokens)
       .where(eq(feedTokens.userId, userId)),
+    readTracking(db),
   ]);
   // The feed at a glance (the Stores pages' status): its last push, the board it read last, its
   // next read, and the boards it watches with when each last gave posts.
@@ -1175,6 +1229,10 @@ export async function storesState(db: Db, userId: string) {
   return {
     post: post?.at ?? null,
     feed: token?.at ?? null,
+    tracking: {
+      ...trackingState(tracking),
+      hours: tracking.hours ? { from: tracking.hours.from, to: tracking.hours.to } : null,
+    },
     status: token?.at
       ? {
           at: token.at,

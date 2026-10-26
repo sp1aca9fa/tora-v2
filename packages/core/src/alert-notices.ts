@@ -58,6 +58,7 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'feedGap',
     'feedSilent',
     'feedSilentStart',
+    'feedSilentTracking',
     'feedStillSilent',
     'boardSilent',
   ],

@@ -4,6 +4,7 @@
 // is a heartbeat: the Stores page shows whether the feed is alive. Format: docs/store-feeds.md.
 import {
   feedTokenUser,
+  feedTracking,
   getDb,
   loadTimeZone,
   readPush,
@@ -43,5 +44,7 @@ export async function POST(request: Request) {
     gap: !!received.gap,
     // The boards chosen in the app: the feed follows them (null: its own choice).
     watch: received.watch ?? null,
+    // The tracking hours: whether to go on reading, until when (else when to start again).
+    tracking: await feedTracking(db),
   });
 }

@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Store,
   Terminal,
+  Timer,
   User,
   Users,
 } from 'lucide-react';
@@ -68,6 +69,7 @@ export const SETTINGS_SECTIONS: SettingsEntry[] = [
       { key: 'languages', href: '/settings/admin/languages', icon: Languages, admin: true },
       { key: 'timeZone', href: '/settings/admin/time-zone', icon: Clock, admin: true },
       { key: 'opening', href: '/settings/admin/opening', icon: PackageOpen, admin: true },
+      { key: 'tracking', href: '/settings/admin/tracking', icon: Timer, admin: true },
       { key: 'database', href: '/settings/admin/database', icon: Database, admin: true },
       { key: 'server', href: '/settings/admin/server', icon: Server, admin: true },
       { key: 'commands', href: '/settings/admin/commands', icon: Terminal, admin: true },

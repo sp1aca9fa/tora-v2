@@ -398,6 +398,10 @@
         "title": "Apertura de cajas",
         "info": "Probabilidades de cada set y la comisión de venta para el valor de abrir una caja."
       },
+      "tracking": {
+        "title": "Seguimiento de foros",
+        "info": "Cuándo los canales de tiendas leen sus foros: horario."
+      },
       "accounts": {
         "title": "Cuentas",
         "info": "Cuentas nuevas, restablecer contraseña y autenticador, dispositivos."
@@ -1200,6 +1204,25 @@
     "primaryInfo": "Se muestra primero, y a quien inicia sesión.",
     "secondaryInfo": "La otra opción del selector."
   },
+  "boardTracking": {
+    "title": "Horario del seguimiento de foros",
+    "info": "Los canales de tiendas (un userscript en un navegador) leen sus foros solo en este horario, como lo haría una persona, no a todas horas. Fuera de él el canal se detiene: no recarga ninguna página ni lee publicaciones, respuestas o imágenes, y pregunta a Tora cada minuto más o menos si debe empezar de nuevo. Para todas las cuentas.",
+    "enable": "Seguir solo dentro del horario",
+    "always": "Desactivado: los canales leen sus foros a todas horas.",
+    "from": "Inicio",
+    "to": "Fin",
+    "delay": "Retraso aleatorio",
+    "minDelay": "Retraso más corto en segundos",
+    "maxDelay": "Retraso más largo en segundos",
+    "toSeconds": "a",
+    "seconds": "segundos",
+    "delayInfo": "Se sortea de nuevo cada día, así el seguimiento nunca empieza ni termina en el minuto exacto (hasta una hora).",
+    "warning": "Tora puede empezar tarde y terminar antes: empieza a leer entre {min} y {max} segundos después de las {from} y se detiene entre {min} y {max} segundos antes de las {to}, a otra hora cada día.",
+    "outside": "Fuera del horario, las páginas de Tiendas lo dicen en rojo, y los administradores pueden seguir una hora o hasta el próximo inicio (una vez: después sigue el horario de siempre).",
+    "save": "Guardar",
+    "saved": "Guardado.",
+    "invalid": "Dos horas distintas y retrasos de 0 a 3600 segundos, el más corto primero."
+  },
   "timeZone": {
     "title": "Zona horaria",
     "info": "La zona horaria de la app: decide cuándo empieza un día para las instantáneas diarias del valor, los gráficos, las ventanas de valor y la recogida de una vez al día, y todas las horas se muestran en ella. Una zona para todas las cuentas, normalmente la del administrador. Elígela al configurar, junto a la moneda base.",
@@ -1504,6 +1527,7 @@
     "storeOpen": "publicación",
     "feedSilent": "Tora: el canal de tiendas ({source}) está en silencio desde {since} ({minutes} min): no habrá avisos de tiendas hasta que vuelva a enviar. Revisa el canal (si es un userscript: su pestaña del navegador).",
     "feedSilentStart": "Tora: el canal de tiendas no ha enviado nada desde que arrancó el servidor a las {started} ({minutes} min; su último envío: {last}). No habrá avisos de tiendas hasta que envíe. Revisa el canal (si es un userscript: su pestaña del navegador).",
+    "feedSilentTracking": "Tora: el canal de tiendas no ha enviado nada desde que empezó el seguimiento a las {started} ({minutes} min; su último envío: {last}). No habrá avisos de tiendas hasta que envíe. Revisa el canal (si es un userscript: su pestaña del navegador).",
     "feedStillSilent": "Tora: el canal de tiendas sigue en silencio: nada desde {since} ({hours} h). Revisa el canal (si es un userscript: su pestaña del navegador).",
     "feedBack": "Tora: el canal de tiendas vuelve a enviar.",
     "feedGap": "Tora: {posts} publicaciones nuevas de golpe en el tablón de {chain}: puede que se perdieran algunas entre dos visitas.",
@@ -1792,7 +1816,10 @@
       "storeCodes": "Códigos de la tienda",
       "productMerged": "Artículo duplicado fusionado",
       "glossaryAdded": "Significado de código añadido",
-      "glossaryRemoved": "Significado de código eliminado"
+      "glossaryRemoved": "Significado de código eliminado",
+      "trackingHours": "Horario del seguimiento de foros",
+      "trackHour": "Seguimiento de foros: una hora fuera del horario",
+      "trackUntilStart": "Seguimiento de foros: hasta el inicio del horario"
     },
     "role": {
       "admin": "administrador",
@@ -2329,7 +2356,16 @@
       "reading": "Leyendo {board}",
       "late": "{board} con retraso (previsto {time})",
       "quiet": "Sin posts de {boards} en 10 min",
-      "silent": "Feed en silencio desde {time}: avisos parados"
+      "silent": "Feed en silencio desde {time}: avisos parados",
+      "stopped": "Detenido: fuera del horario",
+      "starting": "Empezando",
+      "stoppedTitle": "El seguimiento de foros está detenido: fuera del horario ({hours})",
+      "resumes": "Vuelve a empezar hacia las {time}. Hasta entonces no se leen publicaciones, respuestas ni imágenes.",
+      "trackHour": "Seguir una hora",
+      "trackUntilStart": "Seguir hasta las {time} (inicio del horario)",
+      "silentTitle": "El seguimiento de foros no funciona: nada recibido desde las {time}",
+      "silentInfo": "No habrá avisos de tiendas hasta que vuelva a enviar. Revisa la pestaña del navegador con el foro abierto (el userscript).",
+      "extra": "Siguiendo fuera del horario hasta las {time}, a petición de un administrador."
     }
   },
   "accounts": {

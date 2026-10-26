@@ -7,7 +7,10 @@ import {
   type StoreAreaChoice,
   type StoreFeedPrefs,
   STORE_NOTICE_KM,
+  type TrackingHours,
   roundPoint,
+  toLocalIso,
+  validTrackingHours,
 } from '@tora/core';
 import {
   addGlossary,
@@ -17,8 +20,10 @@ import {
   recordAdminChange,
   removeGlossary,
   removeStore,
+  saveTrackingHours,
   setPreferences,
   setStoreCodes,
+  trackNow,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
@@ -214,6 +219,54 @@ export async function saveFeedBoardsAction(boards: string[] | null) {
     storeFeed: clean.length ? { ...rest, boards: clean } : rest,
   });
   revalidatePath('/stores/feed');
+}
+
+/** The board tracker's working hours (admins; null: around the clock). */
+export async function saveTrackingHoursAction(
+  hours: TrackingHours | null,
+): Promise<{ error?: string }> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return { error: 'admin' };
+  const clean = hours
+    ? {
+        from: String(hours.from),
+        to: String(hours.to),
+        minDelay: Number(hours.minDelay),
+        maxDelay: Number(hours.maxDelay),
+      }
+    : null;
+  if (clean && !validTrackingHours(clean)) return { error: 'hours' };
+  await saveTrackingHours(db, clean);
+  await recordAdminChange(
+    db,
+    user.id,
+    'trackingHours',
+    {
+      to: clean
+        ? `${clean.from}-${clean.to} (${clean.minDelay}-${clean.maxDelay} s)`
+        : 'around the clock',
+    },
+    '/settings/admin/tracking',
+  );
+  revalidatePath('/stores', 'layout');
+  revalidatePath('/settings/admin/tracking');
+  return {};
+}
+
+/** Tracks outside the hours once (admins): for an hour, or until the next start of the hours. */
+export async function trackNowAction(kind: 'hour' | 'untilStart') {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' || (kind !== 'hour' && kind !== 'untilStart')) return;
+  const override = await trackNow(db, kind);
+  if (override)
+    await recordAdminChange(
+      db,
+      user.id,
+      kind === 'hour' ? 'trackHour' : 'trackUntilStart',
+      { to: toLocalIso(new Date(override.until)).slice(0, 16).replace('T', ' ') },
+      '/stores',
+    );
+  revalidatePath('/stores', 'layout');
 }
 
 /** The next posts as the list is scrolled (S25). */

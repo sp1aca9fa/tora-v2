@@ -398,6 +398,10 @@
         "title": "Box opening",
         "info": "Pull rates per set and the selling fee for the box opening value."
       },
+      "tracking": {
+        "title": "Board tracker",
+        "info": "When store feeds read their boards: working hours."
+      },
       "accounts": {
         "title": "Accounts",
         "info": "New accounts, password and authenticator resets, devices."
@@ -1200,6 +1204,25 @@
     "primaryInfo": "Shown first, and to people signing in.",
     "secondaryInfo": "The other side of the toggle."
   },
+  "boardTracking": {
+    "title": "Board tracker hours",
+    "info": "Store feeds (a userscript in a browser) read their boards only within these hours, like a person would, not around the clock. Outside them the feed stops: it reloads no page and reads no posts, replies or pictures, and asks Tora every minute or so whether to start again. For every account.",
+    "enable": "Track within working hours only",
+    "always": "Off: feeds read their boards around the clock.",
+    "from": "Start",
+    "to": "Stop",
+    "delay": "Random delay",
+    "minDelay": "Shortest delay in seconds",
+    "maxDelay": "Longest delay in seconds",
+    "toSeconds": "to",
+    "seconds": "seconds",
+    "delayInfo": "Drawn again each day, so the tracker never starts or stops on the minute (up to an hour).",
+    "warning": "Tora may start late and finish early: it starts reading {min} to {max} seconds after {from} and stops {min} to {max} seconds before {to}, at another time each day.",
+    "outside": "Outside the hours, the Stores pages say so in red, and admins can track for an hour or until the next start (once: the hours go on as usual after).",
+    "save": "Save",
+    "saved": "Saved.",
+    "invalid": "Two different times, and delays from 0 to 3600 seconds, the shortest first."
+  },
   "timeZone": {
     "title": "Time zone",
     "info": "The app's time zone: it decides when a day starts for the daily value snapshots, charts, value windows and the collect's once a day, and every time is shown in it. One zone for every account, usually the admin's own. Pick it at setup, next to the base currency.",
@@ -1504,6 +1527,7 @@
     "storeOpen": "post",
     "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).",
     "feedSilentStart": "Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).",
+    "feedSilentTracking": "Tora: the store feed has sent nothing since tracking started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).",
     "feedStillSilent": "Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).",
     "feedBack": "Tora: the store feed is sending again.",
     "feedGap": "Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.",
@@ -1792,7 +1816,10 @@
       "storeCodes": "Store codes",
       "productMerged": "Duplicate item merged",
       "glossaryAdded": "Code meaning added",
-      "glossaryRemoved": "Code meaning removed"
+      "glossaryRemoved": "Code meaning removed",
+      "trackingHours": "Board tracker hours",
+      "trackHour": "Board tracker: an hour outside the hours",
+      "trackUntilStart": "Board tracker: until the start of the hours"
     },
     "role": {
       "admin": "admin",
@@ -2329,7 +2356,16 @@
       "reading": "Reading {board}",
       "late": "{board} late (due {time})",
       "quiet": "No posts from {boards} for 10 min",
-      "silent": "Feed silent since {time}: notices stopped"
+      "silent": "Feed silent since {time}: notices stopped",
+      "stopped": "Stopped: out of tracking hours",
+      "starting": "Starting",
+      "stoppedTitle": "Board tracker is stopped: out of tracking hours ({hours})",
+      "resumes": "It starts again at about {time}. No posts, replies or pictures are read until then.",
+      "trackHour": "Track for an hour",
+      "trackUntilStart": "Track until {time} (start of regular hours)",
+      "silentTitle": "Board tracker is not running: nothing received since {time}",
+      "silentInfo": "No store notices until it sends again. Check the browser tab with the board open (the userscript).",
+      "extra": "Tracking outside regular hours until {time}, as an admin asked."
     }
   },
   "accounts": {

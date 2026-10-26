@@ -14,6 +14,7 @@ import {
   dropOldImages,
   feedStatus,
   feedTokenUser,
+  feedTracking,
   listStores,
   newFeedToken,
   postsPage,
@@ -27,12 +28,14 @@ import {
   removeStore,
   saveGlossary,
   saveStores,
+  saveTrackingHours,
   sendFeedMessages,
   sendStoreNotices,
   setStoreCodes,
   rematchPosts,
   storeCodes,
   storeGlossary,
+  trackNow,
 } from './stores';
 import { storePosts } from './schema';
 import { createUser, setPreferences } from './users';
@@ -409,6 +412,36 @@ it('counts silence from the server start after a night off, and reminds while it
   // A push clears it.
   await receivePush(db, uid, { source: 'myboard', posts: [] }, at('11:20'));
   expect(await checkFeeds(db, ctx, at('11:25'), { startedAt })).toBe(0);
+});
+
+it('lets feeds rest outside the tracking hours, and counts silence from the start', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '00:00', to: '23:59' } });
+  await saveTrackingHours(db, { from: '09:00', to: '21:00', minDelay: 0, maxDelay: 0 });
+  const at = (day: string, time: string) => new Date(`2026-10-${day}T${time}:00+09:00`);
+  // Its last push before the stop; nothing through the night.
+  await receivePush(db, uid, { source: 'myboard', posts: [] }, at('21', '20:58'));
+  sent = [];
+  expect(await checkFeeds(db, ctx, at('22', '03:00'))).toBe(0);
+  expect(await feedTracking(db, at('22', '03:00'))).toEqual({
+    on: false,
+    until: null,
+    resumeAt: '2026-10-22T09:00:00.000+09:00',
+  });
+  // After the start: silent only once the limit passed since the start, and said so.
+  expect(await checkFeeds(db, ctx, at('22', '09:05'))).toBe(0);
+  expect(await checkFeeds(db, ctx, at('22', '09:11'))).toBe(1);
+  expect(sent.at(-1)).toContain('since tracking started at 10-22 09:00 (11 min');
+  // An admin's hour at night: tracked once, then rest again.
+  expect(await trackNow(db, 'hour', at('22', '12:00'))).toBeNull();
+  const override = await trackNow(db, 'hour', at('22', '22:00'));
+  expect(override?.until).toBe('2026-10-22T23:00:00.000+09:00');
+  expect((await feedTracking(db, at('22', '22:30'))).on).toBe(true);
+  expect((await feedTracking(db, at('22', '23:00'))).on).toBe(false);
+  expect((await feedTracking(db, at('23', '22:30'))).on).toBe(false);
+  await saveTrackingHours(db, null);
+  expect((await feedTracking(db, at('23', '03:00'))).on).toBe(true);
 });
 
 it('adds and removes stores by hand, never a plug-in one', async () => {

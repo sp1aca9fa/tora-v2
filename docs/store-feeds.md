@@ -133,6 +133,30 @@ The answer says how many posts were new, matched a store, and how many people we
 Notices: only for posts of the last 30 minutes, at most one per store every 30 minutes for each
 person, and none for a feed's very first push (it usually brings a page of old posts).
 
+### Working hours
+
+An admin can have feeds read only within working hours (**Settings > Admin preferences > Board
+tracker**; off by default: around the clock), as a person would, not all night. Each day the
+tracker starts a random delay after the start and stops one before the end (a range the admin
+sets, e.g. 60 to 300 seconds), so it never starts or stops on the minute.
+
+The answer to every push carries `tracking`, and a feed can ask for it alone with its token:
+
+```http
+GET /api/feed/tracking
+Authorization: Bearer tora_feed_...
+```
+
+```json
+{ "tracking": { "on": false, "until": null, "resumeAt": "2026-10-27T09:03:12.000+09:00" } }
+```
+
+While `on`, read until `until` (null: no end). When it is false, read nothing, send nothing and
+reload nothing: stay on the page and ask again every minute or so (this asks Tora only, never the
+site), then open the board again once `on` comes back. The Stores pages show a red bar while the
+tracker is stopped, and admins can track from there for an hour, or until the next start (once:
+the hours go on as usual after). Silence alerts rest outside the hours and count from the start.
+
 ### A browser feed (userscript) skeleton
 
 For a page that only a real browser can read (a bot check, a login), a userscript (Tampermonkey,
@@ -178,7 +202,8 @@ setTimeout(() => location.reload(), 90_000);
 ```
 
 Even when the page shows no post, push (an empty list is the heartbeat), so a page that stops
-giving posts is noticed.
+giving posts is noticed. With working hours set, ask `/api/feed/tracking` before reading the page
+and skip the reload while `on` is false (above).
 
 ## No silent failures
 
