@@ -456,6 +456,13 @@
       "when": 1792993319554,
       "tag": "0064_canceled_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "6",
+      "when": 1793011282855,
+      "tag": "0065_notice_messages",
+      "breakpoints": true
     }
   ]
 }

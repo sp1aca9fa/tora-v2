@@ -108,10 +108,10 @@ Content-Type: application/json
 "スノーセット" }]`), saved when it changes; send it when it changes (and with `hello`).
 - `replyTo` (per post): the id of the post it answers, for replies (comments) such as "still a
   line" or "sold out". A reply naming no store takes the stores of the post it answers; replies
-  are sent to the people whose area holds the store at once, marked as a comment to their post,
-  even within the store's quiet time (a new post about a store makes at most one notice every 30
-  minutes). On the Stores pages a post shows every reply in its thread under it, answers to
-  replies included, oldest first.
+  are sent to the people whose area holds the store at once, under their post (or, the post not
+  in the notice, with its start), even within the store's quiet time (a new post about a store
+  makes at most one notice every 30 minutes). On the Stores pages a post shows every reply in its
+  thread under it, answers to replies included, oldest first.
 - `images` (per post, optional): its pictures, `[{ "url": "<where it was found>", "data": "<base64>" }]`,
   up to 4, 8 MB each (JPEG, PNG, WebP or GIF). Kept a week, attached to the post's notices and
   shown on the Posts page. Send a post's pictures with its first push only (a post sent again is
@@ -204,6 +204,16 @@ setTimeout(() => location.reload(), 90_000);
 Even when the page shows no post, push (an empty list is the heartbeat), so a page that stops
 giving posts is noticed. With working hours set, ask `/api/feed/tracking` before reading the page
 and skip the reload while `on` is false (above).
+
+## How notices look
+
+Store notices follow the Now page: a card per location (an area and the stores near it), the
+newest first, its name linking to that row on Now (opened); in it a section per store, each post
+with its time, the products its codes stand for, a link to the post and the post as written, its
+replies under it. On Discord the times show in the reader's time zone with how long ago, kept up
+to date by Discord. On Telegram each location is a message of its own, long posts are folded (a tap
+opens them), and a reply to a post told earlier answers that post's message (remembered 3 days).
+The look and wording are set per person in Settings > Alerts > Customize notices.
 
 ## No silent failures
 

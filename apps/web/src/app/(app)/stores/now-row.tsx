@@ -210,6 +210,7 @@ export function NowRow({
   id,
   times,
   seenAt,
+  startOpen = false,
   dashed,
   summary,
   children,
@@ -219,6 +220,8 @@ export function NowRow({
   times: string[];
   /** When it was last opened ('' never). */
   seenAt: string;
+  /** Opened when the page loads (a notice's link: `?open=` its id). */
+  startOpen?: boolean;
   dashed: boolean;
   summary: React.ReactNode;
   children: React.ReactNode;
@@ -255,6 +258,17 @@ export function NowRow({
       void markLocationSeenAction(id, latest);
     }
   }, [latest, children, open, held, read, id]);
+
+  // A notice's link opens its row, in view.
+  useEffect(() => {
+    if (!startOpen || !ref.current) return;
+    const fold = ref.current.parentElement?.closest('details');
+    if (fold) fold.open = true;
+    ref.current.open = true;
+    ref.current.scrollIntoView({ block: 'start' });
+    // Only when the page loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // The reader is there while they scroll, tap or type.
   useEffect(() => {

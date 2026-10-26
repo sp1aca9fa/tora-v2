@@ -1523,7 +1523,6 @@
     "summaryDrops": "Bajadas fuertes (15% o más en una semana):",
     "summaryDrop": "{name}: {price}, {pct} en 7 días",
     "storePosts": "Tora: cartas a la venta en tu zona",
-    "storeComment": "Comentario para {store}",
     "storeLink": "Avisos de tiendas en Tora",
     "storeOpen": "publicación",
     "feedSilent": "Tora: el canal de tiendas ({source}) está en silencio desde {since} ({minutes} min): no habrá avisos de tiendas hasta que vuelva a enviar. Revisa el canal (si es un userscript: su pestaña del navegador).",

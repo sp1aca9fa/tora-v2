@@ -51,6 +51,7 @@ import {
   alertChannels,
   alertLog,
   appSettings,
+  noticeMessages,
   holdings,
   products,
   signals,
@@ -310,7 +311,11 @@ export async function connectTelegram(
 
 // ---- Sending ----
 
+/** Days a Telegram message is remembered for the replies to its posts. */
+const MESSAGE_DAYS = 3;
+
 async function deliver(
+  db: Db,
   channel: AlertChannel,
   message: string | Notice,
   ctx: AlertContext,
@@ -338,21 +343,69 @@ async function deliver(
     return;
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
-  // Cut HTML can be broken: a long message goes as plain text instead.
-  const html = notice && style?.format !== 'plain' ? telegramHtml(notice, style) : null;
-  const send =
-    html && html.length <= 4096 ? html : notice ? plainText(notice, style) : (message as string);
-  await telegram(
-    token,
-    'sendMessage',
-    {
-      chat_id: target,
-      text: send.slice(0, 4096),
-      ...(send === html ? { parse_mode: 'HTML' } : {}),
-      link_preview_options: { is_disabled: true },
-    },
-    fetchFn,
-  );
+  // A split notice goes a card per message, the heading on the first and the link on the last.
+  const parts: (Notice | null)[] = notice?.split
+    ? notice.cards.map((c, i, all) => ({
+        ...notice,
+        head: i === 0 ? notice.head : null,
+        link: i === all.length - 1 ? notice.link : null,
+        cards: [c],
+      }))
+    : [notice];
+  const keep = toLocalIso(new Date(Date.now() - MESSAGE_DAYS * 86_400_000));
+  for (const part of parts) {
+    // Cut HTML can be broken: a long message goes as plain text instead.
+    const html = part && style?.format !== 'plain' ? telegramHtml(part, style) : null;
+    const send =
+      html && html.length <= 4096 ? html : part ? plainText(part, style) : (message as string);
+    const card = part?.split ? part.cards[0] : undefined;
+    const [answer] = card?.replyTo
+      ? await db
+          .select({ id: noticeMessages.messageId })
+          .from(noticeMessages)
+          .where(
+            and(
+              eq(noticeMessages.channelId, channel.id),
+              eq(noticeMessages.postKey, card.replyTo),
+              gte(noticeMessages.sentAt, keep),
+            ),
+          )
+      : [];
+    const result = (await telegram(
+      token,
+      'sendMessage',
+      {
+        chat_id: target,
+        text: send.slice(0, 4096),
+        ...(send === html ? { parse_mode: 'HTML' } : {}),
+        link_preview_options: { is_disabled: true },
+        ...(answer
+          ? {
+              reply_parameters: {
+                message_id: Number(answer.id),
+                allow_sending_without_reply: true,
+              },
+            }
+          : {}),
+      },
+      fetchFn,
+    )) as { message_id?: number } | null;
+    if (card?.keys?.length && result?.message_id) {
+      const sentAt = toLocalIso();
+      for (const postKey of card.keys) {
+        await db
+          .insert(noticeMessages)
+          .values({ channelId: channel.id, postKey, messageId: String(result.message_id), sentAt })
+          .onConflictDoUpdate({
+            target: [noticeMessages.channelId, noticeMessages.postKey],
+            set: { messageId: String(result.message_id), sentAt },
+          });
+      }
+      await db
+        .delete(noticeMessages)
+        .where(and(eq(noticeMessages.channelId, channel.id), lt(noticeMessages.sentAt, keep)));
+    }
+  }
   if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
 }
 
@@ -442,7 +495,7 @@ async function deliverTo(
       })
       .catch((e: unknown) => ctx.log?.(`alerts: history not written: ${errorText(e)}`));
   try {
-    await deliver(channel, text, ctx, token, style);
+    await deliver(db, channel, text, ctx, token, style);
     await db
       .update(alertChannels)
       .set({ lastSentAt: now, lastError: null, updatedAt: now })

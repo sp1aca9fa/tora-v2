@@ -1523,7 +1523,6 @@
     "summaryDrops": "急落（1週間で15%以上）:",
     "summaryDrop": "{name}: {price}、7日間で{pct}",
     "storePosts": "Tora:エリア内の店舗で販売情報",
-    "storeComment": "{store}へのコメント",
     "storeLink": "Toraの店舗通知",
     "storeOpen": "投稿",
     "feedSilent": "Tora:店舗フィード({source})が{since}から受信なし({minutes}分):再開するまで店舗通知は届きません。フィード(ユーザースクリプトならブラウザのタブ)を確認してください。",

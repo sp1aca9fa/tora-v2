@@ -1,5 +1,5 @@
 import { decryptSecret } from '@tora/auth';
-import { toLocalIso } from '@tora/core';
+import { storeNotice, toLocalIso } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +18,7 @@ import {
   listAlertLog,
   pruneAlertLog,
   sendSummaries,
+  sendToUser,
   sendWatchAlerts,
   setTelegramBot,
   telegramCode,
@@ -50,6 +51,9 @@ let member: string;
 /** Messages sent, by where they went. */
 let sent: { to: string; text: string }[];
 let telegramUpdates: unknown[];
+/** Telegram messages sent (their ids count up) and those they answered. */
+let messageIds: number;
+let answered: number[];
 let failDiscord: boolean;
 
 const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -77,7 +81,8 @@ const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => 
   if (method === 'getUpdates') return Response.json({ ok: true, result: telegramUpdates });
   if (method === 'sendMessage') {
     sent.push({ to: `telegram:${body.chat_id}`, text: body.text });
-    return Response.json({ ok: true, result: {} });
+    if (body.reply_parameters) answered.push(body.reply_parameters.message_id);
+    return Response.json({ ok: true, result: { message_id: ++messageIds } });
   }
   return Response.json({ ok: false, description: 'unknown' });
 }) as typeof fetch;
@@ -122,6 +127,8 @@ beforeEach(async () => {
   member = (await createUser(db, 'member', creds)).user.id;
   sent = [];
   telegramUpdates = [];
+  messageIds = 0;
+  answered = [];
   failDiscord = false;
   return () => rm(dir, { recursive: true, force: true });
 });
@@ -394,6 +401,34 @@ it("logs a server's own events, and tells admins only when asked", async () => {
       ['failed', { event: 'Address down', text: 'check its network' }],
     ]),
   );
+});
+
+it('sends a store notice a location per Telegram message, a reply answering its post', async () => {
+  await setTelegramBot(db, '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ', SECRET, fakeFetch);
+  telegramUpdates = [
+    { message: { text: `/start ${telegramCode(member, SECRET)}`, chat: { id: 42 } } },
+  ];
+  await connectTelegram(db, member, ctx);
+  const post = (key: string, location: string, thread: string | null = null) => ({
+    key,
+    thread,
+    location: { id: location, title: location, url: null },
+    store: `${location} store`,
+    products: [],
+    text: key,
+    when: '18:00',
+    url: null,
+    comment: !!thread,
+  });
+  sent = [];
+  await sendToUser(db, member, storeNotice({}, [post('b:1', 'A'), post('b:2', 'B')], null), ctx);
+  expect(sent.map((m) => m.text.match(/<b>(\w)<\/b>/)?.[1])).toEqual(['A', 'B']);
+  // A's message was the second sent (after "connected").
+  await sendToUser(db, member, storeNotice({}, [post('b:3', 'A', 'b:1')], null), ctx);
+  expect(answered).toEqual([2]);
+  // Replies to posts never sent here answer nothing.
+  await sendToUser(db, member, storeNotice({}, [post('b:4', 'A', 'b:9')], null), ctx);
+  expect(answered).toEqual([2]);
 });
 
 it('keeps a history of every delivery, per channel, with filters', async () => {

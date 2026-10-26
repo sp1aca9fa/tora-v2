@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type Notice,
+  type StorePostData,
   discordPayloads,
   noticeExamples,
   plainText,
@@ -79,13 +80,93 @@ describe('notices', () => {
     expect(plainText(m)).toContain('Comment to Megastore Minato\n<sold out>');
   });
 
-  it("builds each kind from the person's texts, examples included", () => {
+  it('groups store posts as the Now page: a card per location, a section per store', () => {
+    const post = (
+      key: string,
+      location: string,
+      store: string,
+      at: string,
+      extra: Partial<StorePostData> = {},
+    ): StorePostData => ({
+      key,
+      location: { id: location, title: location, url: `https://tora.test/stores?open=${location}` },
+      store,
+      products: ['Snow set'],
+      text: key,
+      when: at.slice(11, 16),
+      at,
+      url: `https://b.test/${key}`,
+      comment: false,
+      ...extra,
+    });
     const n = storeNotice(
-      { storeComment: 'Reply at {store}', storePosts: 'On sale' },
-      [{ store: 'Minato', products: [], text: 'x', when: '10-21 18:00', url: null, comment: true }],
+      { storeReply: 'reply', storePosts: 'On sale' },
+      [
+        post('p1', 'Minato', 'Megastore Minato', '2026-10-21T18:00:00+09:00'),
+        post('p2', 'Minato', 'Arcade Minato', '2026-10-21T18:05:00+09:00'),
+        post('r1', 'Minato', 'Megastore Minato', '2026-10-21T18:10:00+09:00', {
+          comment: true,
+          thread: 'p1',
+        }),
+        post('r2', 'Kita', 'Kita', '2026-10-21T17:00:00+09:00', {
+          comment: true,
+          thread: 'p0',
+          threadText: 'an earlier post\nsecond line',
+        }),
+      ],
       null,
     );
-    expect(n.cards[0]).toMatchObject({ title: 'Reply at Minato', role: 'comment' });
+    // The newest location first; in it the store with the newest message (a reply counts).
+    expect(n.cards.map((c) => c.title)).toEqual(['Minato', 'Kita']);
+    const [minato, kita] = n.cards;
+    expect(minato!.sections!.map((sec) => sec.title)).toEqual([
+      'Megastore Minato',
+      'Arcade Minato',
+    ]);
+    expect(minato!.sections![0]!.entries).toEqual([
+      expect.objectContaining({
+        quote: 'p1',
+        replies: [expect.objectContaining({ quote: 'r1', reply: true, sub: null })],
+      }),
+    ]);
+    expect(minato).toMatchObject({ role: 'post', replyTo: null, keys: ['p1', 'r1', 'p2'] });
+    // A store alone in its location has no heading; a reply without its post shows the post's start.
+    expect(kita!.sections).toEqual([
+      {
+        title: '',
+        entries: [expect.objectContaining({ reply: true, to: 'an earlier post…' })],
+      },
+    ]);
+    expect(kita).toMatchObject({ role: 'comment', replyTo: 'p0', keys: ['r2'] });
+    expect(n.split).toBe(true);
+
+    const [discord] = discordPayloads(n);
+    const [first] = discord!.embeds as { title: string; url: string; description: string }[];
+    const at = Date.parse('2026-10-21T18:00:00+09:00') / 1000;
+    expect(first).toMatchObject({ title: 'Minato', url: 'https://tora.test/stores?open=Minato' });
+    expect(first!.description).toContain(
+      `**Megastore Minato**\n<t:${at}:t> · <t:${at}:R> · *Snow set* · [post](https://b.test/p1)\n> p1\n↳ <t:`,
+    );
+    expect(first!.description).toContain('[reply](https://b.test/r1)\n> r1\n\n**Arcade Minato**');
+    const html = telegramHtml({ ...n, cards: [kita!] });
+    expect(html).toContain('<b><a href="https://tora.test/stores?open=Kita">Kita</a></b>');
+    expect(html).toContain('↳ <i>an earlier post…</i> · <code>17:00</code> · <i>Snow set</i>');
+    expect(plainText(n)).toContain('Arcade Minato\n18:05 · Snow set · https://b.test/p2\np2');
+    // Long posts fold on Telegram.
+    const long = storeNotice(
+      {},
+      [post('x'.repeat(250), 'Kita', 'Kita', '2026-10-21T17:00:00+09:00')],
+      null,
+    );
+    expect(telegramHtml(long)).toContain('<blockquote expandable>');
+  });
+
+  it('sends Discord embeds in messages Discord takes (6,000 characters)', () => {
+    const card = { title: 'x', body: 'y'.repeat(3000) };
+    expect(discordPayloads({ kind: 'store', cards: [card, card, card] }).length).toBe(3);
+  });
+
+  it("builds each kind from the person's texts, examples included", () => {
     const examples = noticeExamples({ test: 'Hello' }, (n) => `¥${n}`);
     expect(Object.keys(examples)).toEqual([
       'store',

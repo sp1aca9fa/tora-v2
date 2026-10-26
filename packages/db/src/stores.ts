@@ -7,6 +7,7 @@ import {
   type StoreEntry,
   linesNotice,
   localDate,
+  locationsOf,
   productsInPost,
   storeNotice,
   storeLabelIn,
@@ -45,6 +46,8 @@ import {
   users,
 } from './schema';
 
+/** The Now page's row of posts naming only areas (apps/web stores/page.tsx). */
+const UNKNOWN_SHOP_ROW = 'unknown-shop';
 /** Posts this old or older make no notice (a feed's first push brings a page of old ones). */
 const FRESH_MINUTES = 30;
 /** Posts about one store within this time after a notice make no new one. */
@@ -909,6 +912,7 @@ export async function sendStoreNotices(
   if (!posts.length) return 0;
   const all = await cachedStores(db);
   const byId = new Map(all.map((s) => [s.id, s]));
+  const locationOf = locationsOf(all);
   const people = (await db.select().from(users).where(isNull(users.disabledAt))).filter(
     (u) => u.preferences?.storeArea,
   );
@@ -970,24 +974,39 @@ export async function sendStoreNotices(
     chosen.push(...mine.filter((p) => p.replyTo));
     if (!chosen.length) continue;
     chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
+    // A card per location (the Now page's rows), a section per store; posts naming only areas
+    // open the page's "area known" row.
+    const title = (s: Store) =>
+      s.chain === PLACE ? (storeLabelIn(s, locale) ?? s.name) : storeLabel(s, t, locale);
     const message = storeNotice(
       t,
-      chosen.map((p) => {
-        const where = p.storeIds
-          .filter((id) => area.has(id))
-          .map((id) => storeLabel(byId.get(id)!, t, locale))
-          .join(', ');
+      chosen.flatMap((p) => {
+        const ids = p.storeIds.filter((id) => area.has(id));
+        const areasOnly = ids.every((id) => byId.get(id)?.chain === PLACE);
         let products = named(p.text);
         if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
-        return {
-          store: where,
-          products,
-          text: p.text,
-          // "10-21 18:00", as the Stores page shows it.
-          when: p.postedAt.slice(5, 16).replace('T', ' '),
-          url: p.url,
-          comment: !!p.replyTo,
-        };
+        return ids.map((id) => {
+          const at = byId.get(locationOf.get(id) ?? id) ?? byId.get(id)!;
+          const row = areasOnly ? UNKNOWN_SHOP_ROW : at.id;
+          return {
+            key: `${p.source}:${p.externalId}`,
+            thread: p.thread ? `${p.source}:${p.thread}` : null,
+            location: {
+              id: at.id,
+              title: title(at),
+              url: base ? `${base}/stores?open=${encodeURIComponent(row)}` : null,
+            },
+            store: storeLabel(byId.get(id)!, t, locale),
+            products,
+            text: p.text,
+            // "18:00", as the Now page shows it.
+            when: p.postedAt.slice(11, 16),
+            at: p.postedAt,
+            url: p.url,
+            comment: !!p.replyTo,
+            threadText: p.thread ? (firsts.get(p.thread) ?? null) : null,
+          };
+        });
       }),
       base ? `${base}/stores` : null,
     );

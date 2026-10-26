@@ -32,17 +32,19 @@ type Thread = ReturnType<typeof threads>[number];
  * post and how many came since it was last opened; opened, the posts of each of its stores.
  * Posts naming no store sit in rows of their own: no store or area known, a chain known but not
  * where, or areas only (a section per area). Today's (from 5:00); yesterday's folded. The area's
- * stores, or every store. Before an area is set, the Area page comes first.
+ * stores, or every store. A notice's link opens its row (`?open=` its id). Before an area is set,
+ * the Area page comes first.
  */
 export default async function NowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; open?: string }>;
 }) {
   const { db, user } = await authed();
   const area = user.preferences?.storeArea ?? null;
   if (!area) redirect('/stores/area');
-  const every = (await searchParams).show === 'all';
+  const params = await searchParams;
+  const every = params.show === 'all';
   const [t, locale, places] = await Promise.all([
     getTranslations('stores'),
     getLocale(),
@@ -155,6 +157,7 @@ export default async function NowPage({
       id={location.id}
       times={messages.map((m) => m.postedAt)}
       seenAt={seen[location.id] ?? ''}
+      startOpen={params.open === location.id}
       dashed={unknownRows.has(location.id)}
       summary={
         <>

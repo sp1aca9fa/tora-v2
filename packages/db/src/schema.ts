@@ -1308,6 +1308,20 @@ export const storeNotices = sqliteTable(
   (t) => [uniqueIndex('store_notices_uq').on(t.userId, t.storeId)],
 );
 
+/** The Telegram message that carried a store post, per chat: a later reply answers it. */
+export const noticeMessages = sqliteTable(
+  'notice_messages',
+  {
+    channelId: text('channel_id')
+      .notNull()
+      .references(() => alertChannels.id, { onDelete: 'cascade' }),
+    postKey: text('post_key').notNull(),
+    messageId: text('message_id').notNull(),
+    sentAt: text('sent_at').notNull(),
+  },
+  (t) => [uniqueIndex('notice_messages_uq').on(t.channelId, t.postKey)],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;

@@ -7,6 +7,8 @@ import {
   NOTICE_PARTS,
   NOTICE_TEXTS,
   type Notice,
+  type NoticeCard,
+  type NoticeEntry,
   type NoticeKind,
   type NoticePart,
   type NoticeStyle,
@@ -14,8 +16,8 @@ import {
   plainText,
   styled,
 } from '@tora/core';
-import { useTranslations } from 'next-intl';
-import { useMemo, useState, useTransition } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Fragment, useMemo, useState, useTransition } from 'react';
 import { useMoney } from '@/components/money-context';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -246,6 +248,97 @@ function kindWords(kind: NoticeKind, words: Texts, base: Texts): Texts {
   );
 }
 
+type App = 'discord' | 'telegram';
+
+/** "15 minutes ago", as Discord counts it. */
+function ago(at: string | null | undefined, locale: string): string | null {
+  const ms = at ? Date.parse(at) : Number.NaN;
+  if (!Number.isFinite(ms)) return null;
+  return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(
+    Math.round((ms - Date.now()) / 60_000),
+    'minute',
+  );
+}
+
+/** A section's posts as the app shows them: replies under their post, long quotes folded on Telegram. */
+function PreviewEntries({
+  entries,
+  notice,
+  app,
+}: {
+  entries: NoticeEntry[];
+  notice: Notice;
+  app: App;
+}) {
+  const locale = useLocale();
+  const link = app === 'discord' ? 'text-[#00a8fc]' : 'text-[#3390ec]';
+  return entries.map((e, i) => {
+    const since = app === 'discord' ? ago(e.at, locale) : null;
+    const parts = [
+      e.to && <i key="to">{e.to}</i>,
+      e.when &&
+        (app === 'discord' ? (
+          <span key="when" className="rounded bg-white/10 px-0.5">
+            {e.when}
+            {since && ` · ${since}`}
+          </span>
+        ) : (
+          <code key="when" className="rounded bg-black/5 px-1 text-[12px] dark:bg-white/10">
+            {e.when}
+          </code>
+        )),
+      e.sub && <i key="sub">{e.sub}</i>,
+      e.url && (
+        <span key="url" className={link}>
+          {e.reply ? (notice.replyText ?? 'reply') : (notice.urlText ?? 'post')}
+        </span>
+      ),
+    ].filter(Boolean);
+    const long = (e.quote ?? '').length >= 200 || (e.quote ?? '').split('\n').length >= 4;
+    return (
+      <div key={i} className="space-y-1">
+        <p>
+          {e.reply && '↳ '}
+          {parts.map((part, j) => (
+            <Fragment key={j}>
+              {j > 0 && ' · '}
+              {part}
+            </Fragment>
+          ))}
+        </p>
+        {e.quote && (
+          <p
+            className={cn(
+              'whitespace-pre-wrap break-words',
+              app === 'discord'
+                ? 'border-l-4 border-[#4e5058] pl-2'
+                : 'rounded-r border-l-[3px] border-[#3390ec] bg-[#3390ec]/10 py-0.5 pl-2',
+              app === 'telegram' && long && 'line-clamp-3',
+            )}
+          >
+            {e.quote}
+          </p>
+        )}
+        {e.replies?.length ? (
+          <PreviewEntries entries={e.replies} notice={notice} app={app} />
+        ) : null}
+      </div>
+    );
+  });
+}
+
+/** A card's sections: each store's name, then its posts. */
+function PreviewSections({ card, notice, app }: { card: NoticeCard; notice: Notice; app: App }) {
+  return card.sections?.map((sec, i) => (
+    <div key={i} className="space-y-1 pt-1">
+      {sec.title && (
+        <p className={app === 'discord' ? 'font-semibold text-white' : 'underline'}>{sec.title}</p>
+      )}
+      <PreviewEntries entries={sec.entries} notice={notice} app={app} />
+    </div>
+  ));
+}
+
 /** A Discord message as Discord shows it: the small heading, then each card as an embed. */
 function DiscordPreview({ notice, style }: { notice: Notice; style: NoticeStyle }) {
   const m = styled(notice, style);
@@ -290,6 +383,7 @@ function DiscordPreview({ notice, style }: { notice: Notice; style: NoticeStyle 
                   {c.quote}
                 </p>
               )}
+              <PreviewSections card={c} notice={m} app="discord" />
               {c.when && <p className="text-[11px] text-[#949ba4]">{c.when}</p>}
             </div>
           ))}
@@ -299,44 +393,65 @@ function DiscordPreview({ notice, style }: { notice: Notice; style: NoticeStyle 
   );
 }
 
-/** A Telegram message as Telegram shows it (no colors). */
+/** Telegram messages as Telegram shows them (no colors); a split notice a card per message. */
 function TelegramPreview({ notice, style }: { notice: Notice; style: NoticeStyle }) {
   const m = styled(notice, style);
+  const messages: Notice[] =
+    m.split && m.cards.length > 1
+      ? m.cards.map((c, i, all) => ({
+          ...m,
+          head: i === 0 ? m.head : null,
+          link: i === all.length - 1 ? m.link : null,
+          cards: [c],
+        }))
+      : [m];
   return (
-    <div data-other-app className="rounded-lg bg-[#8eb6d3] p-3 dark:bg-[#0e1621]">
-      <div className="max-w-md space-y-3 rounded-xl bg-white px-3 py-2 text-[13px] leading-snug text-black shadow-sm dark:bg-[#182533] dark:text-white">
-        {style.format === 'plain' ? (
-          <p className="whitespace-pre-wrap break-words">{plainText(notice, style)}</p>
-        ) : (
-          <>
-            {m.head && <p className="italic">{m.head}</p>}
-            {m.cards.map((c, i) => (
-              <div key={i} className="space-y-1">
-                {c.title && <p className="font-semibold">{c.title}</p>}
-                {c.sub && <p className="italic">{c.sub}</p>}
-                {c.body && <p className="whitespace-pre-wrap break-words">{c.body}</p>}
-                {c.quote && (
-                  <p className="rounded-r border-l-[3px] border-[#3390ec] bg-[#3390ec]/10 py-0.5 pl-2 whitespace-pre-wrap break-words">
-                    {c.quote}
-                  </p>
-                )}
-                {(c.when || c.url) && (
-                  <p>
-                    {c.when && (
-                      <code className="rounded bg-black/5 px-1 text-[12px] dark:bg-white/10">
-                        {c.when}
-                      </code>
-                    )}
-                    {c.when && c.url && ' · '}
-                    {c.url && <span className="text-[#3390ec]">{m.urlText ?? 'link'}</span>}
-                  </p>
-                )}
-              </div>
-            ))}
-            {m.link && <p className="text-[#3390ec]">{m.linkText ?? m.link}</p>}
-          </>
-        )}
-      </div>
+    <div data-other-app className="space-y-2 rounded-lg bg-[#8eb6d3] p-3 dark:bg-[#0e1621]">
+      {messages.map((msg, k) => (
+        <div
+          key={k}
+          className="max-w-md space-y-3 rounded-xl bg-white px-3 py-2 text-[13px] leading-snug text-black shadow-sm dark:bg-[#182533] dark:text-white"
+        >
+          {style.format === 'plain' ? (
+            <p className="whitespace-pre-wrap break-words">{plainText(msg)}</p>
+          ) : (
+            <>
+              {msg.head && <p className="italic">{msg.head}</p>}
+              {msg.cards.map((c, i) => (
+                <div key={i} className="space-y-1">
+                  {c.title && (
+                    <p className={cn('font-semibold', c.sections && c.url && 'text-[#3390ec]')}>
+                      {c.title}
+                    </p>
+                  )}
+                  {c.sub && <p className="italic">{c.sub}</p>}
+                  {c.body && <p className="whitespace-pre-wrap break-words">{c.body}</p>}
+                  {c.quote && (
+                    <p className="rounded-r border-l-[3px] border-[#3390ec] bg-[#3390ec]/10 py-0.5 pl-2 whitespace-pre-wrap break-words">
+                      {c.quote}
+                    </p>
+                  )}
+                  {(c.when || (c.url && !c.sections)) && (
+                    <p>
+                      {c.when && (
+                        <code className="rounded bg-black/5 px-1 text-[12px] dark:bg-white/10">
+                          {c.when}
+                        </code>
+                      )}
+                      {c.when && c.url && !c.sections && ' · '}
+                      {c.url && !c.sections && (
+                        <span className="text-[#3390ec]">{msg.urlText ?? 'link'}</span>
+                      )}
+                    </p>
+                  )}
+                  <PreviewSections card={c} notice={msg} app="telegram" />
+                </div>
+              ))}
+              {msg.link && <p className="text-[#3390ec]">{msg.linkText ?? msg.link}</p>}
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

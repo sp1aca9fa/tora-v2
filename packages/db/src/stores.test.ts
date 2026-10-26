@@ -241,7 +241,10 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   ]);
   expect(r.fresh.map((p) => p.externalId)).toEqual(['2', '3', '4']);
   expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
-  expect(sent.at(-1)).toContain('メガストアKita\n> KTA 30th 販売');
+  // A card per location (the store alone here: no section heading), each post's time as
+  // Discord shows it, its link, then the post.
+  expect(sent.at(-1)).toContain('on sale\nメガストアKita\n<t:');
+  expect(sent.at(-1)).toContain('· [post](https://example.com/4)\n> KTA 30th 販売');
   expect(sent.at(-1)).not.toContain('MID');
   // Another post about the same store soon after: no second notice.
   const again = await push([post('5', 'KTA まだある')]);
@@ -320,10 +323,13 @@ it('sends replies at once as comments to their post, with the products its codes
   expect(reply.storeIds).toEqual(r.fresh.find((p) => p.externalId === '10')!.storeIds);
   expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
   const text = sent.at(-1)!;
-  expect(text).toContain('メガストアKita\n*Snow set*\n> KTA 雪(1)');
-  expect(text).toContain('Comment to メガストアKita\n*Snow set*\n> まだ列あり');
-  // The date and time of each post.
-  expect(text).toContain(`\n${r.fresh[0]!.postedAt.slice(5, 16).replace('T', ' ')}`);
+  expect(text).toContain('*Snow set* · [post](https://example.com/10)\n> KTA 雪(1)');
+  // The reply under its post, the products not repeated.
+  expect(text).toContain('> KTA 雪(1)\n↳ <t:');
+  expect(text).toContain(':R> · [reply](https://example.com/11)\n> まだ列あり');
+  // The time of each post, shown by Discord in the reader's time zone.
+  const at = Math.floor(Date.parse(r.fresh[0]!.postedAt) / 1000);
+  expect(text).toContain(`<t:${at}:t> · <t:${at}:R>`);
   // The post's own text shows as written.
   expect(text).toContain('> まだ列あり \\*長い\\*');
   // Later replies come at once, also within the store's quiet time; a reply to a reply keeps the
@@ -331,7 +337,9 @@ it('sends replies at once as comments to their post, with the products its codes
   const more = await push([{ ...post('12', '完売'), replyTo: '11' }]);
   expect(more.fresh[0]).toMatchObject({ replyTo: '11', thread: '10' });
   expect(await sendStoreNotices(db, more, ctx, now)).toBe(1);
-  expect(sent.at(-1)).toContain('Comment to メガストアKita\n*Snow set*');
+  // Its post not in the notice: the post's start, and its products.
+  expect(sent.at(-1)).toContain('↳ *KTA 雪(1)* · <t:');
+  expect(sent.at(-1)).toContain('*Snow set* · [reply](https://example.com/12)');
   // Replies naming no store are no "unknown store" post.
   expect(await sendFeedMessages(db, uid, more, ctx, now)).toBe(0);
   // A store's English label, for people reading English (its name being Japanese).
@@ -350,7 +358,7 @@ it('sends replies at once as comments to their post, with the products its codes
   ]);
   const later = await push([{ ...post('13', '終了'), replyTo: '10' }]);
   expect(await sendStoreNotices(db, later, ctx, now)).toBe(1);
-  expect(sent.at(-1)).toContain('Comment to Megastore Kita');
+  expect(sent.at(-1)).toContain('on sale\nMegastore Kita\n↳');
 });
 
 it("tells the feed's person about unknown stores and posts maybe missed", async () => {
