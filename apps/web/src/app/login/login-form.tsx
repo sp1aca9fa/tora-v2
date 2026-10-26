@@ -39,7 +39,7 @@ export function LoginForm({ next, step }: { next: string; step: 'password' | 'co
               type="password"
               autoComplete="current-password"
               required
-              aria-invalid={state.error === 'invalid' || undefined}
+              aria-invalid={state.error === 'signIn' || undefined}
             />
           </div>
         </>

@@ -47,11 +47,11 @@
     "codeHint": "From your authenticator app. Lost it? Enter one of your backup codes instead.",
     "startOver": "Start over",
     "errors": {
+      "signIn": "Wrong username or password, or this account is already signed in on 2 devices or not set up yet. Sign out on one of its devices, or ask the admin.",
       "invalid": "That did not match. Try again.",
       "locked": "Too many attempts. Try again later.",
       "notConfigured": "Login is not configured (AUTH_SECRET missing, see README).",
       "deviceLimit": "This account is already signed in on 2 devices. Sign out of one in Settings on another device, or ask the admin (Settings > Admin > Accounts).",
-      "notEnrolled": "This account has no authenticator yet. Ask the admin for a setup link (Settings > Admin > Accounts).",
       "expired": "The sign-in took too long. Start over."
     }
   },
@@ -2453,6 +2453,7 @@
       "notConfigured": "Login is not configured (AUTH_SECRET missing).",
       "short": "The password needs at least 12 characters.",
       "mismatch": "The passwords do not match.",
+      "signIn": "Wrong username or password, or this account is already signed in on 2 devices or not set up yet. Sign out on one of its devices, or ask the admin.",
       "invalid": "That did not match. Try again.",
       "newCode": "The authenticator's code did not match (check the phone's clock is automatic)."
     }

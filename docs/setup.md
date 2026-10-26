@@ -131,7 +131,9 @@ pnpm user disable|enable <username>
 The first account is an admin; admins see **Settings > Admin preferences** (settings for the whole
 app). Each account sees only its own collection; the catalog and market data are shared.
 
-- Sign-in: username, password, then a 6-digit code (or a one-time backup code).
+- Sign-in: username, password, then a 6-digit code (or a one-time backup code). A wrong username
+  or password, an account already on 2 devices and one not set up yet get the same message, so a
+  wrong guess never learns which it was.
 - At most 2 devices per account; a third is refused until one is revoked (Settings, or
   `pnpm user revoke`). Signing out frees the slot. On iPhone, Safari and the home-screen app count
   as two devices.

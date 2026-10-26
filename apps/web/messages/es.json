@@ -51,7 +51,6 @@
       "locked": "Demasiados intentos. Inténtalo más tarde.",
       "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET, ver README).",
       "deviceLimit": "Esta cuenta ya tiene sesión abierta en 2 dispositivos. Cierra una en Ajustes desde otro dispositivo, o pídeselo al administrador (Ajustes > Administración > Cuentas).",
-      "notEnrolled": "Esta cuenta aún no tiene autenticador. Pide al administrador un enlace de configuración (Ajustes > Administración > Cuentas).",
       "expired": "El inicio de sesión tardó demasiado. Empieza de nuevo."
     }
   },

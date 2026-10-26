@@ -40,13 +40,17 @@ import {
 } from '@/lib/auth/session';
 
 export type LoginState = {
-  error?: 'invalid' | 'locked' | 'notConfigured' | 'deviceLimit' | 'notEnrolled' | 'expired';
+  error?: 'signIn' | 'invalid' | 'locked' | 'notConfigured' | 'deviceLimit' | 'expired';
 };
 
 /** Verifying a fixed hash for unknown usernames keeps the response time the same. */
 let dummyHash: Promise<string> | undefined;
 
-/** Step 1: username + password. On success, a short-lived cookie unlocks step 2. */
+/**
+ * Step 1: username + password. On success, a short-lived cookie unlocks step 2. A wrong
+ * username or password, an account already on its 2 devices and one not set up yet get the
+ * same answer after the same work, so a wrong guess never learns which it was.
+ */
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const config = authConfigFromEnv();
   if (!config) return { error: 'notConfigured' };
@@ -64,11 +68,10 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const usable = user?.passwordHash && !user.disabledAt ? user : null;
   dummyHash ??= hashPassword('unused-dummy-password');
   const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummyHash));
+  const devices = await listDevices(db, usable?.id ?? '');
   await recordAttempt(db, key, ok && Boolean(usable));
-  if (!ok || !usable) return { error: 'invalid' };
-  if (!usable.totpSecretEnc) return { error: 'notEnrolled' };
-  if ((await listDevices(db, usable.id)).length >= MAX_ACTIVE_DEVICES) {
-    return { error: 'deviceLimit' };
+  if (!ok || !usable || !usable.totpSecretEnc || devices.length >= MAX_ACTIVE_DEVICES) {
+    return { error: 'signIn' };
   }
 
   (await cookies()).set(MFA_COOKIE, await createMfaToken(config, usable.id), {
