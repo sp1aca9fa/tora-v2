@@ -363,6 +363,7 @@
         "info": "The product page that says exactly what each item is."
       },
       "languages": {
+        "short": "EN",
         "title": "Languages",
         "info": "The app's two languages, which people switch between."
       },

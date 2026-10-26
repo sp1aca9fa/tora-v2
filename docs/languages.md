@@ -10,23 +10,29 @@ Item names do not follow the app's language: an item's name is as sold in the pr
 collectors find it on that market's sites), and its second name is the secondary market's. Both
 are editable and searched.
 
-Installed today: English (`en`), Japanese (`ja`) and Spanish (`es`; drafted by Claude for the S10
-Spain setup, not yet checked by a native speaker).
+Installed today: English (`en`, the base: every text is there), Japanese (`ja`) and Spanish
+(`es`; drafted by Claude for the S10 Spain setup, not yet checked by a native speaker).
+
+A language file may be partial: a text it lacks shows in English. New features add their texts to
+`en.json` only; each language catches up when whoever looks after it translates them.
 
 ## Adding a language
 
-1. Copy `apps/web/messages/en.json` to `apps/web/messages/{code}.json` (`fr`, `zh`, ... as BCP 47
-   codes) and translate the values, never the keys. About 2,000 texts; Claude can draft it ("translate
-   this file's values into French, keep the keys, the `{placeholders}` and the ICU plural and select
-   syntax as they are"), then read it through.
-2. Add the code to `LANGUAGES` in `apps/web/src/i18n/locale.ts`, with the toggle's short label:
-   `fr: { short: 'FR' }`.
-3. Run `pnpm test`: a text missing from the new file, or one the code asks for that `en.json`
-   lacks, fails the test.
-4. Deploy, then pick it in Settings > Admin preferences > Languages.
+1. Add `apps/web/messages/{code}.json` (`fr`, `zh`, ... as BCP 47 codes). Start from a copy of
+   `en.json`, or from only the texts you want; translate the values, never the keys. Set
+   `languages.short` to the toggle's label (`"FR"`; the code in capitals without it).
+2. Run `pnpm test`: a text that does not parse, or one `en.json` lacks (a typo in a key, a text
+   since removed), fails.
+3. Deploy (the app finds the files when it is built), then pick it in Settings > Admin
+   preferences > Languages.
 
-Market names are texts too (`sources.market.<code>`): add one for each market you use, in every
-language file.
+To keep a language up: `pnpm languages` shows how many texts each one lacks; `pnpm languages fr`
+prints those `fr` lacks, in English, as JSON to translate and merge into `fr.json`. Claude can
+draft it ("translate this file's values into French, keep the keys, the `{placeholders}` and the
+ICU plural and select syntax as they are"), then read it through. About 2,000 texts in all.
+
+Market names are texts too (`sources.market.<code>`): add one for each market you use in
+`en.json`, and in the other files when translated.
 
 The admin's own names (categories, kinds, fields, condition values) are written in Settings, in
 the app's two languages.

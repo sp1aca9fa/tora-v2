@@ -14,6 +14,7 @@
     "test": "vitest run",
     "crawl": "node scripts/crawl.mjs",
     "perf": "node scripts/perf.mjs",
+    "languages": "node scripts/languages.mjs",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck && node scripts/typecheck-collectors.mjs",
     "lint": "eslint .",

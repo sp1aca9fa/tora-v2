@@ -363,6 +363,7 @@
         "info": "La página de producto que dice exactamente qué es cada artículo."
       },
       "languages": {
+        "short": "ES",
         "title": "Idiomas",
         "info": "Los dos idiomas de la app, entre los que cada uno cambia."
       },
@@ -2338,8 +2339,6 @@
     "agoMin": "hace {n} min",
     "agoHours": "hace {h} h {m} min",
     "nowInfo": "Las publicaciones de hoy por zona, primero la más reciente; abre una para ver las de cada tienda.",
-    "markAllRead": "Marcar todo como leído",
-    "foldAll": "Plegar todo",
     "noToday": "Aún no hay publicaciones de estas tiendas hoy.",
     "earlier": "{n, plural, one {Antes (ayer): # zona} other {Antes (ayer): # zonas}}",
     "byLocationInfo": "Zonas de tu área con publicaciones desde ayer (5:00), las más cercanas primero, con cuántas; elige una para ver sus publicaciones, primero las más recientes.",

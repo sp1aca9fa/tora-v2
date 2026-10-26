@@ -2,6 +2,7 @@
 // (instrumentation.ts) can send alerts too.
 import type { AlertContext, AlertTexts } from '@tora/db';
 import { isLocale } from '@/i18n/locale';
+import { loadMessages } from '@/i18n/messages';
 
 /** What sending needs on the app (S17): the secret and the `alertText` messages. */
 export function alertContext(): AlertContext | null {
@@ -11,8 +12,7 @@ export function alertContext(): AlertContext | null {
     secret,
     texts: async (locale) =>
       isLocale(locale)
-        ? (((await import(`../../messages/${locale}.json`)).default as { alertText?: AlertTexts })
-            .alertText ?? {})
+        ? (((await loadMessages(locale)) as { alertText?: AlertTexts }).alertText ?? {})
         : {},
     log: console.log,
   };

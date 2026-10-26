@@ -1,15 +1,15 @@
 import { type LanguageSettings, type Locale, resolveLanguages } from '@tora/core';
 
 /**
- * Installed languages (requirements S16): one translation file each in messages/ (`{code}.json`),
- * with the short label of the language toggle. Adding a language: translate en.json into a new
- * file, add a line here, check it with `pnpm --filter web test` (missing texts fail).
+ * Installed languages (requirements S16): every translation file in messages/ (`{code}.json`),
+ * found when the app is built (next.config.ts), with the language toggle's short label. Adding a
+ * language is adding its file; texts it lacks show in English (`pnpm languages` lists them).
  */
-export const LANGUAGES: Record<Locale, { short: string }> = {
-  en: { short: 'EN' },
-  ja: { short: 'JP' },
-  es: { short: 'ES' },
-};
+export const LANGUAGES: Record<Locale, { short: string }> = Object.fromEntries(
+  Object.entries(
+    JSON.parse(process.env.TORA_LANGUAGES ?? '{"en":"EN"}') as Record<string, string>,
+  ).map(([code, short]) => [code, { short }]),
+);
 export const LOCALES = Object.keys(LANGUAGES);
 export const LOCALE_COOKIE = 'locale';
 

@@ -1,15 +1,20 @@
-// Translation files (requirements S16): every installed language has every text, and every text
-// the code asks for exists. Run after adding or translating a language.
+// Translation files (requirements S16): every text the code asks for is in en.json; another
+// language may lack texts (they show in English) but has none en.json lacks. Run after adding or
+// translating a language.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createTranslator } from 'next-intl';
 import { describe, expect, it } from 'vitest';
-import { LOCALES } from './locale';
+import { loadMessages } from './messages';
 
 const root = join(__dirname, '../..');
 type Tree = { [key: string]: string | Tree };
 const load = (code: string): Tree =>
   JSON.parse(readFileSync(join(root, 'messages', `${code}.json`), 'utf8'));
+/** The installed languages: their files. */
+const LOCALES = readdirSync(join(root, 'messages'))
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => f.slice(0, -5));
 
 /** Every text's dotted key. */
 const keys = (tree: Tree, prefix = ''): string[] =>
@@ -59,28 +64,26 @@ describe('translation files', () => {
   const english = load('en');
   const all = keys(english);
 
-  it('installs one file per listed language', () => {
-    const files = readdirSync(join(root, 'messages'))
-      .filter((f) => f.endsWith('.json'))
-      .map((f) => f.slice(0, -5));
-    expect(files.sort()).toEqual([...LOCALES].sort());
+  it.each(LOCALES.filter((l) => l !== 'en'))('%s has no text en.json lacks', (code) => {
+    const theirs = keys(load(code));
+    expect(
+      theirs.filter((k) => !all.includes(k)),
+      'not in en.json',
+    ).toEqual([]);
   });
 
-  it.each(LOCALES.filter((l) => l !== 'en'))(
-    '%s has every text of en.json, and no others',
-    (code) => {
-      const other = load(code);
-      const theirs = keys(other);
-      expect(
-        all.filter((k) => !theirs.includes(k)),
-        'missing',
-      ).toEqual([]);
-      expect(
-        theirs.filter((k) => !all.includes(k)),
-        'not in en.json',
-      ).toEqual([]);
-    },
-  );
+  it('shows English where a language has no text', async () => {
+    const code = LOCALES.find((l) => l !== 'en');
+    if (!code) return;
+    const own = load(code);
+    const loaded = await loadMessages(code);
+    expect(keys(loaded).sort()).toEqual([...all].sort());
+    const first = keys(own)[0]!;
+    expect(has(loaded, first)).toBe(true);
+    const value = (tree: Tree, key: string) =>
+      key.split('.').reduce<unknown>((t, p) => (t as Tree)[p], tree);
+    expect(value(loaded, first)).toBe(value(own, first));
+  });
 
   it.each(LOCALES)('%s: every text is a valid message (a literal "<" or "{" is quoted)', (code) => {
     const messages = load(code);

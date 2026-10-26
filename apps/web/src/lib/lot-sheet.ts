@@ -12,6 +12,7 @@ import {
 } from '@tora/db';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { LOCALES } from '@/i18n/locale';
+import { loadMessages } from '@/i18n/messages';
 import { getRegistry } from './sources';
 import { withTaxonomy } from './taxonomy-messages';
 
@@ -60,7 +61,7 @@ export async function sheetReader(): Promise<{
   const registry = await getRegistry();
   const languages = await Promise.all(
     LOCALES.map(async (locale) => {
-      const messages = (await import(`../../messages/${locale}.json`)).default as Texts;
+      const messages = (await loadMessages(locale)) as Texts;
       return registry.taxonomy ? withTaxonomy(messages, registry.taxonomy, locale) : messages;
     }),
   );
