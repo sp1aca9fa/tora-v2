@@ -52,7 +52,7 @@ function Count({ counts, item }: { counts: Promise<Counts>; item: keyof Counts }
   const count = use(counts)[item] ?? 0;
   if (count <= 0) return null;
   return (
-    <span className="min-w-5 rounded-full bg-amber-500 px-1.5 text-center text-[10px] leading-5 font-medium text-white">
+    <span className="min-w-5 rounded-full bg-amber-500 px-1.5 text-center text-[10px] leading-5 font-medium text-amber-950">
       {count > 99 ? '99+' : count}
     </span>
   );
