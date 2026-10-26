@@ -537,7 +537,7 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   expect(await link()).toMatchObject({ active: true, failure: null });
 });
 
-it('leaves a gone page unlinked: no card, no new search, a pasted link still links', async () => {
+it('leaves a gone page unlinked: no card until a new match, a pasted link still links', async () => {
   const { product } = await box();
   await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
   const failure = { nights: 3, since: '2026-10-10', day: '2026-10-12', error: 'gone' };
@@ -547,12 +547,15 @@ it('leaves a gone page unlinked: no card, no new search, a pasted link still lin
     .where(eq(schema.productSources.productId, product.id));
   // The search offers another edition.
   let searches = 0;
+  let found = [{ externalId: 'X9', title: 'BP BOX Collector', url: 'https://x/9', score: 0.8 }];
   const collector = fakeCollector({
     findCandidates: async () => {
       searches++;
-      return [{ externalId: 'X9', title: 'BP BOX Collector', url: 'https://x/9', score: 0.8 }];
+      return found;
     },
   });
+  const sourceCards = async () =>
+    (await pendingActions(db, userId)).filter((c) => c.kind === 'source' && c.source === 'fake');
   await runCollector(db, collector, quiet);
   expect(searches).toBe(1);
   const card = (await pendingActions(db, userId)).find(
@@ -561,13 +564,22 @@ it('leaves a gone page unlinked: no card, no new search, a pasted link still lin
   expect(card).toMatchObject({ broken: expect.anything(), candidates: [expect.anything()] });
 
   expect(await leaveListingGone(db, product.id, 'fake')).toBe(true);
-  expect(
-    (await pendingActions(db, userId)).filter((c) => c.kind === 'source' && c.source === 'fake'),
-  ).toEqual([]);
+  expect(await sourceCards()).toEqual([]);
   expect(await listPendingCandidates(db, product.id)).toEqual([]);
   expect(await productsWithBrokenListings(db)).toEqual([]);
-  await runCollector(db, collector, { ...quiet, now: new Date(Date.now() + 86_400_000) });
-  expect(searches).toBe(1);
+  // Searched again: the rejected edition stays away, the page back shows as a suggestion.
+  const day = (n: number) => ({ ...quiet, now: new Date(Date.now() + n * 86_400_000) });
+  await runCollector(db, collector, day(1));
+  expect(searches).toBe(2);
+  expect(await sourceCards()).toEqual([]);
+  found = [{ externalId: 'X1', title: 'BP BOX', url: 'https://x/1', score: 0.9 }];
+  await runCollector(db, collector, day(2));
+  expect(await sourceCards()).toEqual([
+    expect.objectContaining({
+      broken: null,
+      candidates: [expect.objectContaining({ title: 'BP BOX' })],
+    }),
+  ]);
   expect((await listProductSources(db, product.id))[0]).toMatchObject({ active: false });
 
   await linkSource(db, product.id, { source: 'fake', externalId: 'X2' });

@@ -182,10 +182,12 @@ export async function pendingActions(
               and(inArray(sourceCandidates.productId, ids), eq(sourceCandidates.status, 'pending')),
             ),
         ]);
-  // A page left gone counts as linked: nothing else there is the item.
-  const has = new Set(
-    listings.filter((l) => l.active || l.failure?.leftAt).map((l) => `${l.productId}|${l.source}`),
-  );
+  const has = new Set(listings.filter((l) => l.active).map((l) => `${l.productId}|${l.source}`));
+  // A page left gone counts as linked for the "not linked" cards; new suggestions still show.
+  const linkedOrLeft = new Set([
+    ...has,
+    ...listings.filter((l) => l.failure?.leftAt).map((l) => `${l.productId}|${l.source}`),
+  ]);
   const broken = brokenListings(listings);
   const registry = await loadSourceRegistry(db);
   const known = await linkedListingImages(
@@ -219,7 +221,7 @@ export async function pendingActions(
     const identity = identityFor(product, costBase, registry);
     // No identity link yet: the preferred identity source is the one asked for.
     const main =
-      identity && !identity.accepted.some((source) => has.has(`${product.id}|${source}`))
+      identity && !identity.accepted.some((source) => linkedOrLeft.has(`${product.id}|${source}`))
         ? identity.preferred
         : null;
     // Suggestions of sources the item has no listing of yet (variants of a linked listing wait
@@ -245,7 +247,7 @@ export async function pendingActions(
     const second =
       registry.markets?.secondary &&
       abroad &&
-      !abroad.accepted.some((source) => has.has(`${product.id}|${source}`))
+      !abroad.accepted.some((source) => linkedOrLeft.has(`${product.id}|${source}`))
         ? abroad.preferred
         : null;
     if (second && mine && !dismissed.has(product.id)) {

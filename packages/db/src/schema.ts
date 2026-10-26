@@ -289,8 +289,8 @@ export interface ListingFailure {
   /** Set aside as broken (no longer collected). */
   brokenAt?: string;
   /**
-   * Left gone by a person (the item has no page there now): no new link is asked for nor
-   * searched, and the listing keeps its picture's place.
+   * Left gone by a person (the item has no page there now): no new link is asked for; the site
+   * is still searched, and a new match shows as a suggestion.
    */
   leftAt?: string;
 }

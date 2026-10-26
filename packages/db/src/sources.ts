@@ -400,11 +400,7 @@ export async function productsToMatch(
     .selectDistinct({ id: sourceCandidates.productId })
     .from(sourceCandidates)
     .where(and(eq(sourceCandidates.source, source), eq(sourceCandidates.status, 'pending')));
-  const left = await db
-    .selectDistinct({ id: productSources.productId })
-    .from(productSources)
-    .where(and(eq(productSources.source, source), leftGone));
-  const skip = new Set([...linked, ...pending, ...left].map((r) => r.id));
+  const skip = new Set([...linked, ...pending].map((r) => r.id));
   const ids = [...tracked].filter(
     (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
   );
@@ -632,8 +628,8 @@ const leftGone = sql`${productSources.active} = 0 AND ${productSources.failure} 
 
 /**
  * The item's page on `source` is gone and nothing there is the item (e.g. only another edition
- * is left): its set-aside listings stay unlinked, no new link is asked for nor searched, and the
- * suggestions waiting are rejected. Pasting a link on the item page later still links one.
+ * is left): its set-aside listings stay unlinked, no new link is asked for, and the suggestions
+ * waiting are rejected. The site is still searched: a new match (the page back) shows as usual.
  */
 export async function leaveListingGone(
   db: Db,
