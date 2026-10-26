@@ -749,6 +749,7 @@ Risks (with what covers them today):
 7. Now while open (designed with the user): opening a row scrolls to its newest new message. A message for an open row closes it when the reader has left it (no scroll, tap or key for a minute; the count shows again, nothing missed); while they read, the row stays as it is and a banner at its top ("2 new messages: show") brings them in, tinted. While a row is open the others keep their order (rows new since then go on top); they catch up once all are closed.
 8. Now: posts naming no store were one row (user: a post on a chain's board is known to be at that chain): two rows now, "Area not recognised" (a chain's board, one section per chain) and "Store and area not recognised" (boards mixing chains).
 9. Now: a row's stores could not be folded and all opened (user): each store folds on its own and opens by itself only when it holds a new message (none new: the newest store); a tap on an open row's empty space (not on text, a link or a picture) folds what it is in (a store, a post's replies, or the row).
+10. Now: no way to clear every count or close every row at once (user, 2026-10-26): "Mark all read" (every row's messages up to its latest, on the account) and "Fold all" (every open row, its stores and the earlier fold) above the rows, each on only when it has something to do.
 
 ## S17: Notifications and activity log
 

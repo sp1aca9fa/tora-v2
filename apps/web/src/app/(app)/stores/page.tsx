@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
-import { NowList, NowRow, StoreSection } from './now-row';
+import { NowList, NowRow, NowTools, StoreSection } from './now-row';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
 import { threads } from './threads';
@@ -200,6 +200,9 @@ export default async function NowPage({
     </NowRow>
   );
 
+  const everyRow = [...todays, ...earlier];
+  const unread = everyRow.some((r) => r.latest.postedAt > (seen[r.location.id] ?? ''));
+
   return (
     <div className="space-y-4">
       <AutoRefresh on="post" />
@@ -214,23 +217,28 @@ export default async function NowPage({
           </Link>
         </div>
       </div>
-      {todays.length === 0 ? (
-        <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-          {t('noToday')}
-        </p>
-      ) : (
-        <NowList rows={todays.map((r) => ({ id: r.location.id, node: row(r) }))} />
-      )}
-      {earlier.length > 0 && (
-        <details className="space-y-2">
-          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-            {t('earlier', { n: earlier.length })}
-          </summary>
-          <div className="pt-2">
-            <NowList rows={earlier.map((r) => ({ id: r.location.id, node: row(r) }))} />
-          </div>
-        </details>
-      )}
+      <NowTools
+        rows={everyRow.map((r) => ({ id: r.location.id, at: r.latest.postedAt }))}
+        unread={unread}
+      >
+        {todays.length === 0 ? (
+          <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
+            {t('noToday')}
+          </p>
+        ) : (
+          <NowList rows={todays.map((r) => ({ id: r.location.id, node: row(r) }))} />
+        )}
+        {earlier.length > 0 && (
+          <details className="space-y-2">
+            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+              {t('earlier', { n: earlier.length })}
+            </summary>
+            <div className="pt-2">
+              <NowList rows={earlier.map((r) => ({ id: r.location.id, node: row(r) }))} />
+            </div>
+          </details>
+        )}
+      </NowTools>
     </div>
   );
 }

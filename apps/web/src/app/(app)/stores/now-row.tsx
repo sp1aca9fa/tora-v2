@@ -1,9 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { CheckCheck, ChevronsDownUp } from 'lucide-react';
+import { createContext, useContext, useEffect, useRef, useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { markLocationSeenAction } from './actions';
+import { markAllSeenAction, markLocationSeenAction } from './actions';
 import { FreshSince } from './posts-list';
 
 /** Without a scroll, tap or key for this long, the reader has left an open row. */
@@ -128,6 +130,76 @@ export function NowList({ rows }: { rows: { id: string; node: React.ReactNode }[
 }
 
 /**
+ * The Now lists with "Mark all read" (every row's messages up to its latest, on the account),
+ * on while a row has unread messages, and "Fold all" (every open row, its sections and the
+ * earlier fold), on while a row is open. Always there, so opening a row moves nothing.
+ */
+export function NowTools({
+  rows,
+  unread,
+  children,
+}: {
+  /** Every row and when its latest message was posted. */
+  rows: { id: string; at: string }[];
+  unread: boolean;
+  children: React.ReactNode;
+}) {
+  const t = useTranslations('stores');
+  const ref = useRef<HTMLDivElement>(null);
+  const [anyOpen, setAnyOpen] = useState(false);
+  const [marked, setMarked] = useState(false);
+  const [pending, start] = useTransition();
+  useEffect(() => {
+    const box = ref.current!;
+    const check = () => setAnyOpen(!!box.querySelector('details[data-now-row][open]'));
+    box.addEventListener('toggle', check, true);
+    return () => box.removeEventListener('toggle', check, true);
+  }, []);
+  // A new message after marking shows the button again.
+  const [was, setWas] = useState(unread);
+  if (was !== unread) {
+    setWas(unread);
+    if (unread) setMarked(false);
+  }
+  return (
+    <div ref={ref} className="space-y-2">
+      {rows.length > 0 && (
+        <div className="flex justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!unread || marked || pending}
+            onClick={() =>
+              start(async () => {
+                setMarked(true);
+                await markAllSeenAction(rows);
+              })
+            }
+          >
+            <CheckCheck aria-hidden />
+            {t('markAllRead')}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!anyOpen}
+            onClick={() => {
+              for (const d of ref.current!.querySelectorAll('details[open]')) {
+                (d as HTMLDetailsElement).open = false;
+              }
+            }}
+          >
+            <ChevronsDownUp aria-hidden />
+            {t('foldAll')}
+          </Button>
+        </div>
+      )}
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
+/**
  * A Now row (S25): closed, its summary and how many messages came since it was last opened.
  * Opening it marks them read (on the account, so every device agrees), tints them for a moment
  * and scrolls to the newest. A message coming in while it is open closes it when the reader has
@@ -213,6 +285,7 @@ export function NowRow({
   return (
     <details
       ref={ref}
+      data-now-row
       className={cn('group rounded-xl border bg-card', dashed && 'border-dashed')}
       onToggle={(e) => {
         const now = e.currentTarget.open;

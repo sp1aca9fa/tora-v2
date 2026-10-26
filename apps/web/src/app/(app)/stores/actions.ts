@@ -69,18 +69,32 @@ export async function saveStoreAreaAction(area: StoreArea): Promise<{ error?: st
 /** Days a Now row's last opening is kept (the page shows today and yesterday). */
 const SEEN_DAYS = 3;
 
+/** The account's Now row openings, those older than SEEN_DAYS left out. */
+function seenKept(seen: Record<string, string>): Record<string, string> {
+  const keep = new Date(Date.now() - SEEN_DAYS * 86_400_000).toISOString();
+  return Object.fromEntries(
+    Object.entries(seen).filter(([, when]) => new Date(when).toISOString() > keep),
+  );
+}
+
 /** A Now row opened: its messages up to `at` are read (S25). */
 export async function markLocationSeenAction(locationId: string, at: string) {
   const { db, user } = await authed();
   if (!Date.parse(at)) return;
-  const keep = new Date(Date.now() - SEEN_DAYS * 86_400_000).toISOString();
-  const seen = Object.fromEntries(
-    Object.entries(user.preferences?.storesSeen ?? {}).filter(
-      ([, when]) => new Date(when).toISOString() > keep,
-    ),
-  );
+  const seen = seenKept(user.preferences?.storesSeen ?? {});
   if ((seen[locationId] ?? '') >= at) return;
   await setPreferences(db, user.id, { storesSeen: { ...seen, [String(locationId)]: at } });
+}
+
+/** "Mark all read" on Now: every row's messages up to its latest are read. */
+export async function markAllSeenAction(rows: { id: string; at: string }[]) {
+  const { db, user } = await authed();
+  const seen = seenKept(user.preferences?.storesSeen ?? {});
+  for (const { id, at } of rows.slice(0, 1000)) {
+    if (Date.parse(at) && (seen[String(id)] ?? '') < at) seen[String(id)] = at;
+  }
+  await setPreferences(db, user.id, { storesSeen: seen });
+  revalidatePath('/stores');
 }
 
 /** A new feed token, shown once (the old one stops working). */

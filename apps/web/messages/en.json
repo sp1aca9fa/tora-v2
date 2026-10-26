@@ -2338,6 +2338,8 @@
     "agoMin": "{n} min ago",
     "agoHours": "{h} h {m} min ago",
     "nowInfo": "Today's posts by location, the newest first; open one to see each store's posts.",
+    "markAllRead": "Mark all read",
+    "foldAll": "Fold all",
     "noToday": "No posts about these stores today yet.",
     "earlier": "{n, plural, one {Earlier (yesterday): # location} other {Earlier (yesterday): # locations}}",
     "byLocationInfo": "Locations of your area with posts since yesterday (5:00), nearest first, with how many; open one to see its posts, newest first.",
