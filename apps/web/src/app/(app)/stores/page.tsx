@@ -1,3 +1,4 @@
+import { PLACE } from '@tora/core';
 import { postsPage } from '@tora/db';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -18,6 +19,8 @@ const UNKNOWN = 'unknown';
 const UNKNOWN_AREA = 'unknown-area';
 /** Its sections, one per chain. */
 const BOARD = 'board:';
+/** The row of posts naming only areas (places), no store: where is known, not which store. */
+const UNKNOWN_SHOP = 'unknown-shop';
 /** Posts read at most (two busy days stay well under). */
 const MAX_POSTS = 1000;
 
@@ -27,8 +30,9 @@ type Thread = ReturnType<typeof threads>[number];
  * Store notices, the main sub page (S25): what is going on now, one closed row per location
  * (an area and the stores in it), the newest first, each with its time, how long ago, its latest
  * post and how many came since it was last opened; opened, the posts of each of its stores.
- * Today's (from 5:00); yesterday's folded. The area's stores, or every store. Before an area is
- * set, the Area page comes first.
+ * Posts naming no store sit in rows of their own: no store or area known, a chain known but not
+ * where, or areas only (a section per area). Today's (from 5:00); yesterday's folded. The area's
+ * stores, or every store. Before an area is set, the Area page comes first.
  */
 export default async function NowPage({
   searchParams,
@@ -45,6 +49,12 @@ export default async function NowPage({
     areaLocations(db, area),
   ]);
   const { byId, inArea, locationOf, locations } = places;
+  const isPlace = (id: string) => byId.get(id)?.chain === PLACE;
+  // The area's places: those picked or near, and those of its locations (a picked store's area).
+  const areaPlaces = new Set([
+    ...[...inArea].filter(isPlace),
+    ...places.mine.filter((l) => isPlace(l.id)).map((l) => l.id),
+  ]);
   const { today, yesterday: since } = postDays();
   // The stores' posts, and those naming no store Tora knows (one row of their own: none missed).
   const [named, unknown] = await Promise.all([
@@ -52,7 +62,7 @@ export default async function NowPage({
       offset: 0,
       limit: MAX_POSTS,
       since,
-      storeIds: every ? undefined : [...inArea],
+      storeIds: every ? undefined : [...new Set([...inArea, ...areaPlaces])],
       named: every || undefined,
     }),
     postsPage(db, { offset: 0, limit: MAX_POSTS, since, named: false }),
@@ -65,6 +75,7 @@ export default async function NowPage({
   const unknownRows = new Map([
     [UNKNOWN, { id: UNKNOWN, label: t('unknownStoreTitle'), storeIds: [], km: null }],
     [UNKNOWN_AREA, { id: UNKNOWN_AREA, label: t('unknownAreaTitle'), storeIds: [], km: null }],
+    [UNKNOWN_SHOP, { id: UNKNOWN_SHOP, label: t('unknownShopTitle'), storeIds: [], km: null }],
   ]);
 
   /** When a store's threads last had a message, replies included. */
@@ -78,10 +89,19 @@ export default async function NowPage({
     for (const thread of list) {
       const { storeIds, chain } = thread.post;
       const ids = storeIds.length ? storeIds : [chain ? `${BOARD}${chain}` : UNKNOWN];
+      // Areas only, no store: one row of their own, a section per area.
+      const areasOnly = storeIds.length > 0 && storeIds.every(isPlace);
       for (const id of ids) {
         const unknown = id === UNKNOWN || id.startsWith(BOARD);
-        if (!unknown && !every && !inArea.has(id)) continue;
-        const at = id === UNKNOWN ? UNKNOWN : unknown ? UNKNOWN_AREA : locationOf.get(id);
+        if (areasOnly ? !every && !areaPlaces.has(id) : !unknown && !every && !inArea.has(id))
+          continue;
+        const at = areasOnly
+          ? UNKNOWN_SHOP
+          : id === UNKNOWN
+            ? UNKNOWN
+            : unknown
+              ? UNKNOWN_AREA
+              : locationOf.get(id);
         if (!at) continue;
         const stores = out.get(at) ?? new Map<string, Thread[]>();
         out.set(at, stores);

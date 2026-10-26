@@ -2348,6 +2348,7 @@
     "waiting": "{n, plural, one {# new message: show} other {# new messages: show}}",
     "unknownAreaTitle": "Area not recognised",
     "unknownStoreTitle": "Store and area not recognised",
+    "unknownShopTitle": "Store not recognised (area known)",
     "pill": {
       "none": "Feed not connected: set it up",
       "online": "Online",

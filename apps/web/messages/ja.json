@@ -2348,6 +2348,7 @@
     "waiting": "新着 {n} 件: 表示",
     "unknownAreaTitle": "エリア不明",
     "unknownStoreTitle": "店舗・エリア不明",
+    "unknownShopTitle": "店舗不明（エリアは判明）",
     "pill": {
       "none": "フィード未接続：設定する",
       "online": "稼働中",

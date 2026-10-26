@@ -2348,6 +2348,7 @@
     "waiting": "{n, plural, one {# mensaje nuevo: ver} other {# mensajes nuevos: ver}}",
     "unknownAreaTitle": "Zona no reconocida",
     "unknownStoreTitle": "Tienda y zona no reconocidas",
+    "unknownShopTitle": "Tienda no reconocida (zona conocida)",
     "pill": {
       "none": "Feed sin conectar: configúralo",
       "online": "En línea",
