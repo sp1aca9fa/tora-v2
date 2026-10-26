@@ -2346,7 +2346,7 @@
     "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
     "unread": "{n, plural, one {# new message} other {# new messages}}",
     "waiting": "{n, plural, one {# new message: show} other {# new messages: show}}",
-    "unknownAreaTitle": "Area not recognised",
+    "unknownAreaTitle": "Store and area not recognised (chain known)",
     "unknownStoreTitle": "Store and area not recognised",
     "unknownShopTitle": "Store not recognised (area known)",
     "pill": {
