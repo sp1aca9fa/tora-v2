@@ -213,6 +213,8 @@ with its time, the products its codes stand for, a link to the post and the post
 replies under it. On Discord the times show in the reader's time zone with how long ago, kept up
 to date by Discord. On Telegram each location is a message of its own, long posts are folded (a tap
 opens them), and a reply to a post told earlier answers that post's message (remembered 3 days).
+In a Discord forum channel each location has a post of its own each day, its later messages
+added to it ([Alerts](alerts.md#adding-a-channel-each-person)).
 The look and wording are set per person in Settings > Alerts > Customize notices.
 
 ## No silent failures

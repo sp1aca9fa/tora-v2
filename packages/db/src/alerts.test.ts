@@ -18,8 +18,10 @@ import {
   listAlertLog,
   pruneAlertLog,
   sendSummaries,
+  sendTest,
   sendToUser,
   sendWatchAlerts,
+  setChannelMention,
   setTelegramBot,
   telegramCode,
   stoppedReason,
@@ -36,6 +38,7 @@ import {
   collectorRuns,
   signals,
   supply,
+  users,
   watches,
 } from './schema';
 import { addWatch } from './watches';
@@ -429,6 +432,57 @@ it('sends a store notice a location per Telegram message, a reply answering its 
   // Replies to posts never sent here answer nothing.
   await sendToUser(db, member, storeNotice({}, [post('b:4', 'A', 'b:9')], null), ctx);
   expect(answered).toEqual([2]);
+});
+
+it('posts into a Discord forum: a post per location, each message mentioning the person', async () => {
+  const calls: { url: string; body: Record<string, unknown> }[] = [];
+  let posts = 0;
+  const deleted = new Set<string>();
+  const forum = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (!init?.method) return Response.json({ name: 'forum-hook' });
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    calls.push({ url, body });
+    const thread = new URL(url).searchParams.get('thread_id');
+    if (thread && deleted.has(thread)) return Response.json({ code: 10003 }, { status: 404 });
+    if (thread) return new Response(null, { status: 204 });
+    if (!body.thread_name) return Response.json({ code: 220001 }, { status: 400 });
+    return Response.json({ id: 'm', channel_id: `t${++posts}` });
+  }) as typeof fetch;
+  const fctx = { ...ctx, fetch: forum };
+  const { id } = (await addDiscordChannel(db, member, HOOK, SECRET, forum)) as { id: string };
+  expect(await setChannelMention(db, member, id, 'not an id')).toBe(false);
+  expect(await setChannelMention(db, member, id, '123456789012345678')).toBe(true);
+  const post = (key: string, location: string) => ({
+    key,
+    location: { id: location, title: location, url: null },
+    store: `${location} store`,
+    products: [],
+    text: key,
+    when: '18:00',
+    url: null,
+    comment: false,
+  });
+  await sendToUser(db, member, storeNotice({}, [post('b:1', 'A'), post('b:2', 'B')], null), fctx);
+  // Refused as a plain message, then a post per location, named with the day.
+  expect(calls[0]!.body.thread_name).toBeUndefined();
+  expect(calls.slice(1).map((c) => String(c.body.thread_name).split(' · ')[0])).toEqual(['A', 'B']);
+  expect((await channelsOf(db, member))[0]).toMatchObject({ forum: true });
+  for (const c of calls.slice(1)) {
+    expect(String(c.body.content)).toMatch(/^<@123456789012345678>/);
+    expect(c.body.allowed_mentions).toEqual({ parse: [], users: ['123456789012345678'] });
+  }
+  // Later messages about A go into A's post; other alerts into one Tora post.
+  calls.length = 0;
+  await sendToUser(db, member, storeNotice({}, [post('b:3', 'A')], null), fctx);
+  expect(calls.map((c) => new URL(c.url).searchParams.get('thread_id'))).toEqual(['t1']);
+  await sendTest(db, (await db.select().from(users).where(eq(users.id, member)))[0]!, id, fctx);
+  expect(calls.at(-1)!.body.thread_name).toBe('Tora');
+  // A post deleted in Discord is made again.
+  deleted.add('t1');
+  calls.length = 0;
+  await sendToUser(db, member, storeNotice({}, [post('b:4', 'A')], null), fctx);
+  expect(calls.map((c) => !!c.body.thread_name)).toEqual([false, true]);
 });
 
 it('keeps a history of every delivery, per channel, with filters', async () => {

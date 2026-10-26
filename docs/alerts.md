@@ -71,6 +71,12 @@ kind, channel, outcome and dates. Kept 180 days; a removed channel's messages st
   stay there a day) and sends a first message.
 - **Discord:** in a channel's settings > Integrations > Webhooks > New webhook > Copy webhook URL,
   then paste it in Settings > Alerts. Tora checks it and sends a test.
+- **Discord forum channel:** a webhook made in a forum channel works the same (forum channels may
+  need the server's Community setting). Tora sees it is a forum on the first message and keeps
+  each location's store notices in a post of its own each day, other alerts in one "Tora" post.
+  In a forum only a message that mentions you notifies: add your Discord user ID under the channel
+  (Discord Settings > Advanced > Developer Mode, then right-click your name > Copy User ID). The
+  ID can be set on any Discord channel; every message then mentions you.
 
 "Send a test" checks a channel at any time; a channel whose last message failed shows why.
 Webhook links and chat IDs are stored encrypted.

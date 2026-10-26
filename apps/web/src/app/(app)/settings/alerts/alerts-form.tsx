@@ -12,6 +12,7 @@ import {
   connectTelegramAction,
   removeChannelAction,
   saveAlertPrefsAction,
+  saveMentionAction,
   setTelegramBotAction,
   testChannelAction,
 } from './actions';
@@ -36,6 +37,8 @@ interface Channel {
   id: string;
   kind: 'telegram' | 'discord';
   label: string | null;
+  forum: boolean;
+  mention: string | null;
   lastSent: string | null;
   lastError: string | null;
 }
@@ -93,7 +96,44 @@ function ChannelRow({ channel: c }: { channel: Channel }) {
         </p>
       )}
       <AlertMessage state={state} ok={t('testSent')} />
+      {c.kind === 'discord' && <MentionForm channel={c} />}
     </li>
+  );
+}
+
+/** The Discord user a channel's messages mention: in a forum channel, only a mention notifies. */
+function MentionForm({ channel: c }: { channel: Channel }) {
+  const t = useTranslations('alerts');
+  const [pending, startTransition] = useTransition();
+  const [state, setState] = useState<AlertState>({});
+  return (
+    <form
+      className="space-y-1.5 pt-1"
+      action={(form) =>
+        startTransition(async () =>
+          setState(await saveMentionAction(c.id, String(form.get('mention') ?? ''))),
+        )
+      }
+    >
+      {c.forum && <p className="text-xs">{t('forum')}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          name="mention"
+          defaultValue={c.mention ?? ''}
+          inputMode="numeric"
+          aria-label={t('mention')}
+          placeholder={t('mention')}
+          className="h-8 w-56 text-xs"
+        />
+        <Button size="sm" variant="outline" disabled={pending}>
+          {t('mentionSave')}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {c.forum && !c.mention ? t('forumNoMention') : t('mentionHelp')}
+      </p>
+      <AlertMessage state={state} ok={t('mentionSaved')} />
+    </form>
   );
 }
 

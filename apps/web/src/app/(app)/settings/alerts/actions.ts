@@ -20,6 +20,7 @@ import {
   removeChannel,
   sendTest,
   sendToUser,
+  setChannelMention,
   setPreferences,
   setTelegramBot,
   textsFor,
@@ -63,6 +64,14 @@ export async function testChannelAction(id: string): Promise<AlertState> {
   const ok = await sendTest(db, user, String(id), ctx);
   revalidatePath(PAGE);
   return ok ? { ok } : { error: 'failed' };
+}
+
+export async function saveMentionAction(id: string, mention: string): Promise<AlertState> {
+  const { db, user } = await authed();
+  if (!(await setChannelMention(db, user.id, String(id), String(mention))))
+    return { error: 'invalid' };
+  revalidatePath(PAGE);
+  return { ok: true };
 }
 
 export async function removeChannelAction(id: string): Promise<void> {

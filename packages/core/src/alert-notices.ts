@@ -110,6 +110,8 @@ export interface NoticeCard {
   /** The posts it holds, and the one they answer: Telegram sends the card as a reply to it. */
   keys?: string[];
   replyTo?: string | null;
+  /** Its post in a Discord forum channel (a location's), by a key. */
+  thread?: string | null;
 }
 
 /** A part of a card under its own heading (a store of a location). */
@@ -156,6 +158,8 @@ export interface Notice {
 export interface NoticeImage {
   /** The file's name ("362152-1.jpeg"). */
   name: string;
+  /** The post it is from (a card's `keys`): in a forum, sent to that card's post. */
+  key?: string;
   contentType: string;
   bytes: Uint8Array;
 }
@@ -521,6 +525,7 @@ export function storeNotice(t: NoticeTexts, posts: StorePostData[], link: string
         })),
         keys: [...new Set(all.map((p) => p.key))],
         replyTo: threads.size === 1 ? ([...threads][0] ?? null) : null,
+        thread: `location:${data.location.id}`,
         role: all.some((p) => !p.comment) ? 'post' : 'comment',
       } satisfies NoticeCard,
       latest: sections[0]?.latest ?? '',

@@ -1014,6 +1014,7 @@ export async function sendStoreNotices(
       .flatMap((p) =>
         (pictures.get(p.id) ?? []).map((img, i) => ({
           name: `${p.externalId}-${i + 1}.${img.contentType.split('/')[1]}`,
+          key: `${p.source}:${p.externalId}`,
           contentType: img.contentType,
           bytes: img.bytes,
         })),

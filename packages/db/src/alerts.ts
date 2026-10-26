@@ -168,7 +168,7 @@ export async function setAppUrl(db: Db, url: string): Promise<void> {
 
 export type ChannelView = Pick<
   AlertChannel,
-  'id' | 'kind' | 'label' | 'lastSentAt' | 'lastError' | 'createdAt'
+  'id' | 'kind' | 'label' | 'forum' | 'mention' | 'lastSentAt' | 'lastError' | 'createdAt'
 >;
 
 export async function channelsOf(db: Db, userId: string): Promise<ChannelView[]> {
@@ -177,6 +177,8 @@ export async function channelsOf(db: Db, userId: string): Promise<ChannelView[]>
       id: alertChannels.id,
       kind: alertChannels.kind,
       label: alertChannels.label,
+      forum: alertChannels.forum,
+      mention: alertChannels.mention,
       lastSentAt: alertChannels.lastSentAt,
       lastError: alertChannels.lastError,
       createdAt: alertChannels.createdAt,
@@ -184,6 +186,31 @@ export async function channelsOf(db: Db, userId: string): Promise<ChannelView[]>
     .from(alertChannels)
     .where(eq(alertChannels.userId, userId))
     .orderBy(alertChannels.createdAt);
+}
+
+/** A Discord user id (17 to 20 digits). */
+const DISCORD_USER = /^\d{17,20}$/;
+
+/** The Discord user a channel's messages mention ('' none); false when it is no user id. */
+export async function setChannelMention(
+  db: Db,
+  userId: string,
+  id: string,
+  mention: string,
+): Promise<boolean> {
+  const clean = mention.trim();
+  if (clean && !DISCORD_USER.test(clean)) return false;
+  await db
+    .update(alertChannels)
+    .set({ mention: clean || null, updatedAt: toLocalIso() })
+    .where(
+      and(
+        eq(alertChannels.id, id),
+        eq(alertChannels.userId, userId),
+        eq(alertChannels.kind, 'discord'),
+      ),
+    );
+  return true;
 }
 
 export async function removeChannel(db: Db, userId: string, id: string): Promise<void> {
@@ -326,21 +353,28 @@ async function deliver(
   const target = decryptSecret(channel.targetEnc, ctx.secret);
   const notice = typeof message === 'string' ? null : message;
   if (channel.kind === 'discord') {
-    // No @everyone or role pings from text that came from data.
+    // No @everyone or role pings from text that came from data; the person's own mention only.
     const bodies = notice
       ? discordPayloads(notice, style)
       : [{ content: (message as string).slice(0, 2000), allowed_mentions: { parse: [] } }];
-    for (const body of bodies) {
-      const res = await fetchFn(target, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+    if (!channel.forum) {
+      for (const [i, body] of bodies.entries()) {
+        const res = await discordPost(fetchFn, target, i === 0 ? mentioned(body, channel) : body);
+        if (res.ok) continue;
+        // A forum channel takes posts only: from now on it gets them.
+        if (i === 0 && (await discordCode(res)) === FORUM_REFUSAL) {
+          await db
+            .update(alertChannels)
+            .set({ forum: true })
+            .where(eq(alertChannels.id, channel.id));
+          return discordForum(db, channel, target, message, ctx, style);
+        }
+        throw new Error(`Discord answered ${res.status}`);
+      }
+      if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
+      return;
     }
-    if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
-    return;
+    return discordForum(db, channel, target, message, ctx, style);
   }
   if (!token) throw new Error('No Telegram bot is set (Settings > Alerts)');
   // A split notice goes a card per message, the heading on the first and the link on the last.
@@ -407,6 +441,114 @@ async function deliver(
     }
   }
   if (notice?.images?.length) await sendImages(channel, target, notice.images, ctx, token);
+}
+
+/** Discord's answer to a message without a post in a forum channel, and to a post since deleted. */
+const FORUM_REFUSAL = 220001;
+const UNKNOWN_CHANNEL = 10003;
+/** A day of store posts starts at 5:00, as on the Now page (a late night's posts are the day before's). */
+const DAY_START_HOURS = 5;
+
+/** The error code in Discord's answer. */
+const discordCode = async (res: Response) =>
+  ((await res.json().catch(() => null)) as { code?: number } | null)?.code;
+
+const discordPost = (fetchFn: typeof fetch, url: string, body: Record<string, unknown>) =>
+  fetchFn(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  });
+
+/** The message with the person's mention first (in a forum, only a mention notifies). */
+function mentioned(body: Record<string, unknown>, channel: AlertChannel): Record<string, unknown> {
+  if (!channel.mention) return body;
+  return {
+    ...body,
+    content: [`<@${channel.mention}>`, body.content].filter(Boolean).join('\n'),
+    allowed_mentions: { parse: [], users: [channel.mention] },
+  };
+}
+
+/**
+ * A Discord forum channel: store notices go a card per message, each into its location's post of
+ * the day (made by the first one); other notices into one "Tora" post. Posts are found again for
+ * MESSAGE_DAYS after their last message; one deleted in Discord is made again.
+ */
+async function discordForum(
+  db: Db,
+  channel: AlertChannel,
+  target: string,
+  message: string | Notice,
+  ctx: AlertContext,
+  style?: NoticeStyle,
+): Promise<void> {
+  const fetchFn = ctx.fetch ?? fetch;
+  const notice = typeof message === 'string' ? null : message;
+  const day = localDate(new Date(Date.now() - DAY_START_HOURS * 3_600_000));
+  const parts = notice?.split
+    ? notice.cards.map((c) => ({
+        bodies: discordPayloads({ ...notice, link: null, cards: [c] }, style),
+        key: `${c.thread ?? 'location'}:${day}`,
+        name: `${c.title ?? 'Tora'} · ${day.slice(5)}`,
+        images: (notice.images ?? []).filter((img) => img.key && c.keys?.includes(img.key)),
+      }))
+    : [
+        {
+          bodies: notice
+            ? discordPayloads(notice, style)
+            : [{ content: (message as string).slice(0, 2000), allowed_mentions: { parse: [] } }],
+          key: 'other',
+          name: 'Tora',
+          images: notice?.images ?? [],
+        },
+      ];
+  const keep = toLocalIso(new Date(Date.now() - MESSAGE_DAYS * 86_400_000));
+  for (const part of parts) {
+    const postKey = `thread:${part.key}`;
+    let [post] = await db
+      .select({ id: noticeMessages.messageId })
+      .from(noticeMessages)
+      .where(
+        and(
+          eq(noticeMessages.channelId, channel.id),
+          eq(noticeMessages.postKey, postKey),
+          gte(noticeMessages.sentAt, keep),
+        ),
+      );
+    for (const body of part.bodies.map((b) => mentioned(b, channel))) {
+      if (post) {
+        const res = await discordPost(fetchFn, `${target}?thread_id=${post.id}`, body);
+        if (res.ok) continue;
+        if ((await discordCode(res)) !== UNKNOWN_CHANNEL)
+          throw new Error(`Discord answered ${res.status}`);
+        post = undefined;
+      }
+      const res = await discordPost(fetchFn, `${target}?wait=true`, {
+        ...body,
+        thread_name: part.name.slice(0, 100),
+      });
+      if (!res.ok) throw new Error(`Discord answered ${res.status}`);
+      // A forum post's first message is in the post (its channel).
+      const made = (await res.json().catch(() => null)) as { channel_id?: string } | null;
+      if (made?.channel_id) post = { id: made.channel_id };
+    }
+    if (!post) continue;
+    const sentAt = toLocalIso();
+    await db
+      .insert(noticeMessages)
+      .values({ channelId: channel.id, postKey, messageId: post.id, sentAt })
+      .onConflictDoUpdate({
+        target: [noticeMessages.channelId, noticeMessages.postKey],
+        set: { messageId: post.id, sentAt },
+      });
+    if (part.images.length)
+      await sendImages(channel, `${target}?thread_id=${post.id}`, part.images, ctx, null);
+  }
+  await db
+    .delete(noticeMessages)
+    .where(and(eq(noticeMessages.channelId, channel.id), lt(noticeMessages.sentAt, keep)));
 }
 
 /** Bytes of pictures sent in one message at most (Discord's and Telegram's limits allow more). */

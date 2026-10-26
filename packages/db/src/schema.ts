@@ -1042,6 +1042,10 @@ export const alertChannels = sqliteTable(
     targetEnc: text('target_enc').notNull(),
     /** What the person sees (a Telegram name, or the webhook's channel). */
     label: text('label'),
+    /** A Discord forum channel (found when Discord asks for a post): a post per location a day. */
+    forum: integer('forum', { mode: 'boolean' }).notNull().default(false),
+    /** The Discord user each message mentions (a forum's messages notify no one otherwise). */
+    mention: text('mention'),
     lastSentAt: text('last_sent_at'),
     lastError: text('last_error'),
     ...timestamps,
