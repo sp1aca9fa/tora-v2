@@ -17,6 +17,7 @@ import {
   recordAdminChange,
   dismissSourceQuality,
   getHoldingDetail,
+  leaveListingGone,
   setCardGrade,
   setSourceWarningDismissed,
   userHoldsProduct,
@@ -50,6 +51,17 @@ export async function setSourceWarningAction(productId: string, dismiss: boolean
   const { db, user } = await authed();
   if (!(await userHoldsProduct(db, user.id, productId))) return;
   await setSourceWarningDismissed(db, user.id, productId, dismiss);
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * An item's page that stopped working is gone for good (nothing on the site is the item): left
+ * unlinked, no new one asked for. Admins also for items they do not hold (they see those cards).
+ */
+export async function leaveListingGoneAction(productId: string, source: string) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin' && !(await userHoldsProduct(db, user.id, productId))) return;
+  await leaveListingGone(db, productId, source);
   revalidatePath('/', 'layout');
 }
 

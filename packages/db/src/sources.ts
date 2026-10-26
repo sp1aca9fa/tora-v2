@@ -400,7 +400,11 @@ export async function productsToMatch(
     .selectDistinct({ id: sourceCandidates.productId })
     .from(sourceCandidates)
     .where(and(eq(sourceCandidates.source, source), eq(sourceCandidates.status, 'pending')));
-  const skip = new Set([...linked, ...pending].map((r) => r.id));
+  const left = await db
+    .selectDistinct({ id: productSources.productId })
+    .from(productSources)
+    .where(and(eq(productSources.source, source), leftGone));
+  const skip = new Set([...linked, ...pending, ...left].map((r) => r.id));
   const ids = [...tracked].filter(
     (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
   );
@@ -616,9 +620,58 @@ export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
     .where(
       // Written as the failed-listings index is (a bound false would not use it).
       sql`${productSources.active} = 0 AND ${productSources.failure} IS NOT NULL
-        AND json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL`,
+        AND json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL
+        AND json_extract(${productSources.failure}, '$.leftAt') IS NULL`,
     );
   return rows.map((r) => r.product);
+}
+
+/** A listing a person left gone (see `leaveListingGone`). */
+const leftGone = sql`${productSources.active} = 0 AND ${productSources.failure} IS NOT NULL
+  AND json_extract(${productSources.failure}, '$.leftAt') IS NOT NULL`;
+
+/**
+ * The item's page on `source` is gone and nothing there is the item (e.g. only another edition
+ * is left): its set-aside listings stay unlinked, no new link is asked for nor searched, and the
+ * suggestions waiting are rejected. Pasting a link on the item page later still links one.
+ */
+export async function leaveListingGone(
+  db: Db,
+  productId: string,
+  source: string,
+  now = new Date(),
+): Promise<boolean> {
+  const rows = await db
+    .select({ id: productSources.id, failure: productSources.failure })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, productId),
+        eq(productSources.source, source),
+        eq(productSources.active, false),
+      ),
+    );
+  const broken = rows.filter((r) => r.failure?.brokenAt);
+  if (!broken.length) return false;
+  await db.transaction(async (tx) => {
+    for (const r of broken) {
+      await tx
+        .update(productSources)
+        .set({ failure: { ...r.failure!, leftAt: toLocalIso(now) } })
+        .where(eq(productSources.id, r.id));
+    }
+    await tx
+      .update(sourceCandidates)
+      .set({ status: 'rejected' })
+      .where(
+        and(
+          eq(sourceCandidates.productId, productId),
+          eq(sourceCandidates.source, source),
+          eq(sourceCandidates.status, 'pending'),
+        ),
+      );
+  });
+  return true;
 }
 
 /**
@@ -632,7 +685,8 @@ export function brokenListings(
   const linked = new Set(rows.filter((r) => r.active).map((r) => `${r.productId}|${r.source}`));
   for (const r of rows) {
     const key = `${r.productId}|${r.source}`;
-    if (!r.active && r.failure?.brokenAt && !linked.has(key)) out.set(key, r.failure);
+    if (!r.active && r.failure?.brokenAt && !r.failure.leftAt && !linked.has(key))
+      out.set(key, r.failure);
   }
   return out;
 }
@@ -1184,10 +1238,13 @@ export async function missingPriceSources(db: Db, userId: string): Promise<Missi
   if (wanted.length === 0) return [];
   const ids = wanted.map((w) => w.product.id);
   const [linked, pending] = await Promise.all([
+    // A page left gone counts as linked: nothing else there is the item.
     db
       .select({ productId: productSources.productId, source: productSources.source })
       .from(productSources)
-      .where(and(inArray(productSources.productId, ids), eq(productSources.active, true))),
+      .where(
+        and(inArray(productSources.productId, ids), or(eq(productSources.active, true), leftGone)),
+      ),
     db
       .select({
         productId: sourceCandidates.productId,

@@ -288,6 +288,11 @@ export interface ListingFailure {
   error: string;
   /** Set aside as broken (no longer collected). */
   brokenAt?: string;
+  /**
+   * Left gone by a person (the item has no page there now): no new link is asked for nor
+   * searched, and the listing keeps its picture's place.
+   */
+  leftAt?: string;
 }
 
 export const CANDIDATE_STATUSES = ['pending', 'rejected'] as const;

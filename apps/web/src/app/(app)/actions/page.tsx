@@ -152,6 +152,7 @@ export default async function ActionsPage() {
       source: i.source,
       sourceLabel: sourceLabel(i.source),
       main: i.main,
+      broken: !!i.broken,
       owned: t('actions.owned', { units: i.units, amount: money(i.costBase) }),
       candidates: i.candidates.map((c) => ({
         id: c.id,

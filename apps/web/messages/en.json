@@ -216,6 +216,7 @@
     "owned": "{units, plural, one {# unit} other {# units}} · paid {amount}",
     "moreSuggestions": "{count, plural, one {# more suggestion} other {# more suggestions}}",
     "broken": "Its {source} page stopped working on {day} ({error}) and is no longer collected: link the new one.",
+    "leaveGone": "Page gone, leave it unlinked",
     "paste": "Or paste the {source} page of this item:",
     "openItem": "Open item",
     "openLot": "Open lot",

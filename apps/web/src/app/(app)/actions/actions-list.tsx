@@ -35,6 +35,7 @@ import {
 } from '../products/[id]/source-actions';
 import {
   dismissSourceQualityAction,
+  leaveListingGoneAction,
   setLotConditionAction,
   setLotGradeAction,
   keepSetupDefaultsAction,
@@ -60,6 +61,8 @@ export interface ActionCardView {
   source?: string;
   sourceLabel?: string;
   main?: boolean;
+  /** The item's page there stopped working (it can be left gone). */
+  broken?: boolean;
   /** "2 units · paid ¥36,000" or "x1 · ¥3,000 · 2026-05-01". */
   owned?: string;
   candidates?: {
@@ -570,16 +573,28 @@ function SourceControls({
           label={t('actions.paste', { source: c.sourceLabel ?? '' })}
         />
       </div>
-      {c.main && (
+      {c.broken ? (
         <Button
           size="sm"
           variant="ghost"
           className="text-xs"
           disabled={pending}
-          onClick={() => run(() => setSourceWarningAction(c.productId!, true))}
+          onClick={() => run(() => leaveListingGoneAction(c.productId!, c.source!))}
         >
-          {t('coverage.dismiss')}
+          {t('actions.leaveGone')}
         </Button>
+      ) : (
+        c.main && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs"
+            disabled={pending}
+            onClick={() => run(() => setSourceWarningAction(c.productId!, true))}
+          >
+            {t('coverage.dismiss')}
+          </Button>
+        )
       )}
     </div>
   );

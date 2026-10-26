@@ -10,6 +10,8 @@ const app = join(__dirname, '../app');
 const NOT_LOGGED = new Set([
   // Hides a notice for the admin; the source's role stays as the quality gate set it.
   'dismissSourceQualityAction',
+  // Anyone holding the item may do it (like linking a page); admins also on items they do not hold.
+  'leaveListingGoneAction',
 ]);
 
 it('records every admin action in the activity log', () => {

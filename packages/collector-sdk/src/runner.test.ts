@@ -9,12 +9,14 @@ import {
   createQuerySource,
   createUser,
   currentSupply,
+  leaveListingGone,
   lowestAsk,
   linkSource,
   pendingActions,
   listPendingCandidates,
   listProductSources,
   pendingMatchesForUser,
+  productsWithBrokenListings,
   rejectCandidate,
   saveTaxonomy,
   schema,
@@ -533,4 +535,41 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   // Linked again: collected as before.
   await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
   expect(await link()).toMatchObject({ active: true, failure: null });
+});
+
+it('leaves a gone page unlinked: no card, no new search, a pasted link still links', async () => {
+  const { product } = await box();
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
+  const failure = { nights: 3, since: '2026-10-10', day: '2026-10-12', error: 'gone' };
+  await db
+    .update(schema.productSources)
+    .set({ active: false, failure: { ...failure, brokenAt: '2026-10-12T03:00:00.000+09:00' } })
+    .where(eq(schema.productSources.productId, product.id));
+  // The search offers another edition.
+  let searches = 0;
+  const collector = fakeCollector({
+    findCandidates: async () => {
+      searches++;
+      return [{ externalId: 'X9', title: 'BP BOX Collector', url: 'https://x/9', score: 0.8 }];
+    },
+  });
+  await runCollector(db, collector, quiet);
+  expect(searches).toBe(1);
+  const card = (await pendingActions(db, userId)).find(
+    (c) => c.kind === 'source' && c.source === 'fake',
+  );
+  expect(card).toMatchObject({ broken: expect.anything(), candidates: [expect.anything()] });
+
+  expect(await leaveListingGone(db, product.id, 'fake')).toBe(true);
+  expect(
+    (await pendingActions(db, userId)).filter((c) => c.kind === 'source' && c.source === 'fake'),
+  ).toEqual([]);
+  expect(await listPendingCandidates(db, product.id)).toEqual([]);
+  expect(await productsWithBrokenListings(db)).toEqual([]);
+  await runCollector(db, collector, { ...quiet, now: new Date(Date.now() + 86_400_000) });
+  expect(searches).toBe(1);
+  expect((await listProductSources(db, product.id))[0]).toMatchObject({ active: false });
+
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X2' });
+  expect((await listProductSources(db, product.id)).filter((s) => s.active)).toHaveLength(1);
 });

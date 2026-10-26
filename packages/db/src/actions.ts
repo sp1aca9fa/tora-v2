@@ -182,7 +182,10 @@ export async function pendingActions(
               and(inArray(sourceCandidates.productId, ids), eq(sourceCandidates.status, 'pending')),
             ),
         ]);
-  const has = new Set(listings.filter((l) => l.active).map((l) => `${l.productId}|${l.source}`));
+  // A page left gone counts as linked: nothing else there is the item.
+  const has = new Set(
+    listings.filter((l) => l.active || l.failure?.leftAt).map((l) => `${l.productId}|${l.source}`),
+  );
   const broken = brokenListings(listings);
   const registry = await loadSourceRegistry(db);
   const known = await linkedListingImages(
