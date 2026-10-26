@@ -386,11 +386,11 @@ export const holdings = sqliteTable(
 );
 
 /**
- * Orders the user marked as cancelled (their lots were removed): imports skip these IDs. Needed
+ * Orders the user marked as canceled (their lots were removed): imports skip these IDs. Needed
  * because a buyer's own cancellation sends no email.
  */
-export const cancelledOrders = sqliteTable(
-  'cancelled_orders',
+export const canceledOrders = sqliteTable(
+  'canceled_orders',
   {
     id: id(),
     userId: text('user_id')
@@ -400,7 +400,7 @@ export const cancelledOrders = sqliteTable(
     orderId: text('order_id').notNull(),
     ...timestamps,
   },
-  (t) => [uniqueIndex('cancelled_orders_uq').on(t.userId, t.orderSource, t.orderId)],
+  (t) => [uniqueIndex('canceled_orders_uq').on(t.userId, t.orderSource, t.orderId)],
 );
 
 /**

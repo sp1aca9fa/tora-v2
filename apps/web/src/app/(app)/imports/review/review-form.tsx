@@ -38,7 +38,7 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
     (i) =>
       i.cls === 'card' &&
       !rows.get(i.id)?.gradeType &&
-      !rows.get(i.id)?.cancelled &&
+      !rows.get(i.id)?.canceled &&
       !rows.get(i.id)?.mergeInto,
   ).length;
 
@@ -70,9 +70,7 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
           {state.done !== undefined && (
             <p role="status" className="text-sm text-muted-foreground">
               {t('imports.done', { count: state.done })}
-              {state.cancelled
-                ? ` · ${t('imports.doneCancelled', { count: state.cancelled })}`
-                : ''}
+              {state.canceled ? ` · ${t('imports.doneCanceled', { count: state.canceled })}` : ''}
             </p>
           )}
           <FormError state={state} />

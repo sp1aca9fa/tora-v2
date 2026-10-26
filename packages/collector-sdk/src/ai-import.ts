@@ -54,7 +54,7 @@ export interface ExtractedRow {
   /** YYYY-MM-DD */
   date: string | null;
   dateApprox: boolean;
-  status: 'purchased' | 'cancelled' | 'not_purchase';
+  status: 'purchased' | 'canceled' | 'not_purchase';
   collectible: boolean;
   /** An existing product of the user's (from the list given to the model). */
   productId: string | null;
@@ -153,7 +153,7 @@ const ROWS_SCHEMA = {
           quantity: { type: 'integer' },
           date: str,
           dateApprox: { type: 'boolean' },
-          status: { type: 'string', enum: ['purchased', 'cancelled', 'not_purchase'] },
+          status: { type: 'string', enum: ['purchased', 'canceled', 'not_purchase'] },
           collectible: { type: 'boolean' },
           productId: str,
           product: {
@@ -265,7 +265,7 @@ One row per distinct item in an order. Several of the same item are one row with
 - currency: the ISO 4217 code of that price when the page shows it (¥ or 円: JPY; $ on a US site: USD; €: EUR), else null.
 - quantity: number of copies (1 unless shown or the title says a set of N of the same item).
 - date: the order / purchase date as YYYY-MM-DD (購入日時, 注文日). An order date missing its year: your best guess with dateApprox true. A listing page's age or update time (半年以上前, 3日前, 更新) is not the purchase date: null. Not shown at all: null.
-- status: "cancelled" for cancelled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
+- status: "canceled" for canceled or returned orders (キャンセル, 返品, 返金済み); "not_purchase" for anything that was not bought (recommendations, ads, items sold rather than bought).
 - collectible: true for trading cards (singles, boxes, packs, decks, sets, card supplies), video games, consoles, controllers, amiibo and figures${own ? ', and items of the other categories below' : ''}; false for anything else.
 - productId: when the item is clearly one of the user's products listed below (same card name and number, same box or set, same game and platform), its id; else null.
 - product: for a collectible with no productId, the new product: category "tcg" (trading cards) or "game" (games, consoles, controllers, amiibo, figures); kind ("supply" for sleeves (スリーブ, デッキシールド), deck cases, playmats and loaders; "deck" only for a playable deck of cards); name (the item's own name, without seller words like 美品, 送料無料, 即購入OK, 匿名配送, "X様専用"); franchise (pokemon, one_piece, yugioh, ...); setName; setCode (e.g. SV2a, M-P); cardNumber (e.g. 206/165, or 208 for a promo 208/S-P); rarity (SAR, AR, SR, P, ...); platform for games (switch, switch2, ps5, ps4, n64, ...); region: one of jp, en, zh_cn, zh_tw, kr, other ("jp" unless the item itself is an English or other-language version, 英語版 / 海外版; where it was sold does not matter). Null for non-collectibles.${own ? `\n  Other categories (category: its kinds): ${own}. Their items have only category, kind and name; the other fields are null.` : ''}
@@ -644,7 +644,7 @@ export function mergeRows(
       price: full.price ?? other.price,
       date: dated.date,
       dateApprox: dated.date ? dated.dateApprox : full.dateApprox,
-      status: a.status === 'cancelled' || b.status === 'cancelled' ? 'cancelled' : full.status,
+      status: a.status === 'canceled' || b.status === 'canceled' ? 'canceled' : full.status,
       unsure: [full.unsure, other.unsure].filter(Boolean).join('; ') || null,
     };
   };
@@ -711,9 +711,11 @@ export async function readPurchases(
   const random = options.random ?? Math.random;
   const cache: ReadCache = (await options.loadCache?.()) ?? { version: 1, files: {} };
   // Rows read before prices kept their currency (S16) named the price `priceJpy`.
+  // Rows read before 2026-10-26 spelled the status `cancelled`.
   for (const f of Object.values(cache.files)) {
     for (const r of f.rows as (ExtractedRow & { priceJpy?: number | null })[]) {
       if (r.price === undefined && r.priceJpy !== undefined) r.price = r.priceJpy;
+      if ((r.status as string) === 'cancelled') r.status = 'canceled';
     }
   }
   const result: ReadResult = {

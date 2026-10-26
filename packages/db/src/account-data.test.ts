@@ -102,7 +102,7 @@ function comparable(file: Awaited<ReturnType<typeof accountData>>, otherInstall 
     ...file.watches,
     ...file.importRuns,
     ...file.purchaseLinks,
-    ...file.cancelledOrders,
+    ...file.canceledOrders,
   ]);
   // Events at the same moment come in any order: sorted by what they say.
   const said = (e: (typeof file.history)[number]) => JSON.stringify(walk({ ...e, id: '' }));
@@ -121,6 +121,19 @@ it('loads a download into an empty account on the same install, everything back'
   expect(comparable(await accountData(db, fresh))).toEqual(comparable(file));
   // The original account is untouched.
   expect(comparable(await accountData(db, owner))).toEqual(comparable(file));
+});
+
+it('loads a file saved before the US spelling (cancelled)', async () => {
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  const { canceledOrders, ...rest } = file;
+  const old = { ...rest, cancelledOrders: canceledOrders };
+  if (old.importRuns[0]) old.importRuns[0].counts = { imported: 1, cancelled: 2 };
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  expect(await loadAccountData(db, fresh, old)).toMatchObject({ lots: file.lots.length });
+  const back = await accountData(db, fresh);
+  expect(back.canceledOrders).toHaveLength(canceledOrders.length);
+  if (old.importRuns[0])
+    expect(back.importRuns.map((r) => r.counts)).toContainEqual({ imported: 1, canceled: 2 });
 });
 
 it('loads a download on another install, adding its items and their listings', async () => {

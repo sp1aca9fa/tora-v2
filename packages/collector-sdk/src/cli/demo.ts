@@ -44,7 +44,7 @@ import { loadAndRegister } from '../registry';
 import { runCollector } from '../runner';
 
 const {
-  cancelledOrders,
+  canceledOrders,
   holdingEvents,
   holdings,
   importRuns,
@@ -94,7 +94,7 @@ await db.delete(importRuns).where(eq(importRuns.userId, uid));
 await db.delete(suggestions).where(eq(suggestions.userId, uid));
 await db.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.userId, uid));
 await db.delete(manualPrices).where(eq(manualPrices.userId, uid));
-await db.delete(cancelledOrders).where(eq(cancelledOrders.userId, uid));
+await db.delete(canceledOrders).where(eq(canceledOrders.userId, uid));
 console.log(`reset: ${lotIds.length} lot(s) removed`);
 
 // --- items ------------------------------------------------------------------------------------

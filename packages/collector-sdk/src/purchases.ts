@@ -12,7 +12,7 @@ import {
   saveImportRows,
   createHolding,
   editHolding,
-  cancelledOrderIds,
+  canceledOrderIds,
   findSameProduct,
   flagForReview,
   holdingsWithProducts,
@@ -34,7 +34,7 @@ const NAME_COVERAGE = 0.6;
 /** Purchases this recent (before the export's newest mail) may simply not have arrived yet. */
 const IN_TRANSIT_DAYS = 21;
 
-/** Item with more (older) purchases than delivery mails: some may have been cancelled. */
+/** Item with more (older) purchases than delivery mails: some may have been canceled. */
 export interface DeliveryGap {
   title: string;
   purchases: number;
@@ -63,7 +63,7 @@ export function reviewFlags(
     const recentFrom = Date.parse(asOf) - IN_TRANSIT_DAYS * 86_400_000;
     const byTitle = new Map<string, PurchaseReceipt[]>();
     for (const r of gathered.receipts) {
-      if (gathered.cancelled.has(r.orderId) || skip.has(r.orderId)) continue;
+      if (gathered.canceled.has(r.orderId) || skip.has(r.orderId)) continue;
       byTitle.set(titleKey(r.title), [...(byTitle.get(titleKey(r.title)) ?? []), r]);
     }
     for (const [title, purchases] of byTitle) {
@@ -83,9 +83,9 @@ export function reviewFlags(
 }
 
 export interface GatheredReceipts {
-  /** One receipt per transaction ID, cancelled ones included. */
+  /** One receipt per transaction ID, canceled ones included. */
   receipts: PurchaseReceipt[];
-  cancelled: Set<string>;
+  canceled: Set<string>;
   unreadable: { subject: string; reason: string }[];
   /** Items left out on purpose (e.g. not collectibles), with the reason. */
   skipped: { title: string; reason: string }[];
@@ -99,7 +99,7 @@ export interface GatheredReceipts {
 
 export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
   const byId = new Map<string, PurchaseReceipt>();
-  const cancelled = new Set<string>();
+  const canceled = new Set<string>();
   const unreadable: GatheredReceipts['unreadable'] = [];
   const skipped: GatheredReceipts['skipped'] = [];
   const skippedKeys = new Set<string>();
@@ -117,7 +117,7 @@ export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
         byId.set(mail.receipt.orderId, mail.receipt);
       }
       seen(mail.receipt.orderedAt);
-    } else if (mail.kind === 'cancel') cancelled.add(mail.orderId);
+    } else if (mail.kind === 'cancel') canceled.add(mail.orderId);
     else if (mail.kind === 'delivered') {
       deliveries.set(titleKey(mail.title), (deliveries.get(titleKey(mail.title)) ?? 0) + 1);
       seen(mail.at);
@@ -131,7 +131,7 @@ export function gatherReceipts(mails: Iterable<ReceiptMail>): GatheredReceipts {
     } else unreadable.push({ subject: mail.subject, reason: mail.reason });
   }
   const receipts = [...byId.values()].sort((a, b) => a.orderedAt.localeCompare(b.orderedAt));
-  return { receipts, cancelled, unreadable, skipped, deliveries, notices, latestAt };
+  return { receipts, canceled, unreadable, skipped, deliveries, notices, latestAt };
 }
 
 /** An existing product, or one to create from the receipt. */
@@ -158,12 +158,12 @@ export type PlanEntry = (
       ref: ProductRef | null;
       linked: boolean;
     }
-  /** Purchased then cancelled (per the emails): not imported. */
-  | { type: 'cancelled'; receipt: PurchaseReceipt }
-  /** Cancelled per the emails but registered: reported, never removed. */
-  | { type: 'cancelledRegistered'; receipt: PurchaseReceipt; existing: Holding[] }
-  /** The user marked this order as cancelled in the app: skipped. */
-  | { type: 'cancelledInApp'; receipt: PurchaseReceipt }
+  /** Purchased then canceled (per the emails): not imported. */
+  | { type: 'canceled'; receipt: PurchaseReceipt }
+  /** Canceled per the emails but registered: reported, never removed. */
+  | { type: 'canceledRegistered'; receipt: PurchaseReceipt; existing: Holding[] }
+  /** The user marked this order as canceled in the app: skipped. */
+  | { type: 'canceledInApp'; receipt: PurchaseReceipt }
 ) & {
   /** Reasons to review it (see `reviewFlags`); applied to new and existing lots alike. */
   flags?: string[];
@@ -245,27 +245,26 @@ export async function planImport(
     return { ref: same ? { existing: same } : { create: input }, linked: false };
   };
 
-  const cancelledInApp = await cancelledOrderIds(db, userId, importer.source);
-  const { flags } = reviewFlags(gathered, cancelledInApp, options.exportedAt ?? gathered.latestAt);
+  const canceledInApp = await canceledOrderIds(db, userId, importer.source);
+  const { flags } = reviewFlags(gathered, canceledInApp, options.exportedAt ?? gathered.latestAt);
 
-  // An item of a several-item order ("<order>#2") is cancelled with its order.
+  // An item of a several-item order ("<order>#2") is canceled with its order.
   const orderOf = (id: string) => id.replace(/#\d+$/, '');
-  const isCancelled = (id: string) =>
-    gathered.cancelled.has(id) || gathered.cancelled.has(orderOf(id));
+  const isCanceled = (id: string) =>
+    gathered.canceled.has(id) || gathered.canceled.has(orderOf(id));
   const entries: PlanEntry[] = [];
   for (const receipt of gathered.receipts) {
     const existing = byOrder.get(receipt.orderId) ?? [];
-    const inApp =
-      cancelledInApp.has(receipt.orderId) || cancelledInApp.has(orderOf(receipt.orderId));
-    if (inApp && !isCancelled(receipt.orderId)) {
-      entries.push({ type: 'cancelledInApp', receipt });
+    const inApp = canceledInApp.has(receipt.orderId) || canceledInApp.has(orderOf(receipt.orderId));
+    if (inApp && !isCanceled(receipt.orderId)) {
+      entries.push({ type: 'canceledInApp', receipt });
       continue;
     }
-    if (isCancelled(receipt.orderId)) {
+    if (isCanceled(receipt.orderId)) {
       entries.push(
         existing.length
-          ? { type: 'cancelledRegistered', receipt, existing }
-          : { type: 'cancelled', receipt },
+          ? { type: 'canceledRegistered', receipt, existing }
+          : { type: 'canceled', receipt },
       );
       continue;
     }
@@ -322,7 +321,7 @@ export async function planImport(
   }
   for (const e of entries) {
     const f = flags.get(e.receipt.orderId);
-    if (f && e.type !== 'cancelled' && e.type !== 'cancelledInApp') e.flags = f;
+    if (f && e.type !== 'canceled' && e.type !== 'canceledInApp') e.flags = f;
   }
   return entries;
 }
@@ -479,12 +478,12 @@ export async function applyImport(
         logRow(receipt, 'existing', 'differs_kept', entry.existing[0]?.id ?? null);
       } else if (entry.type === 'unclassified') {
         logRow(receipt, 'problem', 'unclassified');
-      } else if (entry.type === 'cancelled') {
-        logRow(receipt, 'skipped', 'cancelled');
-      } else if (entry.type === 'cancelledInApp') {
-        logRow(receipt, 'skipped', 'cancelled_in_app');
-      } else if (entry.type === 'cancelledRegistered') {
-        logRow(receipt, 'existing', 'cancelled_registered', entry.existing[0]?.id ?? null);
+      } else if (entry.type === 'canceled') {
+        logRow(receipt, 'skipped', 'canceled');
+      } else if (entry.type === 'canceledInApp') {
+        logRow(receipt, 'skipped', 'canceled_in_app');
+      } else if (entry.type === 'canceledRegistered') {
+        logRow(receipt, 'existing', 'canceled_registered', entry.existing[0]?.id ?? null);
       }
       // Lots already in the app (or just matched to one) get the same review flags.
       const existing =

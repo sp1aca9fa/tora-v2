@@ -20,7 +20,7 @@ export const initialRow = (item: ReviewItem): ReviewRow => ({
   rawGrade: (item.rawGrade as ReviewRow['rawGrade']) ?? 'A',
   grade: item.grade ?? '10',
   certNumber: item.certNumber ?? '',
-  cancelled: false,
+  canceled: false,
   packagingState:
     item.cls === 'sealed'
       ? item.packagingState === 'sealed_no_shrink'
@@ -33,7 +33,7 @@ export const initialRow = (item: ReviewItem): ReviewRow => ({
 
 /**
  * The review controls of one imported lot: why it was flagged, quantity and date, the same
- * purchase as another lot, a cancelled order, and its grade (cards) or shrink (sealed).
+ * purchase as another lot, a canceled order, and its grade (cards) or shrink (sealed).
  */
 export function ReviewRowFields({
   item,
@@ -73,7 +73,7 @@ export function ReviewRowFields({
           {t.has(`imports.reason.${r}`) ? t(`imports.reason.${r}`) : r}
         </p>
       ))}
-      {!row.cancelled && !row.mergeInto && (
+      {!row.canceled && !row.mergeInto && (
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t('fields.quantity')}</span>
@@ -110,7 +110,7 @@ export function ReviewRowFields({
           <NativeSelect
             value={row.mergeInto ?? ''}
             onChange={(e) =>
-              update(item.id, { mergeInto: e.target.value || undefined, cancelled: false })
+              update(item.id, { mergeInto: e.target.value || undefined, canceled: false })
             }
             className="w-auto max-w-full"
           >
@@ -132,16 +132,16 @@ export function ReviewRowFields({
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={row.cancelled ?? false}
-            onChange={(e) => update(item.id, { cancelled: e.target.checked })}
+            checked={row.canceled ?? false}
+            onChange={(e) => update(item.id, { canceled: e.target.checked })}
             className="size-4"
           />
-          <span className={row.cancelled ? 'text-destructive' : 'text-muted-foreground'}>
-            {t(item.orderId ? 'imports.cancelled' : 'imports.removeLot')}
+          <span className={row.canceled ? 'text-destructive' : 'text-muted-foreground'}>
+            {t(item.orderId ? 'imports.canceled' : 'imports.removeLot')}
           </span>
         </label>
       )}
-      {row.cancelled || row.mergeInto ? null : item.cls === 'card' ? (
+      {row.canceled || row.mergeInto ? null : item.cls === 'card' ? (
         <div className="flex flex-wrap gap-2">
           <NativeSelect
             aria-label={t('fields.grading')}

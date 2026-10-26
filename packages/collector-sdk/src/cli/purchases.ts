@@ -108,15 +108,15 @@ for (const importer of selected) {
   const of = <T extends PlanEntry['type']>(type: T) =>
     plan.filter((e): e is Extract<PlanEntry, { type: T }> => e.type === type);
   console.log(
-    `Read ${gathered.receipts.length} purchase(s), ${gathered.cancelled.size} cancellation(s).\n`,
+    `Read ${gathered.receipts.length} purchase(s), ${gathered.canceled.size} cancellation(s).\n`,
   );
 
   section('Already registered with the same data, not imported again', of('duplicate'));
-  section('Cancelled, not imported', of('cancelled'));
-  section('Marked as cancelled in the app, not imported', of('cancelledInApp'));
+  section('Canceled, not imported', of('canceled'));
+  section('Marked as canceled in the app, not imported', of('canceledInApp'));
   section(
-    'Cancelled per the emails but registered (left as is; check them)',
-    of('cancelledRegistered'),
+    'Canceled per the emails but registered (left as is; check them)',
+    of('canceledRegistered'),
   );
   section(
     'Could not tell what product this is (add by hand with its order ID)',
@@ -134,10 +134,10 @@ for (const importer of selected) {
   }
   const { gaps } = reviewFlags(
     gathered,
-    new Set(of('cancelledInApp').map((e) => e.receipt.orderId)),
+    new Set(of('canceledInApp').map((e) => e.receipt.orderId)),
   );
   if (gaps.length) {
-    console.log('Fewer delivery emails than purchases (some may have been cancelled by you,');
+    console.log('Fewer delivery emails than purchases (some may have been canceled by you,');
     console.log('which sends no email). Their older purchases are flagged for review in the app:');
     for (const g of gaps) {
       console.log(
@@ -235,7 +235,7 @@ for (const importer of selected) {
     matched: outcome.attached,
     flagged: outcome.flagged,
     duplicate: of('duplicate').length,
-    cancelled: of('cancelled').length + of('cancelledInApp').length,
+    canceled: of('canceled').length + of('canceledInApp').length,
     unclassified: of('unclassified').length,
     failed: outcome.failed.length,
   });

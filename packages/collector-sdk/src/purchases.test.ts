@@ -6,7 +6,7 @@ import {
   createHolding,
   createUser,
   linkSource,
-  markOrderCancelled,
+  markOrderCanceled,
   listProductSources,
   schema,
 } from '@tora/db';
@@ -171,8 +171,8 @@ describe('purchase import', () => {
       '100': 'duplicate',
       '101': 'conflict',
       '102': 'likely',
-      '103': 'cancelled',
-      '104': 'cancelledRegistered',
+      '103': 'canceled',
+      '104': 'canceledRegistered',
       '105': 'new',
       '106': 'new',
       '107': 'unclassified',
@@ -211,7 +211,7 @@ describe('purchase import', () => {
     ]);
     expect(rows.find((h) => h.orderId === '106')?.productId).toBe(linked.product.id);
     expect(rows.find((h) => h.orderId === '108')?.productId).toBe(titled.product.id);
-    // Cancelled-but-registered entries stay.
+    // Canceled-but-registered entries stay.
     expect(rows.some((h) => h.orderId === '104')).toBe(true);
     expect(rows.some((h) => h.orderId === '103')).toBe(false);
 
@@ -288,7 +288,7 @@ describe('purchase import', () => {
     expect(gathered.skipped).toEqual([{ title: 'Plush', reason: 'not_card_product' }]);
   });
 
-  it('cancels every item of a cancelled order', async () => {
+  it('cancels every item of a canceled order', async () => {
     const plan = await planImport(
       db,
       userId,
@@ -299,7 +299,7 @@ describe('purchase import', () => {
         { kind: 'cancel', orderId: '500' },
       ]),
     );
-    expect(plan.map((e) => e.type)).toEqual(['cancelled', 'cancelled']);
+    expect(plan.map((e) => e.type)).toEqual(['canceled', 'canceled']);
   });
 });
 
@@ -331,7 +331,7 @@ describe('review flags', () => {
     ]);
   });
 
-  it('flags new and existing lots, and skips orders cancelled in the app', async () => {
+  it('flags new and existing lots, and skips orders canceled in the app', async () => {
     const existing = await createHolding(
       db,
       userId,
@@ -344,7 +344,7 @@ describe('review flags', () => {
       { productId: existing.product.id },
       holdingInput({ acquiredFrom: 'SNKRDUNK', orderId: '3', acquiredAt: at('08-10') }),
     );
-    await markOrderCancelled(db, userId, gone.holding.id);
+    await markOrderCanceled(db, userId, gone.holding.id);
     const gathered = gatherReceipts([
       box('1', '08-01'),
       box('2', '08-05'),
@@ -355,7 +355,7 @@ describe('review flags', () => {
     expect(plan.map((e) => [e.receipt.orderId, e.type, e.flags])).toEqual([
       ['1', 'duplicate', ['no_delivery']],
       ['2', 'new', ['no_delivery']],
-      ['3', 'cancelledInApp', undefined],
+      ['3', 'canceledInApp', undefined],
     ]);
     const outcome = await applyImport(db, userId, importer, plan, new Map());
     expect(outcome).toMatchObject({ created: 1, flagged: 1 });

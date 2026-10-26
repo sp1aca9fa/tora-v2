@@ -40,7 +40,7 @@ import {
   type NewProduct,
   type Product,
   type User,
-  cancelledOrders,
+  canceledOrders,
   holdingEvents,
   holdings,
   manualPrices,
@@ -967,10 +967,10 @@ export async function deleteHolding(db: Db, userId: string, id: string): Promise
 }
 
 /**
- * The order was cancelled (e.g. by the buyer, which sends no email): removes every lot of that
+ * The order was canceled (e.g. by the buyer, which sends no email): removes every lot of that
  * order and remembers the ID so imports skip it. Refused when a lot has pulls logged from it.
  */
-export async function markOrderCancelled(
+export async function markOrderCanceled(
   db: Db,
   userId: string,
   holdingId: string,
@@ -998,23 +998,23 @@ export async function markOrderCancelled(
     await tx.delete(holdingEvents).where(inArray(holdingEvents.holdingId, ids));
     await tx.delete(holdings).where(inArray(holdings.id, ids));
     await tx
-      .insert(cancelledOrders)
+      .insert(canceledOrders)
       .values({ userId, orderSource: holding.orderSource, orderId: holding.orderId })
       .onConflictDoNothing();
     return { orderId: holding.orderId, removed: ids.length, productId: holding.productId };
   });
 }
 
-/** Order IDs of one source the user marked as cancelled. */
-export async function cancelledOrderIds(
+/** Order IDs of one source the user marked as canceled. */
+export async function canceledOrderIds(
   db: Db,
   userId: string,
   orderSource: string,
 ): Promise<Set<string>> {
   const rows = await db
-    .select({ orderId: cancelledOrders.orderId })
-    .from(cancelledOrders)
-    .where(and(eq(cancelledOrders.userId, userId), eq(cancelledOrders.orderSource, orderSource)));
+    .select({ orderId: canceledOrders.orderId })
+    .from(canceledOrders)
+    .where(and(eq(canceledOrders.userId, userId), eq(canceledOrders.orderSource, orderSource)));
   return new Set(rows.map((r) => r.orderId));
 }
 

@@ -736,8 +736,8 @@
     "confirmAll": "グレードなしで{count}枚を確定",
     "done": "{count}件を確定しました",
     "banner": "確認待ちのインポート購入が{count}件あります",
-    "cancelled": "この取引はキャンセル済み（削除する）",
-    "doneCancelled": "キャンセル済みの取引を{count}件削除しました",
+    "canceled": "この取引はキャンセル済み（削除する）",
+    "doneCanceled": "キャンセル済みの取引を{count}件削除しました",
     "reason": {
       "deadline_missed": "出品者が発送期限を過ぎました。この取引をキャンセルした場合は下のチェックを入れてください。",
       "no_delivery": "この商品の購入の一部にお届け完了メールがありません。キャンセルした取引なら下のチェックを入れてください。",
@@ -804,7 +804,7 @@
         "failed": "{count}件失敗",
         "corrected": "{count}件修正",
         "flagged": "{count}件要確認",
-        "cancelled": "{count}件キャンセル",
+        "canceled": "{count}件キャンセル",
         "unclassified": "{count}件分類不可",
         "left": "{count}件次回へ"
       },
@@ -916,9 +916,9 @@
         "like_entry_by_hand": "手入力の登録に似ているため対象外にしました",
         "differs_kept": "内容の違う登録があります。登録内容のままです",
         "unclassified": "どの商品か分かりません。手入力で登録してください",
-        "cancelled": "キャンセル",
-        "cancelled_in_app": "アプリでキャンセル済みにした注文",
-        "cancelled_registered": "メールではキャンセルですが登録されています。確認してください",
+        "canceled": "キャンセル",
+        "canceled_in_app": "アプリでキャンセル済みにした注文",
+        "canceled_registered": "メールではキャンセルですが登録されています。確認してください",
         "not_purchase": "購入ではありません",
         "not_collectible": "コレクション品ではありません",
         "corrected": "修正：{fields}"

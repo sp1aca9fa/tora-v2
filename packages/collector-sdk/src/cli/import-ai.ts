@@ -125,7 +125,7 @@ for (const s of plan.shops) {
               ? `registered with different ${entry.diffs.map((d) => d.field).join(' / ')}: kept as registered`
               : entry.type === 'unclassified'
                 ? 'could not tell what item this is: not imported'
-                : 'cancelled';
+                : 'canceled';
     console.log(
       `  ${localDate(new Date(r.orderedAt))}${r.dateApprox ? '?' : ' '} ${yen(r.total)}${r.quantity > 1 ? ` x${r.quantity}` : ''}  ${r.title}`,
     );
@@ -137,7 +137,7 @@ for (const s of plan.shops) {
 const skippedBy = (why: string) => plan.skipped.filter((s) => s.why === why);
 for (const [why, label] of [
   ['not_collectible', 'Not collectibles (left out)'],
-  ['cancelled', 'Cancelled or returned (left out)'],
+  ['canceled', 'Canceled or returned (left out)'],
 ] as const) {
   const list = skippedBy(why);
   if (list.length) {

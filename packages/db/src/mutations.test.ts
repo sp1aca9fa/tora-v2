@@ -21,10 +21,10 @@ import {
   markOpened,
   returnGrading,
   sellHolding,
-  cancelledOrderIds,
+  canceledOrderIds,
   confirmImportReview,
   flagForReview,
-  markOrderCancelled,
+  markOrderCanceled,
   setCardGrade,
   splitOff,
   submitGrading,
@@ -653,7 +653,7 @@ describe('confirmImportReview', () => {
   });
 });
 
-describe('cancelled orders and review flags', () => {
+describe('canceled orders and review flags', () => {
   const card = { product: { category: 'tcg' as const, kind: 'single' as const, name: 'ミュウ' } };
   const input = (orderId: string) => ({
     quantity: 3,
@@ -665,20 +665,20 @@ describe('cancelled orders and review flags', () => {
     rawGrade: 'A' as const,
   });
 
-  it('removes every lot of a cancelled order and remembers it', async () => {
+  it('removes every lot of a canceled order and remembers it', async () => {
     const lot = await createHolding(db, uid, card, input('900'));
     const part = await splitOff(db, uid, lot.holding.id, 1, day('09-02'));
     const other = await createHolding(db, uid, card, input('901'));
-    expect(await markOrderCancelled(db, uid, part.id)).toMatchObject({
+    expect(await markOrderCanceled(db, uid, part.id)).toMatchObject({
       orderId: '900',
       removed: 2,
     });
     const left = await db.select().from(holdings);
     expect(left.map((h) => h.id)).toEqual([other.holding.id]);
-    expect(await cancelledOrderIds(db, uid, 'snkrdunk')).toEqual(new Set(['900']));
-    // Lots without an order ID cannot be "cancelled orders".
+    expect(await canceledOrderIds(db, uid, 'snkrdunk')).toEqual(new Set(['900']));
+    // Lots without an order ID cannot be "canceled orders".
     const plain = await createHolding(db, uid, card, { ...input('x'), orderId: null });
-    await expectDomainError(markOrderCancelled(db, uid, plain.holding.id), 'invalid_input');
+    await expectDomainError(markOrderCanceled(db, uid, plain.holding.id), 'invalid_input');
   });
 
   it('flags a lot once per reason, even after it was confirmed', async () => {

@@ -736,8 +736,8 @@
     "confirmAll": "{count, plural, one {Confirm # card without grade} other {Confirm # cards without grade}}",
     "done": "{count, plural, one {Confirmed # item} other {Confirmed # items}}",
     "banner": "{count, plural, one {# imported purchase to review} other {# imported purchases to review}}",
-    "cancelled": "This order was canceled (remove it)",
-    "doneCancelled": "{count, plural, one {# canceled order removed} other {# canceled orders removed}}",
+    "canceled": "This order was canceled (remove it)",
+    "doneCanceled": "{count, plural, one {# canceled order removed} other {# canceled orders removed}}",
     "reason": {
       "deadline_missed": "The seller missed the shipping deadline: if you canceled this order, tick the box below.",
       "no_delivery": "Some purchases of this item have no delivery email: if this was one you canceled, tick the box below.",
@@ -804,7 +804,7 @@
         "failed": "{count, plural, one {# failed} other {# failed}}",
         "corrected": "{count, plural, one {# corrected} other {# corrected}}",
         "flagged": "{count, plural, one {# flagged for review} other {# flagged for review}}",
-        "cancelled": "{count, plural, one {# canceled} other {# canceled}}",
+        "canceled": "{count, plural, one {# canceled} other {# canceled}}",
         "unclassified": "{count, plural, one {# unclassified} other {# unclassified}}",
         "left": "{count, plural, one {# left for next time} other {# left for next time}}"
       },
@@ -916,9 +916,9 @@
         "like_entry_by_hand": "looks like an entry you added; you chose to skip it",
         "differs_kept": "registered with different details; kept as registered",
         "unclassified": "could not tell which item it is: add it by hand",
-        "cancelled": "canceled",
-        "cancelled_in_app": "marked as canceled in the app",
-        "cancelled_registered": "canceled per the emails, but registered: check it",
+        "canceled": "canceled",
+        "canceled_in_app": "marked as canceled in the app",
+        "canceled_registered": "canceled per the emails, but registered: check it",
         "not_purchase": "not a purchase",
         "not_collectible": "not a collectible",
         "corrected": "corrected: {fields}"

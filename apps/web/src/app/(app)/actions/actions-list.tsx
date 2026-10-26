@@ -389,10 +389,10 @@ function ReviewControls({ item, pending, run }: { item: ReviewItem; pending: boo
         <Button
           size="sm"
           disabled={pending}
-          variant={row.cancelled ? 'destructive' : 'default'}
+          variant={row.canceled ? 'destructive' : 'default'}
           onClick={confirm}
         >
-          {row.cancelled ? t('actions.removeLot') : t('actions.confirmLot')}
+          {row.canceled ? t('actions.removeLot') : t('actions.confirmLot')}
         </Button>
         <FormError state={error} />
       </div>

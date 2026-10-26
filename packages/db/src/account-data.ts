@@ -6,7 +6,7 @@ import { type Table, asc, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadSourceRegistry } from './registry';
 import {
-  cancelledOrders,
+  canceledOrders,
   holdingEvents,
   holdings,
   importRuns,
@@ -103,10 +103,7 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
     listings,
     importRuns: await db.select().from(importRuns).where(eq(importRuns.userId, userId)),
     purchaseLinks: await db.select().from(purchaseLinks).where(eq(purchaseLinks.userId, userId)),
-    cancelledOrders: await db
-      .select()
-      .from(cancelledOrders)
-      .where(eq(cancelledOrders.userId, userId)),
+    canceledOrders: await db.select().from(canceledOrders).where(eq(canceledOrders.userId, userId)),
   };
 }
 
@@ -186,14 +183,20 @@ export async function loadAccountData(
   const history = rowsOf(data, 'history');
   const manual = rowsOf(data, 'manualPrices');
   const watched = rowsOf(data, 'watches');
-  const runs = rowsOf(data, 'importRuns');
+  // Files saved before 2026-10-26 spell `cancelled` (the orders, an import's count).
+  const runs = rowsOf(data, 'importRuns').map((r) => {
+    const counts = r.counts as Record<string, number> | undefined;
+    if (!counts || !('cancelled' in counts)) return r;
+    const { cancelled, ...rest } = counts;
+    return { ...r, counts: { ...rest, canceled: cancelled } };
+  });
   const links = rowsOf(data, 'purchaseLinks');
-  const cancelled = rowsOf(data, 'cancelledOrders');
+  const canceled = [...rowsOf(data, 'canceledOrders'), ...rowsOf(data, 'cancelledOrders')];
 
   // New ids for the person's rows; any string equal to an old one (a lot's box, a split's other
   // side in its history) is renamed with it.
   const ids = new Map<string, string>();
-  for (const r of [...lots, ...history, ...manual, ...watched, ...runs, ...links, ...cancelled]) {
+  for (const r of [...lots, ...history, ...manual, ...watched, ...runs, ...links, ...canceled]) {
     ids.set(r.id as string, newId());
   }
   const rename = (value: unknown): unknown => {
@@ -294,8 +297,8 @@ export async function loadAccountData(
     );
     await insert(
       tx,
-      cancelledOrders,
-      cancelled.map((c) => own(cancelledOrders, c)),
+      canceledOrders,
+      canceled.map((c) => own(canceledOrders, c)),
     );
     const account = data.account as { preferences?: unknown; noticeLevels?: unknown } | null;
     if (account) {

@@ -44,8 +44,8 @@ export interface ShopPlan {
 
 export interface AiPlan {
   shops: ShopPlan[];
-  /** Rows not imported on purpose: not a purchase, not a collectible, or cancelled. */
-  skipped: { row: ExtractedRow; why: 'not_purchase' | 'not_collectible' | 'cancelled' }[];
+  /** Rows not imported on purpose: not a purchase, not a collectible, or canceled. */
+  skipped: { row: ExtractedRow; why: 'not_purchase' | 'not_collectible' | 'canceled' }[];
 }
 
 export async function planAiImport(
@@ -61,8 +61,8 @@ export async function planAiImport(
   for (const r of read.rows) {
     if (r.row.status === 'not_purchase') skipped.push({ row: r.row, why: 'not_purchase' });
     else if (!r.row.collectible) skipped.push({ row: r.row, why: 'not_collectible' });
-    else if (r.row.status === 'cancelled') {
-      skipped.push({ row: r.row, why: 'cancelled' });
+    else if (r.row.status === 'canceled') {
+      skipped.push({ row: r.row, why: 'canceled' });
       if (r.row.orderId) cancels.push(r.row);
     } else kept.push(r);
   }
@@ -86,7 +86,7 @@ export async function planAiImport(
     const importer = aiImporter(shop, mine, products, registry);
     const mails: ReceiptMail[] = [
       ...mine.map((r) => ({ kind: 'purchase' as const, receipt: r.receipt })),
-      // A cancelled order already registered is reported (never removed).
+      // A canceled order already registered is reported (never removed).
       ...cancels
         .filter((c) => shopKey(c.shop, registry) === shop)
         .map((c) => ({ kind: 'cancel' as const, orderId: c.orderId! })),
@@ -154,7 +154,7 @@ export async function applyAiImport(
       day: row.date,
     })),
   );
-  add('cancelled', plan.skipped.filter((s) => s.why === 'cancelled').length);
+  add('canceled', plan.skipped.filter((s) => s.why === 'canceled').length);
   add('skipped', plan.skipped.filter((s) => s.why === 'not_collectible').length);
 
   // Failed Mercari links whose item this import brought in (the order ID is the item ID).

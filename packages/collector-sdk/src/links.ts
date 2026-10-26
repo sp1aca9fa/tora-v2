@@ -174,9 +174,9 @@ export async function importPurchaseLinks(
           entry.type === 'conflict'
             ? 'Already registered with different data; kept as registered.'
             : 'Already registered.';
-      } else if (entry.type === 'cancelledInApp') {
+      } else if (entry.type === 'canceledInApp') {
         status = 'skipped';
-        message = 'You marked this order as cancelled.';
+        message = 'You marked this order as canceled.';
       } else {
         status = 'failed';
         message = 'Could not tell what product this is; add it by hand with its order ID.';

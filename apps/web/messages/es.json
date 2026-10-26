@@ -736,8 +736,8 @@
     "confirmAll": "{count, plural, one {Confirmar # carta sin grado} other {Confirmar # cartas sin grado}}",
     "done": "{count, plural, one {# artículo confirmado} other {# artículos confirmados}}",
     "banner": "{count, plural, one {# compra importada por revisar} other {# compras importadas por revisar}}",
-    "cancelled": "Este pedido se canceló (quitarlo)",
-    "doneCancelled": "{count, plural, one {# pedido cancelado quitado} other {# pedidos cancelados quitados}}",
+    "canceled": "Este pedido se canceló (quitarlo)",
+    "doneCanceled": "{count, plural, one {# pedido cancelado quitado} other {# pedidos cancelados quitados}}",
     "reason": {
       "deadline_missed": "El vendedor no envió a tiempo: si cancelaste este pedido, marca la casilla de abajo.",
       "no_delivery": "Algunas compras de este artículo no tienen correo de entrega: si esta fue una que cancelaste, marca la casilla de abajo.",
@@ -804,7 +804,7 @@
         "failed": "{count, plural, one {# falló} other {# fallaron}}",
         "corrected": "{count, plural, one {# corregido} other {# corregidos}}",
         "flagged": "{count, plural, one {# marcado para revisar} other {# marcados para revisar}}",
-        "cancelled": "{count, plural, one {# cancelado} other {# cancelados}}",
+        "canceled": "{count, plural, one {# cancelado} other {# cancelados}}",
         "unclassified": "{count, plural, one {# sin clasificar} other {# sin clasificar}}",
         "left": "{count, plural, one {# queda para la próxima vez} other {# quedan para la próxima vez}}"
       },
@@ -916,9 +916,9 @@
         "like_entry_by_hand": "parece una entrada que añadiste; elegiste saltarla",
         "differs_kept": "registrado con otros datos; se mantiene como estaba",
         "unclassified": "no se pudo saber qué artículo es: añádelo a mano",
-        "cancelled": "cancelado",
-        "cancelled_in_app": "marcado como cancelado en la app",
-        "cancelled_registered": "cancelado según los correos, pero registrado: revísalo",
+        "canceled": "cancelado",
+        "canceled_in_app": "marcado como cancelado en la app",
+        "canceled_registered": "cancelado según los correos, pero registrado: revísalo",
         "not_purchase": "no es una compra",
         "not_collectible": "no es un coleccionable",
         "corrected": "corregido: {fields}"

@@ -8,7 +8,7 @@ import {
   confirmImportReview,
   linksIn,
   deleteHolding,
-  markOrderCancelled,
+  markOrderCanceled,
   mergeImportedLots,
   removePurchaseLinks,
   retryPurchaseLinks,
@@ -18,7 +18,7 @@ import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
 import { type FormState, runDomain } from '@/lib/form';
 
-export type ReviewState = FormState & { done?: number; cancelled?: number };
+export type ReviewState = FormState & { done?: number; canceled?: number };
 
 const rowSchema = z.object({
   id: z.string().min(1).max(64),
@@ -34,8 +34,8 @@ const rowSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  /** The order was cancelled: remove its lots instead of confirming. */
-  cancelled: z.boolean().optional(),
+  /** The order was canceled: remove its lots instead of confirming. */
+  canceled: z.boolean().optional(),
   /** The same purchase as this other lot: merged into it (that one stays). */
   mergeInto: z.string().min(1).max(64).optional(),
 });
@@ -76,15 +76,15 @@ export async function confirmReviewAction(
   }
   const all = formData.get('mode') === 'all';
   const reviews: ImportReview[] = [];
-  const cancelled: string[] = [];
+  const canceled: string[] = [];
   // Merges into a lot that is itself merged away are left out (no chains or loops).
   const merges = rows.filter(
     (r) => r.mergeInto && !rows.some((o) => o.id === r.mergeInto && o.mergeInto),
   );
   for (const row of rows) {
     if (row.mergeInto) continue;
-    if (row.cancelled) {
-      cancelled.push(row.id);
+    if (row.canceled) {
+      canceled.push(row.id);
       continue;
     }
     let grade: CardGrade | null;
@@ -103,7 +103,7 @@ export async function confirmReviewAction(
       quantity: row.quantity ?? null,
     });
   }
-  if (reviews.length === 0 && cancelled.length === 0 && merges.length === 0) {
+  if (reviews.length === 0 && canceled.length === 0 && merges.length === 0) {
     return { error: 'noneGraded' };
   }
   const result = await runDomain(async () => {
@@ -113,12 +113,12 @@ export async function confirmReviewAction(
       const kept = reviews.find((r) => r.id === row.mergeInto);
       if (kept && dateTaken) kept.acquiredAt = null;
     }
-    // A cancelled order removes all its lots (several rows may share it): skip ones already gone.
+    // A canceled order removes all its lots (several rows may share it): skip ones already gone.
     // A lot without an order ID (e.g. read from a screenshot) is only removed.
     let removed = 0;
-    for (const id of cancelled) {
+    for (const id of canceled) {
       try {
-        await markOrderCancelled(db, user.id, id);
+        await markOrderCanceled(db, user.id, id);
         removed++;
       } catch (e) {
         if (e instanceof DomainError && e.code === 'invalid_input') {
@@ -127,7 +127,7 @@ export async function confirmReviewAction(
         } else if (!(e instanceof DomainError && e.code === 'not_found')) throw e;
       }
     }
-    return { done: await confirmImportReview(db, user.id, reviews), cancelled: removed };
+    return { done: await confirmImportReview(db, user.id, reviews), canceled: removed };
   });
   if (!result.ok) return result.state;
   revalidatePath('/', 'layout');
