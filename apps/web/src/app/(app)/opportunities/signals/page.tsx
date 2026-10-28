@@ -48,7 +48,7 @@ export default async function SignalsPage() {
   const table = ({ tests, product }: { tests: OpportunityTests; product: Product }) => {
     const keys = (Object.keys(tests.signals) as OpportunitySignal[]).sort();
     return (
-      <div key={groupLabel(t, product)} className="space-y-2">
+      <div key={groupLabel(t, product)} className="min-w-0 space-y-2">
         <h3 className="text-sm font-medium">
           {groupLabel(t, product)}{' '}
           <span className="font-normal text-muted-foreground">
