@@ -11,6 +11,7 @@ import {
   addWatch,
   getProduct,
   linkSets,
+  loadOpportunities,
   removeWatch,
   setPreferences,
   suggestFromKnownProducts,
@@ -96,6 +97,27 @@ export async function saveWatchAction(
 export async function removeWatchAction(watchId: string): Promise<void> {
   const { db, user } = await authed();
   await removeWatch(db, user.id, String(watchId).slice(0, 40));
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * The conditions Opportunities and the Buy plan suggest per item type (S27), from the strategy
+ * page; a type with every condition ticked is left out (all, also those added later).
+ */
+export async function saveConditionsAction(byType: Record<string, string[]>) {
+  const { db, user } = await authed();
+  const saved = await loadOpportunities(db);
+  const clean: Record<string, string[]> = { ...user.preferences?.suggestConditions };
+  for (const [type, buckets] of Object.entries(byType).slice(0, 40)) {
+    const known = new Set(
+      (saved?.items ?? []).filter((o) => o.itemType === type).map((o) => o.bucket),
+    );
+    if (!known.size || !Array.isArray(buckets)) continue;
+    const chosen = [...new Set(buckets.filter((b) => typeof b === 'string' && known.has(b)))];
+    if (chosen.length === known.size) delete clean[type];
+    else clean[type] = chosen;
+  }
+  await setPreferences(db, user.id, { suggestConditions: clean });
   revalidatePath('/', 'layout');
 }
 

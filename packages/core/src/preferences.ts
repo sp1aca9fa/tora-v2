@@ -40,6 +40,11 @@ export interface UserPreferences {
     /** When the person chose (the Watchlist asks until then). */
     chosenAt?: string;
   };
+  /**
+   * Per item type, the price conditions Opportunities and the Buy plan suggest (S27, Watchlist >
+   * Strategy); every condition when a type is not listed.
+   */
+  suggestConditions?: Record<string, string[]>;
   /** The stores watched for store notices (S25). */
   storeArea?: StoreArea;
   /** When each Now row (a location) was last opened, for its unread count (S25). */
@@ -66,6 +71,16 @@ export interface AlertPrefs {
   drops?: boolean;
   /** The messages' language (one of the admin's two); the app's primary when unset. */
   language?: string;
+}
+
+/** Whether a person wants items of a type in this price condition suggested (S27). */
+export function suggestsCondition(
+  prefs: UserPreferences | null | undefined,
+  itemType: string,
+  bucket: string,
+): boolean {
+  const chosen = prefs?.suggestConditions?.[itemType];
+  return !chosen || chosen.includes(bucket);
 }
 
 export function alertPrefs(prefs: UserPreferences | null | undefined) {

@@ -7,6 +7,7 @@ import {
   planStep,
   productClass,
   strategyOf,
+  suggestsCondition,
 } from '@tora/core';
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
@@ -52,6 +53,8 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
   const opportunities = saved ? withMarket(saved.items, saved.rules).adjusted : [];
   const ranked = new Map(opportunities.map((o) => [`${o.productId}|${o.bucket}`, o]));
   for (const o of opportunities) {
+    // Conditions the person doesn't want suggested stay out (their watches and plan still come in).
+    if (!suggestsCondition(user.preferences, o.itemType, o.bucket)) continue;
     if (worthALook(o)) add(o.productId, o.bucket, 'opportunity');
     // Every other item can come into a suggested mix.
     else if (!wanted.has(`${o.productId}|${o.bucket}`)) {

@@ -5,6 +5,7 @@
 import {
   type DayPrice,
   type OpportunityMember,
+  type ReprintHint,
   type OpportunityNumbers,
   type OpportunitySignal,
   type OpportunityTests,
@@ -20,6 +21,8 @@ import {
   judge,
   localDate,
   provenEdge,
+  suggestsCondition,
+  waitPrice,
   productClass,
   rankOpportunity,
   roleOf,
@@ -94,6 +97,7 @@ export async function refreshOpportunities(
   now = new Date(),
   save = true,
   rules: SignalRule[] = [],
+  reprintHints: ReprintHint[] = [],
 ): Promise<SavedOpportunities> {
   // The daily prices come from the packed item sales: any days still marked are updated first.
   await refreshItemSales(db, { marksOnly: true });
@@ -140,8 +144,23 @@ export async function refreshOpportunities(
         }
       }
     }
+    // Out of print or a reprint coming: the admin's mark, else a plug-in's guess (from always).
+    let hint: 'none' | 'likely' | null = null;
+    if (!p.reprint) {
+      for (const guess of reprintHints) {
+        try {
+          hint = guess(p);
+        } catch {
+          // A plug-in's error is no guess.
+        }
+        if (hint) break;
+      }
+    }
     memberOf.set(p.id, {
       id: p.id,
+      reprint: p.reprint
+        ? { status: p.reprint, since: p.reprintSince }
+        : hint && { status: hint, since: null },
       kind: p.kind,
       bucket: best.bucket,
       others,
@@ -351,6 +370,11 @@ export interface OpportunityCard extends Opportunity {
   /** The top of the person's buy zone (buy timing, their strategy), else their watch's target. */
   target: number | null;
   verdict: Verdict | null;
+  /**
+   * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
+   * lowered by that fall (S27).
+   */
+  wait: ReturnType<typeof waitPrice>;
   imageVersion: string | null;
   ranks: (RankView & { label: string })[];
 }
@@ -461,8 +485,11 @@ export async function opportunityCards(
   const saved = await loadOpportunities(db);
   if (!saved) return null;
   const { market, adjusted } = withMarket(saved.items, saved.rules);
+  // Only the conditions the person wants suggested for each type.
+  const keep = saved.items.map((o) => suggestsCondition(user.preferences, o.itemType, o.bucket));
   const summary: OpportunitySummary = { types: [], signals: {} };
-  for (const o of saved.items) {
+  for (const [i, o] of saved.items.entries()) {
+    if (!keep[i]) continue;
     let t = summary.types.find((x) => x.type === o.itemType);
     if (!t) summary.types.push((t = { type: o.itemType, items: 0, proven: 0 }));
     t.items++;
@@ -476,8 +503,8 @@ export async function opportunityCards(
       }
     }
   }
-  for (const o of adjusted) {
-    if (worthALook(o)) summary.types.find((x) => x.type === o.itemType)!.proven++;
+  for (const [i, o] of adjusted.entries()) {
+    if (keep[i] && worthALook(o)) summary.types.find((x) => x.type === o.itemType)!.proven++;
   }
   // The type with the most items worth a look first.
   summary.types.sort((a, b) => b.proven - a.proven || b.items - a.items);
@@ -487,6 +514,7 @@ export async function opportunityCards(
   // Filtered on the item's signals as saved: a market warning too.
   const list = adjusted.filter(
     (o, i) =>
+      keep[i] &&
       o.itemType === type &&
       (filter.signals ?? []).every(
         (k) => o.proven.includes(k) || saved.items[i]!.warnings.includes(k),
@@ -509,15 +537,19 @@ export async function opportunityCards(
     now,
   );
   const choice = strategyOf(user.preferences, type ?? '');
+  // The warnings as saved: the market's too.
+  const warned = new Map(saved.items.map((o) => [`${o.productId}|${o.bucket}`, o.warnings]));
   const ordered = list.map((o) => {
     const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
     const j = s ? judge(s, choice) : null;
     const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
+    const target = j?.zone.top ?? watch?.target ?? null;
     return {
       o,
       now: s?.fair ?? o.numbers.price,
-      target: j?.zone.top ?? watch?.target ?? null,
+      target,
       verdict: j?.verdict ?? null,
+      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target),
       watching: watched.some((w) => w.id === o.productId),
     };
   });

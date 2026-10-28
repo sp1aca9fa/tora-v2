@@ -89,8 +89,18 @@ try {
   // Without it the schedule counts days on the PC's clock.
 }
 // The plug-ins' source descriptions are saved first: the app reads them.
-const { collectors, importers, rates, sources, setCards, rankings, catalogs, signals, missing } =
-  await loadAndRegister(db);
+const {
+  collectors,
+  importers,
+  rates,
+  sources,
+  setCards,
+  rankings,
+  catalogs,
+  signals,
+  reprintHints,
+  missing,
+} = await loadAndRegister(db);
 // The plug-ins' set lists, when they or the admin's categories changed (S10).
 try {
   const synced = await syncCatalogs(db, catalogs);
@@ -387,7 +397,7 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   }
   // Opportunities (S13): every item's signals and their tests on each group's history.
   try {
-    opportunities = await refreshOpportunities(db, new Date(), true, signals);
+    opportunities = await refreshOpportunities(db, new Date(), true, signals, reprintHints);
   } catch (error) {
     console.log(`opportunities: stopped (${errorText(error)})`);
   }

@@ -120,7 +120,7 @@ export default async function WorthALookPage({
         {data.market.map((m) => (
           <div
             key={m.key}
-            className="max-w-3xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
+            className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
           >
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
               {t('opportunities.marketTitle', {
@@ -136,7 +136,10 @@ export default async function WorthALookPage({
           </div>
         ))}
         <p className="text-xs text-muted-foreground">
-          {t('opportunities.updated', { day: data.day })}
+          {t('opportunities.updated', { day: data.day })} ·{' '}
+          <Link href="/watchlist/strategy" className="underline">
+            {t('opportunities.chooseConditions')}
+          </Link>
         </p>
       </div>
       <OpportunityList
@@ -152,6 +155,7 @@ export default async function WorthALookPage({
           good: t('opportunities.goodNow'),
           watch: t('opportunities.watch'),
           noSignal: t('opportunities.noSignal'),
+          seeRecord: t('opportunities.seeRecord'),
         }}
       />
     </div>

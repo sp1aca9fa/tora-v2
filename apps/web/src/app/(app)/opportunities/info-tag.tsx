@@ -10,10 +10,13 @@ import { cn } from '@/lib/utils';
 export function InfoTag({
   label,
   className,
+  icon: Icon,
   children,
 }: {
   label: string;
   className?: string;
+  /** Drawn before the label (a warning's triangle). */
+  icon?: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -42,6 +45,7 @@ export function InfoTag({
           className,
         )}
       >
+        {Icon && <Icon className="mr-1 inline size-3" aria-hidden />}
         {label}
       </button>
       {open && (

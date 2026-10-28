@@ -200,6 +200,12 @@ export const products = sqliteTable(
     cardNumber: text('card_number'),
     rarity: text('rarity'),
     releaseDate: text('release_date'),
+    /**
+     * Whether it will be made or sold again (S27), set by an admin: `none` (out of print),
+     * `likely` (a reprint is coming); null unknown. Tested as signals from `reprintSince` on.
+     */
+    reprint: text('reprint').$type<'none' | 'likely'>(),
+    reprintSince: text('reprint_since'),
     retailPriceBase: integer('retail_price_base'),
     imageUrl: text('image_url'),
     notes: text('notes'),

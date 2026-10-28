@@ -7,6 +7,7 @@ import {
   provenEdge,
   rankOpportunity,
   signalsOn,
+  waitPrice,
 } from './opportunities';
 import type { DayPrice } from './signals';
 
@@ -221,5 +222,55 @@ describe('provenEdge and rankOpportunity', () => {
     expect(r.warnings).toEqual(['sales_down']);
     expect(r.unproven).toEqual(['leader']);
     expect(r.score).toBeCloseTo(78 / 96 - 0.6 + (44 / 117 - 0.6), 5);
+  });
+});
+
+describe('waitPrice', () => {
+  const test = (change: number | null) => ({ signals: 20, checked: 20, higher: 5, change });
+  const tests = {
+    day: '2026-10-28',
+    items: 10,
+    any: test(0.1),
+    signals: { line_falling: test(-0.13), sales_down: test(-0.2) },
+  };
+
+  it('lowers the target by the warning after which prices fell most', () => {
+    expect(waitPrice(['line_falling', 'sales_down'], tests, 10000)).toEqual({
+      key: 'sales_down',
+      change: -0.2,
+      under: 8000,
+    });
+  });
+
+  it('says nothing when no warning was followed by a fall', () => {
+    expect(waitPrice([], tests, 10000)).toBeNull();
+    expect(
+      waitPrice(['line_falling'], { ...tests, signals: { line_falling: test(0.02) } }, 10000),
+    ).toBeNull();
+  });
+
+  it('still says wait without a target', () => {
+    expect(waitPrice(['line_falling'], tests, null)?.under).toBeNull();
+  });
+});
+
+describe('out of print and reprints', () => {
+  const series = days('2025-01-01', 400, () => 10000);
+  const group = new OpportunityGroup([
+    { id: 'gone', line: null, release: null, series, reprint: { status: 'none', since: null } },
+    {
+      id: 'again',
+      line: null,
+      release: null,
+      series,
+      reprint: { status: 'likely', since: '2025-11-01' },
+    },
+  ]);
+  const n = numbers({ line84: null });
+
+  it('is on always for an item never made again, from its day for a reprint', () => {
+    expect(group.signals('gone', '2025-06-01', n)).toEqual(['out_of_print']);
+    expect(group.signals('again', '2025-10-31', n)).toEqual([]);
+    expect(group.signals('again', '2025-11-01', n)).toEqual(['reprint_coming']);
   });
 });

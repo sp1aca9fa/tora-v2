@@ -1829,6 +1829,7 @@
       "glossaryRemoved": "Code meaning removed",
       "glossaryHidden": "Code turned off",
       "glossaryShown": "Code turned back on",
+      "productReprint": "Reprint status set",
       "signalPicked": "Signal shown as admin's pick",
       "signalUnpicked": "Admin's pick stopped",
       "trackingHours": "Board tracker hours",
@@ -1931,7 +1932,9 @@
       "sales_down": "Sales slowing",
       "strong_for_age": "Strong for its age",
       "weak_for_age": "Weak for its age",
-      "quick_rise": "Quick rise"
+      "quick_rise": "Quick rise",
+      "out_of_print": "Out of print",
+      "reprint_coming": "Reprint coming"
     },
     "why": {
       "line_rising": "{Scope}: {line} over 12 weeks ({items} items).",
@@ -1942,7 +1945,9 @@
       "sales_down": "{sales30} sales in 30 days, {before} a month before.",
       "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
       "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
-      "quick_rise": "Its last 14 days: {jump} against the 60 days before."
+      "quick_rise": "Its last 14 days: {jump} against the 60 days before.",
+      "out_of_print": "Not expected to be made or sold again (marked by an admin, or a plug-in's guess).",
+      "reprint_coming": "A reprint is expected (marked by an admin)."
     },
     "scope": {
       "set": "its set",
@@ -1956,7 +1961,7 @@
     "pickOn": "Show as admin's pick",
     "pickOff": "Stop showing",
     "marketTitle": "A warning on nearly all {type}: {signal} ({on} of {of} items)",
-    "marketNote": "Buying while it was on did worse before. It is left off the cards below, which are ranked by what sets them apart.",
+    "marketNote": "Buying while it was on did worse before. The cards below are ranked by what sets them apart, and each says how much lower to buy to allow for it.",
     "rankLine": "#{rank} on {label} ({move})",
     "rankNew": "new",
     "rankSame": "same as a week ago",
@@ -2020,6 +2025,15 @@
     "toGo": "{pct} to go",
     "atTarget": "At target",
     "goodNow": "Good price now",
+    "chooseConditions": "Choose the conditions suggested",
+    "seeRecord": "See its record on Signals",
+    "bestTitle": "Best signals right now",
+    "bestLine": "higher 90 days later {pct} of {checked} times, {points} points vs any day",
+    "fewChecks": "few checks",
+    "wait": "Wait",
+    "waitUnder": "Wait, or under {price}",
+    "waitWhy": "{signal} is on. While it was, prices were typically {change} 90 days later: {price} (your target {target}, lowered by that) allows for it. The bar measures against it.",
+    "waitWhyNoTarget": "{signal} is on. While it was, prices were typically {change} 90 days later.",
     "noRankings": "No popularity rankings in the last 3 days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
     "showAll": "Show all {count}",
     "listingsN": "{n} listed",
@@ -2047,6 +2061,12 @@
     "first_sale": "First sale {date}"
   },
   "strategy": {
+    "conditionsTitle": "Conditions to suggest",
+    "conditionsIntro": "Per item type, the conditions Opportunities and the Buy plan suggest. Your watches and plan show whatever their condition.",
+    "conditionItems": "{count, plural, one {# item} other {# items}}",
+    "conditionsSave": "Save conditions",
+    "conditionsSaved": "Saved.",
+    "anyCondition": "Any condition",
     "title": "Buy strategy",
     "intro": "How Tora decides that a price is good to buy at. Pick one for each kind of item you watch or own; try each on the three examples first. A target price on a watch always counts too.",
     "suggestAll": "{count, plural, one {One kind of item uses} other {# kinds of item use}} Tora's suggestion until you choose.",
@@ -2186,6 +2206,14 @@
     "builtIn": "Built in",
     "others": "Other lines, one per line",
     "saved": "Saved."
+  },
+  "reprintField": {
+    "label": "Made or sold again?",
+    "unknown": "Unknown",
+    "none": "No: out of print",
+    "likely": "Yes: a reprint is coming",
+    "since": "Since (optional)",
+    "hint": "Admins. Opportunities tests it as a signal on past prices from that day (no day: always, for an item never meant to be made again). Left unknown, a plug-in may guess (a shop's own boxes)."
   },
   "lineField": {
     "label": "Set line",

@@ -13,8 +13,9 @@ export const OPPORTUNITY_SIGNALS = [
   'strong_for_age',
   'weak_for_age',
   'quick_rise',
+  'out_of_print',
 ] as const;
-export const OPPORTUNITY_WARNINGS = ['line_falling', 'sales_down'] as const;
+export const OPPORTUNITY_WARNINGS = ['line_falling', 'sales_down', 'reprint_coming'] as const;
 export type BuiltInSignal =
   (typeof OPPORTUNITY_SIGNALS)[number] | (typeof OPPORTUNITY_WARNINGS)[number];
 /** A built-in signal, or a signal plug-in's key (S27). */
@@ -55,6 +56,17 @@ export interface SignalItem {
    */
   price(bucket: string | null, days: number): number | null;
 }
+
+/**
+ * A plug-in's guess whether an item will be made or sold again (S27): `none` (out of print, such
+ * as a shop's own exclusive), `likely`, or null when it cannot tell. An admin's mark wins.
+ */
+export type ReprintHint = (item: {
+  name: string;
+  category: string;
+  kind: string;
+  franchise: string | null;
+}) => 'none' | 'likely' | null;
 
 /** A plug-in's signal as saved for the app, which cannot load plug-ins. */
 export type SignalRuleInfo = Pick<SignalRule, 'key' | 'label' | 'about' | 'warning'>;
@@ -103,6 +115,8 @@ export interface OpportunityMember {
   others?: Record<string, DayPrice[]>;
   release: string | null;
   series: DayPrice[];
+  /** Out of print, or a reprint coming (S27): an admin's mark or a plug-in's hint, from a day on. */
+  reprint?: { status: 'none' | 'likely'; since: string | null } | null;
 }
 
 /** The numbers behind an item's signals on one day. Fractions, not percents. */
@@ -230,9 +244,14 @@ export class OpportunityGroup {
   signals(id: string, day: string | number, n: OpportunityNumbers): OpportunitySignal[] {
     const on: OpportunitySignal[] = signalsOn(n);
     const item = this.items.get(id);
-    if (!item || !this.rules.length) return on;
+    if (!item) return on;
     const end = typeof day === 'number' ? day : dayNumber(day);
     const { member, s, others } = item;
+    const reprint = member.reprint;
+    if (reprint && (!reprint.since || dayNumber(reprint.since) <= end)) {
+      on.push(reprint.status === 'none' ? 'out_of_print' : 'reprint_coming');
+    }
+    if (!this.rules.length) return on;
     const studied = member.bucket ?? '';
     const view: SignalItem = {
       kind: member.kind ?? null,
@@ -467,4 +486,22 @@ export function rankOpportunity(
     if (edge !== null) score += edge;
   }
   return { proven, warnings, unproven, score };
+}
+
+/**
+ * Wait, or buy lower (S27): of an item's proven warnings, the one after which prices fell most
+ * (median 90 days later), and its target lowered by that fall, a price that allows for it.
+ */
+export function waitPrice(
+  warnings: readonly OpportunitySignal[],
+  tests: OpportunityTests | null | undefined,
+  target: number | null,
+): { key: OpportunitySignal; change: number; under: number | null } | null {
+  let worst: { key: OpportunitySignal; change: number } | null = null;
+  for (const key of warnings) {
+    const change = tests?.signals[key]?.change;
+    if (change != null && change < 0 && (!worst || change < worst.change)) worst = { key, change };
+  }
+  if (!worst) return null;
+  return { ...worst, under: target ? Math.round(target * (1 + worst.change)) : null };
 }

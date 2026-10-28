@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { editProductAction } from '@/app/(app)/holdings/[id]/actions';
 import { ActionForm } from '@/components/action-form';
 import { authed } from '@/lib/auth/guard';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NativeSelect } from '@/components/ui/native-select';
 import { franchiseLabel, lineLabel } from '@/lib/product-display';
@@ -78,6 +79,28 @@ export default async function EditProductPage({
               ))}
             </NativeSelect>
             <p className="text-xs text-muted-foreground">{t('lineField.hint')}</p>
+          </div>
+        )}
+        {user.role === 'admin' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="reprint">{t('reprintField.label')}</Label>
+              <NativeSelect id="reprint" name="reprint" defaultValue={product.reprint ?? ''}>
+                <option value="">{t('reprintField.unknown')}</option>
+                <option value="none">{t('reprintField.none')}</option>
+                <option value="likely">{t('reprintField.likely')}</option>
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reprintSince">{t('reprintField.since')}</Label>
+              <Input
+                id="reprintSince"
+                name="reprintSince"
+                type="date"
+                defaultValue={product.reprintSince ?? ''}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2">{t('reprintField.hint')}</p>
           </div>
         )}
       </ActionForm>

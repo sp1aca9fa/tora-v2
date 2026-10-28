@@ -10,9 +10,16 @@ import { type Product, opportunitiesFor, signalPicks } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { groupLabel, signalLabel, typeLabel } from '../cards';
+import Link from 'next/link';
+import { groupLabel, signalAnchor, signalLabel, typeLabel } from '../cards';
 import { CHIP } from '../opportunity-row';
 import { PickSignal } from '../pick-signal';
+
+interface Group {
+  group: string;
+  tests: OpportunityTests;
+  product: Product;
+}
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
@@ -37,25 +44,43 @@ export default async function SignalsPage() {
 
   /** Each group of a type with its tests. */
   const groups = (type: string) => {
-    const out = new Map<string, { tests: OpportunityTests; product: Product }>();
+    const out = new Map<string, Group>();
     for (const o of items) {
       if (o.itemType === type && o.tests && !out.has(o.group)) {
-        out.set(o.group, { tests: o.tests, product: o.product });
+        out.set(o.group, { group: o.group, tests: o.tests, product: o.product });
       }
     }
     return [...out.values()].filter((g) => g.tests.any.checked > 0);
   };
+  const all = types.flatMap((type) => groups(type));
+  // The signals that beat buying on any day by most, for the top of the page.
+  const best = all
+    .flatMap((g) =>
+      (Object.keys(g.tests.signals) as OpportunitySignal[]).flatMap((key) => {
+        const edge = provenEdge(g.tests, key, rules);
+        const rule = isBuiltInSignal(key) ? null : rules.find((x) => x.key === key);
+        const warning = rule
+          ? !!rule.warning
+          : (OPPORTUNITY_WARNINGS as readonly string[]).includes(key);
+        return edge !== null && !warning ? [{ g, key, edge }] : [];
+      }),
+    )
+    .sort((a, b) => b.edge - a.edge)
+    .slice(0, 3);
   const higher = (h: number, c: number) => (c ? pct(h / c) : '-');
-  const table = ({ tests, product }: { tests: OpportunityTests; product: Product }) => {
+  const table = ({ group, tests, product }: Group) => {
     const keys = (Object.keys(tests.signals) as OpportunitySignal[]).sort();
+    // Groups with a proven signal or warning open; the rest (few checks) folded.
+    const open = keys.some((k) => provenEdge(tests, k, rules) !== null);
     return (
-      <div key={groupLabel(t, product)} className="min-w-0 space-y-2">
-        <h3 className="text-sm font-medium">
+      <details key={group} open={open} className="group/g min-w-0 space-y-2">
+        <summary className="cursor-pointer text-sm font-medium">
           {groupLabel(t, product)}{' '}
           <span className="font-normal text-muted-foreground">
             {t('opportunities.group', { items: tests.items })}
+            {!open && <> · {t('opportunities.fewChecks')}</>}
           </span>
-        </h3>
+        </summary>
         <div className="overflow-x-auto rounded-xl border bg-card">
           <table className="w-full text-xs">
             <thead className="text-muted-foreground">
@@ -93,7 +118,9 @@ export default async function SignalsPage() {
                 return (
                   <tr
                     key={key}
+                    id={signalAnchor(group, key)}
                     className={cn(
+                      'scroll-mt-20 target:bg-amber-500/10',
                       'border-b last:border-0',
                       // Too few checks to read anything into.
                       r.checked < PROVEN_MIN_CHECKS && 'text-muted-foreground',
@@ -143,17 +170,60 @@ export default async function SignalsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     );
   };
 
   return (
     <div className="space-y-6">
       <p className="max-w-3xl text-xs text-muted-foreground">{t('opportunities.recordsIntro')}</p>
+      {best.length > 0 && (
+        <section className="space-y-1.5 rounded-xl border bg-card px-4 py-3">
+          <h2 className="text-sm font-semibold">{t('opportunities.bestTitle')}</h2>
+          <ul className="space-y-1 text-sm">
+            {best.map(({ g, key }) => {
+              const r = g.tests.signals[key]!;
+              return (
+                <li key={`${g.group}|${key}`}>
+                  <Link href={`#${signalAnchor(g.group, key)}`} className="hover:underline">
+                    <span className="font-medium">{signalLabel(t, key, rules)}</span> ·{' '}
+                    {groupLabel(t, g.product)}
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {': '}
+                    {t('opportunities.bestLine', {
+                      pct: higher(r.higher, r.checked),
+                      checked: r.checked,
+                      points: signedPoints(
+                        r.higher / r.checked - g.tests.any.higher / g.tests.any.checked,
+                      ),
+                    })}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      {types.length > 1 && (
+        <nav className="flex flex-wrap gap-2 text-xs">
+          {types.map((type) =>
+            groups(type).length ? (
+              <a
+                key={type}
+                href={`#type-${type}`}
+                className="rounded-full border px-3 py-1 hover:bg-accent"
+              >
+                {typeLabel(t, type)}
+              </a>
+            ) : null,
+          )}
+        </nav>
+      )}
       {types.map((type) => {
         const list = groups(type);
         return list.length ? (
-          <section key={type} className="space-y-3">
+          <section key={type} id={`type-${type}`} className="scroll-mt-20 space-y-3">
             <h2 className="font-semibold">{typeLabel(t, type)}</h2>
             <div className="gap-4 xl:columns-2 min-[1800px]:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
               {list.map(table)}

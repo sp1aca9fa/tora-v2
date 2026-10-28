@@ -477,6 +477,13 @@
       "when": 1793028077030,
       "tag": "0067_drop_cancelled_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "6",
+      "when": 1793188614144,
+      "tag": "0068_product_reprint",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import type {
   CatalogSetEntry,
   CodeMeaning,
+  ReprintHint,
   SignalRule,
   SourceInfo,
   SuggestedRates,
@@ -355,4 +356,6 @@ export interface CollectorModule {
    * built-in signals (docs/opportunities.md).
    */
   signals?: SignalRule[];
+  /** Guesses whether items will be reprinted (S27), until an admin marks them. */
+  reprintHints?: ReprintHint[];
 }

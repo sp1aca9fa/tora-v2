@@ -28,6 +28,8 @@ import {
   updateProduct,
   linkSets,
   setProductLine,
+  setProductReprint,
+  recordAdminChange,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -286,6 +288,21 @@ export async function editProductAction(
       // The set line picked by hand, or automatic (S9).
       if (formData.has('line')) {
         await setProductLine(db, session.user, productId, String(formData.get('line')) || null);
+      }
+      // Out of print or a reprint coming (S27): admins.
+      if (formData.has('reprint') && session.user.role === 'admin') {
+        const value = String(formData.get('reprint'));
+        const reprint = value === 'none' || value === 'likely' ? value : null;
+        const since = String(formData.get('reprintSince') ?? '') || null;
+        if (await setProductReprint(db, session.user, productId, reprint, since)) {
+          await recordAdminChange(
+            db,
+            session.user.id,
+            'productReprint',
+            { name: product.name, reprint: reprint ?? 'unknown', since: since ?? '' },
+            `/products/${productId}`,
+          );
+        }
       }
       return product;
     },

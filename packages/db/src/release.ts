@@ -263,6 +263,27 @@ export async function setProductLine(
 }
 
 /**
+ * Marks an item out of print or with a reprint coming (S27; null: unknown), from a day on (null:
+ * always, for an item never meant to be made again). Admins only. Whether it changed.
+ */
+export async function setProductReprint(
+  db: Db,
+  actor: Pick<User, 'role'>,
+  productId: string,
+  reprint: 'none' | 'likely' | null,
+  since: string | null,
+): Promise<boolean> {
+  if (actor.role !== 'admin') throw new DomainError('forbidden');
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw new DomainError('invalid_input');
+  const [product] = await db.select().from(products).where(eq(products.id, productId));
+  if (!product) throw new DomainError('not_found');
+  const next = { reprint, reprintSince: reprint ? since : null };
+  if (product.reprint === next.reprint && product.reprintSince === next.reprintSince) return false;
+  await db.update(products).set(next).where(eq(products.id, productId));
+  return true;
+}
+
+/**
  * Each item's set line: set by hand, else (Pokemon) what its catalog set's official title or its
  * own name says (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); only lines on the
  * admin's list.

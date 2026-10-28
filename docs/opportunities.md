@@ -18,11 +18,19 @@ past prices only and is never a sure thing.
     ranks and signals as tags (a tap opens why a signal is on and its record), the price now
     against a target (the top of the person's buy zone from [Buy timing](buy-timing.md), else
     their watch's target) and how far, a listing well under the price, a shop buy price near it,
-    and Watch.
+    and Watch (an icon by the name). The price bar's color: green at or under the target, blue
+    within 10 %, red 30 % or more over it, amber while a warning says wait. With a proven warning
+    on (the market's too) after which prices fell, the card says **Wait, or under** a price: the
+    target lowered by the warning's typical change 90 days later on the group's past prices (a
+    tap says why), and the bar and "to go" measure against it. A signal tag links to its row on
+    Signals. Only the conditions the person wants suggested for each type show (Watchlist >
+    Strategy, "Conditions to suggest"; every condition until chosen); the Buy plan follows it,
+    and the person's watches and plan show whatever their condition.
   - **Popular now** (`/opportunities/popular`): each ranking with pictures and links, the first
     10 shown, the rest on demand.
-  - **Signals** (`/opportunities/signals`): each group's signals and their record against buying
-    on any day, per item type.
+  - **Signals** (`/opportunities/signals`): the three signals that beat buying on any day by most,
+    links to each item type, then each group's signals and their record against buying on any
+    day; groups with nothing proven are folded ("few checks"), rows under 10 checks greyed.
   - **Buy plan** (`/opportunities/plan`): the budget and date below.
 - **MCP** (`opportunities`): the same list for a Claude chat.
 
@@ -68,17 +76,18 @@ days on any source. A single's line is its own set when 5 or more of the set's s
 prices, else its set line, else the whole group.
 
 A warning on for 80 % or more of an item type's items (5 or more) is the market's: Worth a look
-says it once above the list, with its record, and leaves it out of each card and of the order, so
-items are ranked by what sets them apart.
+says it once above the list, with its record, and leaves it out of the order, so items are ranked
+by what sets them apart; each card still says how much lower to buy for it (Wait, or under).
 
-| Signal                               | On when                                                                                                                                                  |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Line rising / falling (warning)      | The median 12-week change of the item's line (5+ items; else the whole group) is +10 % or more / -10 % or less                                           |
-| Leads its line                       | The item's 12-week change is 15 points or more above its line's                                                                                          |
-| Lags a rising line                   | The line is rising and the item is 15 points or more under it                                                                                            |
-| Sales picking up / slowing (warning) | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |
-| Quick rise                           | The last 14 days' price is 20 % or more above the 60 days before                                                                                         |
-| Strong / weak for its age            | The item's last 90 days are 20 points above / under similar items' at the same age since release (3+ items; day 120 to 3 years; real release dates only) |
+| Signal                                  | On when                                                                                                                                                  |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Line rising / falling (warning)         | The median 12-week change of the item's line (5+ items; else the whole group) is +10 % or more / -10 % or less                                           |
+| Leads its line                          | The item's 12-week change is 15 points or more above its line's                                                                                          |
+| Lags a rising line                      | The line is rising and the item is 15 points or more under it                                                                                            |
+| Sales picking up / slowing (warning)    | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |
+| Quick rise                              | The last 14 days' price is 20 % or more above the 60 days before                                                                                         |
+| Out of print / Reprint coming (warning) | An admin marked the item not to be made again / a reprint expected, from the day given (none: always); unmarked, a plug-in may guess (`reprintHints`)    |
+| Strong / weak for its age               | The item's last 90 days are 20 points above / under similar items' at the same age since release (3+ items; day 120 to 3 years; real release dates only) |
 
 Facts, not tested: the lowest ask on the same site as the prices, 15-50 % under the recent price
 (another site's cheapest listing, or one under half the price, is too often something else), and

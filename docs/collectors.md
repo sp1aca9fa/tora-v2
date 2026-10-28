@@ -375,6 +375,17 @@ export const signals: SignalRule[] = [
 ];
 ```
 
+Plug-ins can also guess whether an item will be made again (`reprintHints`, `ReprintHint` in the
+same file), for items an admin hasn't marked on the item's edit page: `'none'` (out of print),
+`'likely'`, or null. Tora tests "Out of print" like any signal.
+
+```ts
+export const reprintHints: ReprintHint[] = [
+  // A shop's own exclusive boxes are not made again.
+  (item) => (item.kind === 'special_set' && /Megastore exclusive/.test(item.name) ? 'none' : null),
+];
+```
+
 The public package ships this one (`collectors-public/src/signals.ts`) as an example. Prefer
 rules with a reason behind them, and let the tests judge them: a rule tried in many variants
 until one looks proven is likely to have found luck in the past, not a pattern. Asking an AI

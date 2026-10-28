@@ -43,6 +43,10 @@ export function cleanFilter(f: {
   };
 }
 
+/** Within 10 % of the target: close (blue); 30 % or more over it: too high (red). */
+const CLOSE = 0.1;
+const TOO_HIGH = 0.3;
+
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
 
@@ -70,6 +74,10 @@ export function signalLabel(t: T, key: OpportunitySignal, rules: readonly Signal
     ? t(`opportunities.signal.${key}`)
     : (rules.find((r) => r.key === key)?.label ?? key);
 }
+
+/** A signal's row on the Signals page, to link to (S27). */
+export const signalAnchor = (group: string, key: string) =>
+  `s-${group}-${key}`.replace(/[\s|#:/?]+/g, '-');
 
 /** A signal's record on its group's past prices, as a sentence. */
 export function recordText(t: T, tests: OpportunityTests | null, key: OpportunitySignal) {
@@ -137,7 +145,10 @@ function rowOf(
       .filter((key) => !o.picked.includes(key))
       .map((key) => ({ key, style: 'unproven' as const })),
   ];
-  const over = o.now !== null && o.target ? o.now / o.target - 1 : null;
+  // With a warning on, measured against the target lowered for it.
+  const goal = o.wait ? o.wait.under : o.target;
+  const over = o.now !== null && goal ? o.now / goal - 1 : null;
+  const warning = o.wait && signalLabel(t, o.wait.key, rules);
   return {
     productId: o.productId,
     href: `/products/${o.productId}/buy${o.bucket ? `?condition=${encodeURIComponent(o.bucket)}` : ''}`,
@@ -167,7 +178,38 @@ function rowOf(
           ? t('opportunities.atTarget')
           : t('opportunities.toGo', { pct: pct(over) }),
     reach: over === null ? null : Math.min(1, 1 / (1 + Math.max(0, over))),
-    good: o.verdict === 'good',
+    tone: o.wait
+      ? over !== null && over <= 0
+        ? 'at'
+        : 'wait'
+      : over === null
+        ? 'mid'
+        : over <= 0
+          ? 'at'
+          : over <= CLOSE
+            ? 'close'
+            : over >= TOO_HIGH
+              ? 'over'
+              : 'mid',
+    wait:
+      o.wait && warning
+        ? {
+            label:
+              o.wait.under !== null
+                ? t('opportunities.waitUnder', { price: money(o.wait.under) })
+                : t('opportunities.wait'),
+            why: t(
+              o.wait.under !== null ? 'opportunities.waitWhy' : 'opportunities.waitWhyNoTarget',
+              {
+                signal: warning,
+                change: signed(o.wait.change),
+                price: o.wait.under !== null ? money(o.wait.under) : '-',
+                target: o.target ? money(o.target) : '-',
+              },
+            ),
+          }
+        : null,
+    good: o.verdict === 'good' && (!o.wait || (over !== null && over <= 0)),
     askUnder:
       o.askUnder && o.ask && n.price
         ? t('opportunities.askUnder', {
@@ -184,6 +226,7 @@ function rowOf(
       style,
       label: signalLabel(t, key, rules),
       why: why(key),
+      href: `/opportunities/signals#${signalAnchor(o.group, key)}`,
       record:
         style === 'pick'
           ? `${t('opportunities.pickTag')}: ${recordText(t, o.tests, key)}`
