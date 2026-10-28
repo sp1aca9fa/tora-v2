@@ -13,7 +13,7 @@ import { OpportunityList } from './opportunity-list';
 export default async function WorthALookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; signal?: string }>;
+  searchParams: Promise<{ type?: string; signal?: string; q?: string }>;
 }) {
   const { db, user } = await authed();
   const filter = cleanFilter(await searchParams);
@@ -21,14 +21,14 @@ export default async function WorthALookPage({
   if (!data?.type) {
     return (
       <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-        {t('opportunities.none')}
+        {filter.q ? t('opportunities.search.none', { q: filter.q }) : t('opportunities.none')}
       </p>
     );
   }
   const type = data.type;
   const signals = data.summary.signals[type] ?? [];
   const href = (q: { type: string; signals?: string[] }) =>
-    `/opportunities?type=${encodeURIComponent(q.type)}${q.signals?.length ? `&signal=${q.signals.join(',')}` : ''}`;
+    `/opportunities?type=${encodeURIComponent(q.type)}${q.signals?.length ? `&signal=${q.signals.join(',')}` : ''}${filter.q ? `&q=${encodeURIComponent(filter.q)}` : ''}`;
   /** The chosen signals with this one added, or taken out. */
   const toggled = (key: string) =>
     filter.signals.some((k) => k === key)
@@ -143,12 +143,12 @@ export default async function WorthALookPage({
         </p>
       </div>
       <OpportunityList
-        key={`${type}|${filter.signals.join()}`}
+        key={`${type}|${filter.signals.join()}|${filter.q ?? ''}`}
         initial={data.rows}
         total={data.total}
         proven={data.proven}
         picked={data.picked}
-        filter={{ type, signals: filter.signals }}
+        filter={{ type, signals: filter.signals, q: filter.q }}
         labels={{
           now: t('opportunities.now'),
           target: t('opportunities.target'),

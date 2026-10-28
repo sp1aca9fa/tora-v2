@@ -1,4 +1,10 @@
-import type { Category, HoldingStatus, ProductKind, Region } from '@tora/core';
+import {
+  type Category,
+  type HoldingStatus,
+  type ProductKind,
+  type Region,
+  nameSearch,
+} from '@tora/core';
 import {
   type SQL,
   and,
@@ -166,6 +172,36 @@ export async function searchProducts(
     )
     .orderBy(desc(products.releaseDate), asc(products.name))
     .limit(options.limit ?? 20);
+}
+
+/**
+ * Of these products, the ones a name search finds (S27, Opportunities): every word in the name,
+ * alias or set name, romaji finding katakana (core `nameSearch`). Null without a search.
+ */
+export async function matchingProducts(
+  db: Pick<Db, 'select'>,
+  ids: string[],
+  q: string | null | undefined,
+): Promise<Set<string> | null> {
+  const match = nameSearch(q ?? '');
+  if (!match) return null;
+  const found = new Set<string>();
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 5000) {
+    const rows = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        alias: products.nameAlias,
+        set: products.setName,
+      })
+      .from(products)
+      .where(inArray(products.id, unique.slice(i, i + 5000)));
+    for (const r of rows) {
+      if (match([r.name, r.alias, r.set].filter(Boolean).join(' '))) found.add(r.id);
+    }
+  }
+  return found;
 }
 
 /**

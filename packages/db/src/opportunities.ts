@@ -34,6 +34,7 @@ import {
 import { and, eq, gte, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { imageVersions } from './images';
+import { matchingProducts } from './queries';
 import { refreshItemSales } from './item-sales';
 import { type RankView, latestRanks, rankingLabels } from './rankings';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
@@ -453,7 +454,7 @@ export interface ItemView {
   verdict: Verdict | null;
   /**
    * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
-   * (else the price now) lowered by that fall (S27).
+   * (else the price now) lowered by that fall, never under `low` (S27).
    */
   wait: ReturnType<typeof waitPrice>;
   /** The past year's cheapest tenth of days: at or under this on 1 day in 10. */
@@ -498,7 +499,12 @@ async function itemViews(
       chosen: !!user.preferences?.buyStrategy?.byType[o.itemType],
       verdict: j?.verdict ?? null,
       // Without a target, today's price lowered.
-      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target ?? price),
+      wait: waitPrice(
+        warned.get(`${o.productId}|${o.bucket}`) ?? [],
+        o.tests,
+        target ?? price,
+        s?.q10d365 ?? null,
+      ),
       low: s?.q10d365 ?? null,
       watching: watched.some((w) => w.id === o.productId),
     };
@@ -543,7 +549,7 @@ const gap = (c: { now: number | null; target: number | null }) =>
 export async function opportunityCards(
   db: Db,
   user: Pick<User, 'id' | 'preferences'>,
-  filter: { type: string | null; signals?: OpportunitySignal[] },
+  filter: { type: string | null; signals?: OpportunitySignal[]; q?: string | null },
   offset: number,
   limit: number,
   now = new Date(),
@@ -569,8 +575,17 @@ export async function opportunityCards(
   const saved = await loadOpportunities(db);
   if (!saved) return null;
   const { market, adjusted } = withMarket(saved.items, saved.rules);
-  // Only the conditions the person wants suggested for each type.
-  const keep = saved.items.map((o) => suggestsCondition(user.preferences, o.itemType, o.bucket));
+  // Only the conditions the person wants suggested for each type, and the names searched for.
+  const found = await matchingProducts(
+    db,
+    saved.items.map((o) => o.productId),
+    filter.q,
+  );
+  const keep = saved.items.map(
+    (o) =>
+      suggestsCondition(user.preferences, o.itemType, o.bucket) &&
+      (!found || found.has(o.productId)),
+  );
   const summary: OpportunitySummary = { types: [], signals: {} };
   for (const [i, o] of saved.items.entries()) {
     if (!keep[i]) continue;

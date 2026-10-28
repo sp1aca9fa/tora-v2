@@ -33,6 +33,17 @@ export function suggestedStrategy(itemType: string): StrategyChoice {
 export const RANGE_MIN_DAYS = { 180: 10, 365: 20 } as const;
 /** A fall this fast over 2 weeks (and still down over 4) means "wait". */
 export const FALLING_2W = -0.05;
+/**
+ * Cheap and steadying (S27): the price in the cheapest 30 % of the past year's daily prices (from
+ * 300+ days of prices), and its fall paused (the last 14 days' median at least -2 % against the 30
+ * days before). A falling line or market then does not count against the item: in the past such
+ * items rose about as often as on any day.
+ */
+export const CHEAP_YEAR = 0.3;
+export const YEAR_MIN_DAYS = 300;
+export const HELD_2W = -0.02;
+export const cheapSteady = (year: number | null | undefined, hold14: number | null | undefined) =>
+  year != null && year <= CHEAP_YEAR && hold14 != null && hold14 >= HELD_2W;
 /** The new-set pattern: how far ahead it looks and how many similar items it needs. */
 export const PATTERN_HORIZON = 90;
 export const PATTERN_MIN_ITEMS = 3;
@@ -75,6 +86,13 @@ export interface SignalStats {
   trend14: number | null;
   trend28: number | null;
   trend84: number | null;
+  /** The last 14 days' median price against the 30 days before them; missing on older rows. */
+  hold14?: number | null;
+  /**
+   * Share of the past year's daily prices at or under fair value (0: its cheapest), from 300+
+   * days of prices; missing on older rows.
+   */
+  year365?: number | null;
   /** The lowest ask now in this condition, per unit. */
   ask: number | null;
   /** Days since release (S9 part 3's release date), and where that date came from. */
@@ -177,7 +195,28 @@ export function seriesStats(
     trend14: fittedChange(series, end, 14),
     trend28: fittedChange(series, end, 28),
     trend84: fittedChange(series, end, 84),
+    hold14: held(series, end),
+    year365:
+      value !== null &&
+      d365.length >= RANGE_MIN_DAYS[365] &&
+      dayNumber(series[0]!.day) <= end - YEAR_MIN_DAYS
+        ? p365.filter((p) => p <= value).length / p365.length
+        : null,
   };
+}
+
+/** The last 14 days' median price against the 30 days before them (2+ days each), else null. */
+function held(series: DayPrice[], end: number): number | null {
+  const prices = (from: number, to: number) =>
+    series
+      .filter((p) => {
+        const d = dayNumber(p.day);
+        return d > end - from && d <= end - to;
+      })
+      .map((p) => p.price);
+  const recent = prices(14, 0);
+  const before = prices(44, 14);
+  return recent.length >= 2 && before.length >= 2 ? median(recent)! / median(before)! - 1 : null;
 }
 
 /** The typical price around a day (±7 days), from at least 2 days with sales. */
@@ -298,6 +337,8 @@ export interface Judgement {
   falling: boolean;
   /** Similar items as a group are down over 15 % in 12 weeks. */
   marketFalling: boolean;
+  /** Cheap for its year and its fall paused: the market's fall does not make it wait. */
+  cheapSteady: boolean;
   /**
    * A new release (a real release date) younger than the age similar items usually hit their
    * low at (else 90 days): wait, new releases often drop in their first months.
@@ -319,6 +360,7 @@ export function judge(stats: SignalStats, choice: StrategyChoice): Judgement {
   const zone = buyZone(stats, choice);
   const falling = isFalling(stats);
   const marketFalling = !!stats.market && stats.market.change84 < MARKET_FALLING_12W;
+  const steady = cheapSteady(stats.year365, stats.hold14);
   const limited: Judgement['limited'] = [];
   if (stats.sales30 < 3) limited.push('few_sales');
   if (stats.q25d180 === null) limited.push('short_range');
@@ -328,12 +370,21 @@ export function judge(stats: SignalStats, choice: StrategyChoice): Judgement {
     stats.ageDays !== null &&
     (stats.releaseFrom === 'set' || stats.releaseFrom === 'item') &&
     stats.ageDays < waitDays;
-  const base = { zone, falling, marketFalling, newRelease, waitDays, limited, askInZone };
+  const base = {
+    zone,
+    falling,
+    marketFalling,
+    cheapSteady: steady,
+    newRelease,
+    waitDays,
+    limited,
+    askInZone,
+  };
   if (stats.fair === null) return { verdict: 'none', ...base };
   if (zone.top !== null && stats.fair <= zone.top) {
-    // A fall of the item or of its whole market waits, and so does a new release, except for
-    // Catch the dip (it warns).
-    const wait = (falling || marketFalling || newRelease) && choice.strategy !== 'dip';
+    // A fall of the item or of its whole market (unless the item is cheap and its fall paused)
+    // waits, and so does a new release, except for Catch the dip (it warns).
+    const wait = (falling || (marketFalling && !steady) || newRelease) && choice.strategy !== 'dip';
     return { verdict: wait ? 'wait' : 'good', ...base };
   }
   if (stats.q75d180 !== null && stats.fair > stats.q75d180) return { verdict: 'high', ...base };

@@ -2,7 +2,7 @@
 // similar items, from the prices already collected, each tested on the group's past prices. Only
 // a signal that beat buying on any day ranks items; the others are shown as not tested yet.
 import { median } from './market';
-import type { DayPrice } from './signals';
+import { type DayPrice, RANGE_MIN_DAYS, YEAR_MIN_DAYS, cheapSteady } from './signals';
 
 /** Signals that point to a buy, and warnings against one. */
 export const OPPORTUNITY_SIGNALS = [
@@ -14,6 +14,7 @@ export const OPPORTUNITY_SIGNALS = [
   'weak_for_age',
   'quick_rise',
   'out_of_print',
+  'cheap_steady',
 ] as const;
 export const OPPORTUNITY_WARNINGS = ['line_falling', 'sales_down', 'reprint_coming'] as const;
 export type BuiltInSignal =
@@ -139,6 +140,13 @@ export interface OpportunityNumbers {
   age: { days: number; change: number; typical: number; items: number } | null;
   /** The last 14 days' price against the 60 days before them (null without both). */
   jump14?: number | null;
+  /** The last 14 days' price against the 30 days before them (null without both). */
+  hold14?: number | null;
+  /**
+   * Share of the past year's daily prices at or under the price (0: its cheapest), from 300+ days
+   * of prices; null with fewer.
+   */
+  year?: number | null;
 }
 
 const DAY = 86_400_000;
@@ -181,6 +189,14 @@ class Indexed {
   around(day: number): number | null {
     const [a, b] = this.range(day - 7, day + 7);
     return b - a >= 2 ? median(this.y.slice(a, b)) : null;
+  }
+  /** Share of the daily prices from `from` to `to` at or under `price` (`min` days or more). */
+  share(from: number, to: number, price: number, min: number): number | null {
+    const [a, b] = this.range(from, to);
+    if (b - a < min) return null;
+    let n = 0;
+    for (let i = a; i < b; i++) if (this.y[i]! <= price) n++;
+    return n / (b - a);
   }
   sales(from: number, to: number): number {
     const [a, b] = this.range(from, to);
@@ -349,6 +365,15 @@ export class OpportunityGroup {
         const before = s.price(end - 14, 60);
         return recent && before ? recent / before - 1 : null;
       })(),
+      hold14: (() => {
+        const recent = s.price(end, 14);
+        const before = s.price(end - 14, 30);
+        return recent && before ? recent / before - 1 : null;
+      })(),
+      year:
+        price !== null && s.first! <= end - YEAR_MIN_DAYS
+          ? s.share(end - 364, end, price, RANGE_MIN_DAYS[365])
+          : null,
     };
   }
 
@@ -401,12 +426,16 @@ export class OpportunityGroup {
   }
 }
 
-/** The signals on, from an item's numbers. */
+/**
+ * The signals on, from an item's numbers. A falling line is not held against an item cheap for
+ * its year whose fall paused (S27).
+ */
 export function signalsOn(n: OpportunityNumbers): OpportunitySignal[] {
   const on: OpportunitySignal[] = [];
   const line = n.line84?.change ?? null;
+  const cheap = cheapSteady(n.year, n.hold14);
   if (line !== null && line >= LINE_MOVE) on.push('line_rising');
-  if (line !== null && line <= -LINE_MOVE) on.push('line_falling');
+  if (line !== null && line <= -LINE_MOVE && !cheap) on.push('line_falling');
   if (line !== null && n.own84 !== null) {
     if (n.own84 >= line + AGAINST_LINE) on.push('leader');
     if (line >= LINE_MOVE && n.own84 <= line - AGAINST_LINE) on.push('laggard');
@@ -423,6 +452,7 @@ export function signalsOn(n: OpportunityNumbers): OpportunitySignal[] {
     if (n.age.change <= n.age.typical - AGAINST_AGE) on.push('weak_for_age');
   }
   if ((n.jump14 ?? 0) >= QUICK_RISE) on.push('quick_rise');
+  if (cheap) on.push('cheap_steady');
   return on;
 }
 
@@ -490,18 +520,22 @@ export function rankOpportunity(
 
 /**
  * Wait, or buy lower (S27): of an item's proven warnings, the one after which prices fell most
- * (median 90 days later), and its target lowered by that fall, a price that allows for it.
+ * (median 90 days later), and its target lowered by that fall, a price that allows for it. Never
+ * under the past year's cheapest tenth (`low`): it would ask for a new low (`floored`).
  */
 export function waitPrice(
   warnings: readonly OpportunitySignal[],
   tests: OpportunityTests | null | undefined,
   target: number | null,
-): { key: OpportunitySignal; change: number; under: number | null } | null {
+  low: number | null = null,
+): { key: OpportunitySignal; change: number; under: number | null; floored: boolean } | null {
   let worst: { key: OpportunitySignal; change: number } | null = null;
   for (const key of warnings) {
     const change = tests?.signals[key]?.change;
     if (change != null && change < 0 && (!worst || change < worst.change)) worst = { key, change };
   }
   if (!worst) return null;
-  return { ...worst, under: target ? Math.round(target * (1 + worst.change)) : null };
+  const lowered = target ? Math.round(target * (1 + worst.change)) : null;
+  const floored = lowered !== null && low !== null && lowered < low;
+  return { ...worst, under: floored ? low : lowered, floored };
 }

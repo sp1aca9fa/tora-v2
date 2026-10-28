@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import type { ReactNode } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import { AmountsToggle } from '@/components/amounts-toggle';
 import { OpportunitiesNav } from './opportunities-nav';
+import { OpportunitySearch } from './opportunity-search';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('opportunities') };
 }
 
-/** Opportunities (S13, as sub pages S26): the title, the sub pages. */
+/** Opportunities (S13, as sub pages S26): the title, the sub pages, a name search (S27). */
 export default async function OpportunitiesLayout({ children }: { children: ReactNode }) {
   const t = await getTranslations('opportunities');
   return (
@@ -20,7 +21,10 @@ export default async function OpportunitiesLayout({ children }: { children: Reac
         </div>
         <p className="max-w-3xl text-sm text-muted-foreground">{t('intro')}</p>
       </header>
-      <OpportunitiesNav />
+      <Suspense>
+        <OpportunitiesNav />
+        <OpportunitySearch />
+      </Suspense>
       {children}
     </div>
   );

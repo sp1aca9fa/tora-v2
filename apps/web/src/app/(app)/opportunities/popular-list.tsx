@@ -13,11 +13,13 @@ export function PopularList({
   total,
   type,
   by,
+  q,
 }: {
   initial: PopularRowData[];
   total: number;
   type: string;
   by: PopularBy;
+  q: string | null;
 }) {
   const t = useTranslations('opportunities');
   const [rows, setRows] = useState(initial);
@@ -33,7 +35,7 @@ export function PopularList({
         if (!entry?.isIntersecting || loading) return;
         setLoading(true);
         try {
-          const next = await morePopularAction(type, by, rows.length);
+          const next = await morePopularAction(type, by, rows.length, q);
           setRows((had) => [...had, ...next.filter((r) => !had.some((h) => h.key === r.key))]);
         } finally {
           setLoading(false);
@@ -43,7 +45,7 @@ export function PopularList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rows.length, more, loading, type, by]);
+  }, [rows.length, more, loading, type, by, q]);
 
   const labels = { tora: t('toraView'), worth: t('toraWorth') };
   return (

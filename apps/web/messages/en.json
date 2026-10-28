@@ -1934,6 +1934,7 @@
       "weak_for_age": "Weak for its age",
       "quick_rise": "Quick rise",
       "out_of_print": "Out of print",
+      "cheap_steady": "Cheap, fall paused",
       "reprint_coming": "Reprint coming"
     },
     "why": {
@@ -1947,6 +1948,7 @@
       "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
       "quick_rise": "Its last 14 days: {jump} against the 60 days before.",
       "out_of_print": "Not expected to be made or sold again (marked by an admin, or a plug-in's guess).",
+      "cheap_steady": "Cheaper than on {cheaper} of its past year's days, and its last 14 days are {hold} against the 30 before.",
       "reprint_coming": "A reprint is expected (marked by an admin)."
     },
     "scope": {
@@ -1970,7 +1972,13 @@
     "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top 60 are added as candidates and collected while they stay there; how a rank change does as a signal is tested once enough days are saved.",
     "colWeek": "Week",
     "candidate": "Suggested",
+    "search": {
+      "label": "Search by name",
+      "placeholder": "Search by name, e.g. pikachu",
+      "none": "Nothing here matches \"{q}\"."
+    },
     "plan": {
+      "searched": "{shown} of {all} items match \"{q}\". Suggest a mix picks from these; ticked items not shown still count.",
       "intro": "Set a budget, then tick what to buy or let Tora suggest a mix.",
       "howTitle": "How the mix is picked",
       "how": "Only items worth a look or on your watchlist, best first: the best of each item type, then the next best of any type. No item over 40% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
@@ -2068,7 +2076,7 @@
     "toraWorth": "worth a look",
     "toraNow": "Tora {price}",
     "waitLow": "It has been this cheap before: in the past year it sold for {low} or less on 1 day in 10.",
-    "waitBelowLow": "But that would be a new low: in the past year it sold for {low} or less on only 1 day in 10. It may not get there.",
+    "waitFloored": "The usual drop would take it under {low}, a price it sold at or under on only 1 day in 10 in the past year, so Tora asks no lower.",
     "targetBasis": {
       "quarter180": "Target: the price it sold at or under on a quarter of days in the last 6 months.",
       "tenth365": "Target: the price it sold at or under on a tenth of days in the last year.",
@@ -2207,6 +2215,7 @@
     },
     "marketFalling": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. Wait until it flattens.",
     "marketFallingDip": "The market is still falling: similar items ({items}{group}) are {pct} over 12 weeks. It may go lower.",
+    "marketFallingHeld": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. But this item is cheaper than on {cheaper} of its past year's days and its price has held over the last 2 weeks ({hold}), so it doesn't wait for the market. In the past, such items rose about as often as on any day.",
     "newRelease": "New release ({days} days): similar items ({items}{group}) usually hit their first-year low around day {wait}. Wait until then.",
     "newReleaseDefault": "New release ({days} days): new releases often drop in their first months. Wait until day {wait} (too few similar items with a full first year to learn when).",
     "newReleaseDip": "New release ({days} days): prices often drop until about day {wait}. It may go lower.",

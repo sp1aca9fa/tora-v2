@@ -1,6 +1,13 @@
 'use client';
 
-import { type MixOption, type PlanStep, checkPlan, suggestMix, swapInMix } from '@tora/core';
+import {
+  type MixOption,
+  type PlanStep,
+  checkPlan,
+  nameSearch,
+  suggestMix,
+  swapInMix,
+} from '@tora/core';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
@@ -27,18 +34,21 @@ export interface PlanRow {
 /**
  * A budget and a date (S13 part 4): each item offered with when to buy and at what price; the
  * person ticks items and sees whether they fit, or has a varied mix suggested (S27) and swaps its
- * picks. Saved with Save.
+ * picks. A name search (`q`) narrows the list and the mix; ticked items it hides still count.
+ * Saved with Save.
  */
 export function PlanCard({
   rows,
   budget: savedBudget,
   until: savedUntil,
   today,
+  q,
 }: {
   rows: PlanRow[];
   budget: number | null;
   until: string | null;
   today: string;
+  q: string | null;
 }) {
   const t = useTranslations('opportunities');
   const tAll = useTranslations();
@@ -65,7 +75,9 @@ export function PlanCard({
         : null,
     [chosen, amount, until],
   );
-  const options = rows.map((r) => r.mix);
+  const match = q ? nameSearch(q) : null;
+  const searched = match ? rows.filter((r) => match(r.name)) : rows;
+  const options = searched.map((r) => r.mix);
   const suggest = () => {
     if (amount === null) return;
     const mix = suggestMix(options, amount, until || null);
@@ -96,7 +108,9 @@ export function PlanCard({
     setMessage(null);
   };
   // Shown: the items offered, and those a mix picked.
-  const shown = rows.filter((r) => r.from.length || ticked.has(`${r.productId}|${r.bucket}`));
+  const offered = (list: PlanRow[]) =>
+    list.filter((r) => r.from.length || ticked.has(`${r.productId}|${r.bucket}`));
+  const shown = offered(searched);
   // Buy now first, then by day, then the prices to wait for.
   const order = { now: 0, from: 1, under: 2, none: 3 };
   const sorted = shown.toSorted(
@@ -152,8 +166,15 @@ export function PlanCard({
           <span className="text-xs text-muted-foreground">{t('plan.needBudget')}</span>
         )}
       </div>
+      {q && (
+        <p className="text-xs text-muted-foreground">
+          {t('plan.searched', { shown: shown.length, all: offered(rows).length, q })}
+        </p>
+      )}
       {shown.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('plan.empty')}</p>
+        <p className="text-sm text-muted-foreground">
+          {q ? t('search.none', { q }) : t('plan.empty')}
+        </p>
       ) : (
         <h3 className="text-xs font-medium text-muted-foreground">{t('plan.listFrom')}</h3>
       )}

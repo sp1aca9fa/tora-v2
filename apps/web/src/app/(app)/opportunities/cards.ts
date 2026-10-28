@@ -20,6 +20,8 @@ export interface CardsFilter {
   type: string | null;
   /** Items with every one of these on (`?signal=a,b`). */
   signals: OpportunitySignal[];
+  /** A name search (`?q=`). */
+  q: string | null;
 }
 
 /** A filter from the address or a client: unknown values dropped. */
@@ -27,6 +29,7 @@ export function cleanFilter(f: {
   type?: unknown;
   signal?: unknown;
   signals?: unknown;
+  q?: unknown;
 }): CardsFilter {
   const asked = Array.isArray(f.signals)
     ? f.signals
@@ -41,8 +44,13 @@ export function cleanFilter(f: {
         asked.filter((k): k is string => typeof k === 'string' && /^[a-z0-9_]{1,40}$/.test(k)),
       ),
     ].slice(0, 10),
+    q: cleanSearch(f.q),
   };
 }
+
+/** A name search from the address or a client: trimmed, at most 60 characters, else null. */
+export const cleanSearch = (q: unknown) =>
+  typeof q === 'string' && q.trim() ? q.trim().slice(0, 60) : null;
 
 /** Within 10 % of the target: close (blue); 30 % or more over it: too high (red). */
 const CLOSE = 0.1;
@@ -137,6 +145,8 @@ function rowOf(
           typical: n.age ? signed(n.age.typical) : '-',
           days: n.age?.days ?? 0,
           jump: n.jump14 != null ? signed(n.jump14) : '-',
+          cheaper: n.year != null ? pct(1 - n.year) : '-',
+          hold: n.hold14 != null ? signed(n.hold14) : '-',
         });
   const signals = [
     ...o.proven.map((key) => ({ key, style: 'proven' as const })),
@@ -213,10 +223,10 @@ function rowOf(
                 target: o.target ? money(o.target) : '-',
               },
             ),
-            // Whether prices got that low before.
+            // Whether prices got that low before (else the wait price stops at that low).
             past:
               o.wait.under !== null && o.low
-                ? t(o.wait.under < o.low ? 'opportunities.waitBelowLow' : 'opportunities.waitLow', {
+                ? t(o.wait.floored ? 'opportunities.waitFloored' : 'opportunities.waitLow', {
                     low: money(o.low),
                   })
                 : null,

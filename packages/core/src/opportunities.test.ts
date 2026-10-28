@@ -155,6 +155,34 @@ describe('OpportunityGroup', () => {
     expect(signalsOn(n)).toContain('quick_rise');
   });
 
+  it('marks an item cheap for its year whose fall paused', () => {
+    // A year at 10000, then down to 6000 for the last 44 days.
+    const fell = (recent: number) =>
+      new OpportunityGroup([
+        {
+          id: 'c',
+          line: null,
+          release: null,
+          series: days('2025-01-01', 400, (i) => (i < 356 ? 10000 : i < 386 ? 6000 : recent)),
+        },
+      ]).numbers('c', '2026-02-04')!;
+    const steady = fell(6100);
+    expect(steady.year).toBeLessThan(0.15);
+    expect(steady.hold14).toBeCloseTo(0.017, 2);
+    expect(signalsOn(steady)).toContain('cheap_steady');
+    // Still falling.
+    expect(signalsOn(fell(5000))).not.toContain('cheap_steady');
+    // A falling line is not held against it.
+    const line84 = { change: -0.2, items: 6, line: null };
+    expect(signalsOn({ ...steady, line84 })).not.toContain('line_falling');
+    expect(signalsOn({ ...fell(5000), line84 })).toContain('line_falling');
+    // Under 300 days of prices: no year to compare with.
+    const young = new OpportunityGroup([
+      { id: 'y', line: null, release: null, series: days('2025-06-01', 200, () => 10000) },
+    ]).numbers('y', '2025-12-17')!;
+    expect(young.year).toBeNull();
+  });
+
   it('tests each signal against buying on any day', () => {
     const t = group.tests('2026-02-04');
     expect(t.items).toBe(6);
@@ -239,6 +267,18 @@ describe('waitPrice', () => {
       key: 'sales_down',
       change: -0.2,
       under: 8000,
+      floored: false,
+    });
+  });
+
+  it("never asks under the past year's cheapest tenth", () => {
+    expect(waitPrice(['sales_down'], tests, 10000, 8500)).toMatchObject({
+      under: 8500,
+      floored: true,
+    });
+    expect(waitPrice(['sales_down'], tests, 10000, 7000)).toMatchObject({
+      under: 8000,
+      floored: false,
     });
   });
 

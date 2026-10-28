@@ -8,6 +8,7 @@ import {
   pickSeries,
   imageVersions,
   loadPopularity,
+  matchingProducts,
   productsByIds,
   rankPopular,
   rankedViews,
@@ -15,7 +16,7 @@ import {
   sold30Of,
   trendOf,
 } from '@tora/db';
-import { localDate } from '@tora/core';
+import { localDate, nameSearch } from '@tora/core';
 import { getTranslations } from 'next-intl/server';
 import { getMoney } from '@/lib/money-server';
 import { sourceLabels } from '@/lib/sources';
@@ -59,15 +60,19 @@ const typeOfBoard = (b: RankingBoard) => {
   return [...count].sort((a, z) => z[1] - a[1])[0]?.[0] ?? null;
 };
 
-/** Popular for an item type, ranked by a site's ranking or by trades (S27). */
+/**
+ * Popular for an item type, ranked by a site's ranking or by trades (S27); with a name search,
+ * only the items it finds, at their rank in the whole list.
+ */
 export async function loadPopular(
   db: Db,
   user: Pick<User, 'id' | 'preferences'>,
   type: string | null,
   by: PopularBy,
   offset: number,
+  q: string | null = null,
 ) {
-  const [boards, saved, t, tAll, money, labelOf] = await Promise.all([
+  const [all, saved, t, tAll, money, labelOf] = await Promise.all([
     rankingBoards(db, user.id),
     loadPopularity(db),
     getTranslations('opportunities'),
@@ -75,18 +80,38 @@ export async function loadPopular(
     getMoney(),
     sourceLabels(),
   ]);
-  const boardTypes = new Map(boards.map((b) => [b.ranking, typeOfBoard(b)]));
+  const match = nameSearch(q ?? '');
+  const found = await matchingProducts(
+    db,
+    [
+      ...(saved?.items ?? []).map((i) => i.productId),
+      ...all.flatMap((b) => b.items.flatMap((i) => (i.productId ? [i.productId] : []))),
+    ],
+    q,
+  );
+  // A site's item is found by its linked item's name or its own title.
+  const hit = (id: string | null, title?: string) =>
+    !found || (!!id && found.has(id)) || (!!title && match!(title));
+  // Each board's type from all its items, then only the items searched for.
+  const boardTypes = new Map(all.map((b) => [b.ranking, typeOfBoard(b)]));
+  const boards = all
+    .map((b) => ({ ...b, items: b.items.filter((i) => hit(i.productId, i.title)) }))
+    .filter((b) => b.items.length);
   const types = [
     ...new Set([
-      ...[...boardTypes.values()].filter((x): x is string => !!x),
-      ...(saved?.items ?? []).filter((i) => i.sold365 > 0).map((i) => i.itemType),
+      ...boards.map((b) => boardTypes.get(b.ranking)).filter((x): x is string => !!x),
+      ...(saved?.items ?? [])
+        .filter((i) => i.sold365 > 0 && hit(i.productId))
+        .map((i) => i.itemType),
     ]),
   ];
   const chosen = type && types.includes(type) ? type : (types[0] ?? null);
   const typeBoards = boards.filter((b) => boardTypes.get(b.ranking) === chosen);
   // Site rankings when the type has one, else trades.
   const measure: PopularBy = by === 'site' && !typeBoards.length ? 'sold' : by;
-  const ranked = saved && chosen && measure !== 'site' ? rankPopular(saved, chosen, measure) : [];
+  const ranked = (
+    saved && chosen && measure !== 'site' ? rankPopular(saved, chosen, measure) : []
+  ).flatMap((i, n) => (hit(i.productId) ? [{ ...i, rank: n + 1 }] : []));
   const page = ranked.slice(offset, offset + POPULAR_BATCH);
   const ids = [
     ...(measure === 'site' ? typeBoards.flatMap((b) => b.items.map((i) => i.productId)) : []),
@@ -184,7 +209,7 @@ export async function loadPopular(
     spark: spark(i.productId),
   });
 
-  const rows: PopularRowData[] = page.flatMap((i, n) => {
+  const rows: PopularRowData[] = page.flatMap((i) => {
     const p = byId.get(i.productId);
     if (!p) return [];
     const sites = Object.entries(i.sold30)
@@ -194,7 +219,7 @@ export async function loadPopular(
     return [
       {
         key: i.productId,
-        rank: offset + n + 1,
+        rank: i.rank,
         productId: i.productId,
         href: href(i.productId),
         product: { id: p.id, name: p.name, category: p.category, kind: p.kind },

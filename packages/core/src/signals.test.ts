@@ -117,6 +117,18 @@ describe('zones and verdicts', () => {
     expect(judge(low, { strategy: 'dip' }).verdict).toBe('good');
     const mild = stats({ fair: 8500, market: { items: 20, change84: -0.05 } });
     expect(judge(mild, { strategy: 'steady' }).verdict).toBe('good');
+    // Cheap for its year and its fall paused: the market's no longer makes it wait.
+    expect(judge({ ...low, year365: 0.2, hold14: 0.03 }, { strategy: 'steady' })).toMatchObject({
+      verdict: 'good',
+      marketFalling: true,
+      cheapSteady: true,
+    });
+    expect(judge({ ...low, year365: 0.2, hold14: -0.08 }, { strategy: 'steady' }).verdict).toBe(
+      'wait',
+    );
+    expect(judge({ ...low, year365: 0.6, hold14: 0.03 }, { strategy: 'steady' }).verdict).toBe(
+      'wait',
+    );
     expect(marketTrend([days('2026-01-01', 84, () => 1000)], '2026-03-25')).toBeNull();
     const five = Array.from({ length: 5 }, () => days('2026-01-01', 84, (i) => 1000 - i * 4));
     expect(marketTrend(five, '2026-03-25')!.change84).toBeLessThan(-0.25);

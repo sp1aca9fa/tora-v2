@@ -24,7 +24,9 @@ export const VERDICT_STYLE: Record<string, string> = {
 
 /** The verdict's label: a wait only for a new release says so. */
 export const verdictKey = (j: Judgement) =>
-  j.verdict === 'wait' && j.newRelease && !j.falling && !j.marketFalling ? 'newRelease' : j.verdict;
+  j.verdict === 'wait' && j.newRelease && !j.falling && !(j.marketFalling && !j.cheapSteady)
+    ? 'newRelease'
+    : j.verdict;
 
 /** Which items a group study used: the item's line only, or all of them (S9). */
 function groupLabel(
@@ -127,12 +129,27 @@ export async function BuyVerdict({
           </p>
         )}
         {j.marketFalling && stats.market && (
-          <p className="text-amber-700 dark:text-amber-300">
-            {t(choice.strategy === 'dip' ? 'buy.marketFallingDip' : 'buy.marketFalling', {
-              items: stats.market.items,
-              group: group(stats.market),
-              pct: pct(stats.market.change84),
-            })}
+          <p
+            className={
+              j.cheapSteady && choice.strategy !== 'dip'
+                ? 'text-muted-foreground'
+                : 'text-amber-700 dark:text-amber-300'
+            }
+          >
+            {t(
+              choice.strategy === 'dip'
+                ? 'buy.marketFallingDip'
+                : j.cheapSteady
+                  ? 'buy.marketFallingHeld'
+                  : 'buy.marketFalling',
+              {
+                items: stats.market.items,
+                group: group(stats.market),
+                pct: pct(stats.market.change84),
+                hold: pct(stats.hold14 ?? 0),
+                cheaper: `${Math.round((1 - (stats.year365 ?? 0)) * 100)}%`,
+              },
+            )}
           </p>
         )}
         {j.newRelease && stats.ageDays !== null && (

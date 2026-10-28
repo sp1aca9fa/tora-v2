@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { typeLabel } from '../cards';
+import { cleanSearch, typeLabel } from '../cards';
 import { PopularList } from '../popular-list';
 import { PopularRow } from '../popular-row';
 import { loadPopular } from '../popular-rows';
@@ -19,28 +19,29 @@ const FIRST = 10;
 export default async function PopularPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; by?: string }>;
+  searchParams: Promise<{ type?: string; by?: string; q?: string }>;
 }) {
   const { db, user } = await authed();
   const q = await searchParams;
   const asked = (POPULAR_BY as readonly string[]).includes(q.by ?? '')
     ? (q.by as PopularBy)
     : 'site';
+  const search = cleanSearch(q.q);
   const [data, t, tAll] = await Promise.all([
-    loadPopular(db, user, typeof q.type === 'string' ? q.type : null, asked, 0),
+    loadPopular(db, user, typeof q.type === 'string' ? q.type : null, asked, 0, search),
     getTranslations('opportunities'),
     getTranslations(),
   ]);
   if (!data.type) {
     return (
       <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-        {t('noRankings')}
+        {search ? t('search.none', { q: search }) : t('noRankings')}
       </p>
     );
   }
   const type = data.type;
   const href = (q: { type: string; by: PopularBy }) =>
-    `/opportunities/popular?type=${encodeURIComponent(q.type)}&by=${q.by}`;
+    `/opportunities/popular?type=${encodeURIComponent(q.type)}&by=${q.by}${search ? `&q=${encodeURIComponent(search)}` : ''}`;
   const chip = (active: boolean) =>
     cn(
       'rounded-full border px-3 py-1 text-sm transition-colors',
@@ -116,15 +117,16 @@ export default async function PopularPage({
         </div>
       ) : data.total ? (
         <PopularList
-          key={`${type}|${data.by}`}
+          key={`${type}|${data.by}|${search ?? ''}`}
           initial={data.rows}
           total={data.total}
           type={type}
           by={data.by}
+          q={search}
         />
       ) : (
         <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-          {t(`popular.none.${data.by}`)}
+          {search ? t('search.none', { q: search }) : t(`popular.none.${data.by}`)}
         </p>
       )}
     </div>

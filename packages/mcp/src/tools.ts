@@ -830,6 +830,8 @@ export async function watchlist(db: Db, userId: string) {
               loweredByNewSetPattern: j.zone.pattern,
               fallingFast: j.falling,
               marketFalling: j.marketFalling,
+              // Cheap for its year and its fall paused: the market's fall does not make it wait.
+              cheapSteady: j.cheapSteady,
               // A new release waits until similar items' usual first-year low (else 90 days).
               newRelease: j.newRelease,
               newReleaseWaitDays: j.waitDays,

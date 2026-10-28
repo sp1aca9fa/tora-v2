@@ -41,7 +41,7 @@ export function planStep(stats: SignalStats, choice: StrategyChoice, today: stri
       when: 'under',
       day: null,
       price: top,
-      reason: j.marketFalling && !j.falling ? 'market_falling' : 'falling',
+      reason: j.marketFalling && !j.cheapSteady && !j.falling ? 'market_falling' : 'falling',
     };
   }
   return top === null

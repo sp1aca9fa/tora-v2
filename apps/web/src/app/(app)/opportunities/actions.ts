@@ -9,7 +9,7 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
-import { type CardsFilter, cleanFilter, loadCards } from './cards';
+import { type CardsFilter, cleanFilter, cleanSearch, loadCards } from './cards';
 import { loadPopular } from './popular-rows';
 
 /** Saves the person's budget, date and ticked items (S13 part 4). */
@@ -64,8 +64,13 @@ export async function moreOpportunitiesAction(filter: CardsFilter, offset: numbe
   return data?.rows ?? [];
 }
 
-/** The next rows of Popular ranked by trades (S27), from `offset`. */
-export async function morePopularAction(type: string, by: string, offset: number) {
+/** The next rows of Popular ranked by trades (S27), from `offset`, of a name search if any. */
+export async function morePopularAction(
+  type: string,
+  by: string,
+  offset: number,
+  q: string | null = null,
+) {
   const { db, user } = await authed();
   const measure = (POPULAR_BY as readonly string[]).includes(by) ? (by as PopularBy) : 'sold';
   const data = await loadPopular(
@@ -74,6 +79,7 @@ export async function morePopularAction(type: string, by: string, offset: number
     typeof type === 'string' ? type.slice(0, 40) : null,
     measure,
     Math.max(0, Math.floor(Number(offset)) || 0),
+    cleanSearch(q),
   );
   return data.rows;
 }
