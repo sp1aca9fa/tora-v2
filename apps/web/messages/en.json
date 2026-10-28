@@ -1921,7 +1921,7 @@
     "colChange": "Typical change",
     "proven": "Proven",
     "warning": "Warning",
-    "group": "{items} items",
+    "group": "{items, plural, one {# item} other {# items}}",
     "signal": {
       "line_rising": "Line rising",
       "line_falling": "Line falling",
@@ -1966,7 +1966,6 @@
     "colWeek": "Week",
     "candidate": "Suggested",
     "plan": {
-      "title": "Buy plan",
       "intro": "Set a budget, then tick what to buy or let Tora suggest a mix.",
       "howTitle": "How the mix is picked",
       "how": "Only items worth a look or on your watchlist, best first: the best of each item type, then the next best of any type. No item over 40% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
@@ -1986,6 +1985,7 @@
       "from": "From {day}",
       "under": "Under {price}",
       "none": "No price yet",
+      "notCounted": "not counted in the total",
       "reason": {
         "good": "good price",
         "new_release": "new release: wait",
@@ -2020,7 +2020,7 @@
     "toGo": "{pct} to go",
     "atTarget": "At target",
     "goodNow": "Good price now",
-    "noRankings": "No popularity ranking in the last 3 days. Rankings are read with each night's collect once a ranking source is set up (see the collectors guide).",
+    "noRankings": "No popularity rankings in the last 3 days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
     "showAll": "Show all {count}",
     "listingsN": "{n} listed",
     "favoritesN": "{n} favorites"

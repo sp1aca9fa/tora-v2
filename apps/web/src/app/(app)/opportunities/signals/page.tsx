@@ -2,6 +2,7 @@ import {
   type OpportunitySignal,
   type OpportunityTests,
   OPPORTUNITY_WARNINGS,
+  PROVEN_MIN_CHECKS,
   isBuiltInSignal,
   provenEdge,
 } from '@tora/core';
@@ -68,7 +69,7 @@ export default async function SignalsPage() {
                 <th className="px-3 py-2 text-right font-medium">{t('opportunities.colChange')}</th>
               </tr>
             </thead>
-            <tbody className="tabular-nums">
+            <tbody className="tabular-nums [&_td:not(:first-child)]:whitespace-nowrap">
               <tr className="border-b bg-muted/40">
                 <td className="px-3 py-1.5">{t('opportunities.anyDay')}</td>
                 <td className="px-3 py-1.5 text-right">{tests.any.checked}</td>
@@ -90,7 +91,14 @@ export default async function SignalsPage() {
                   provenEdge(tests, key, rules) === null ? null : warning ? 'warning' : 'proven';
                 const picked = !proven && !!rule && picks.includes(key);
                 return (
-                  <tr key={key} className="border-b last:border-0">
+                  <tr
+                    key={key}
+                    className={cn(
+                      'border-b last:border-0',
+                      // Too few checks to read anything into.
+                      r.checked < PROVEN_MIN_CHECKS && 'text-muted-foreground',
+                    )}
+                  >
                     <td className="px-3 py-1.5">
                       {signalLabel(t, key, rules)}
                       {rule && (
@@ -147,7 +155,9 @@ export default async function SignalsPage() {
         return list.length ? (
           <section key={type} className="space-y-3">
             <h2 className="font-semibold">{typeLabel(t, type)}</h2>
-            <div className="grid items-start gap-4 xl:grid-cols-2">{list.map(table)}</div>
+            <div className="gap-4 xl:columns-2 min-[1800px]:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+              {list.map(table)}
+            </div>
           </section>
         ) : null;
       })}

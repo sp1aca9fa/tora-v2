@@ -12,7 +12,7 @@ const WIDE = [
   /^\/stores(\/[a-z-]+)?$/,
   /^\/holdings\/(?!grades$)[^/]+$/,
   /^\/imports$/,
-  /^\/opportunities$/,
+  /^\/opportunities(\/[a-z]+)?$/,
 ];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */

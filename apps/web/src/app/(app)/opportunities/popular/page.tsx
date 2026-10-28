@@ -22,7 +22,7 @@ export default async function PopularPage() {
   );
   if (!boards.length) {
     return (
-      <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
+      <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
         {t('noRankings')}
       </p>
     );

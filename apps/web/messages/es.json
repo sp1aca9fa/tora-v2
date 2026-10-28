@@ -1922,7 +1922,6 @@
     "colWeek": "Semana",
     "candidate": "Candidato",
     "plan": {
-      "title": "Presupuesto y fecha",
       "intro": "Pon un presupuesto y una fecha, y marca qué comprar. Cada artículo dice cuándo (ahora a buen precio, desde un día para una novedad, o cuando baje de un precio) y lo que costaría, según su momento de compra y tu estrategia. Nunca es algo seguro.",
       "budget": "Presupuesto ({symbol})",
       "until": "Para",

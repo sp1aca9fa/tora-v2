@@ -117,7 +117,6 @@ export function PlanCard({
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4">
       <div className="space-y-1">
-        <h2 className="font-semibold">{t('plan.title')}</h2>
         <p className="max-w-3xl text-xs text-muted-foreground">{t('plan.intro')}</p>
         <details className="max-w-3xl text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t('plan.howTitle')}</summary>
@@ -159,12 +158,12 @@ export function PlanCard({
         <h3 className="text-xs font-medium text-muted-foreground">{t('plan.listFrom')}</h3>
       )}
       {shown.length > 0 && (
-        <ul className="divide-y rounded-lg border text-sm">
+        <ul className="grid gap-2 text-sm lg:grid-cols-2 2xl:grid-cols-3">
           {sorted.map((r) => {
             const key = `${r.productId}|${r.bucket}`;
             const late = !!until && r.step.when === 'from' && (r.step.day ?? '') > until;
             return (
-              <li key={key} className="flex items-start gap-3 px-3 py-2">
+              <li key={key} className="flex items-start gap-3 rounded-lg border px-3 py-2">
                 <input
                   type="checkbox"
                   className="mt-1 size-4"
@@ -220,9 +219,11 @@ export function PlanCard({
                   {r.step.price !== null && r.step.when !== 'under' && (
                     <p className="tabular-nums">{money(r.step.price)}</p>
                   )}
-                  {r.step.when !== 'none' && (
-                    <p className="text-muted-foreground">{t(`plan.reason.${r.step.reason}`)}</p>
-                  )}
+                  <p className="text-muted-foreground">
+                    {r.step.when === 'none'
+                      ? t('plan.notCounted')
+                      : t(`plan.reason.${r.step.reason}`)}
+                  </p>
                 </div>
               </li>
             );
