@@ -168,7 +168,10 @@ export function PlanCard({
       </div>
       {q && (
         <p className="text-xs text-muted-foreground">
-          {t('plan.searched', { shown: shown.length, all: offered(rows).length, q })}
+          {t('plan.searched', { shown: shown.length, all: offered(rows).length, q })}{' '}
+          <Link href="/opportunities/plan" className="underline">
+            {t('search.clear')}
+          </Link>
         </p>
       )}
       {shown.length === 0 ? (

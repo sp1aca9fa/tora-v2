@@ -1975,7 +1975,9 @@
     "search": {
       "label": "Search by name",
       "placeholder": "Search by name, e.g. pikachu",
-      "none": "Nothing here matches \"{q}\"."
+      "none": "Nothing here matches \"{q}\".",
+      "ranks": "Each item keeps its rank among all items of this type; the numbers skip the ones the search leaves out.",
+      "clear": "Clear the search"
     },
     "plan": {
       "searched": "{shown} of {all} items match \"{q}\". Suggest a mix picks from these; ticked items not shown still count.",
@@ -2024,8 +2026,8 @@
     "signalsHere": "Filter by signal:",
     "noneWithSignals": "No item has all of these on today.",
     "provenTitle": "With a proven signal ({count})",
-    "restTitle": "No proven signal ({count})",
-    "restNote": "Ranked by their signals not proven yet, then by how near their target they are.",
+    "restTitle": "Not worth a look yet ({count})",
+    "restNote": "No proven signal, or a warning outweighs it. Ranked by their other signals, then by how near their target they are.",
     "loading": "Loading...",
     "more": "{count, plural, one {# more} other {# more}}",
     "now": "now",

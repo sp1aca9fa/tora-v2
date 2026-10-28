@@ -83,6 +83,7 @@ export default async function PopularPage({
         <p className="max-w-3xl text-xs text-muted-foreground">
           {data.fellBack && <>{t('popular.fellBack')} </>}
           {t(`popular.about.${data.by}`, { day: data.day ?? '-' })}
+          {search && <> {t('search.ranks')}</>}
         </p>
       </div>
       {data.by === 'site' ? (
