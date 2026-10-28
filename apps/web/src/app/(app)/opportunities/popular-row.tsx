@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { ProductImage } from '@/components/product-image';
 import { cn } from '@/lib/utils';
@@ -18,9 +19,18 @@ export function PopularRow({
       <span className="min-w-0 flex-1 space-y-0.5">
         <span className="line-clamp-2 block text-sm leading-snug">{r.product.name}</span>
         <span className="flex flex-wrap gap-x-2 text-xs text-muted-foreground tabular-nums">
-          {r.meta.map((m) => (
-            <span key={m}>{m}</span>
+          {r.meta.map((m, i) => (
+            // Per site counts (the last) only from small tablets up: rows stay short on phones.
+            <span
+              key={m}
+              className={cn(
+                i > 0 && i === r.meta.length - 1 && r.price === null && 'max-sm:hidden',
+              )}
+            >
+              {m}
+            </span>
           ))}
+          {r.toraPrice && <span className="text-foreground sm:hidden">{r.toraPrice}</span>}
         </span>
         {r.tora && (r.tora.text || r.tora.worth || r.tora.signals.length > 0) && (
           <span className="flex flex-wrap gap-x-2 text-xs tabular-nums">
@@ -46,7 +56,28 @@ export function PopularRow({
           </span>
         )}
       </span>
-      <span className="shrink-0 space-y-0.5 text-right tabular-nums">
+      {r.spark && (
+        <svg
+          viewBox="0 0 100 24"
+          preserveAspectRatio="none"
+          className={cn(
+            'hidden h-6 w-24 shrink-0 md:block',
+            r.spark.down
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-emerald-600 dark:text-emerald-400',
+          )}
+          aria-hidden
+        >
+          <polyline
+            points={r.spark.points}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
+      <span className="shrink-0 space-y-0.5 text-right tabular-nums max-sm:hidden">
         {r.price && <span className="block text-sm">{r.price}</span>}
         {r.toraPrice && (
           <span className={cn('block', r.price ? 'text-xs text-muted-foreground' : 'text-sm')}>
@@ -67,6 +98,7 @@ export function PopularRow({
           className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent/50"
         >
           {body}
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </Link>
       ) : (
         <div className="flex items-center gap-3 px-2 py-1.5">{body}</div>

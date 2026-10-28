@@ -4,6 +4,8 @@ import {
   type PopularBy,
   type RankingBoard,
   type User,
+  dailySeries,
+  pickSeries,
   imageVersions,
   loadPopularity,
   productsByIds,
@@ -13,6 +15,7 @@ import {
   sold30Of,
   trendOf,
 } from '@tora/db';
+import { localDate } from '@tora/core';
 import { getTranslations } from 'next-intl/server';
 import { getMoney } from '@/lib/money-server';
 import { sourceLabels } from '@/lib/sources';
@@ -41,7 +44,11 @@ export interface PopularRowData {
   /** The site's price (a ranking's), and Tora's. */
   price: string | null;
   toraPrice: string | null;
+  /** The last 90 days' daily prices as an SVG polyline (100 x 24), and whether down overall. */
+  spark: { points: string; down: boolean } | null;
 }
+
+const SPARK_DAYS = 90;
 
 type Item = RankingBoard['items'][number];
 
@@ -85,14 +92,32 @@ export async function loadPopular(
     ...(measure === 'site' ? typeBoards.flatMap((b) => b.items.map((i) => i.productId)) : []),
     ...page.map((i) => i.productId),
   ].filter((id): id is string => !!id);
-  const [images, views, items] = await Promise.all([
+  const since = localDate(new Date(Date.now() - SPARK_DAYS * 86_400_000));
+  const [images, views, items, series] = await Promise.all([
     imageVersions(db, ids),
     rankedViews(db, user, ids),
     productsByIds(
       db,
       page.map((i) => i.productId),
     ),
+    dailySeries(db, ids, since),
   ]);
+  /** The item's studied prices (Tora's series) over 90 days, as a small line. */
+  const spark = (productId: string | null): PopularRowData['spark'] => {
+    const v = productId ? views.items.get(productId) : undefined;
+    if (!v || !productId) return null;
+    const s = pickSeries(series, productId, v.bucket || null, v.source)?.series ?? [];
+    const points = s.filter((p) => p.day >= since);
+    if (points.length < 5) return null;
+    const prices = points.map((p) => p.price);
+    const [lo, hi] = [Math.min(...prices), Math.max(...prices)];
+    const x = (i: number) => ((i / (points.length - 1)) * 100).toFixed(1);
+    const y = (p: number) => (hi === lo ? 12 : 22 - ((p - lo) / (hi - lo)) * 20).toFixed(1);
+    return {
+      points: points.map((p, i) => `${x(i)},${y(p.price)}`).join(' '),
+      down: prices.at(-1)! < prices[0]!,
+    };
+  };
   const byId = new Map(items.map((p) => [p.id, p]));
 
   const tora = (productId: string | null): PopularRowData['tora'] => {
@@ -156,6 +181,7 @@ export async function loadPopular(
     tora: tora(i.productId),
     price: i.price !== null ? money(i.price) : null,
     toraPrice: toraPrice(i.productId),
+    spark: spark(i.productId),
   });
 
   const rows: PopularRowData[] = page.flatMap((i, n) => {
@@ -180,11 +206,12 @@ export async function loadPopular(
           measure === 'trending'
             ? t('popular.trendX', { x: trendOf(i).toFixed(1), before: Math.round(i.before90 / 3) })
             : null,
-          sites ? `(${sites})` : null,
+          sites ? t('popular.bySite', { sites }) : null,
         ].filter((m): m is string => !!m),
         tora: tora(i.productId),
         price: null,
         toraPrice: toraPrice(i.productId),
+        spark: spark(i.productId),
       },
     ];
   });
@@ -193,6 +220,8 @@ export async function loadPopular(
     types,
     type: chosen,
     by: measure,
+    /** Site rankings asked, none for the type: most traded shown. */
+    fellBack: by === 'site' && measure !== 'site',
     day: saved?.day ?? null,
     boards:
       measure === 'site'

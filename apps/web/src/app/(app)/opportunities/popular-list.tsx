@@ -48,7 +48,7 @@ export function PopularList({
   const labels = { tora: t('toraView'), worth: t('toraWorth') };
   return (
     <>
-      <ul className="grid gap-x-6 rounded-xl border bg-card p-1 xl:grid-cols-2 [&>li]:border-b">
+      <ul className="divide-y rounded-xl border bg-card p-1">
         {rows.map((r) => (
           <PopularRow key={r.key} r={r} labels={labels} />
         ))}

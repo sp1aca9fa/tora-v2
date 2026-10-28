@@ -70,13 +70,17 @@ export default async function PopularPage({
               key={b}
               href={href({ type, by: b })}
               aria-pressed={b === data.by}
-              className={cn(chip(b === data.by), 'py-0.5 text-xs')}
+              className={cn(
+                'rounded-md border px-2.5 py-0.5 text-xs transition-colors',
+                b === data.by ? 'border-foreground/40 bg-muted font-medium' : 'hover:bg-accent',
+              )}
             >
               {t(`popular.measure.${b}`)}
             </Link>
           ))}
         </div>
         <p className="max-w-3xl text-xs text-muted-foreground">
+          {data.fellBack && <>{t('popular.fellBack')} </>}
           {t(`popular.about.${data.by}`, { day: data.day ?? '-' })}
         </p>
       </div>

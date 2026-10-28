@@ -2034,7 +2034,7 @@
     "jumpTo": "Jump to:",
     "fewGroups": "{count, plural, one {# group} other {# groups}} with few checks",
     "wait": "Wait",
-    "waitUnder": "Wait, or under {price}",
+    "waitUnder": "Wait, or buy at {price} or less",
     "waitWhy": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
     "waitWhyNow": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
     "popular": {
@@ -2048,7 +2048,7 @@
       "about": {
         "site": "Each site's own ranking, read every night. Sites don't publish how they rank; they show listings and favorites next to it.",
         "sold": "The items Tora follows, by trades in the last 30 days on every site it reads (as of {day}).",
-        "trending": "Trades in the last 30 days at 1.5 times the monthly rate of the 90 days before or more, on sites Tora has read for 120 days or more (as of {day}).",
+        "trending": "Trades up 1.5x or more against the 90 days before, counting only sites Tora has read for 120+ days (as of {day}).",
         "year": "Trades in the last 365 days on every site Tora reads, since it started following each item (as of {day})."
       },
       "none": {
@@ -2059,10 +2059,12 @@
       },
       "trades30": "{n, plural, one {# trade} other {# trades}} in 30 days",
       "tradesYear": "{n, plural, one {# trade} other {# trades}} this year",
-      "trendX": "{x}x the usual {before} a month",
-      "seeRanking": "See it in the ranking"
+      "trendX": "{x}x its average of the 90 days before ({before} a month)",
+      "seeRanking": "See it in the ranking",
+      "bySite": "by site: {sites}",
+      "fellBack": "No recent site ranking for this item type: showing the most traded."
     },
-    "toraView": "Tora:",
+    "toraView": "Tora's view:",
     "toraWorth": "worth a look",
     "toraNow": "Tora {price}",
     "waitLow": "It has been this cheap before: in the past year it sold for {low} or less on 1 day in 10.",
