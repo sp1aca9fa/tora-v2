@@ -8,7 +8,7 @@ easier to forgive.
 ## What the reviewer is given
 
 - Screenshots of each changed page: phone, wide and dark (`pnpm crawl --only /x --views
-  phone,wide,dark --shots <dir>`).
+phone,wide,dark --shots <dir>`).
 - Per page, one line: what it is for and who opens it ("pick what to buy this month, with a budget;
   a collector, a few times a month").
 - Nothing else. If a page cannot be understood without more, that is a finding.
@@ -35,11 +35,19 @@ Answer as someone who has never seen the app. For each page:
 8. **Phone.** Tap targets, text that wraps badly, sideways scroll, things cut off.
 9. **Trust.** Where the page states a guess or a forecast, does it say so plainly? Anything that
    could make a person spend money on a wrong reading is a top finding.
+10. **Breaks and bugs.** Anything that looks wrong rather than unclear: numbers that don't add up
+    or contradict each other, a total that doesn't match its items, overlapping or clipped parts,
+    a layout that breaks at one width but not another, a control that looks dead, the same item
+    shown twice. Say what you would expect instead.
 
 ## How to report
 
 - At most 10 findings per page, most important first. Each: where (page, part), what a new user
   would think or do, why that is a problem, one concrete change. Plain words, no design jargon.
-- Mark each as **fix** (clearly better, small) or **ask** (a trade-off the owner should choose).
+- Mark each as **fix** (clearly better, small), **bug** (looks broken) or **ask** (a trade-off to
+  weigh; say which option you would pick).
 - End with the one change per page that would help most.
+- Then, apart from the findings, up to 3 **ideas**: a perspective the page hasn't taken into
+  account, a different way to do its job, or something a collector would want next. Keep them
+  short; they don't count toward the 10.
 - No praise, no summary of what the page does well, no restating the screenshots.
