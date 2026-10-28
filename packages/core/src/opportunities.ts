@@ -38,12 +38,21 @@ export const PROVEN_POINTS = 0.05;
 export const ASK_UNDER = 0.85;
 /** An ask under half the recent price is more likely something else (parts, one pack). */
 export const ASK_FLOOR = 0.5;
+/**
+ * A warning on for this share of an item type's items or more (5+ items) is the market's: said
+ * once above the list, it does not count against each item (S27).
+ */
+export const MARKET_SHARE = 0.8;
 export const BUYLIST_NEAR = 0.8;
 
-/** One item of a group: its line, its real release date (not a first sale), its daily prices. */
+/**
+ * One item of a group: its line, its set (singles: compared with their set first), its real
+ * release date (not a first sale), its daily prices.
+ */
 export interface OpportunityMember {
   id: string;
   line: string | null;
+  set?: string | null;
   release: string | null;
   series: DayPrice[];
 }
@@ -52,7 +61,10 @@ export interface OpportunityMember {
 export interface OpportunityNumbers {
   /** Fair value: the median of the last 30 days' daily prices (else 90). */
   price: number | null;
-  /** The item's fitted 12-week change, and its line's (the median of 5+ items; `line` null: the group). */
+  /**
+   * The item's fitted 12-week change, and its line's (the median of 5+ items): its set's (`line`
+   * "set:..."), else its line's, else (`line` null) the whole group's.
+   */
   own84: number | null;
   line84: { change: number; items: number; line: string | null } | null;
   /**
@@ -135,8 +147,8 @@ class Indexed {
 }
 
 /**
- * A group of similar items prepared for many days' numbers: each item's line study uses its own
- * line when 5+ of its items have prices, else the whole group (as `byLine`).
+ * A group of similar items prepared for many days' numbers: each item's line study uses its set
+ * when 5+ of its items have prices, else its own line likewise, else the whole group.
  */
 export class OpportunityGroup {
   private readonly items: Map<string, { member: OpportunityMember; s: Indexed }>;
@@ -161,19 +173,30 @@ export class OpportunityGroup {
     return this.fits.get(key)!;
   }
 
-  private lineChange(line: string | null, end: number): OpportunityNumbers['line84'] {
-    const key = `${line ?? ''}|${end}`;
+  private lineChange(m: OpportunityMember, end: number): OpportunityNumbers['line84'] {
+    const key = `${m.set ?? ''}|${m.line ?? ''}|${end}`;
     if (!this.lines.has(key)) {
-      const study = (ids: string[]) => {
-        const changes = ids.map((id) => this.fit(id, end)).filter((c) => c !== null);
+      const all = [...this.items.values()];
+      const study = (of: (x: OpportunityMember) => boolean) => {
+        const changes = all
+          .filter((x) => of(x.member))
+          .map((x) => this.fit(x.member.id, end))
+          .filter((c) => c !== null);
         return changes.length >= LINE_MIN_ITEMS
           ? { change: median(changes)!, items: changes.length }
           : null;
       };
-      const all = [...this.items.keys()];
-      const own = line ? study(all.filter((id) => this.items.get(id)!.member.line === line)) : null;
-      const whole = own ? null : study(all);
-      this.lines.set(key, own ? { ...own, line } : whole && { ...whole, line: null });
+      const set = m.set ? study((x) => x.set === m.set) : null;
+      const own = !set && m.line ? study((x) => x.line === m.line) : null;
+      const whole = set || own ? null : study(() => true);
+      this.lines.set(
+        key,
+        set
+          ? { ...set, line: `set:${m.set}` }
+          : own
+            ? { ...own, line: m.line }
+            : whole && { ...whole, line: null },
+      );
     }
     return this.lines.get(key)!;
   }
@@ -207,7 +230,7 @@ export class OpportunityGroup {
     return {
       price: price === null ? null : Math.round(price),
       own84: this.fit(id, end),
-      line84: this.lineChange(member.line, end),
+      line84: this.lineChange(member, end),
       sales30: s.sales(end - 29, end),
       salesBefore: s.first! <= end - 119 ? s.sales(end - 119, end - 30) / 3 : null,
       age,

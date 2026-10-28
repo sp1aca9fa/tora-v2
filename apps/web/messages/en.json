@@ -1923,15 +1923,22 @@
       "weak_for_age": "Weak for its age"
     },
     "why": {
-      "line_rising": "Its line: {line} over 12 weeks ({items} items).",
-      "line_falling": "Its line: {line} over 12 weeks ({items} items).",
-      "leader": "Its 12 weeks: {own}, its line's {line}.",
-      "laggard": "Its 12 weeks: {own}, its line's {line}.",
+      "line_rising": "{Scope}: {line} over 12 weeks ({items} items).",
+      "line_falling": "{Scope}: {line} over 12 weeks ({items} items).",
+      "leader": "Its 12 weeks: {own}; {scope}: {line}.",
+      "laggard": "Its 12 weeks: {own}; {scope}: {line}.",
       "sales_up": "{sales30} sales in 30 days, {before} a month before.",
       "sales_down": "{sales30} sales in 30 days, {before} a month before.",
       "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
       "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items)."
     },
+    "scope": {
+      "set": "its set",
+      "line": "its line",
+      "group": "similar items"
+    },
+    "marketTitle": "{signal} for nearly all {type}: {on} of {of} items",
+    "marketNote": "Said here once instead of on every card, so the list below is ranked by what sets items apart. It still matters: buying while it was on did worse before.",
     "rankLine": "#{rank} on {label} ({move})",
     "rankNew": "new",
     "rankSame": "same as a week ago",

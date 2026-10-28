@@ -104,6 +104,24 @@ export default async function WorthALookPage({
             )}
           </ul>
         )}
+        {data.market.map((m) => (
+          <div
+            key={m.key}
+            className="max-w-3xl rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2"
+          >
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+              {t('opportunities.marketTitle', {
+                signal: t(`opportunities.signal.${m.key}`),
+                type: typeLabel(t, type).toLowerCase(),
+                on: m.on,
+                of: m.of,
+              })}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t('opportunities.marketNote')} {recordText(t, m.tests, m.key)}
+            </p>
+          </div>
+        ))}
         <p className="text-xs text-muted-foreground">
           {t('opportunities.updated', { day: data.day })}
         </p>

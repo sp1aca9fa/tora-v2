@@ -82,6 +82,25 @@ describe('OpportunityGroup', () => {
     expect(group.numbers('missing', '2025-12-01')).toBeNull();
   });
 
+  it("compares a single with its set when 5+ of the set's items have prices", () => {
+    const flat = (id: string, set: string | null) => ({
+      id,
+      line: 'era',
+      set,
+      release: null,
+      series: days('2025-01-01', 400, () => 10000),
+    });
+    const sets = new OpportunityGroup([
+      ...members.map((m) => ({ ...m, line: 'era', set: 'S1' })),
+      ...[1, 2, 3, 4].map((n) => flat(`f${n}`, 'S2')),
+      flat('alone', 'S3'),
+    ]);
+    expect(sets.numbers('flat', '2025-12-01')!.line84).toMatchObject({ items: 6, line: 'set:S1' });
+    // A set of 4: its line (all 11 items).
+    expect(sets.numbers('f1', '2025-12-01')!.line84).toMatchObject({ items: 11, line: 'era' });
+    expect(sets.numbers('alone', '2025-12-01')!.line84!.line).toBe('era');
+  });
+
   it('tests each signal against buying on any day', () => {
     const t = group.tests('2026-02-04');
     expect(t.items).toBe(6);

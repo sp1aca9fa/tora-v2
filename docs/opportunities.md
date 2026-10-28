@@ -53,12 +53,18 @@ days are saved (ranks partly follow price moves).
 
 ## Signals
 
-Worked out after each collect, per item, on its prices with the most days of sales (one source and
-condition):
+Worked out after each collect, per item, on its steadiest prices (one source and condition): a
+reference source's condition with the most days of sales (30 or more), else the one with the most
+days on any source. A single's line is its own set when 5 or more of the set's singles have
+prices, else its set line, else the whole group.
+
+A warning on for 80 % or more of an item type's items (5 or more) is the market's: Worth a look
+says it once above the list, with its record, and leaves it out of each card and of the order, so
+items are ranked by what sets them apart.
 
 | Signal                               | On when                                                                                                                                                  |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Line rising / falling (warning)      | The median 12-week change of the item's set line (5+ items; else the whole group) is +10 % or more / -10 % or less                                       |
+| Line rising / falling (warning)      | The median 12-week change of the item's line (5+ items; else the whole group) is +10 % or more / -10 % or less                                           |
 | Leads its line                       | The item's 12-week change is 15 points or more above its line's                                                                                          |
 | Lags a rising line                   | The line is rising and the item is 15 points or more under it                                                                                            |
 | Sales picking up / slowing (warning) | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |

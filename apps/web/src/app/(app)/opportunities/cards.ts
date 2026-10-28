@@ -91,9 +91,15 @@ export function rankText(t: T, rank: number, weekAgo: number | null, label: stri
 /** A card as its row's texts (the list draws them on the client). */
 function rowOf(t: T, money: (n: number) => string, o: OpportunityCard): OpportunityRowData {
   const n = o.numbers;
+  // What the item's line is: its set, its line, or (too few of either) similar items.
+  const scope = t(
+    `opportunities.scope.${n.line84?.line?.startsWith('set:') ? 'set' : n.line84?.line ? 'line' : 'group'}`,
+  );
   const why = (key: OpportunitySignal) =>
     t(`opportunities.why.${key}`, {
       line: n.line84 ? signed(n.line84.change) : '-',
+      scope,
+      Scope: scope.charAt(0).toUpperCase() + scope.slice(1),
       items: (key.endsWith('_age') ? n.age?.items : n.line84?.items) ?? 0,
       own: n.own84 !== null ? signed(n.own84) : '-',
       sales30: n.sales30,

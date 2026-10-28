@@ -1,6 +1,7 @@
 // Opportunities (requirements S13 part 1): after each collect, the signals of every item (any
-// person's, owned, watched or not) on the condition with the most days of sales, and each
-// signal's test on its group's whole history, saved in one setting that pages and the MCP read.
+// person's, owned, watched or not) on its steadiest prices (S27: a reference source's condition
+// with the most days, else any source's), and each signal's test on its group's whole history,
+// saved in one setting that pages and the MCP read.
 import {
   type OpportunityMember,
   type OpportunityNumbers,
@@ -10,11 +11,15 @@ import {
   ASK_FLOOR,
   ASK_UNDER,
   BUYLIST_NEAR,
+  MARKET_SHARE,
+  OPPORTUNITY_WARNINGS,
   OpportunityGroup,
   judge,
   localDate,
+  provenEdge,
   productClass,
   rankOpportunity,
+  roleOf,
   signalsOn,
   strategyOf,
   toLocalIso,
@@ -24,13 +29,15 @@ import type { Db } from './client';
 import { imageVersions } from './images';
 import { refreshItemSales } from './item-sales';
 import { type RankView, latestRanks, rankingLabels } from './rankings';
-import { readSetting, saveSetting } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, latestSignals, pickSeries } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
 const DAY = 86_400_000;
+/** Days of sales a reference source's series needs to be preferred over a longer one elsewhere. */
+const STEADY_DAYS = 30;
 /** Shop buy prices (買取) older than this are not shown. */
 const BUYLIST_DAYS = 30;
 
@@ -74,27 +81,32 @@ export async function refreshOpportunities(
   await refreshItemSales(db, { marksOnly: true });
   const today = localDate(now);
   const all = await db.select().from(products);
-  const [series, lines, released] = await Promise.all([
+  const [series, lines, released, registry] = await Promise.all([
     dailySeries(
       db,
       all.map((p) => p.id),
     ),
     productLines(db, all),
     releaseDates(db, all),
+    loadSourceRegistry(db),
   ]);
 
-  // Each item on its longest series (any source and condition), grouped with similar items.
+  // Each item on its steadiest series: a reference source's condition with the most days (30+),
+  // else the longest of any source; grouped with similar items.
   const groups = new Map<string, { id: string; bucket: string | null; source: string }[]>();
   const memberOf = new Map<string, OpportunityMember>();
   for (const p of all) {
     const key = similarKey(p);
     if (!key) continue;
-    let best: { bucket: string | null; source: string; length: number } | null = null;
+    const cls = productClass(p);
+    let best: { bucket: string | null; source: string; length: number; tier: number } | null = null;
     for (const [k, s] of series) {
       if (!k.startsWith(`${p.id}|`)) continue;
       const [source, bucket] = k.slice(p.id.length + 1).split('|');
-      if (!best || s.length > best.length) {
-        best = { bucket: bucket || null, source: source!, length: s.length };
+      const tier =
+        roleOf(registry, source!, cls) === 'reference' && s.length >= STEADY_DAYS ? 0 : 1;
+      if (!best || tier < best.tier || (tier === best.tier && s.length > best.length)) {
+        best = { bucket: bucket || null, source: source!, length: s.length, tier };
       }
     }
     if (!best) continue;
@@ -103,6 +115,11 @@ export async function refreshOpportunities(
     memberOf.set(p.id, {
       id: p.id,
       line: lines.get(p.id) ?? null,
+      // Singles are compared with their set first.
+      set:
+        p.kind === 'single'
+          ? (p.setId ?? (p.setCode ? `code:${p.setCode.toUpperCase()}` : null))
+          : null,
       // A first collected sale is not a release date.
       release: r && r.from !== 'first_sale' ? r.date : null,
       series: picked.series,
@@ -326,6 +343,11 @@ export async function opportunityCards(
   total: number;
   /** Of the list, how many have a proven signal (they come first). */
   proven: number;
+  /**
+   * Warnings on for nearly every item of the type (the market's): how many of how many, and the
+   * record on the group with the most of them. Left out of the items' warnings and scores.
+   */
+  market: { key: OpportunitySignal; on: number; of: number; tests: OpportunityTests | null }[];
   items: OpportunityCard[];
   /** An item of each group of the type's signals, to name the group. */
   groupItems: Record<string, Product>;
@@ -353,6 +375,15 @@ export async function opportunityCards(
   const type = summary.types.some((t) => t.type === filter.type)
     ? filter.type
     : (summary.types[0]?.type ?? null);
+  const ofType = saved.items.filter((o) => o.itemType === type);
+  const market = OPPORTUNITY_WARNINGS.flatMap((key) => {
+    const on = ofType.filter((o) => o.warnings.includes(key));
+    if (ofType.length < 5 || on.length < MARKET_SHARE * ofType.length) return [];
+    const count = (g: string) => on.filter((o) => o.group === g).length;
+    const biggest = on.toSorted((a, b) => count(b.group) - count(a.group))[0]!;
+    return [{ key, on: on.length, of: ofType.length, tests: biggest.tests }];
+  });
+  const marketKeys = new Set<OpportunitySignal>(market.map((m) => m.key));
   const list = saved.items.filter(
     (o) =>
       o.itemType === type &&
@@ -375,7 +406,19 @@ export async function opportunityCards(
     now,
   );
   const choice = strategyOf(user.preferences, type ?? '');
-  const ordered = list.map((o) => {
+  const ordered = list.map((item) => {
+    // The market's warnings are said once, above the list.
+    const o = marketKeys.size
+      ? {
+          ...item,
+          warnings: item.warnings.filter((k) => !marketKeys.has(k)),
+          score:
+            item.score -
+            item.warnings
+              .filter((k) => marketKeys.has(k))
+              .reduce((sum, k) => sum + (provenEdge(item.tests ?? undefined, k) ?? 0), 0),
+        }
+      : item;
     const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
     const j = s ? judge(s, choice) : null;
     const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
@@ -416,6 +459,7 @@ export async function opportunityCards(
     ),
     total: ordered.length,
     proven: ordered.filter((c) => c.o.proven.length > 0).length,
+    market,
     items: page.flatMap(({ o, ...c }) => {
       const product = byId.get(o.productId);
       if (!product) return [];
