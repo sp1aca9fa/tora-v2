@@ -1,5 +1,5 @@
-import { productClass, strategyOf, suggestedStrategy } from '@tora/core';
-import { heldItemTypes, listWatches, loadOpportunities } from '@tora/db';
+import { STRATEGIES, judge, productClass, strategyOf, suggestedStrategy } from '@tora/core';
+import { heldItemTypes, latestSignals, listWatches, loadOpportunities } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -25,15 +25,39 @@ export default async function StrategyPage() {
     loadOpportunities(db),
   ]);
   const types = [...new Set([...watches.map((w) => productClass(w.product)), ...owned])];
+  // Each strategy on the person's own watches today (S27): how many it calls a good price.
+  const stats = await latestSignals(
+    db,
+    watches.map((w) => ({ productId: w.product.id, bucket: w.watch.bucket })),
+  );
+  const today = (type: string) => {
+    const priced = watches.flatMap((w) => {
+      const s = stats.get(`${w.product.id}|${w.watch.bucket ?? ''}`)?.stats;
+      return productClass(w.product) === type && s?.fair ? [s] : [];
+    });
+    return {
+      watches: priced.length,
+      good: Object.fromEntries(
+        STRATEGIES.map((s) => [
+          s,
+          priced.filter(
+            (x) =>
+              judge(x, { ...strategyOf(user.preferences, type), strategy: s }).verdict === 'good',
+          ).length,
+        ]),
+      ) as Record<(typeof STRATEGIES)[number], number>,
+    };
+  };
   const views: StrategyTypeView[] = types.map((type) => ({
     type,
     label: t.has(`sourceRoles.class.${type}`) ? t(`sourceRoles.class.${type}`) : type,
     suggested: suggestedStrategy(type),
     current: strategyOf(user.preferences, type),
     chosen: !!user.preferences?.buyStrategy?.byType[type],
+    today: today(type),
   }));
 
-  // The conditions Opportunities has items in, per type, most items first (S27).
+  // The conditions Opportunities has items in, per type, by name (S27).
   const counts = new Map<string, Map<string, number>>();
   for (const o of saved?.items ?? []) {
     const of = counts.get(o.itemType) ?? new Map<string, number>();
@@ -46,17 +70,17 @@ export default async function StrategyPage() {
       type,
       label: t.has(`sourceRoles.class.${type}`) ? t(`sourceRoles.class.${type}`) : type,
       buckets: [...of]
-        .sort((a, b) => b[1] - a[1])
         .map(([bucket, items]) => ({
           bucket,
           label: bucket ? bucketLabel(bucket, t) : t('strategy.anyCondition'),
           items,
-        })),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
       chosen: user.preferences?.suggestConditions?.[type] ?? null,
     }));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <header className="space-y-1">
         <p className="text-sm text-muted-foreground">
           <Link href="/watchlist" className="hover:underline">

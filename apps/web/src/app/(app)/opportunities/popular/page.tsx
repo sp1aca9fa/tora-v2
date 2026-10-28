@@ -1,9 +1,11 @@
-import { type RankingBoard, imageVersions, rankingBoards } from '@tora/db';
+import { type RankingBoard, imageVersions, rankedViews, rankingBoards } from '@tora/db';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { ProductImage } from '@/components/product-image';
 import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
+import { cn } from '@/lib/utils';
+import { signalLabel } from '../cards';
 
 /** Shown at first per ranking; the rest open on demand. */
 const FIRST = 10;
@@ -11,15 +13,43 @@ const FIRST = 10;
 /** Popular now (S13 part 3, as a sub page S26): each ranking with pictures and links. */
 export default async function PopularPage() {
   const { db, user } = await authed();
-  const [boards, t, money] = await Promise.all([
+  const [boards, t, tAll, money] = await Promise.all([
     rankingBoards(db, user.id),
     getTranslations('opportunities'),
+    getTranslations(),
     getMoney(),
   ]);
-  const images = await imageVersions(
-    db,
-    boards.flatMap((b) => b.items.flatMap((i) => (i.productId ? [i.productId] : []))),
-  );
+  const ids = boards.flatMap((b) => b.items.flatMap((i) => (i.productId ? [i.productId] : [])));
+  const [images, views] = await Promise.all([imageVersions(db, ids), rankedViews(db, user, ids)]);
+
+  /** Tora's view of a ranked item (S27): what to do at what price, and its proven signals. */
+  const tora = (productId: string | null) => {
+    const v = productId ? views.items.get(productId) : undefined;
+    if (!v) return null;
+    const goal = v.wait ? v.wait.under : v.target;
+    const over = v.now !== null && goal ? v.now / goal - 1 : null;
+    const [text, tone] =
+      v.wait && (over === null || over > 0)
+        ? [
+            v.wait.under !== null ? t('waitUnder', { price: money(v.wait.under) }) : t('wait'),
+            'wait',
+          ]
+        : v.verdict === 'good' || (over !== null && over <= 0)
+          ? [t('goodNow'), 'good']
+          : v.target && over !== null
+            ? [
+                `${t('target')} ${money(v.target)} · ${t('toGo', { pct: `${Math.round(over * 100)}%` })}`,
+                'mid',
+              ]
+            : [null, 'mid'];
+    return {
+      now: v.now !== null ? money(v.now) : null,
+      text,
+      tone,
+      worth: v.worth,
+      signals: [...v.proven, ...v.warnings].map((k) => signalLabel(tAll, k, views.rules)),
+    };
+  };
   if (!boards.length) {
     return (
       <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
@@ -35,6 +65,7 @@ export default async function PopularPage() {
         : i.weekAgo === i.rank
           ? '='
           : `${i.weekAgo > i.rank ? '+' : '-'}${Math.abs(i.weekAgo - i.rank)}`;
+    const view = tora(i.productId);
     const body = (
       <>
         <span className="w-7 shrink-0 text-right text-sm font-medium tabular-nums">{i.rank}</span>
@@ -64,9 +95,37 @@ export default async function PopularPage() {
             {i.watching && <span>{t('watching')}</span>}
             {i.candidate && !i.owned && !i.watching && <span>{t('candidate')}</span>}
           </span>
+          {view && (view.text || view.worth || view.signals.length > 0) && (
+            <span className="flex flex-wrap gap-x-2 text-xs tabular-nums">
+              <span className="text-muted-foreground">{t('toraView')}</span>
+              {view.worth && (
+                <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                  {t('toraWorth')}
+                </span>
+              )}
+              {view.text && (
+                <span
+                  className={cn(
+                    view.tone === 'wait' && 'text-amber-700 dark:text-amber-300',
+                    view.tone === 'good' && 'text-emerald-700 dark:text-emerald-400',
+                  )}
+                >
+                  {view.text}
+                </span>
+              )}
+              {view.signals.length > 0 && (
+                <span className="text-muted-foreground">{view.signals.join(' · ')}</span>
+              )}
+            </span>
+          )}
         </span>
-        <span className="shrink-0 text-right text-sm tabular-nums">
-          {i.price !== null ? money(i.price) : '-'}
+        <span className="shrink-0 space-y-0.5 text-right tabular-nums">
+          <span className="block text-sm">{i.price !== null ? money(i.price) : '-'}</span>
+          {view?.now && (
+            <span className="block text-xs text-muted-foreground">
+              {t('toraNow', { price: view.now })}
+            </span>
+          )}
         </span>
       </>
     );

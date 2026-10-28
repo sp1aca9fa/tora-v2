@@ -211,8 +211,24 @@ function rowOf(
                 target: o.target ? money(o.target) : '-',
               },
             ),
+            // Whether prices got that low before.
+            past:
+              o.wait.under !== null && o.low
+                ? t(o.wait.under < o.low ? 'opportunities.waitBelowLow' : 'opportunities.waitLow', {
+                    low: money(o.low),
+                  })
+                : null,
           }
         : null,
+    targetWhy: o.basis
+      ? [
+          t(`opportunities.targetBasis.${o.basis}`),
+          o.pattern && t('opportunities.targetPattern'),
+          o.basis !== 'watch' && t('opportunities.targetStrategy'),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : null,
     good: o.verdict === 'good' && (!o.wait || (over !== null && over <= 0)),
     askUnder:
       o.askUnder && o.ask && n.price

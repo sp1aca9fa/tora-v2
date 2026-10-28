@@ -42,8 +42,10 @@ export interface OpportunityRowData {
   reach: number | null;
   /** The bar's color: at or under the target, close, between, far over it, or a warning's wait. */
   tone: keyof typeof BAR;
-  /** A warning on: wait, or buy under a lower price, and why. */
-  wait: { label: string; why: string } | null;
+  /** A warning on: wait, or buy under a lower price, why, and whether prices got that low before. */
+  wait: { label: string; why: string; past: string | null } | null;
+  /** How the target is worked out. */
+  targetWhy: string | null;
   /** Buy timing says a good price now. */
   good: boolean;
   askUnder: string | null;
@@ -148,7 +150,18 @@ export function OpportunityRow({
             </span>
             {o.target && (
               <span className="text-xs text-muted-foreground">
-                {labels.target} <span className="text-foreground">{o.target}</span>
+                {o.targetWhy ? (
+                  <InfoTag
+                    label={`${labels.target} ${o.target}`}
+                    className="px-0 font-normal text-muted-foreground"
+                  >
+                    <span className="block">{o.targetWhy}</span>
+                  </InfoTag>
+                ) : (
+                  <>
+                    {labels.target} <span className="text-foreground">{o.target}</span>
+                  </>
+                )}
                 {o.toGo && !o.wait && <> · {o.toGo}</>}
               </span>
             )}
@@ -157,6 +170,7 @@ export function OpportunityRow({
             <div className="flex flex-wrap items-baseline justify-end gap-x-2 text-xs">
               <InfoTag label={o.wait.label} className={CHIP.warning} icon={TriangleAlert}>
                 <span className="block">{o.wait.why}</span>
+                {o.wait.past && <span className="block">{o.wait.past}</span>}
               </InfoTag>
               {o.toGo && <span className="text-muted-foreground">{o.toGo}</span>}
             </div>

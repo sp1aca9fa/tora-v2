@@ -43,7 +43,7 @@ export function ConditionPicker({ types }: { types: ConditionTypeView[] }) {
           <fieldset key={v.type} className="space-y-1.5">
             <legend className="text-sm font-medium">{v.label}</legend>
             {v.buckets.map((b) => (
-              <label key={b.bucket} className="flex items-center gap-2 text-sm">
+              <label key={b.bucket} className="flex items-center gap-2 py-1 text-sm">
                 <input
                   type="checkbox"
                   className="size-4"

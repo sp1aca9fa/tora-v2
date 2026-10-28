@@ -21,13 +21,17 @@ past prices only and is never a sure thing.
     and Watch (an icon by the name). The price bar's color: green at or under the target, blue
     within 10 %, red 30 % or more over it, amber while a warning says wait. With a proven warning
     on (the market's too) after which prices fell, the card says **Wait, or under** a price: the
-    target lowered by the warning's typical change 90 days later on the group's past prices (a
-    tap says why), and the bar and "to go" measure against it. A signal tag links to its row on
+    target (else the price now) lowered by the warning's typical change 90 days later on the
+    group's past prices (a tap says why, and whether the item sold that low in the past year: on 1
+    day in 10, or not even then). A tap on the target says how it is worked out (the buy zone's
+    basis, or the watch), and the bar and "to go" measure against it. A signal tag links to its row on
     Signals. Only the conditions the person wants suggested for each type show (Watchlist >
     Strategy, "Conditions to suggest"; every condition until chosen); the Buy plan follows it,
     and the person's watches and plan show whatever their condition.
   - **Popular now** (`/opportunities/popular`): each ranking with pictures and links, the first
-    10 shown, the rest on demand.
+    10 shown, the rest on demand; under each ranked item Tora's view (worth a look, wait or under a
+    price, good price, or the target and how far), its proven signals and warnings, and Tora's
+    price next to the site's.
   - **Signals** (`/opportunities/signals`): the three signals that beat buying on any day by most,
     links to each item type, then each group's signals and their record against buying on any
     day; groups with nothing proven are folded ("few checks"), rows under 10 checks greyed.

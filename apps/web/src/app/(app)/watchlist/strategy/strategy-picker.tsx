@@ -27,6 +27,8 @@ export interface StrategyTypeView {
   current: StrategyChoice;
   /** The person chose for this type (else the current one is the suggestion). */
   chosen: boolean;
+  /** Their watches of this type with a price today, and how many each strategy calls good. */
+  today: { watches: number; good: Record<StrategyKey, number> };
 }
 
 const EXAMPLES = strategyExamples();
@@ -42,6 +44,7 @@ export function StrategyPicker({ types }: { types: StrategyTypeView[] }) {
   }));
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">{t('notAdvice')}</p>
       {unchosen.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
           <p>{t('suggestAll', { count: unchosen.length })}</p>
@@ -67,7 +70,6 @@ export function StrategyPicker({ types }: { types: StrategyTypeView[] }) {
       ) : (
         <Tabs tabs={panels} />
       )}
-      <p className="text-xs text-muted-foreground">{t('notAdvice')}</p>
     </div>
   );
 }
@@ -100,8 +102,10 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
   const inUse = view.chosen && same(choice, view.current);
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-2 rounded-xl border bg-card p-4">
+    // Wide screens: the example on the left, the strategies on the right.
+    // Phones: the strategies first, the example after.
+    <div className="flex flex-col gap-4 xl:grid xl:grid-cols-2 xl:items-start xl:gap-x-4 xl:gap-y-3">
+      <div className="order-last space-y-2 rounded-xl border bg-card p-4 xl:sticky xl:top-4 xl:order-none xl:row-span-3">
         <p className="text-xs text-muted-foreground">{t('exampleIntro')}</p>
         <div className="flex flex-wrap gap-2" role="group">
           {EXAMPLES.map((e) => (
@@ -109,7 +113,7 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
               key={e.key}
               type="button"
               size="sm"
-              variant={e.key === example.key ? 'default' : 'outline'}
+              variant={e.key === example.key ? 'secondary' : 'ghost'}
               aria-pressed={e.key === example.key}
               onClick={() => setExample(e)}
             >
@@ -122,18 +126,20 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
         <p className="text-xs text-muted-foreground">{t('chartLegend')}</p>
       </div>
 
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <p className="text-sm font-medium xl:col-start-2">{t('pickOne')}</p>
+      <ul className="grid gap-2 sm:grid-cols-2 xl:col-start-2">
         {STRATEGIES.map((s) => {
           const r = resultOf(s);
           const active = s === picked;
           return (
-            <li key={s}>
+            // An odd last card takes the whole row.
+            <li key={s} className="space-y-2 sm:[&:last-child:nth-child(odd)]:col-span-2">
               <button
                 type="button"
                 onClick={() => setPicked(s)}
                 aria-pressed={active}
                 className={cn(
-                  'h-full w-full space-y-1 rounded-xl border bg-card p-3 text-left text-sm transition-colors',
+                  'flex h-full w-full flex-col items-stretch justify-start gap-1 rounded-xl border bg-card p-3 text-left text-sm transition-colors',
                   active ? 'border-primary ring-1 ring-primary' : 'hover:bg-accent/50',
                 )}
               >
@@ -153,6 +159,11 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
                 <span className="block text-xs text-muted-foreground">
                   {t(`about.${s}`, { margin })}
                 </span>
+                {view.today.watches > 0 && s !== 'target' && (
+                  <span className="block text-xs font-medium">
+                    {t('todayGood', { good: view.today.good[s], watches: view.today.watches })}
+                  </span>
+                )}
                 {r && (
                   <span className="block text-xs">
                     {t('calls', { count: r.calls.length })}
@@ -173,32 +184,41 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
                   </span>
                 )}
               </button>
+              {s === 'margin' && active && (
+                <label className="flex items-center gap-2 px-1 text-sm">
+                  {t('marginLabel')}
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={margin}
+                    onChange={(e) =>
+                      setMargin(Math.min(50, Math.max(1, Number(e.target.value) || 1)))
+                    }
+                    className="w-20"
+                  />
+                  %
+                </label>
+              )}
             </li>
           );
         })}
       </ul>
 
-      {picked === 'margin' && (
-        <label className="flex items-center gap-2 text-sm">
-          {t('marginLabel')}
-          <Input
-            type="number"
-            min={1}
-            max={50}
-            value={margin}
-            onChange={(e) => setMargin(Math.min(50, Math.max(1, Number(e.target.value) || 1)))}
-            className="w-20"
-          />
-          %
-        </label>
+      {inUse ? (
+        <p className="inline-flex items-center gap-1 text-sm text-emerald-700 xl:col-start-2 dark:text-emerald-400">
+          <Check className="size-4" />{' '}
+          {t('inUseFor', { name: t(`name.${picked}`), type: view.label })}
+        </p>
+      ) : (
+        <Button
+          className="self-start xl:col-start-2 xl:justify-self-start"
+          disabled={pending}
+          onClick={() => start(() => saveStrategyAction({ [view.type]: choice }))}
+        >
+          {t('use', { name: t(`name.${picked}`), type: view.label })}
+        </Button>
       )}
-
-      <Button
-        disabled={pending || inUse}
-        onClick={() => start(() => saveStrategyAction({ [view.type]: choice }))}
-      >
-        {inUse ? t('inUse') : t('use', { name: t(`name.${picked}`), type: view.label })}
-      </Button>
     </div>
   );
 }

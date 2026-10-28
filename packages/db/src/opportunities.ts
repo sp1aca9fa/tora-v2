@@ -12,6 +12,7 @@ import {
   type SignalRule,
   type SignalRuleInfo,
   type Verdict,
+  type ZoneBasis,
   ASK_FLOOR,
   ASK_UNDER,
   BUYLIST_NEAR,
@@ -361,20 +362,9 @@ export async function opportunitiesFor(
 }
 
 /** An item on the Worth a look list (S26): its opportunity, the item, and the person's target. */
-export interface OpportunityCard extends Opportunity {
+export interface OpportunityCard extends Opportunity, ItemView {
   product: Product;
   owned: boolean;
-  watching: boolean;
-  /** The price now (buy timing's fair value, else the 30-day median). */
-  now: number | null;
-  /** The top of the person's buy zone (buy timing, their strategy), else their watch's target. */
-  target: number | null;
-  verdict: Verdict | null;
-  /**
-   * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
-   * (else the price now) lowered by that fall (S27).
-   */
-  wait: ReturnType<typeof waitPrice>;
   imageVersion: string | null;
   ranks: (RankView & { label: string })[];
 }
@@ -445,6 +435,93 @@ export function withMarket(
  */
 export const worthALook = (o: Pick<Opportunity, 'proven' | 'score'>) =>
   o.proven.length > 0 && o.score > 0;
+
+/** The person's view of an item (S26, S27): its price against their target, and why. */
+export interface ItemView {
+  /** The price now (buy timing's fair value, else the 30-day median). */
+  now: number | null;
+  /** The top of the person's buy zone (buy timing, their strategy), else their watch's target. */
+  target: number | null;
+  /** What the target comes from: the buy zone's basis, or the watch. */
+  basis: ZoneBasis | 'watch' | null;
+  /** The zone lowered by the new-set pattern. */
+  pattern: boolean;
+  verdict: Verdict | null;
+  /**
+   * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
+   * (else the price now) lowered by that fall (S27).
+   */
+  wait: ReturnType<typeof waitPrice>;
+  /** The past year's cheapest tenth of days: at or under this on 1 day in 10. */
+  low: number | null;
+  watching: boolean;
+}
+
+/** Each item's view for a person, in order; `saved`: the items as saved (the market's warnings). */
+async function itemViews(
+  db: Db,
+  user: Pick<User, 'id' | 'preferences'>,
+  list: Opportunity[],
+  saved: Opportunity[],
+  now: Date,
+): Promise<ItemView[]> {
+  const [watched, stats] = await Promise.all([
+    db
+      .select({ id: watches.productId, bucket: watches.bucket, target: watches.targetPriceBase })
+      .from(watches)
+      .where(eq(watches.userId, user.id)),
+    latestSignals(
+      db,
+      list.map((o) => ({ productId: o.productId, bucket: o.bucket })),
+      now,
+    ),
+  ]);
+  const warned = new Map(saved.map((o) => [`${o.productId}|${o.bucket}`, o.warnings]));
+  return list.map((o) => {
+    const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
+    const j = s ? judge(s, strategyOf(user.preferences, o.itemType)) : null;
+    const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
+    const zone = j?.zone.top ? j.zone : null;
+    const target = zone?.top ?? watch?.target ?? null;
+    const price = s?.fair ?? o.numbers.price;
+    return {
+      now: price,
+      target,
+      basis: zone?.basis ?? (watch?.target ? 'watch' : null),
+      pattern: !!zone?.pattern,
+      verdict: j?.verdict ?? null,
+      // Without a target, today's price lowered.
+      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target ?? price),
+      low: s?.q10d365 ?? null,
+      watching: watched.some((w) => w.id === o.productId),
+    };
+  });
+}
+
+/**
+ * Tora's view of ranked items (S27, Popular): each one's signals (the market's warnings left out
+ * of its score) and the person's view, by item.
+ */
+export async function rankedViews(
+  db: Db,
+  user: Pick<User, 'id' | 'preferences'>,
+  productIds: string[],
+  now = new Date(),
+): Promise<{
+  items: Map<string, Opportunity & ItemView & { worth: boolean }>;
+  rules: SignalRuleInfo[];
+}> {
+  const saved = await loadOpportunities(db);
+  if (!saved || !productIds.length) return { items: new Map(), rules: [] };
+  const wanted = new Set(productIds);
+  const { adjusted } = withMarket(saved.items, saved.rules);
+  const list = adjusted.filter((o) => wanted.has(o.productId));
+  const views = await itemViews(db, user, list, saved.items, now);
+  return {
+    items: new Map(list.map((o, i) => [o.productId, { ...o, ...views[i]!, worth: worthALook(o) }])),
+    rules: saved.rules,
+  };
+}
 
 /** How far over its target an item is (0 at or under it); unknown last. */
 const gap = (c: { now: number | null; target: number | null }) =>
@@ -520,41 +597,15 @@ export async function opportunityCards(
         (k) => o.proven.includes(k) || saved.items[i]!.warnings.includes(k),
       ),
   );
-  const [owned, watched] = await Promise.all([
+  const [owned, views] = await Promise.all([
     db
       .selectDistinct({ id: holdings.productId })
       .from(holdings)
       .where(and(eq(holdings.userId, user.id), eq(holdings.status, 'owned'))),
-    db
-      .select({ id: watches.productId, bucket: watches.bucket, target: watches.targetPriceBase })
-      .from(watches)
-      .where(eq(watches.userId, user.id)),
+    itemViews(db, user, list, saved.items, now),
   ]);
   const own = new Set(owned.map((r) => r.id));
-  const stats = await latestSignals(
-    db,
-    list.map((o) => ({ productId: o.productId, bucket: o.bucket })),
-    now,
-  );
-  const choice = strategyOf(user.preferences, type ?? '');
-  // The warnings as saved: the market's too.
-  const warned = new Map(saved.items.map((o) => [`${o.productId}|${o.bucket}`, o.warnings]));
-  const ordered = list.map((o) => {
-    const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
-    const j = s ? judge(s, choice) : null;
-    const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
-    const target = j?.zone.top ?? watch?.target ?? null;
-    const price = s?.fair ?? o.numbers.price;
-    return {
-      o,
-      now: price,
-      target,
-      verdict: j?.verdict ?? null,
-      // Without a target, today's price lowered.
-      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target ?? price),
-      watching: watched.some((w) => w.id === o.productId),
-    };
-  });
+  const ordered = list.map((o, i) => ({ o, ...views[i]! }));
   ordered.sort(
     (a, b) =>
       Number(worthALook(b.o)) - Number(worthALook(a.o)) ||
