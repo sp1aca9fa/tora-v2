@@ -15,6 +15,8 @@ import { PickSignal } from '../pick-signal';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
+/** A share's gap in percentage points ("+18"). */
+const signedPoints = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}`;
 
 /**
  * Signals and their record (S13, as a sub page S26): per item type, each group's signals tested
@@ -62,6 +64,7 @@ export default async function SignalsPage() {
                   {t('opportunities.colChecked')}
                 </th>
                 <th className="px-3 py-2 text-right font-medium">{t('opportunities.colHigher')}</th>
+                <th className="px-3 py-2 text-right font-medium">{t('opportunities.colVsAny')}</th>
                 <th className="px-3 py-2 text-right font-medium">{t('opportunities.colChange')}</th>
               </tr>
             </thead>
@@ -72,6 +75,7 @@ export default async function SignalsPage() {
                 <td className="px-3 py-1.5 text-right">
                   {higher(tests.any.higher, tests.any.checked)}
                 </td>
+                <td className="px-3 py-1.5 text-right">-</td>
                 <td className="px-3 py-1.5 text-right">
                   {tests.any.change !== null ? signed(tests.any.change) : '-'}
                 </td>
@@ -113,6 +117,15 @@ export default async function SignalsPage() {
                     </td>
                     <td className="px-3 py-1.5 text-right">{r.checked}</td>
                     <td className="px-3 py-1.5 text-right">{higher(r.higher, r.checked)}</td>
+                    <td className="px-3 py-1.5 text-right">
+                      {r.checked && tests.any.checked
+                        ? t('opportunities.points', {
+                            n: signedPoints(
+                              r.higher / r.checked - tests.any.higher / tests.any.checked,
+                            ),
+                          })
+                        : '-'}
+                    </td>
                     <td className="px-3 py-1.5 text-right">
                       {r.change !== null ? signed(r.change) : '-'}
                     </td>

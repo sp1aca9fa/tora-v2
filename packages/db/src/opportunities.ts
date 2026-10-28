@@ -355,6 +355,14 @@ export interface OpportunityCard extends Opportunity {
   ranks: (RankView & { label: string })[];
 }
 
+/** A warning on for nearly every item of a type: how many of how many, and its record. */
+export interface MarketWarning {
+  key: OpportunitySignal;
+  on: number;
+  of: number;
+  tests: OpportunityTests | null;
+}
+
 /** The types and the signals proven in each, for the page's chips. */
 export interface OpportunitySummary {
   types: { type: string; items: number; proven: number }[];
@@ -368,6 +376,12 @@ export interface OpportunitySummary {
     }[]
   >;
 }
+
+/**
+ * Worth a look: a proven signal on, and the proven signals outweighing the warnings (an item whose
+ * warning outweighs its signal is ranked with the rest).
+ */
+const worth = (o: Pick<Opportunity, 'proven' | 'score'>) => o.proven.length > 0 && o.score > 0;
 
 /** How far over its target an item is (0 at or under it); unknown last. */
 const gap = (c: { now: number | null; target: number | null }) =>
@@ -400,19 +414,47 @@ export async function opportunityCards(
    * Warnings on for nearly every item of the type (the market's): how many of how many, and the
    * record on the group with the most of them. Left out of the items' warnings and scores.
    */
-  market: { key: OpportunitySignal; on: number; of: number; tests: OpportunityTests | null }[];
+  market: MarketWarning[];
   items: OpportunityCard[];
   /** An item of each group of the type's signals, to name the group. */
   groupItems: Record<string, Product>;
 } | null> {
   const saved = await loadOpportunities(db);
   if (!saved) return null;
+  // Per type, the warnings on for nearly every item (the market's): said once above the list,
+  // left out of each item's warnings and score.
+  const market = new Map<string, MarketWarning[]>();
+  for (const type of new Set(saved.items.map((o) => o.itemType))) {
+    const ofType = saved.items.filter((o) => o.itemType === type);
+    market.set(
+      type,
+      OPPORTUNITY_WARNINGS.flatMap((key) => {
+        const on = ofType.filter((o) => o.warnings.includes(key));
+        if (ofType.length < 5 || on.length < MARKET_SHARE * ofType.length) return [];
+        const count = (g: string) => on.filter((o) => o.group === g).length;
+        const biggest = on.toSorted((a, b) => count(b.group) - count(a.group))[0]!;
+        return [{ key, on: on.length, of: ofType.length, tests: biggest.tests }];
+      }),
+    );
+  }
+  const adjusted = saved.items.map((item) => {
+    const keys = new Set<OpportunitySignal>((market.get(item.itemType) ?? []).map((m) => m.key));
+    if (!keys.size) return item;
+    const off = item.warnings.filter((k) => keys.has(k));
+    return {
+      ...item,
+      warnings: item.warnings.filter((k) => !keys.has(k)),
+      score: off.reduce(
+        (score, k) => score - (provenEdge(item.tests ?? undefined, k, saved.rules) ?? 0),
+        item.score,
+      ),
+    };
+  });
   const summary: OpportunitySummary = { types: [], signals: {} };
   for (const o of saved.items) {
     let t = summary.types.find((x) => x.type === o.itemType);
     if (!t) summary.types.push((t = { type: o.itemType, items: 0, proven: 0 }));
     t.items++;
-    if (o.proven.length) t.proven++;
     if (!o.tests) continue;
     const list = (summary.signals[o.itemType] ??= []);
     for (const key of [...o.proven, ...o.warnings]) {
@@ -423,24 +465,21 @@ export async function opportunityCards(
       }
     }
   }
+  for (const o of adjusted) {
+    if (worth(o)) summary.types.find((x) => x.type === o.itemType)!.proven++;
+  }
   // The type with the most items worth a look first.
   summary.types.sort((a, b) => b.proven - a.proven || b.items - a.items);
   const type = summary.types.some((t) => t.type === filter.type)
     ? filter.type
     : (summary.types[0]?.type ?? null);
-  const ofType = saved.items.filter((o) => o.itemType === type);
-  const market = OPPORTUNITY_WARNINGS.flatMap((key) => {
-    const on = ofType.filter((o) => o.warnings.includes(key));
-    if (ofType.length < 5 || on.length < MARKET_SHARE * ofType.length) return [];
-    const count = (g: string) => on.filter((o) => o.group === g).length;
-    const biggest = on.toSorted((a, b) => count(b.group) - count(a.group))[0]!;
-    return [{ key, on: on.length, of: ofType.length, tests: biggest.tests }];
-  });
-  const marketKeys = new Set<OpportunitySignal>(market.map((m) => m.key));
-  const list = saved.items.filter(
-    (o) =>
+  // Filtered on the item's signals as saved: a market warning too.
+  const list = adjusted.filter(
+    (o, i) =>
       o.itemType === type &&
-      (filter.signals ?? []).every((k) => o.proven.includes(k) || o.warnings.includes(k)),
+      (filter.signals ?? []).every(
+        (k) => o.proven.includes(k) || saved.items[i]!.warnings.includes(k),
+      ),
   );
   const [owned, watched] = await Promise.all([
     db
@@ -459,22 +498,7 @@ export async function opportunityCards(
     now,
   );
   const choice = strategyOf(user.preferences, type ?? '');
-  const ordered = list.map((item) => {
-    // The market's warnings are said once, above the list.
-    const o = marketKeys.size
-      ? {
-          ...item,
-          warnings: item.warnings.filter((k) => !marketKeys.has(k)),
-          score:
-            item.score -
-            item.warnings
-              .filter((k) => marketKeys.has(k))
-              .reduce(
-                (sum, k) => sum + (provenEdge(item.tests ?? undefined, k, saved.rules) ?? 0),
-                0,
-              ),
-        }
-      : item;
+  const ordered = list.map((o) => {
     const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
     const j = s ? judge(s, choice) : null;
     const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
@@ -488,7 +512,7 @@ export async function opportunityCards(
   });
   ordered.sort(
     (a, b) =>
-      Number(b.o.proven.length > 0) - Number(a.o.proven.length > 0) ||
+      Number(worth(b.o)) - Number(worth(a.o)) ||
       Number(b.o.picked.length > 0) - Number(a.o.picked.length > 0) ||
       b.o.score - a.o.score ||
       gap(a) - gap(b) ||
@@ -515,10 +539,10 @@ export async function opportunityCards(
       [...samples].flatMap(([group, id]) => (byId.has(id) ? [[group, byId.get(id)!]] : [])),
     ),
     total: ordered.length,
-    proven: ordered.filter((c) => c.o.proven.length > 0).length,
-    picked: ordered.filter((c) => !c.o.proven.length && c.o.picked.length > 0).length,
+    proven: ordered.filter((c) => worth(c.o)).length,
+    picked: ordered.filter((c) => !worth(c.o) && c.o.picked.length > 0).length,
     rules: saved.rules,
-    market,
+    market: market.get(type ?? '') ?? [],
     items: page.flatMap(({ o, ...c }) => {
       const product = byId.get(o.productId);
       if (!product) return [];

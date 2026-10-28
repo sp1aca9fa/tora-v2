@@ -130,6 +130,28 @@ it('ranks proven items first, then the rest nearest their target, in batches', a
   expect((await opportunityCards(db, user, { type: 'nope' }, 0, 1, now))!.type).toBe('sealed');
 });
 
+it('ranks an item whose warning outweighs its signal with the rest', async () => {
+  const a = await box('Outweighed', ['sales_up', 'sales_down'], 9000);
+  const b = await box('Plain good', ['sales_up'], 9000);
+  await saveSetting(db, 'opportunities', {
+    day: localDate(now),
+    tests: {
+      [GROUP]: {
+        day: localDate(now),
+        items: 2,
+        any: test(100, 60),
+        signals: { sales_up: test(20, 18), sales_down: test(20, 2) },
+      },
+    },
+    items: [a, b].map((x) => x.item),
+  });
+  const user = { id: uid, preferences: null };
+  const c = (await opportunityCards(db, user, { type: 'sealed' }, 0, 20, now))!;
+  expect(c.proven).toBe(1);
+  expect(c.summary.types[0]!.proven).toBe(1);
+  expect(c.items.map((i) => i.product.name)).toEqual(['Plain good', 'Outweighed']);
+});
+
 it('puts a plug-in signal an admin picks after the proven items, apart', async () => {
   const a = await box('Proven', ['sales_up'], 9000);
   const b = await box('Picked', ['slab_cheap'], 9000);

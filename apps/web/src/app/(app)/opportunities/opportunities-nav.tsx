@@ -24,7 +24,7 @@ export function OpportunitiesNav() {
           href={href}
           aria-current={pathname === href ? 'page' : undefined}
           className={cn(
-            '-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+            '-mb-px shrink-0 border-b-2 px-2.5 py-2 sm:px-4 text-sm font-medium transition-colors',
             pathname === href
               ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground',

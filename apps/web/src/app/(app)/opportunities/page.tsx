@@ -38,14 +38,6 @@ export default async function WorthALookPage({
       'rounded-full border px-3 py-1 text-sm transition-colors',
       active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
     );
-  /** The share higher 90 days later on the group with the most checks. */
-  const share = (s: (typeof signals)[number]) => {
-    const g = s.groups.toSorted(
-      (a, b) => (b.tests.signals[s.key]?.checked ?? 0) - (a.tests.signals[s.key]?.checked ?? 0),
-    )[0];
-    const r = g?.tests.signals[s.key];
-    return r?.checked ? `${Math.round((r.higher / r.checked) * 100)}%` : '';
-  };
   const chosen = signals.filter((s) => filter.signals.includes(s.key));
 
   return (
@@ -59,7 +51,10 @@ export default async function WorthALookPage({
               aria-current={x.type === type ? 'page' : undefined}
               className={chip(x.type === type)}
             >
-              {typeLabel(t, x.type)} <span className="tabular-nums opacity-70">{x.proven}</span>
+              {typeLabel(t, x.type)}{' '}
+              <span className="text-xs tabular-nums opacity-70">
+                {t('opportunities.typeCount', { proven: x.proven, items: x.items })}
+              </span>
             </Link>
           ))}
         </div>
@@ -79,12 +74,22 @@ export default async function WorthALookPage({
                     s.warning && !on && 'text-amber-800 dark:text-amber-300',
                   )}
                 >
-                  {signalLabel(t, s.key, data.rules)}{' '}
-                  <span className="tabular-nums">{share(s)}</span>
+                  {signalLabel(t, s.key, data.rules)}
                 </Link>
               );
             })}
           </div>
+        )}
+        {filter.signals.length > 0 && (
+          <p className="text-xs">
+            {t('opportunities.filtered', {
+              count: data.total,
+              signals: filter.signals.map((k) => signalLabel(t, k, data.rules)).join(' + '),
+            })}{' '}
+            <Link href={href({ type })} className="underline">
+              {t('opportunities.clearFilter')}
+            </Link>
+          </p>
         )}
         {chosen.length > 0 && (
           <ul className="max-w-3xl space-y-0.5 text-xs text-muted-foreground">
@@ -138,6 +143,7 @@ export default async function WorthALookPage({
           target: t('opportunities.target'),
           good: t('opportunities.goodNow'),
           watch: t('opportunities.watch'),
+          noSignal: t('opportunities.noSignal'),
         }}
       />
     </div>

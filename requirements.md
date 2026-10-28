@@ -1044,6 +1044,8 @@ Decided 2026-10-28 (user, decision log), from the S26 check. Steps, each built a
 
 Acceptance: the user's check after each step that shows in the app; a UX review (`docs/ux-review.md`) before each.
 
+First UX review (2026-10-28, steps 1-3, on the real-data test copy): fixed what it marked "fix": an item whose proven warning outweighs its proven signal was listed as worth a look (now with the rest; the type chips count the same way, "1 of 64"); a shorter intro on every tab; the four tabs fit a phone ("Popular"); the signal chips without a bare percent that read as a price change; "Prices as of"; the market note in plain words; a filter line with the count and Clear; "No signal today" on cards with no tag; the Signals tables with a "Vs any day" column in points; a plain empty Popular page. Left to the owner: owned items among the suggestions, warning chips as a filter, grading warnings by strength, folding groups with few checks. The Buy plan findings go to steps 4-5.
+
 ## S18: Documentation pass
 
 The last phase (user, 2026-10-16): nothing to build, so it comes after everything else. Each phase keeps its guide current as it goes; this pass reads `docs/` and the README from start to finish against the app as it is then (S17, S9, S13, S10's France + China setup, S14, S15 all change what a newcomer sees), fixes what drifted, fills gaps, and checks every command and link. To consider then: the Japanese documentation for the portfolio (Open issues).

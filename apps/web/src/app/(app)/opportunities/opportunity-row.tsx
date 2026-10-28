@@ -52,6 +52,7 @@ export interface OpportunityLabels {
   target: string;
   good: string;
   watch: string;
+  noSignal: string;
 }
 
 export function OpportunityRow({
@@ -95,6 +96,9 @@ export function OpportunityRow({
             <span className="block text-muted-foreground">{s.record}</span>
           </InfoTag>
         ))}
+        {!o.good && !o.ranks.length && !o.signals.length && (
+          <span className="text-xs text-muted-foreground">{labels.noSignal}</span>
+        )}
       </div>
       {o.now !== null && (
         <div className="space-y-1 text-sm tabular-nums">

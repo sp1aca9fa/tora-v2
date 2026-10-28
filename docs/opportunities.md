@@ -11,8 +11,9 @@ past prices only and is never a sure thing.
   - **Worth a look** (`/opportunities`): chips per item type and per signal proven in it,
     warnings too (tap one or more: the list keeps the items with all of them on, and each one's
     record per group shows), then every item of the type best
-    first: those with a proven signal (by score), then apart those without (by their signals not
-    proven yet); equal scores nearest their target first. 20 items come from the server at a time
+    first: those whose proven signals outweigh their warnings (by score), then an admin's picks,
+    then apart the rest (by their signals not proven yet); equal scores nearest their target
+    first. 20 items come from the server at a time
     as the list is scrolled. A card shows the picture, the name, owned / watching / suggested, its
     ranks and signals as tags (a tap opens why a signal is on and its record), the price now
     against a target (the top of the person's buy zone from [Buy timing](buy-timing.md), else
