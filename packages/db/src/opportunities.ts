@@ -372,7 +372,7 @@ export interface OpportunityCard extends Opportunity {
   verdict: Verdict | null;
   /**
    * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
-   * lowered by that fall (S27).
+   * (else the price now) lowered by that fall (S27).
    */
   wait: ReturnType<typeof waitPrice>;
   imageVersion: string | null;
@@ -544,12 +544,14 @@ export async function opportunityCards(
     const j = s ? judge(s, choice) : null;
     const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
     const target = j?.zone.top ?? watch?.target ?? null;
+    const price = s?.fair ?? o.numbers.price;
     return {
       o,
-      now: s?.fair ?? o.numbers.price,
+      now: price,
       target,
       verdict: j?.verdict ?? null,
-      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target),
+      // Without a target, today's price lowered.
+      wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target ?? price),
       watching: watched.some((w) => w.id === o.productId),
     };
   });

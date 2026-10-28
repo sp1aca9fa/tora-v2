@@ -51,7 +51,7 @@ export function ConditionPicker({ types }: { types: ConditionTypeView[] }) {
                   onChange={(e) => toggle(v.type, b.bucket, e.target.checked)}
                 />
                 {b.label}
-                <span className="text-xs text-muted-foreground tabular-nums">
+                <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                   {t('conditionItems', { count: b.items })}
                 </span>
               </label>

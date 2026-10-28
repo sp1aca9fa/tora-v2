@@ -15,6 +15,9 @@ import { groupLabel, signalAnchor, signalLabel, typeLabel } from '../cards';
 import { CHIP } from '../opportunity-row';
 import { PickSignal } from '../pick-signal';
 
+/** Tables in balanced columns on wide screens. */
+const COLUMNS = 'gap-4 xl:columns-2 min-[1800px]:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid';
+
 interface Group {
   group: string;
   tests: OpportunityTests;
@@ -67,13 +70,15 @@ export default async function SignalsPage() {
     )
     .sort((a, b) => b.edge - a.edge)
     .slice(0, 3);
+  /** A group with a proven signal or warning. */
+  const proven = (g: Pick<Group, 'tests'>) =>
+    Object.keys(g.tests.signals).some((k) => provenEdge(g.tests, k, rules) !== null);
   const higher = (h: number, c: number) => (c ? pct(h / c) : '-');
   const table = ({ group, tests, product }: Group) => {
     const keys = (Object.keys(tests.signals) as OpportunitySignal[]).sort();
-    // Groups with a proven signal or warning open; the rest (few checks) folded.
-    const open = keys.some((k) => provenEdge(tests, k, rules) !== null);
+    const open = proven({ tests });
     return (
-      <details key={group} open={open} className="group/g min-w-0 space-y-2">
+      <details key={group} open className="min-w-0 space-y-2">
         <summary className="cursor-pointer text-sm font-medium">
           {groupLabel(t, product)}{' '}
           <span className="font-normal text-muted-foreground">
@@ -91,7 +96,9 @@ export default async function SignalsPage() {
                 </th>
                 <th className="px-3 py-2 text-right font-medium">{t('opportunities.colHigher')}</th>
                 <th className="px-3 py-2 text-right font-medium">{t('opportunities.colVsAny')}</th>
-                <th className="px-3 py-2 text-right font-medium">{t('opportunities.colChange')}</th>
+                <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">
+                  {t('opportunities.colChange')}
+                </th>
               </tr>
             </thead>
             <tbody className="tabular-nums [&_td:not(:first-child)]:whitespace-nowrap">
@@ -102,7 +109,7 @@ export default async function SignalsPage() {
                   {higher(tests.any.higher, tests.any.checked)}
                 </td>
                 <td className="px-3 py-1.5 text-right">-</td>
-                <td className="px-3 py-1.5 text-right">
+                <td className="hidden px-3 py-1.5 text-right sm:table-cell">
                   {tests.any.change !== null ? signed(tests.any.change) : '-'}
                 </td>
               </tr>
@@ -153,15 +160,17 @@ export default async function SignalsPage() {
                     <td className="px-3 py-1.5 text-right">{r.checked}</td>
                     <td className="px-3 py-1.5 text-right">{higher(r.higher, r.checked)}</td>
                     <td className="px-3 py-1.5 text-right">
-                      {r.checked && tests.any.checked
-                        ? t('opportunities.points', {
-                            n: signedPoints(
-                              r.higher / r.checked - tests.any.higher / tests.any.checked,
-                            ),
-                          })
-                        : '-'}
+                      {r.checked < PROVEN_MIN_CHECKS
+                        ? t('opportunities.tooFew')
+                        : tests.any.checked
+                          ? t('opportunities.points', {
+                              n: signedPoints(
+                                r.higher / r.checked - tests.any.higher / tests.any.checked,
+                              ),
+                            })
+                          : '-'}
                     </td>
-                    <td className="px-3 py-1.5 text-right">
+                    <td className="hidden px-3 py-1.5 text-right sm:table-cell">
                       {r.change !== null ? signed(r.change) : '-'}
                     </td>
                   </tr>
@@ -206,7 +215,8 @@ export default async function SignalsPage() {
         </section>
       )}
       {types.length > 1 && (
-        <nav className="flex flex-wrap gap-2 text-xs">
+        <nav className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{t('opportunities.jumpTo')}</span>
           {types.map((type) =>
             groups(type).length ? (
               <a
@@ -222,12 +232,20 @@ export default async function SignalsPage() {
       )}
       {types.map((type) => {
         const list = groups(type);
+        // Groups with nothing proven (few checks) folded together.
+        const few = list.filter((g) => !proven(g));
         return list.length ? (
           <section key={type} id={`type-${type}`} className="scroll-mt-20 space-y-3">
             <h2 className="font-semibold">{typeLabel(t, type)}</h2>
-            <div className="gap-4 xl:columns-2 min-[1800px]:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
-              {list.map(table)}
-            </div>
+            <div className={COLUMNS}>{list.filter(proven).map(table)}</div>
+            {few.length > 0 && (
+              <details className="space-y-3">
+                <summary className="cursor-pointer text-sm text-muted-foreground">
+                  {t('opportunities.fewGroups', { count: few.length })}
+                </summary>
+                <div className={COLUMNS}>{few.map(table)}</div>
+              </details>
+            )}
           </section>
         ) : null;
       })}

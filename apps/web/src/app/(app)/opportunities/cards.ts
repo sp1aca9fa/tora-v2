@@ -199,7 +199,11 @@ function rowOf(
                 ? t('opportunities.waitUnder', { price: money(o.wait.under) })
                 : t('opportunities.wait'),
             why: t(
-              o.wait.under !== null ? 'opportunities.waitWhy' : 'opportunities.waitWhyNoTarget',
+              o.wait.under === null
+                ? 'opportunities.waitWhyNoTarget'
+                : o.target
+                  ? 'opportunities.waitWhy'
+                  : 'opportunities.waitWhyNow',
               {
                 signal: warning,
                 change: signed(o.wait.change),
