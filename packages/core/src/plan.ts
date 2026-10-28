@@ -78,3 +78,91 @@ export function checkPlan(
   }
   return { total, left: budget - total, late, undated, unpriced };
 }
+
+/** An item a suggested mix can pick (S27): its step, what it is, how good an opportunity. */
+export interface MixOption {
+  key: string;
+  step: PlanStep;
+  /** Its item type and set (or group): a mix spreads over both. */
+  type: string;
+  set: string;
+  /** Worth a look (proven signals outweighing warnings), its score, and a watch of the person's. */
+  worth: boolean;
+  score: number;
+  watched: boolean;
+}
+
+/** A balanced mix (S27): no item over this share of the budget, one item per set. */
+export const MIX_MAX_SHARE = 0.4;
+
+/** Best first: worth a look, buyable now (then from a day), then by score, then watched. */
+function mixRank(a: MixOption, b: MixOption): number {
+  const when = { now: 0, from: 1, under: 2, none: 3 };
+  return (
+    Number(b.worth) - Number(a.worth) ||
+    when[a.step.when] - when[b.step.when] ||
+    b.score - a.score ||
+    Number(b.watched) - Number(a.watched) ||
+    a.key.localeCompare(b.key)
+  );
+}
+
+/**
+ * Whether an option can go in a mix at all: a reason to buy it (worth a look, or watched; a good
+ * price alone is not one), a price within the share, a day by the date. An item to wait for comes
+ * in at its buy zone's top.
+ */
+function mixable(o: MixOption, budget: number, until: string | null): boolean {
+  if (!o.worth && !o.watched) return false;
+  if (o.step.price === null || o.step.when === 'none') return false;
+  if (o.step.price > budget * MIX_MAX_SHARE) return false;
+  return !(until && o.step.when === 'from' && o.step.day !== null && o.step.day > until);
+}
+
+/**
+ * A varied mix within a budget (S27, "spend a budget well"): first the best option of each item
+ * type (so more than one type when the budget allows), then the next best of any type, never two
+ * of one set nor one item over 40 % of the budget. Only items with a reason to buy (worth a look,
+ * watched) come in; those to wait for at their buy zone's top. Returns the keys picked, best
+ * first.
+ */
+export function suggestMix(options: MixOption[], budget: number, until: string | null): string[] {
+  const ranked = options.filter((o) => mixable(o, budget, until)).sort(mixRank);
+  const picked: MixOption[] = [];
+  let left = budget;
+  const fits = (o: MixOption) =>
+    o.step.price! <= left && !picked.some((p) => p.set === o.set || p.key === o.key);
+  const take = (o: MixOption) => {
+    picked.push(o);
+    left -= o.step.price!;
+  };
+  for (const type of [...new Set(ranked.map((o) => o.type))]) {
+    const best = ranked.find((o) => o.type === type && fits(o));
+    if (best) take(best);
+  }
+  for (const o of ranked) if (fits(o)) take(o);
+  return picked.sort(mixRank).map((o) => o.key);
+}
+
+/**
+ * The next best option for a pick of a mix (S27): one that fits the budget once the pick is out,
+ * keeps one item per set, and is not in the mix already; null when none.
+ */
+export function swapInMix(
+  options: MixOption[],
+  mix: string[],
+  out: string,
+  budget: number,
+  until: string | null,
+): string | null {
+  const byKey = new Map(options.map((o) => [o.key, o]));
+  const rest = mix.filter((k) => k !== out).flatMap((k) => byKey.get(k) ?? []);
+  const left = budget - rest.reduce((sum, o) => sum + (o.step.price ?? 0), 0);
+  const gone = byKey.get(out);
+  const next = options
+    .filter((o) => mixable(o, budget, until) && !mix.includes(o.key))
+    .filter((o) => o.step.price! <= left && !rest.some((p) => p.set === o.set))
+    .sort(mixRank);
+  // Rather another item of the same type, so the mix keeps its spread.
+  return (next.find((o) => o.type === gone?.type) ?? next[0])?.key ?? null;
+}

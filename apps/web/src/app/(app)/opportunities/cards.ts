@@ -150,7 +150,7 @@ function rowOf(
     version: o.imageVersion,
     meta: [
       o.bucket && bucketLabel(o.bucket, t),
-      o.owned && t('opportunities.owned'),
+      o.owned && t('opportunities.ownedAnother'),
       o.watching && t('opportunities.watching'),
       !o.product.createdBy && !o.owned && !o.watching && t('opportunities.candidate'),
     ].filter((m): m is string => Boolean(m)),

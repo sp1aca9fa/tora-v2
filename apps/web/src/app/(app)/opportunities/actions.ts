@@ -14,7 +14,8 @@ export async function savePlanAction(plan: {
   const { db, user } = await authed();
   const budget = Math.round(Number(plan.budget));
   if (!Number.isFinite(budget) || budget < 0) return { error: 'budget' };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(plan.until))) return { error: 'until' };
+  // The date is optional: '' for none.
+  if (plan.until && !/^\d{4}-\d{2}-\d{2}$/.test(String(plan.until))) return { error: 'until' };
   const items = (Array.isArray(plan.items) ? plan.items : [])
     .filter((i) => i && typeof i.productId === 'string' && typeof i.bucket === 'string')
     .slice(0, 200)

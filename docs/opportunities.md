@@ -28,8 +28,8 @@ past prices only and is never a sure thing.
 
 ## Budget and date
 
-On the Buy plan sub page: a budget and a date, and the items to choose from (those
-with a proven signal, the person's watches, and what their plan already holds). Each says when to
+On the Buy plan sub page: a budget, and a date when there is one, and the items to choose from
+(those worth a look, the person's watches, and what their plan already holds). Each says when to
 buy and at what price, from its buy timing ([Buy timing](buy-timing.md)) and the person's
 strategy for its type: buy now (a good price; a listing in the zone when cheaper), from a day (a
 new release waits until similar items' usual first-year low), or once under a price (falling,
@@ -38,6 +38,14 @@ their prices and says what is left of the budget, which come after the date and 
 price (no day). Saved in the person's preferences (`buyPlan`). Buy timing numbers are saved each
 night for these items too (besides those owned or watched), and for every item with signal
 numbers (their cards' target).
+
+**Suggest a mix** (S27) ticks a varied set within the budget: the best item of each item type
+first (so more than one type when the budget allows), then the next best of any type; never two
+items of one set, nor one item over 40 % of the budget. Only items with a reason to buy come in
+(worth a look, or watched; a good price alone is not one), best first: worth a look, buyable now,
+then by score. Items to wait for count at their buy zone's top. Each pick can be swapped for the
+next best that fits (of the same type first). When few items qualify, the rest of the budget is
+left free and the page says so, rather than filling it with items nothing points to.
 
 ## Rankings
 

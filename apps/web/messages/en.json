@@ -1897,6 +1897,8 @@
     "typeCount": "{proven} of {items}",
     "filtered": "{count} items with {signals}.",
     "clearFilter": "Clear",
+    "withWarning": "the warning {name}",
+    "ownedAnother": "Owned: buy another?",
     "noSignal": "No signal today",
     "none": "Nothing yet: the opportunities are worked out after the next collect.",
     "noneProven": "No item of this type has a proven signal today.",
@@ -1964,8 +1966,13 @@
     "colWeek": "Week",
     "candidate": "Suggested",
     "plan": {
-      "title": "Budget and date",
-      "intro": "Set a budget and a date, then tick what to buy. Each item says when (now at a good price, from a day for a new release, or once it comes under a price) and what it would cost, from its buy timing and your strategy. Never a sure thing.",
+      "title": "Buy plan",
+      "intro": "Set a budget (and a date if you have one), then tick what to buy, or let Tora suggest a varied mix: no item over 40% of the budget, one per set, more than one type when the budget allows. Each item says when to buy and what it would cost, from its buy timing and your strategy. Never a sure thing.",
+      "suggest": "Suggest a mix",
+      "swap": "Swap for the next best",
+      "noMix": "Nothing fits this budget yet: no item worth a look or on your watchlist has a price under 40% of it (by the date).",
+      "noSwap": "No other item fits in its place.",
+      "thinMix": "Only {count, plural, one {# item has} other {# items have}} a reason to buy within this budget (worth a look, or on your watchlist): the rest is left free rather than filled with items nothing points to.",
       "budget": "Budget ({symbol})",
       "until": "By",
       "save": "Save",
@@ -1986,7 +1993,8 @@
       "fromKind": {
         "opportunity": "opportunity",
         "watch": "watched",
-        "plan": "in your plan"
+        "plan": "in your plan",
+        "mix": "suggested for the mix"
       },
       "total": "{count, plural, one {# item} other {# items}}: {total}, {left} {over, select, over {over budget} other {left}}.",
       "late": "{count, plural, one {# comes} other {# come}} after your date.",

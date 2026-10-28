@@ -1,6 +1,6 @@
 'use client';
 
-import { type PlanStep, checkPlan } from '@tora/core';
+import { type MixOption, type PlanStep, checkPlan, suggestMix, swapInMix } from '@tora/core';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState, useTransition } from 'react';
@@ -16,13 +16,18 @@ export interface PlanRow {
   bucket: string;
   name: string;
   step: PlanStep;
+  /** None: an item only a suggested mix brings in. */
   from: ('opportunity' | 'watch' | 'plan')[];
   ticked: boolean;
+  mix: MixOption;
+  /** Its proven signals' (and admin's picks') names. */
+  signals: string[];
 }
 
 /**
  * A budget and a date (S13 part 4): each item offered with when to buy and at what price; the
- * person ticks items and sees whether they fit. Saved with Save.
+ * person ticks items and sees whether they fit, or has a varied mix suggested (S27) and swaps its
+ * picks. Saved with Save.
  */
 export function PlanCard({
   rows,
@@ -44,23 +49,57 @@ export function PlanCard({
     new Set(rows.filter((r) => r.ticked).map((r) => `${r.productId}|${r.bucket}`)),
   );
   const [message, setMessage] = useState<string | null>(null);
+  // The picks of the last suggested mix: they can be swapped.
+  const [suggested, setSuggested] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   const amount = money.parse(budget);
   const chosen = rows.filter((r) => ticked.has(`${r.productId}|${r.bucket}`));
   const check = useMemo(
     () =>
-      amount !== null && until
+      amount !== null
         ? checkPlan(
             chosen.map((r) => r.step),
             amount,
-            until,
+            until || '9999-12-31',
           )
         : null,
     [chosen, amount, until],
   );
+  const options = rows.map((r) => r.mix);
+  const suggest = () => {
+    if (amount === null) return;
+    const mix = suggestMix(options, amount, until || null);
+    setTicked(new Set(mix));
+    setSuggested(new Set(mix));
+    const spent = mix.reduce(
+      (sum, k) => sum + (options.find((o) => o.key === k)?.step.price ?? 0),
+      0,
+    );
+    // Few items with a reason to buy: the rest of the budget is left free, not filled.
+    setMessage(
+      !mix.length
+        ? t('plan.noMix')
+        : spent < amount * 0.7
+          ? t('plan.thinMix', { count: mix.length })
+          : null,
+    );
+  };
+  const swap = (key: string) => {
+    if (amount === null) return;
+    const next = swapInMix(options, [...ticked], key, amount, until || null);
+    if (!next) {
+      setMessage(t('plan.noSwap'));
+      return;
+    }
+    setTicked(new Set([...ticked].filter((k) => k !== key).concat(next)));
+    setSuggested(new Set([...suggested].filter((k) => k !== key).concat(next)));
+    setMessage(null);
+  };
+  // Shown: the items offered, and those a mix picked.
+  const shown = rows.filter((r) => r.from.length || ticked.has(`${r.productId}|${r.bucket}`));
   // Buy now first, then by day, then the prices to wait for.
   const order = { now: 0, from: 1, under: 2, none: 3 };
-  const sorted = rows.toSorted(
+  const sorted = shown.toSorted(
     (a, b) =>
       order[a.step.when] - order[b.step.when] ||
       (a.step.day ?? '').localeCompare(b.step.day ?? '') ||
@@ -103,9 +142,12 @@ export function PlanCard({
             className="h-9 w-44"
           />
         </label>
+        <Button size="sm" variant="outline" disabled={amount === null} onClick={suggest}>
+          {t('plan.suggest')}
+        </Button>
         <Button
           size="sm"
-          disabled={pending || amount === null || !until}
+          disabled={pending || amount === null}
           onClick={() =>
             startTransition(async () => {
               const r = await savePlanAction({
@@ -121,7 +163,7 @@ export function PlanCard({
         </Button>
         {message && <span className="text-xs text-muted-foreground">{message}</span>}
       </div>
-      {rows.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('plan.empty')}</p>
       ) : (
         <ul className="divide-y rounded-lg border text-sm">
@@ -149,9 +191,28 @@ export function PlanCard({
                     {r.name}
                   </Link>
                   <p className="text-xs text-muted-foreground">
-                    {r.bucket && <span>{bucketLabel(r.bucket, tAll)} · </span>}
-                    {r.from.map((f) => t(`plan.fromKind.${f}`)).join(' · ')}
+                    {[
+                      r.bucket && bucketLabel(r.bucket, tAll),
+                      ...r.from.map((f) => t(`plan.fromKind.${f}`)),
+                      !r.from.length && t('plan.fromKind.mix'),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
+                  {r.signals.length > 0 && (
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                      {r.signals.join(' · ')}
+                    </p>
+                  )}
+                  {suggested.has(key) && ticked.has(key) && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground underline"
+                      onClick={() => swap(key)}
+                    >
+                      {t('plan.swap')}
+                    </button>
+                  )}
                 </div>
                 <div className="shrink-0 text-right text-xs">
                   <p
@@ -166,7 +227,9 @@ export function PlanCard({
                   {r.step.price !== null && r.step.when !== 'under' && (
                     <p className="tabular-nums">{money(r.step.price)}</p>
                   )}
-                  <p className="text-muted-foreground">{t(`plan.reason.${r.step.reason}`)}</p>
+                  {r.step.when !== 'none' && (
+                    <p className="text-muted-foreground">{t(`plan.reason.${r.step.reason}`)}</p>
+                  )}
                 </div>
               </li>
             );

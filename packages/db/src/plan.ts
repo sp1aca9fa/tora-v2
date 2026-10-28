@@ -1,18 +1,17 @@
 // A budget and a date (requirements S13 part 4): the items a person may plan to buy, each with
 // when and at what price, from its saved buy timing numbers and the person's strategy.
 import {
+  type OpportunitySignal,
   type PlanStep,
   localDate,
   planStep,
   productClass,
-  rankOpportunity,
   strategyOf,
 } from '@tora/core';
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from './client';
-import { readSetting } from './registry';
 import { type Product, type User, products, watches } from './schema';
-import type { SavedOpportunities } from './opportunities';
+import { loadOpportunities, withMarket, worthALook } from './opportunities';
 import { latestSignals } from './signals';
 
 export interface PlanItem {
@@ -20,9 +19,20 @@ export interface PlanItem {
   bucket: string;
   product: Product;
   step: PlanStep;
-  /** Why it is offered: a proven opportunity, a watch, or already in the plan. */
+  /**
+   * Why it is offered: a proven opportunity, a watch, or already in the plan; none for the other
+   * items a suggested mix may pick (S27).
+   */
   from: ('opportunity' | 'watch' | 'plan')[];
   ticked: boolean;
+  /** For a suggested mix (S27): its item type and set, worth a look, its score and signals. */
+  mix: {
+    type: string;
+    set: string;
+    worth: boolean;
+    score: number;
+    signals: OpportunitySignal[];
+  };
 }
 
 /**
@@ -38,10 +48,18 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
       if (!had.from.includes(from)) had.from.push(from);
     } else wanted.set(key, { productId, bucket, from: [from] });
   };
-  const saved = await readSetting<SavedOpportunities>(db, 'opportunities');
-  for (const o of saved?.items ?? []) {
-    if (rankOpportunity(o.on, saved!.tests[o.group]).proven.length) {
-      add(o.productId, o.bucket, 'opportunity');
+  const saved = await loadOpportunities(db);
+  const opportunities = saved ? withMarket(saved.items, saved.rules).adjusted : [];
+  const ranked = new Map(opportunities.map((o) => [`${o.productId}|${o.bucket}`, o]));
+  for (const o of opportunities) {
+    if (worthALook(o)) add(o.productId, o.bucket, 'opportunity');
+    // Every other item can come into a suggested mix.
+    else if (!wanted.has(`${o.productId}|${o.bucket}`)) {
+      wanted.set(`${o.productId}|${o.bucket}`, {
+        productId: o.productId,
+        bucket: o.bucket,
+        from: [],
+      });
     }
   }
   for (const w of await db
@@ -78,6 +96,22 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
     const step: PlanStep = stats
       ? planStep(stats, strategyOf(user.preferences, productClass(product)), today)
       : { when: 'none', day: null, price: null, reason: 'no_price' };
-    return [{ ...w, product, step, ticked: ticked.has(`${w.productId}|${w.bucket}`) }];
+    const o = ranked.get(`${w.productId}|${w.bucket}`);
+    return [
+      {
+        ...w,
+        product,
+        step,
+        ticked: ticked.has(`${w.productId}|${w.bucket}`),
+        mix: {
+          type: productClass(product),
+          // Its set (a single's, a box's): a mix holds one of each; an item without one is its own.
+          set: product.setId ?? product.setCode ?? product.id,
+          worth: !!o && worthALook(o),
+          score: o?.score ?? 0,
+          signals: o ? [...o.proven, ...o.picked] : [],
+        },
+      },
+    ];
   });
 }

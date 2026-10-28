@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
@@ -74,6 +75,7 @@ export default async function WorthALookPage({
                     s.warning && !on && 'text-amber-800 dark:text-amber-300',
                   )}
                 >
+                  {s.warning && <TriangleAlert className="mr-1 inline size-3" aria-hidden />}
                   {signalLabel(t, s.key, data.rules)}
                 </Link>
               );
@@ -84,7 +86,13 @@ export default async function WorthALookPage({
           <p className="text-xs">
             {t('opportunities.filtered', {
               count: data.total,
-              signals: filter.signals.map((k) => signalLabel(t, k, data.rules)).join(' + '),
+              signals: filter.signals
+                .map((k) =>
+                  signals.find((s) => s.key === k)?.warning
+                    ? t('opportunities.withWarning', { name: signalLabel(t, k, data.rules) })
+                    : signalLabel(t, k, data.rules),
+                )
+                .join(' + '),
             })}{' '}
             <Link href={href({ type })} className="underline">
               {t('opportunities.clearFilter')}
