@@ -28,10 +28,16 @@ past prices only and is never a sure thing.
     Signals. Only the conditions the person wants suggested for each type show (Watchlist >
     Strategy, "Conditions to suggest"; every condition until chosen); the Buy plan follows it,
     and the person's watches and plan show whatever their condition.
-  - **Popular now** (`/opportunities/popular`): each ranking with pictures and links, the first
-    10 shown, the rest on demand; under each ranked item Tora's view (worth a look, wait or under a
-    price, good price, or the target and how far), its proven signals and warnings, and Tora's
-    price next to the site's.
+  - **Popular** (`/opportunities/popular`): per item type, ranked by one of: **Site rankings**
+    (each ranking site's own list, read nightly, the first 10 shown, the rest on demand; sites
+    don't publish how they rank), **Most traded** (trades in the last 30 days on every site Tora
+    reads, per site), **Trending** (30 days at 1.5x the monthly rate of the 90 days before or
+    more, only on sites read for 120+ days and with 10+ trades before, so an item followed lately
+    doesn't look like a jump) and **Most traded this year**; the last three cover the items Tora
+    follows, load as the list is scrolled, and are worked out after each collect. Under each item,
+    Tora's view (worth a look, wait or under a price, good price, or the target and how far) and
+    its proven signals and warnings, and Tora's price next to the site's. A rank tag on a card
+    opens its ranking with the item marked.
   - **Signals** (`/opportunities/signals`): the three signals that beat buying on any day by most,
     links to each item type, then each group's signals and their record against buying on any
     day; groups with nothing proven are folded ("few checks"), rows under 10 checks greyed.

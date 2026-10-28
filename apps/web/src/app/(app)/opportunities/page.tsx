@@ -156,6 +156,7 @@ export default async function WorthALookPage({
           watch: t('opportunities.watch'),
           noSignal: t('opportunities.noSignal'),
           seeRecord: t('opportunities.seeRecord'),
+          seeRanking: t('opportunities.popular.seeRanking'),
         }}
       />
     </div>

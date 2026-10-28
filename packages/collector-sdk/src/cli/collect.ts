@@ -20,6 +20,7 @@ import {
   getProduct,
   refreshItemSales,
   refreshOpportunities,
+  refreshPopularity,
   refreshRuleTests,
   refreshSignals,
   refreshTradeCounts,
@@ -400,6 +401,12 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
     opportunities = await refreshOpportunities(db, new Date(), true, signals, reprintHints);
   } catch (error) {
     console.log(`opportunities: stopped (${errorText(error)})`);
+  }
+  // Popular by trades on every site (S27).
+  try {
+    await refreshPopularity(db);
+  } catch (error) {
+    console.log(`popularity: stopped (${errorText(error)})`);
   }
   await saveSetting(db, CLOSED_KEY, localDate());
 }

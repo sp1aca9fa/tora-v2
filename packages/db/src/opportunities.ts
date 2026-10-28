@@ -11,6 +11,7 @@ import {
   type OpportunityTests,
   type SignalRule,
   type SignalRuleInfo,
+  type StrategyChoice,
   type Verdict,
   type ZoneBasis,
   ASK_FLOOR,
@@ -446,6 +447,9 @@ export interface ItemView {
   basis: ZoneBasis | 'watch' | null;
   /** The zone lowered by the new-set pattern. */
   pattern: boolean;
+  /** The strategy behind the zone, and whether the person chose it (else Tora's suggestion). */
+  strategy: StrategyChoice;
+  chosen: boolean;
   verdict: Verdict | null;
   /**
    * A proven warning on (the market's too) after which prices fell: wait, or buy under the target
@@ -479,7 +483,8 @@ async function itemViews(
   const warned = new Map(saved.map((o) => [`${o.productId}|${o.bucket}`, o.warnings]));
   return list.map((o) => {
     const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
-    const j = s ? judge(s, strategyOf(user.preferences, o.itemType)) : null;
+    const strategy = strategyOf(user.preferences, o.itemType);
+    const j = s ? judge(s, strategy) : null;
     const watch = watched.find((w) => w.id === o.productId && (w.bucket ?? '') === o.bucket);
     const zone = j?.zone.top ? j.zone : null;
     const target = zone?.top ?? watch?.target ?? null;
@@ -489,6 +494,8 @@ async function itemViews(
       target,
       basis: zone?.basis ?? (watch?.target ? 'watch' : null),
       pattern: !!zone?.pattern,
+      strategy,
+      chosen: !!user.preferences?.buyStrategy?.byType[o.itemType],
       verdict: j?.verdict ?? null,
       // Without a target, today's price lowered.
       wait: waitPrice(warned.get(`${o.productId}|${o.bucket}`) ?? [], o.tests, target ?? price),

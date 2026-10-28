@@ -2035,22 +2035,48 @@
     "fewGroups": "{count, plural, one {# group} other {# groups}} with few checks",
     "wait": "Wait",
     "waitUnder": "Wait, or under {price}",
-    "waitWhy": "{signal} is on. While it was, prices were typically {change} 90 days later: {price} (your target {target}, lowered by that) allows for it. The bar measures against it.",
-    "waitWhyNow": "{signal} is on. While it was, prices were typically {change} 90 days later: {price} (today's price, lowered by that) allows for it. The bar measures against it.",
+    "waitWhy": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "waitWhyNow": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "popular": {
+      "by": "Rank by:",
+      "measure": {
+        "site": "Site rankings",
+        "sold": "Most traded",
+        "trending": "Trending",
+        "year": "Most traded this year"
+      },
+      "about": {
+        "site": "Each site's own ranking, read every night. Sites don't publish how they rank; they show listings and favorites next to it.",
+        "sold": "The items Tora follows, by trades in the last 30 days on every site it reads (as of {day}).",
+        "trending": "Trades in the last 30 days at 1.5 times the monthly rate of the 90 days before or more, on sites Tora has read for 120 days or more (as of {day}).",
+        "year": "Trades in the last 365 days on every site Tora reads, since it started following each item (as of {day})."
+      },
+      "none": {
+        "site": "No site ranking for this item type.",
+        "sold": "No trades in the last 30 days.",
+        "trending": "Nothing trending: no item trades 1.5 times as often as before, with enough history to compare.",
+        "year": "No trades in the last year."
+      },
+      "trades30": "{n, plural, one {# trade} other {# trades}} in 30 days",
+      "tradesYear": "{n, plural, one {# trade} other {# trades}} this year",
+      "trendX": "{x}x the usual {before} a month",
+      "seeRanking": "See it in the ranking"
+    },
     "toraView": "Tora:",
     "toraWorth": "worth a look",
     "toraNow": "Tora {price}",
-    "waitLow": "In the past year it sold at or under {low} on 1 day in 10.",
-    "waitBelowLow": "That is under even the cheapest tenth of days in the past year ({low}): it may not get there unless the fall goes on.",
+    "waitLow": "It has been this cheap before: in the past year it sold for {low} or less on 1 day in 10.",
+    "waitBelowLow": "But that would be a new low: in the past year it sold for {low} or less on only 1 day in 10. It may not get there.",
     "targetBasis": {
-      "quarter180": "The top of your buy zone: it sold at or under this on a quarter of days in the last 6 months.",
-      "tenth365": "The top of your buy zone: it sold at or under this on a tenth of days in the last year.",
-      "margin": "The top of your buy zone: your margin under its usual price (the median of the last 6 months).",
-      "thin_margin": "The top of your buy zone: 10% under its usual price (too few sales for a range).",
+      "quarter180": "Target: the price it sold at or under on a quarter of days in the last 6 months.",
+      "tenth365": "Target: the price it sold at or under on a tenth of days in the last year.",
+      "margin": "Target: {pct}% under its usual price (the median of the last 6 months).",
+      "thin_margin": "Target: 10% under its usual price (too few sales for a range).",
       "watch": "The target on your watch."
     },
     "targetPattern": "Lowered: similar items usually fell further at this age.",
-    "targetStrategy": "From your buy strategy for this item type (Watchlist > Strategy).",
+    "targetYours": "Your strategy for this item type: {name}.",
+    "targetSuggested": "Tora's suggested strategy for this item type: {name} (choose your own in Watchlist > Strategy).",
     "waitWhyNoTarget": "{signal} is on. While it was, prices were typically {change} 90 days later.",
     "noRankings": "No popularity rankings in the last 3 days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
     "showAll": "Show all {count}",

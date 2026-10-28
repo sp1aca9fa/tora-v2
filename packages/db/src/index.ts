@@ -32,6 +32,7 @@ export * from './supply';
 export * from './release';
 export * from './signals';
 export * from './opportunities';
+export * from './popularity';
 export * from './rankings';
 export * from './plan';
 export * from './schedule';

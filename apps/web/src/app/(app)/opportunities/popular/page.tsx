@@ -1,173 +1,128 @@
-import { type RankingBoard, imageVersions, rankedViews, rankingBoards } from '@tora/db';
+import { type PopularBy, POPULAR_BY } from '@tora/db';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { ProductImage } from '@/components/product-image';
 import { authed } from '@/lib/auth/guard';
-import { getMoney } from '@/lib/money-server';
 import { cn } from '@/lib/utils';
-import { signalLabel } from '../cards';
+import { typeLabel } from '../cards';
+import { PopularList } from '../popular-list';
+import { PopularRow } from '../popular-row';
+import { loadPopular } from '../popular-rows';
 
-/** Shown at first per ranking; the rest open on demand. */
+/** Shown at first per site ranking; the rest open on demand. */
 const FIRST = 10;
 
-/** Popular now (S13 part 3, as a sub page S26): each ranking with pictures and links. */
-export default async function PopularPage() {
+/**
+ * Popular (S13 part 3, as a sub page S26; per item type and measure S27): a site's own ranking,
+ * or the items Tora follows ranked by trades on every site (30 days, trending, the year), each
+ * with Tora's view.
+ */
+export default async function PopularPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; by?: string }>;
+}) {
   const { db, user } = await authed();
-  const [boards, t, tAll, money] = await Promise.all([
-    rankingBoards(db, user.id),
+  const q = await searchParams;
+  const asked = (POPULAR_BY as readonly string[]).includes(q.by ?? '')
+    ? (q.by as PopularBy)
+    : 'site';
+  const [data, t, tAll] = await Promise.all([
+    loadPopular(db, user, typeof q.type === 'string' ? q.type : null, asked, 0),
     getTranslations('opportunities'),
     getTranslations(),
-    getMoney(),
   ]);
-  const ids = boards.flatMap((b) => b.items.flatMap((i) => (i.productId ? [i.productId] : [])));
-  const [images, views] = await Promise.all([imageVersions(db, ids), rankedViews(db, user, ids)]);
-
-  /** Tora's view of a ranked item (S27): what to do at what price, and its proven signals. */
-  const tora = (productId: string | null) => {
-    const v = productId ? views.items.get(productId) : undefined;
-    if (!v) return null;
-    const goal = v.wait ? v.wait.under : v.target;
-    const over = v.now !== null && goal ? v.now / goal - 1 : null;
-    const [text, tone] =
-      v.wait && (over === null || over > 0)
-        ? [
-            v.wait.under !== null ? t('waitUnder', { price: money(v.wait.under) }) : t('wait'),
-            'wait',
-          ]
-        : v.verdict === 'good' || (over !== null && over <= 0)
-          ? [t('goodNow'), 'good']
-          : v.target && over !== null
-            ? [
-                `${t('target')} ${money(v.target)} · ${t('toGo', { pct: `${Math.round(over * 100)}%` })}`,
-                'mid',
-              ]
-            : [null, 'mid'];
-    return {
-      now: v.now !== null ? money(v.now) : null,
-      text,
-      tone,
-      worth: v.worth,
-      signals: [...v.proven, ...v.warnings].map((k) => signalLabel(tAll, k, views.rules)),
-    };
-  };
-  if (!boards.length) {
+  if (!data.type) {
     return (
       <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
         {t('noRankings')}
       </p>
     );
   }
-
-  const row = (i: RankingBoard['items'][number]) => {
-    const week =
-      i.weekAgo === null
-        ? t('rankNew')
-        : i.weekAgo === i.rank
-          ? '='
-          : `${i.weekAgo > i.rank ? '+' : '-'}${Math.abs(i.weekAgo - i.rank)}`;
-    const view = tora(i.productId);
-    const body = (
-      <>
-        <span className="w-7 shrink-0 text-right text-sm font-medium tabular-nums">{i.rank}</span>
-        <ProductImage
-          product={{
-            id: i.productId ?? i.title,
-            name: i.title,
-            category: i.category ?? 'tcg',
-            kind: i.kind ?? 'other',
-          }}
-          version={i.productId ? (images.get(i.productId) ?? null) : null}
-          className="size-12"
-        />
-        <span className="min-w-0 flex-1 space-y-0.5">
-          <span className="line-clamp-2 block text-sm leading-snug">{i.title}</span>
-          <span className="flex flex-wrap gap-x-2 text-xs text-muted-foreground tabular-nums">
-            <span>
-              {t('colWeek')} {week}
-            </span>
-            {i.numbers?.listings !== undefined && (
-              <span>{t('listingsN', { n: i.numbers.listings })}</span>
-            )}
-            {i.numbers?.favorites !== undefined && (
-              <span>{t('favoritesN', { n: i.numbers.favorites })}</span>
-            )}
-            {i.owned && <span>{t('owned')}</span>}
-            {i.watching && <span>{t('watching')}</span>}
-            {i.candidate && !i.owned && !i.watching && <span>{t('candidate')}</span>}
-          </span>
-          {view && (view.text || view.worth || view.signals.length > 0) && (
-            <span className="flex flex-wrap gap-x-2 text-xs tabular-nums">
-              <span className="text-muted-foreground">{t('toraView')}</span>
-              {view.worth && (
-                <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                  {t('toraWorth')}
-                </span>
-              )}
-              {view.text && (
-                <span
-                  className={cn(
-                    view.tone === 'wait' && 'text-amber-700 dark:text-amber-300',
-                    view.tone === 'good' && 'text-emerald-700 dark:text-emerald-400',
-                  )}
-                >
-                  {view.text}
-                </span>
-              )}
-              {view.signals.length > 0 && (
-                <span className="text-muted-foreground">{view.signals.join(' · ')}</span>
-              )}
-            </span>
-          )}
-        </span>
-        <span className="shrink-0 space-y-0.5 text-right tabular-nums">
-          <span className="block text-sm">{i.price !== null ? money(i.price) : '-'}</span>
-          {view?.now && (
-            <span className="block text-xs text-muted-foreground">
-              {t('toraNow', { price: view.now })}
-            </span>
-          )}
-        </span>
-      </>
+  const type = data.type;
+  const href = (q: { type: string; by: PopularBy }) =>
+    `/opportunities/popular?type=${encodeURIComponent(q.type)}&by=${q.by}`;
+  const chip = (active: boolean) =>
+    cn(
+      'rounded-full border px-3 py-1 text-sm transition-colors',
+      active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
     );
-    return (
-      <li key={`${i.rank}|${i.title}`}>
-        {i.productId ? (
-          <Link
-            href={`/products/${i.productId}`}
-            className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent/50"
-          >
-            {body}
-          </Link>
-        ) : (
-          <div className="flex items-center gap-3 px-2 py-1.5">{body}</div>
-        )}
-      </li>
-    );
-  };
+  const labels = { tora: t('toraView'), worth: t('toraWorth') };
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-2">
-      {boards.map((b) => (
-        <section key={b.ranking} className="space-y-2">
-          <div className="space-y-1">
-            <h2 className="font-semibold">{b.label}</h2>
-            <p className="max-w-3xl text-xs text-muted-foreground">
-              {t('popularIntro', { day: b.day })}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-card p-1">
-            <ul className="divide-y">{b.items.slice(0, FIRST).map(row)}</ul>
-            {b.items.length > FIRST && (
-              <details className="group">
-                <summary className="cursor-pointer px-3 py-2 text-sm text-muted-foreground hover:text-foreground group-open:hidden">
-                  {t('showAll', { count: b.items.length })}
-                </summary>
-                <ul className="divide-y border-t">{b.items.slice(FIRST).map(row)}</ul>
-              </details>
-            )}
-          </div>
-        </section>
-      ))}
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2">
+          {data.types.map((x) => (
+            <Link
+              key={x}
+              href={href({ type: x, by: data.by })}
+              aria-current={x === type ? 'page' : undefined}
+              className={chip(x === type)}
+            >
+              {typeLabel(tAll, x)}
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('popular.by')}</span>
+          {POPULAR_BY.map((b) => (
+            <Link
+              key={b}
+              href={href({ type, by: b })}
+              aria-pressed={b === data.by}
+              className={cn(chip(b === data.by), 'py-0.5 text-xs')}
+            >
+              {t(`popular.measure.${b}`)}
+            </Link>
+          ))}
+        </div>
+        <p className="max-w-3xl text-xs text-muted-foreground">
+          {t(`popular.about.${data.by}`, { day: data.day ?? '-' })}
+        </p>
+      </div>
+      {data.by === 'site' ? (
+        <div className="grid items-start gap-6 xl:grid-cols-2">
+          {data.boards.map((b) => (
+            <section key={b.ranking} className="space-y-2">
+              <div className="space-y-1">
+                <h2 className="font-semibold">{b.label}</h2>
+                <p className="text-xs text-muted-foreground">{t('popularIntro', { day: b.day })}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-1">
+                <ul className="divide-y">
+                  {b.rows.slice(0, FIRST).map((r) => (
+                    <PopularRow key={r.key} r={r} labels={labels} />
+                  ))}
+                </ul>
+                {b.rows.length > FIRST && (
+                  <details className="group">
+                    <summary className="cursor-pointer px-3 py-2 text-sm text-muted-foreground group-open:hidden hover:text-foreground">
+                      {t('showAll', { count: b.rows.length })}
+                    </summary>
+                    <ul className="divide-y border-t">
+                      {b.rows.slice(FIRST).map((r) => (
+                        <PopularRow key={r.key} r={r} labels={labels} />
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : data.total ? (
+        <PopularList
+          key={`${type}|${data.by}`}
+          initial={data.rows}
+          total={data.total}
+          type={type}
+          by={data.by}
+        />
+      ) : (
+        <p className="max-w-3xl rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
+          {t(`popular.none.${data.by}`)}
+        </p>
+      )}
     </div>
   );
 }

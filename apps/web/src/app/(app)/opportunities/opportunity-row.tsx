@@ -33,7 +33,7 @@ export interface OpportunityRowData {
   /** Condition, owned, watching, suggested. */
   meta: string[];
   /** "#3" and its ranking's sentence. */
-  ranks: { short: string; text: string }[];
+  ranks: { short: string; text: string; href: string }[];
   now: string | null;
   target: string | null;
   /** "11% to go" or "At target". */
@@ -70,6 +70,7 @@ export interface OpportunityLabels {
   watch: string;
   noSignal: string;
   seeRecord: string;
+  seeRanking: string;
 }
 
 export function OpportunityRow({
@@ -126,6 +127,9 @@ export function OpportunityRow({
             className="bg-sky-500/15 text-sky-800 dark:text-sky-300"
           >
             <span className="block">{r.text}</span>
+            <Link href={r.href} className="block underline">
+              {labels.seeRanking}
+            </Link>
           </InfoTag>
         ))}
         {o.signals.map((s) => (

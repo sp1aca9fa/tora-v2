@@ -3,6 +3,7 @@ import {
   type OpportunitySignal,
   type OpportunityTests,
   type SignalRuleInfo,
+  DEFAULT_MARGIN,
   isBuiltInSignal,
   PROVEN_MIN_CHECKS,
 } from '@tora/core';
@@ -168,6 +169,7 @@ function rowOf(
     ranks: o.ranks.map((r) => ({
       short: `#${r.rank}`,
       text: rankText(t, r.rank, r.weekAgo, r.label),
+      href: `/opportunities/popular?type=${encodeURIComponent(o.itemType)}&by=site#rank-${o.productId}`,
     })),
     now: o.now !== null ? money(o.now) : null,
     target: o.target ? money(o.target) : null,
@@ -222,9 +224,14 @@ function rowOf(
         : null,
     targetWhy: o.basis
       ? [
-          t(`opportunities.targetBasis.${o.basis}`),
+          o.basis !== 'watch' &&
+            t(o.chosen ? 'opportunities.targetYours' : 'opportunities.targetSuggested', {
+              name: t(`strategy.name.${o.strategy.strategy}`),
+            }),
+          t(`opportunities.targetBasis.${o.basis}`, {
+            pct: o.strategy.margin ?? DEFAULT_MARGIN,
+          }),
           o.pattern && t('opportunities.targetPattern'),
-          o.basis !== 'watch' && t('opportunities.targetStrategy'),
         ]
           .filter(Boolean)
           .join(' ')
