@@ -1967,14 +1967,18 @@
     "candidate": "Suggested",
     "plan": {
       "title": "Buy plan",
-      "intro": "Set a budget (and a date if you have one), then tick what to buy, or let Tora suggest a varied mix: no item over 40% of the budget, one per set, more than one type when the budget allows. Each item says when to buy and what it would cost, from its buy timing and your strategy. Never a sure thing.",
+      "intro": "Set a budget, then tick what to buy or let Tora suggest a mix.",
+      "howTitle": "How the mix is picked",
+      "how": "Only items worth a look or on your watchlist, best first: the best of each item type, then the next best of any type. No item over 40% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
+      "needBudget": "Enter a budget to get a suggestion.",
+      "listFrom": "From Worth a look, your watchlist and your plan",
       "suggest": "Suggest a mix",
       "swap": "Swap for the next best",
       "noMix": "Nothing fits this budget yet: no item worth a look or on your watchlist has a price under 40% of it (by the date).",
       "noSwap": "No other item fits in its place.",
       "thinMix": "Only {count, plural, one {# item has} other {# items have}} a reason to buy within this budget (worth a look, or on your watchlist): the rest is left free rather than filled with items nothing points to.",
       "budget": "Budget ({symbol})",
-      "until": "By",
+      "until": "Buy by (optional)",
       "save": "Save",
       "saved": "Saved.",
       "empty": "Nothing to plan yet: items with a proven signal and your watches show here.",
@@ -1991,7 +1995,7 @@
         "no_price": "no price yet"
       },
       "fromKind": {
-        "opportunity": "opportunity",
+        "opportunity": "worth a look",
         "watch": "watched",
         "plan": "in your plan",
         "mix": "suggested for the mix"

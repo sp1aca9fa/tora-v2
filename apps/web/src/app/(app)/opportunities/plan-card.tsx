@@ -119,6 +119,10 @@ export function PlanCard({
       <div className="space-y-1">
         <h2 className="font-semibold">{t('plan.title')}</h2>
         <p className="max-w-3xl text-xs text-muted-foreground">{t('plan.intro')}</p>
+        <details className="max-w-3xl text-xs text-muted-foreground">
+          <summary className="cursor-pointer">{t('plan.howTitle')}</summary>
+          <p className="mt-1">{t('plan.how')}</p>
+        </details>
       </div>
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="space-y-1">
@@ -142,30 +146,19 @@ export function PlanCard({
             className="h-9 w-44"
           />
         </label>
-        <Button size="sm" variant="outline" disabled={amount === null} onClick={suggest}>
+        <Button size="sm" disabled={amount === null} onClick={suggest}>
           {t('plan.suggest')}
         </Button>
-        <Button
-          size="sm"
-          disabled={pending || amount === null}
-          onClick={() =>
-            startTransition(async () => {
-              const r = await savePlanAction({
-                budget: amount ?? 0,
-                until,
-                items: chosen.map((c) => ({ productId: c.productId, bucket: c.bucket })),
-              });
-              setMessage(r.error ? t(`plan.error.${r.error}`) : t('plan.saved'));
-            })
-          }
-        >
-          {t('plan.save')}
-        </Button>
-        {message && <span className="text-xs text-muted-foreground">{message}</span>}
+        {amount === null && (
+          <span className="text-xs text-muted-foreground">{t('plan.needBudget')}</span>
+        )}
       </div>
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('plan.empty')}</p>
       ) : (
+        <h3 className="text-xs font-medium text-muted-foreground">{t('plan.listFrom')}</h3>
+      )}
+      {shown.length > 0 && (
         <ul className="divide-y rounded-lg border text-sm">
           {sorted.map((r) => {
             const key = `${r.productId}|${r.bucket}`;
@@ -236,23 +229,43 @@ export function PlanCard({
           })}
         </ul>
       )}
-      {check && chosen.length > 0 && (
-        <p
-          className={cn(
-            'text-sm',
-            check.left < 0 ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400',
-          )}
+      <div className="flex flex-wrap items-center gap-3">
+        {check && (
+          <p
+            className={cn(
+              'text-sm',
+              check.left < 0 ? 'text-destructive' : 'text-emerald-700 dark:text-emerald-400',
+            )}
+          >
+            {t('plan.total', {
+              count: chosen.length,
+              total: money(check.total),
+              left: money(Math.abs(check.left)),
+              over: check.left < 0 ? 'over' : 'left',
+            })}
+            {check.late > 0 && ` ${t('plan.late', { count: check.late })}`}
+            {check.undated > 0 && ` ${t('plan.undated', { count: check.undated })}`}
+          </p>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || amount === null}
+          onClick={() =>
+            startTransition(async () => {
+              const r = await savePlanAction({
+                budget: amount ?? 0,
+                until,
+                items: chosen.map((c) => ({ productId: c.productId, bucket: c.bucket })),
+              });
+              setMessage(r.error ? t(`plan.error.${r.error}`) : t('plan.saved'));
+            })
+          }
         >
-          {t('plan.total', {
-            count: chosen.length,
-            total: money(check.total),
-            left: money(Math.abs(check.left)),
-            over: check.left < 0 ? 'over' : 'left',
-          })}
-          {check.late > 0 && ` ${t('plan.late', { count: check.late })}`}
-          {check.undated > 0 && ` ${t('plan.undated', { count: check.undated })}`}
-        </p>
-      )}
+          {t('plan.save')}
+        </Button>
+        {message && <span className="text-xs text-muted-foreground">{message}</span>}
+      </div>
     </section>
   );
 }
