@@ -2,7 +2,8 @@ import 'server-only';
 import {
   type OpportunitySignal,
   type OpportunityTests,
-  OPPORTUNITY_SIGNALS,
+  type SignalRuleInfo,
+  isBuiltInSignal,
   PROVEN_MIN_CHECKS,
 } from '@tora/core';
 import { type Db, type OpportunityCard, type Product, type User, opportunityCards } from '@tora/db';
@@ -33,7 +34,12 @@ export function cleanFilter(f: {
       : [];
   return {
     type: typeof f.type === 'string' && f.type.length < 40 ? f.type : null,
-    signals: OPPORTUNITY_SIGNALS.filter((k) => asked.includes(k)),
+    // Built-in signals and plug-ins' keys alike; an unknown one just matches no item.
+    signals: [
+      ...new Set(
+        asked.filter((k): k is string => typeof k === 'string' && /^[a-z0-9_]{1,40}$/.test(k)),
+      ),
+    ].slice(0, 10),
   };
 }
 
@@ -57,6 +63,13 @@ export function groupLabel(t: T, p: Product) {
 /** An item type's name ("Sealed"). */
 export const typeLabel = (t: T, type: string) =>
   t.has(`sourceRoles.class.${type}`) ? t(`sourceRoles.class.${type}`) : type;
+
+/** A signal's name: a built-in one's text, a plug-in's own label (S27). */
+export function signalLabel(t: T, key: OpportunitySignal, rules: readonly SignalRuleInfo[]) {
+  return isBuiltInSignal(key)
+    ? t(`opportunities.signal.${key}`)
+    : (rules.find((r) => r.key === key)?.label ?? key);
+}
 
 /** A signal's record on its group's past prices, as a sentence. */
 export function recordText(t: T, tests: OpportunityTests | null, key: OpportunitySignal) {
@@ -89,29 +102,40 @@ export function rankText(t: T, rank: number, weekAgo: number | null, label: stri
 }
 
 /** A card as its row's texts (the list draws them on the client). */
-function rowOf(t: T, money: (n: number) => string, o: OpportunityCard): OpportunityRowData {
+function rowOf(
+  t: T,
+  money: (n: number) => string,
+  o: OpportunityCard,
+  rules: readonly SignalRuleInfo[],
+): OpportunityRowData {
   const n = o.numbers;
   // What the item's line is: its set, its line, or (too few of either) similar items.
   const scope = t(
     `opportunities.scope.${n.line84?.line?.startsWith('set:') ? 'set' : n.line84?.line ? 'line' : 'group'}`,
   );
   const why = (key: OpportunitySignal) =>
-    t(`opportunities.why.${key}`, {
-      line: n.line84 ? signed(n.line84.change) : '-',
-      scope,
-      Scope: scope.charAt(0).toUpperCase() + scope.slice(1),
-      items: (key.endsWith('_age') ? n.age?.items : n.line84?.items) ?? 0,
-      own: n.own84 !== null ? signed(n.own84) : '-',
-      sales30: n.sales30,
-      before: Math.round(n.salesBefore ?? 0),
-      change: n.age ? signed(n.age.change) : '-',
-      typical: n.age ? signed(n.age.typical) : '-',
-      days: n.age?.days ?? 0,
-    });
+    !isBuiltInSignal(key)
+      ? (rules.find((r) => r.key === key)?.about ?? '')
+      : t(`opportunities.why.${key}`, {
+          line: n.line84 ? signed(n.line84.change) : '-',
+          scope,
+          Scope: scope.charAt(0).toUpperCase() + scope.slice(1),
+          items: (key.endsWith('_age') ? n.age?.items : n.line84?.items) ?? 0,
+          own: n.own84 !== null ? signed(n.own84) : '-',
+          sales30: n.sales30,
+          before: Math.round(n.salesBefore ?? 0),
+          change: n.age ? signed(n.age.change) : '-',
+          typical: n.age ? signed(n.age.typical) : '-',
+          days: n.age?.days ?? 0,
+          jump: n.jump14 != null ? signed(n.jump14) : '-',
+        });
   const signals = [
     ...o.proven.map((key) => ({ key, style: 'proven' as const })),
     ...o.warnings.map((key) => ({ key, style: 'warning' as const })),
-    ...o.unproven.map((key) => ({ key, style: 'unproven' as const })),
+    ...o.picked.map((key) => ({ key, style: 'pick' as const })),
+    ...o.unproven
+      .filter((key) => !o.picked.includes(key))
+      .map((key) => ({ key, style: 'unproven' as const })),
   ];
   const over = o.now !== null && o.target ? o.now / o.target - 1 : null;
   return {
@@ -158,12 +182,14 @@ function rowOf(t: T, money: (n: number) => string, o: OpportunityCard): Opportun
     signals: signals.map(({ key, style }) => ({
       key,
       style,
-      label: t(`opportunities.signal.${key}`),
+      label: signalLabel(t, key, rules),
       why: why(key),
       record:
-        style === 'unproven'
-          ? `${t('opportunities.notProven')}: ${recordText(t, o.tests, key)}`
-          : recordText(t, o.tests, key),
+        style === 'pick'
+          ? `${t('opportunities.pickTag')}: ${recordText(t, o.tests, key)}`
+          : style === 'unproven'
+            ? `${t('opportunities.notProven')}: ${recordText(t, o.tests, key)}`
+            : recordText(t, o.tests, key),
     })),
     watching: o.watching,
   };
@@ -181,5 +207,5 @@ export async function loadCards(
     getTranslations(),
     getMoney(),
   ]);
-  return data && { ...data, rows: data.items.map((o) => rowOf(t, money, o)) };
+  return data && { ...data, rows: data.items.map((o) => rowOf(t, money, o, data.rules)) };
 }

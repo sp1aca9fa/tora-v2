@@ -2,14 +2,16 @@ import {
   type OpportunitySignal,
   type OpportunityTests,
   OPPORTUNITY_WARNINGS,
+  isBuiltInSignal,
   provenEdge,
 } from '@tora/core';
-import { type Product, opportunitiesFor } from '@tora/db';
+import { type Product, opportunitiesFor, signalPicks } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { groupLabel, typeLabel } from '../cards';
+import { groupLabel, signalLabel, typeLabel } from '../cards';
 import { CHIP } from '../opportunity-row';
+import { PickSignal } from '../pick-signal';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
@@ -20,8 +22,14 @@ const signed = (x: number) => `${x > 0 ? '+' : ''}${pct(x)}`;
  */
 export default async function SignalsPage() {
   const { db, user } = await authed();
-  const [data, t] = await Promise.all([opportunitiesFor(db, user.id), getTranslations()]);
+  const [data, t, picks] = await Promise.all([
+    opportunitiesFor(db, user.id),
+    getTranslations(),
+    signalPicks(db),
+  ]);
   const items = data?.items ?? [];
+  const rules = data?.rules ?? [];
+  const admin = user.role === 'admin';
   const types = [...new Set(items.map((o) => o.itemType))];
 
   /** Each group of a type with its tests. */
@@ -70,16 +78,28 @@ export default async function SignalsPage() {
               </tr>
               {keys.map((key) => {
                 const r = tests.signals[key]!;
+                const rule = isBuiltInSignal(key) ? null : rules.find((x) => x.key === key);
+                const warning = rule
+                  ? !!rule.warning
+                  : (OPPORTUNITY_WARNINGS as readonly string[]).includes(key);
                 const proven =
-                  provenEdge(tests, key) === null
-                    ? null
-                    : (OPPORTUNITY_WARNINGS as readonly string[]).includes(key)
-                      ? 'warning'
-                      : 'proven';
+                  provenEdge(tests, key, rules) === null ? null : warning ? 'warning' : 'proven';
+                const picked = !proven && !!rule && picks.includes(key);
                 return (
                   <tr key={key} className="border-b last:border-0">
                     <td className="px-3 py-1.5">
-                      {t(`opportunities.signal.${key}`)}
+                      {signalLabel(t, key, rules)}
+                      {rule && (
+                        <span className="ml-1 text-muted-foreground">
+                          · {t('opportunities.pluginTag')}
+                        </span>
+                      )}
+                      {picked && (
+                        <span className={cn('ml-2 rounded px-1.5 py-0.5', CHIP.pick)}>
+                          {t('opportunities.pickTag')}
+                        </span>
+                      )}
+                      {admin && rule && !proven && <PickSignal signal={key} picked={picked} />}
                       {proven && (
                         <span
                           className={cn(

@@ -3,10 +3,13 @@
 // with the most days, else any source's), and each signal's test on its group's whole history,
 // saved in one setting that pages and the MCP read.
 import {
+  type DayPrice,
   type OpportunityMember,
   type OpportunityNumbers,
   type OpportunitySignal,
   type OpportunityTests,
+  type SignalRule,
+  type SignalRuleInfo,
   type Verdict,
   ASK_FLOOR,
   ASK_UNDER,
@@ -20,7 +23,6 @@ import {
   productClass,
   rankOpportunity,
   roleOf,
-  signalsOn,
   strategyOf,
   toLocalIso,
 } from '@tora/core';
@@ -64,18 +66,34 @@ export interface SavedOpportunities {
   day: string;
   tests: Record<string, OpportunityTests>;
   items: OpportunityItem[];
+  /** The signal plug-ins of the run (S27), for their labels in the app. */
+  rules?: SignalRuleInfo[];
 }
 
 const KEY = 'opportunities';
+/** The signal plug-ins an admin shows while not proven (the admin's picks, S27). */
+const PICKS_KEY = 'signalPicks';
+
+export async function signalPicks(db: Pick<Db, 'select'>): Promise<string[]> {
+  return (await readSetting<string[]>(db, PICKS_KEY)) ?? [];
+}
+
+/** Shows a signal plug-in's signal as the admin's pick while not proven, or stops. */
+export async function setSignalPick(db: Db, key: string, picked: boolean): Promise<void> {
+  const picks = await signalPicks(db);
+  await saveSetting(db, PICKS_KEY, [...picks.filter((k) => k !== key), ...(picked ? [key] : [])]);
+}
 
 /**
- * Works out every item's signals today and every group's tests, and saves them (`save` false:
- * only returns them, for checks on real data).
+ * Works out every item's signals today and every group's tests, with the signal plug-ins' rules
+ * (`rules`, from the collect), and saves them (`save` false: only returns them, for checks on
+ * real data).
  */
 export async function refreshOpportunities(
   db: Db,
   now = new Date(),
   save = true,
+  rules: SignalRule[] = [],
 ): Promise<SavedOpportunities> {
   // The daily prices come from the packed item sales: any days still marked are updated first.
   await refreshItemSales(db, { marksOnly: true });
@@ -112,8 +130,21 @@ export async function refreshOpportunities(
     if (!best) continue;
     const picked = pickSeries(series, p.id, best.bucket, best.source)!;
     const r = released.get(p.id);
+    // The other conditions on the same source, for signal plug-ins (PSA 10 against raw).
+    const others: Record<string, DayPrice[]> = {};
+    if (rules.length) {
+      const prefix = `${p.id}|${best.source}|`;
+      for (const [k, s] of series) {
+        if (k.startsWith(prefix) && k !== `${prefix}${best.bucket ?? ''}`) {
+          others[k.slice(prefix.length)] = s;
+        }
+      }
+    }
     memberOf.set(p.id, {
       id: p.id,
+      kind: p.kind,
+      bucket: best.bucket,
+      others,
       line: lines.get(p.id) ?? null,
       // Singles are compared with their set first.
       set:
@@ -139,7 +170,10 @@ export async function refreshOpportunities(
   const tests: SavedOpportunities['tests'] = {};
   const items: OpportunityItem[] = [];
   for (const [key, list] of groups) {
-    const group = new OpportunityGroup(list.map((m) => memberOf.get(m.id)!));
+    const group = new OpportunityGroup(
+      list.map((m) => memberOf.get(m.id)!),
+      rules,
+    );
     tests[key] = group.tests(today);
     for (const m of list) {
       const numbers = group.numbers(m.id, today);
@@ -159,7 +193,7 @@ export async function refreshOpportunities(
         group: key,
         itemType: productClass(byId.get(m.id)!),
         numbers,
-        on: signalsOn(numbers),
+        on: group.signals(m.id, today, numbers),
         ask: ask?.lowestAskBase
           ? { price: ask.lowestAskBase, source: ask.source, url: ask.url }
           : null,
@@ -167,7 +201,12 @@ export async function refreshOpportunities(
       });
     }
   }
-  const saved: SavedOpportunities = { day: today, tests, items };
+  const saved: SavedOpportunities = {
+    day: today,
+    tests,
+    items,
+    rules: rules.map(({ key, label, about, warning }) => ({ key, label, about, warning })),
+  };
   if (save) await saveSetting(db, KEY, saved);
   return saved;
 }
@@ -208,6 +247,8 @@ export interface Opportunity extends OpportunityItem {
   proven: OpportunitySignal[];
   warnings: OpportunitySignal[];
   unproven: OpportunitySignal[];
+  /** Of the unproven, the plug-ins' an admin shows as their pick (S27). */
+  picked: OpportunitySignal[];
   score: number;
   tests: OpportunityTests | null;
   /**
@@ -224,15 +265,21 @@ export interface Opportunity extends OpportunityItem {
  */
 export async function loadOpportunities(
   db: Pick<Db, 'select'>,
-): Promise<{ day: string; items: Opportunity[] } | null> {
-  const saved = await readSetting<SavedOpportunities>(db, KEY);
+): Promise<{ day: string; items: Opportunity[]; rules: SignalRuleInfo[] } | null> {
+  const [saved, picks] = await Promise.all([
+    readSetting<SavedOpportunities>(db, KEY),
+    signalPicks(db),
+  ]);
   if (!saved) return null;
+  const rules = saved.rules ?? [];
   const items = saved.items.map((item): Opportunity => {
     const tests = saved.tests[item.group] ?? null;
     const price = item.numbers.price;
+    const ranked = rankOpportunity(item.on, tests ?? undefined, rules);
     return {
       ...item,
-      ...rankOpportunity(item.on, tests ?? undefined),
+      ...ranked,
+      picked: ranked.unproven.filter((k) => picks.includes(k) && rules.some((r) => r.key === k)),
       tests,
       askUnder:
         !!item.ask &&
@@ -245,10 +292,11 @@ export async function loadOpportunities(
   items.sort(
     (a, b) =>
       Number(b.proven.length > 0) - Number(a.proven.length > 0) ||
+      Number(b.picked.length > 0) - Number(a.picked.length > 0) ||
       b.score - a.score ||
       a.productId.localeCompare(b.productId),
   );
-  return { day: saved.day, items };
+  return { day: saved.day, items, rules };
 }
 
 /** The Opportunities page: the saved opportunities with each item and whether the person owns or watches it. */
@@ -258,6 +306,7 @@ export async function opportunitiesFor(
 ): Promise<{
   day: string;
   items: (Opportunity & { product: Product; owned: boolean; watching: boolean })[];
+  rules: SignalRuleInfo[];
 } | null> {
   const saved = await loadOpportunities(db);
   if (!saved) return null;
@@ -282,6 +331,7 @@ export async function opportunitiesFor(
   const watching = new Set(watched.map((r) => r.id));
   return {
     day: saved.day,
+    rules: saved.rules,
     items: saved.items.flatMap((o) => {
       const product = byId.get(o.productId);
       return product
@@ -341,8 +391,11 @@ export async function opportunityCards(
   type: string | null;
   summary: OpportunitySummary;
   total: number;
-  /** Of the list, how many have a proven signal (they come first). */
+  /** Of the list, how many have a proven signal (they come first), then an admin's pick. */
   proven: number;
+  picked: number;
+  /** The signal plug-ins' labels (S27). */
+  rules: SignalRuleInfo[];
   /**
    * Warnings on for nearly every item of the type (the market's): how many of how many, and the
    * record on the group with the most of them. Left out of the items' warnings and scores.
@@ -416,7 +469,10 @@ export async function opportunityCards(
             item.score -
             item.warnings
               .filter((k) => marketKeys.has(k))
-              .reduce((sum, k) => sum + (provenEdge(item.tests ?? undefined, k) ?? 0), 0),
+              .reduce(
+                (sum, k) => sum + (provenEdge(item.tests ?? undefined, k, saved.rules) ?? 0),
+                0,
+              ),
         }
       : item;
     const s = stats.get(`${o.productId}|${o.bucket}`)?.stats;
@@ -433,6 +489,7 @@ export async function opportunityCards(
   ordered.sort(
     (a, b) =>
       Number(b.o.proven.length > 0) - Number(a.o.proven.length > 0) ||
+      Number(b.o.picked.length > 0) - Number(a.o.picked.length > 0) ||
       b.o.score - a.o.score ||
       gap(a) - gap(b) ||
       a.o.productId.localeCompare(b.o.productId),
@@ -459,6 +516,8 @@ export async function opportunityCards(
     ),
     total: ordered.length,
     proven: ordered.filter((c) => c.o.proven.length > 0).length,
+    picked: ordered.filter((c) => !c.o.proven.length && c.o.picked.length > 0).length,
+    rules: saved.rules,
     market,
     items: page.flatMap(({ o, ...c }) => {
       const product = byId.get(o.productId);

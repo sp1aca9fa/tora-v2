@@ -10,6 +10,7 @@ export const CHIP = {
   proven: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
   warning: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
   unproven: 'bg-muted text-muted-foreground',
+  pick: 'bg-violet-500/15 text-violet-800 dark:text-violet-300',
 } as const;
 
 /**

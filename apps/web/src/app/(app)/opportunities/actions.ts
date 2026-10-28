@@ -1,6 +1,6 @@
 'use server';
 
-import { setPreferences } from '@tora/db';
+import { recordAdminChange, setPreferences, setSignalPick } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
 import { type CardsFilter, cleanFilter, loadCards } from './cards';
@@ -22,6 +22,26 @@ export async function savePlanAction(plan: {
   await setPreferences(db, user.id, { buyPlan: { budget, until: plan.until, items } });
   revalidatePath('/opportunities', 'layout');
   return {};
+}
+
+/**
+ * Shows a signal plug-in's signal as the admin's pick while not proven, or stops (S27, admins):
+ * items it is on then come after the proven ones, apart and labeled.
+ */
+export async function pickSignalAction(signal: string, picked: boolean) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const key = String(signal);
+  if (!/^[a-z0-9_]{1,40}$/.test(key)) return;
+  await setSignalPick(db, key, picked === true);
+  await recordAdminChange(
+    db,
+    user.id,
+    picked === true ? 'signalPicked' : 'signalUnpicked',
+    { signal: key },
+    '/opportunities/signals',
+  );
+  revalidatePath('/opportunities', 'layout');
 }
 
 /** The next rows of the Worth a look list (S26), from `offset`. */

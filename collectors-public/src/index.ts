@@ -1,9 +1,10 @@
-import type { SourceInfo } from '@tora/core';
+import type { SignalRule, SourceInfo } from '@tora/core';
 import type { Collector, PullRateSource, RateSource, SetCatalog } from '@tora/collector-sdk';
 import { tcgSets } from './catalog';
 import { ebay as ebayCollector } from './ebay';
 import { frankfurter } from './fx';
 import { pullRateSuggestions } from './pull-rates';
+import { slabCheap } from './signals';
 import { tcgcsv } from './tcgcsv';
 import { tcgdex } from './tcgdex';
 
@@ -21,6 +22,8 @@ export const rates: RateSource[] = [frankfurter];
 export const pullRates: PullRateSource[] = [pullRateSuggestions];
 // Set lists for the set picker and set-based features (loaded per the admin's categories).
 export const catalogs: SetCatalog[] = [tcgSets];
+// Signal plug-ins for Opportunities (S27): tested on past prices, ranking only once proven.
+export const signals: SignalRule[] = [slabCheap];
 
 /** eBay's official Browse API: US asking prices. */
 const ebay: SourceInfo = {

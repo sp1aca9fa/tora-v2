@@ -68,11 +68,17 @@ items are ranked by what sets them apart.
 | Leads its line                       | The item's 12-week change is 15 points or more above its line's                                                                                          |
 | Lags a rising line                   | The line is rising and the item is 15 points or more under it                                                                                            |
 | Sales picking up / slowing (warning) | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |
+| Quick rise                           | The last 14 days' price is 20 % or more above the 60 days before                                                                                         |
 | Strong / weak for its age            | The item's last 90 days are 20 points above / under similar items' at the same age since release (3+ items; day 120 to 3 years; real release dates only) |
 
 Facts, not tested: the lowest ask on the same site as the prices, 15-50 % under the recent price
 (another site's cheapest listing, or one under half the price, is too often something else), and
 a shop buy price (買取, last 30 days) at 80 % of the recent price or more.
+
+Signal plug-ins add an admin's own strategies (e.g. a PSA 10 under twice the raw price), tested
+the same way ([Collectors](collectors.md#signal-plug-ins)). An unproven one an admin picks shows
+as the admin's pick: its items come after the proven ones, under their own heading, tagged so. We
+recommend sticking to proven signals.
 
 ## Tests
 

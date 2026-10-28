@@ -8,7 +8,7 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct } from './mutations';
-import { type OpportunityItem, opportunityCards } from './opportunities';
+import { type OpportunityItem, opportunityCards, setSignalPick } from './opportunities';
 import { saveSetting } from './registry';
 import { signals } from './schema';
 import { createUser } from './users';
@@ -128,4 +128,36 @@ it('ranks proven items first, then the rest nearest their target, in batches', a
   expect(bySignal.items.map((i) => i.product.name)).toEqual(['Proven near', 'Proven far']);
   // An unknown type falls back to the one with the most items worth a look.
   expect((await opportunityCards(db, user, { type: 'nope' }, 0, 1, now))!.type).toBe('sealed');
+});
+
+it('puts a plug-in signal an admin picks after the proven items, apart', async () => {
+  const a = await box('Proven', ['sales_up'], 9000);
+  const b = await box('Picked', ['slab_cheap'], 9000);
+  const c = await box('Plain', [], 9000);
+  await saveSetting(db, 'opportunities', {
+    day: localDate(now),
+    tests: {
+      [GROUP]: {
+        day: localDate(now),
+        items: 3,
+        any: test(100, 60),
+        signals: { sales_up: test(20, 18), slab_cheap: test(4, 3) },
+      },
+    },
+    items: [a, b, c].map((x) => x.item),
+    rules: [{ key: 'slab_cheap', label: 'Cheap slab', about: 'A slab is cheap.' }],
+  });
+  const user = { id: uid, preferences: null };
+  const names = async () =>
+    (await opportunityCards(db, user, { type: 'sealed' }, 0, 20, now))!.items.map(
+      (i) => `${i.product.name}${i.picked.length ? '*' : ''}`,
+    );
+  expect(await names()).toEqual(['Proven', 'Picked', 'Plain']);
+  await setSignalPick(db, 'slab_cheap', true);
+  const picked = (await opportunityCards(db, user, { type: 'sealed' }, 0, 20, now))!;
+  expect([picked.proven, picked.picked]).toEqual([1, 1]);
+  expect(picked.rules[0]!.label).toBe('Cheap slab');
+  expect(await names()).toEqual(['Proven', 'Picked*', 'Plain']);
+  await setSignalPick(db, 'slab_cheap', false);
+  expect(await names()).toEqual(['Proven', 'Picked', 'Plain']);
 });

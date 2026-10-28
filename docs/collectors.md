@@ -92,6 +92,7 @@ export const pullRates: PullRateSource[] = []; // optional: suggested pull rates
 export const rankings: RankingSource[] = []; // optional: a site's popularity ranking (S13)
 export const stores: StoreDirectory[] = []; // optional: physical stores for store notices (store-feeds.md)
 export const catalogs: SetCatalog[] = []; // optional: set lists (name, code, date, region) for set categories
+export const signals: SignalRule[] = []; // optional: your own Opportunities signals, tested on past prices
 ```
 
 ## Describing a source (`SourceInfo`)
@@ -344,6 +345,40 @@ export const rankings: RankingSource[] = [
 
 Read only what the ranking page shows, one or a few requests a day, and keep the reader's tests
 on a saved page (`test/fixtures`).
+
+## Signal plug-ins
+
+A strategy of your own for [Opportunities](opportunities.md): a rule that says, for an item on a
+day, whether its signal is on, from the item's prices up to that day (`SignalRule` in
+`packages/core/src/opportunities.ts`). Tora runs it with every collect, on today's prices and on
+every past week of the item's group, and tests it like the built-in signals: it ranks items only
+once proven. Until then an admin may show it as the admin's pick (Opportunities > Signals), labeled
+and kept apart from the proven ones.
+
+```ts
+export const signals: SignalRule[] = [
+  {
+    key: 'slab_cheap', // saved with the tests; not a built-in signal's
+    label: 'PSA 10 under 2x raw', // the tag on a card
+    about: 'A PSA 10 sells for under twice a near-mint raw copy (last 30 days).',
+    kinds: ['single'], // optional: the item kinds it looks at
+    // warning: true, // optional: against buying
+    on(item) {
+      // item.bucket: the condition studied; item.numbers: the built-in numbers;
+      // item.price(bucket, days): a condition's median daily price on the same source.
+      if (item.bucket !== 'graded:PSA:10') return false;
+      const slab = item.price('graded:PSA:10', 30);
+      const raw = item.price('raw:A', 30);
+      return !!slab && !!raw && slab < 2 * raw;
+    },
+  },
+];
+```
+
+The public package ships this one (`collectors-public/src/signals.ts`) as an example. Prefer
+rules with a reason behind them, and let the tests judge them: a rule tried in many variants
+until one looks proven is likely to have found luck in the past, not a pattern. Asking an AI
+assistant whether a rule makes sense before adding it is a good check.
 
 ## Checklist before turning a source on
 

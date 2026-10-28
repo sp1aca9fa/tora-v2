@@ -1829,6 +1829,8 @@
       "glossaryRemoved": "Code meaning removed",
       "glossaryHidden": "Code turned off",
       "glossaryShown": "Code turned back on",
+      "signalPicked": "Signal shown as admin's pick",
+      "signalUnpicked": "Admin's pick stopped",
       "trackingHours": "Board tracker hours",
       "trackHour": "Board tracker: an hour outside the hours",
       "trackUntilStart": "Board tracker: until the start of the hours"
@@ -1920,7 +1922,8 @@
       "sales_up": "Sales picking up",
       "sales_down": "Sales slowing",
       "strong_for_age": "Strong for its age",
-      "weak_for_age": "Weak for its age"
+      "weak_for_age": "Weak for its age",
+      "quick_rise": "Quick rise"
     },
     "why": {
       "line_rising": "{Scope}: {line} over 12 weeks ({items} items).",
@@ -1930,13 +1933,20 @@
       "sales_up": "{sales30} sales in 30 days, {before} a month before.",
       "sales_down": "{sales30} sales in 30 days, {before} a month before.",
       "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
-      "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items)."
+      "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
+      "quick_rise": "Its last 14 days: {jump} against the 60 days before."
     },
     "scope": {
       "set": "its set",
       "line": "its line",
       "group": "similar items"
     },
+    "pickTitle": "Admin's picks ({count})",
+    "pickNote": "On a strategy the admin added (a signal plug-in) that past prices have not proven. Shown apart, at the admin's choice: weigh them less than the proven ones.",
+    "pickTag": "admin's pick, not proven",
+    "pluginTag": "plug-in",
+    "pickOn": "Show as admin's pick",
+    "pickOff": "Stop showing",
     "marketTitle": "{signal} for nearly all {type}: {on} of {of} items",
     "marketNote": "Said here once instead of on every card, so the list below is ranked by what sets items apart. It still matters: buying while it was on did worse before.",
     "rankLine": "#{rank} on {label} ({move})",

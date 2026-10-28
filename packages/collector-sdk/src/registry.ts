@@ -1,4 +1,4 @@
-import type { SourceInfo } from '@tora/core';
+import { type SignalRule, type SourceInfo, isBuiltInSignal } from '@tora/core';
 import {
   type Db,
   saveGlossary,
@@ -43,6 +43,7 @@ export interface LoadedCollectors {
   stores: StoreDirectory[];
   rankings: RankingSource[];
   catalogs: SetCatalog[];
+  signals: SignalRule[];
   missing: string[];
 }
 
@@ -56,6 +57,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const stores: StoreDirectory[] = [];
   const rankings: RankingSource[] = [];
   const catalogs: SetCatalog[] = [];
+  const signals: SignalRule[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -73,6 +75,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     stores.push(...(mod.stores ?? []));
     rankings.push(...(mod.rankings ?? []));
     catalogs.push(...(mod.catalogs ?? []));
+    signals.push(...(mod.signals ?? []).filter((r) => !isBuiltInSignal(r.key)));
   }
   return {
     collectors,
@@ -84,6 +87,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     stores,
     rankings,
     catalogs,
+    signals,
     missing,
   };
 }

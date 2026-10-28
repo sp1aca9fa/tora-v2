@@ -14,12 +14,14 @@ export function OpportunityList({
   initial,
   total,
   proven,
+  picked,
   filter,
   labels,
 }: {
   initial: OpportunityRowData[];
   total: number;
   proven: number;
+  picked: number;
   filter: CardsFilter;
   labels: OpportunityLabels;
 }) {
@@ -66,8 +68,11 @@ export function OpportunityList({
         {rows.map((o, i) => (
           <Fragment key={o.productId}>
             {i === proven &&
+              picked > 0 &&
+              heading(t('pickTitle', { count: picked }), t('pickNote'))}
+            {i === proven + picked &&
               heading(
-                t('restTitle', { count: total - proven }),
+                t('restTitle', { count: total - proven - picked }),
                 proven ? t('restNote') : `${t('noneProven')} ${t('restNote')}`,
               )}
             <OpportunityRow o={o} labels={labels} />

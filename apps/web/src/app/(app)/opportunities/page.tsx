@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
-import { cleanFilter, groupLabel, loadCards, recordText, typeLabel } from './cards';
+import { cleanFilter, groupLabel, loadCards, recordText, signalLabel, typeLabel } from './cards';
 import { OpportunityList } from './opportunity-list';
 
 /**
@@ -79,7 +79,7 @@ export default async function WorthALookPage({
                     s.warning && !on && 'text-amber-800 dark:text-amber-300',
                   )}
                 >
-                  {t(`opportunities.signal.${s.key}`)}{' '}
+                  {signalLabel(t, s.key, data.rules)}{' '}
                   <span className="tabular-nums">{share(s)}</span>
                 </Link>
               );
@@ -94,7 +94,7 @@ export default async function WorthALookPage({
                 return (
                   <li key={`${c.key}|${g.group}`}>
                     <span className="text-foreground">
-                      {t(`opportunities.signal.${c.key}`)}
+                      {signalLabel(t, c.key, data.rules)}
                       {sample && <> · {groupLabel(t, sample)}</>}:{' '}
                     </span>
                     {recordText(t, g.tests, c.key)}
@@ -111,7 +111,7 @@ export default async function WorthALookPage({
           >
             <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
               {t('opportunities.marketTitle', {
-                signal: t(`opportunities.signal.${m.key}`),
+                signal: signalLabel(t, m.key, data.rules),
                 type: typeLabel(t, type).toLowerCase(),
                 on: m.on,
                 of: m.of,
@@ -131,6 +131,7 @@ export default async function WorthALookPage({
         initial={data.rows}
         total={data.total}
         proven={data.proven}
+        picked={data.picked}
         filter={{ type, signals: filter.signals }}
         labels={{
           now: t('opportunities.now'),

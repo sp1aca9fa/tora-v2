@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type OpportunityNumbers,
   type OpportunityTests,
+  type SignalRule,
   OpportunityGroup,
   provenEdge,
   rankOpportunity,
@@ -99,6 +100,58 @@ describe('OpportunityGroup', () => {
     // A set of 4: its line (all 11 items).
     expect(sets.numbers('f1', '2025-12-01')!.line84).toMatchObject({ items: 11, line: 'era' });
     expect(sets.numbers('alone', '2025-12-01')!.line84!.line).toBe('era');
+  });
+
+  it("runs a signal plug-in on the item's other conditions, and tests it", () => {
+    // A slab under twice the raw price for the first 200 days, then over it.
+    const slab = (i: number) => (i < 200 ? 15000 : 30000);
+    const rule: SignalRule = {
+      key: 'slab_cheap',
+      label: 'Cheap slab',
+      about: 'A slab sells for under twice a raw copy.',
+      kinds: ['single'],
+      on: (item) => {
+        const a = item.price('graded:10', 30);
+        const b = item.price('raw:A', 30);
+        return !!a && !!b && a < 2 * b;
+      },
+    };
+    const card = {
+      id: 'card',
+      line: null,
+      kind: 'single',
+      bucket: 'graded:10',
+      release: null,
+      series: days('2025-01-01', 400, slab),
+      others: { 'raw:A': days('2025-01-01', 400, () => 10000) },
+    };
+    const g = new OpportunityGroup([card, { ...card, id: 'box', kind: 'box' }], [rule]);
+    const early = g.numbers('card', '2025-05-01')!;
+    expect(g.signals('card', '2025-05-01', early)).toContain('slab_cheap');
+    expect(g.signals('card', '2025-12-01', g.numbers('card', '2025-12-01')!)).not.toContain(
+      'slab_cheap',
+    );
+    // Not a single: the rule does not look at it.
+    expect(g.signals('box', '2025-05-01', g.numbers('box', '2025-05-01')!)).not.toContain(
+      'slab_cheap',
+    );
+    // Tested like a built-in signal: on once (one stretch), and higher 90 days later.
+    const t = g.tests('2026-02-04').signals.slab_cheap!;
+    expect([t.signals, t.higher]).toEqual([1, 1]);
+  });
+
+  it('marks a quick rise over the last 14 days', () => {
+    const jump = new OpportunityGroup([
+      {
+        id: 'j',
+        line: null,
+        release: null,
+        series: days('2025-01-01', 200, (i) => (i < 186 ? 10000 : 13000)),
+      },
+    ]);
+    const n = jump.numbers('j', '2025-07-19')!;
+    expect(n.jump14).toBeCloseTo(0.3, 5);
+    expect(signalsOn(n)).toContain('quick_rise');
   });
 
   it('tests each signal against buying on any day', () => {

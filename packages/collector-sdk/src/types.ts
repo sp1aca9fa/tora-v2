@@ -1,4 +1,10 @@
-import type { CatalogSetEntry, CodeMeaning, SourceInfo, SuggestedRates } from '@tora/core';
+import type {
+  CatalogSetEntry,
+  CodeMeaning,
+  SignalRule,
+  SourceInfo,
+  SuggestedRates,
+} from '@tora/core';
 import type {
   CandidateInput,
   FoundSetCard,
@@ -344,4 +350,9 @@ export interface CollectorModule {
   stores?: StoreDirectory[];
   rankings?: RankingSource[];
   catalogs?: SetCatalog[];
+  /**
+   * Signal plug-ins for Opportunities (S27): an admin's strategies, tested on past prices like the
+   * built-in signals (docs/opportunities.md).
+   */
+  signals?: SignalRule[];
 }

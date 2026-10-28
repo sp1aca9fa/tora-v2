@@ -12,10 +12,52 @@ export const OPPORTUNITY_SIGNALS = [
   'sales_up',
   'strong_for_age',
   'weak_for_age',
+  'quick_rise',
 ] as const;
 export const OPPORTUNITY_WARNINGS = ['line_falling', 'sales_down'] as const;
-export type OpportunitySignal =
+export type BuiltInSignal =
   (typeof OPPORTUNITY_SIGNALS)[number] | (typeof OPPORTUNITY_WARNINGS)[number];
+/** A built-in signal, or a signal plug-in's key (S27). */
+export type OpportunitySignal = BuiltInSignal | (string & {});
+
+export const isBuiltInSignal = (key: string): key is BuiltInSignal =>
+  (OPPORTUNITY_SIGNALS as readonly string[]).includes(key) ||
+  (OPPORTUNITY_WARNINGS as readonly string[]).includes(key);
+
+/**
+ * A signal plug-in (S27): a strategy of the admin's, on or off for an item on a day from its
+ * prices up to that day, tested on past prices like the built-in signals and ranking items only
+ * once proven (an admin may show an unproven one as the admin's pick).
+ */
+export interface SignalRule {
+  /** Saved with the tests ("slab_cheap"); not a built-in signal's. */
+  key: string;
+  /** The tag on a card ("PSA 10 under 2x raw"). */
+  label: string;
+  /** When it is on, one sentence ("A PSA 10 sells for under twice a raw A copy."). */
+  about: string;
+  /** Against buying when on. */
+  warning?: boolean;
+  /** The item kinds it looks at ("single"); none: every item. */
+  kinds?: string[];
+  on(item: SignalItem): boolean;
+}
+
+/** What a signal plug-in sees of an item on a day (only prices up to that day). */
+export interface SignalItem {
+  kind: string | null;
+  /** The condition studied (its prices are the item's), null for none. */
+  bucket: string | null;
+  numbers: OpportunityNumbers;
+  /**
+   * The median daily price of a condition over the last `days` (2+ days of sales), on the source
+   * of the studied prices; null without enough sales.
+   */
+  price(bucket: string | null, days: number): number | null;
+}
+
+/** A plug-in's signal as saved for the app, which cannot load plug-ins. */
+export type SignalRuleInfo = Pick<SignalRule, 'key' | 'label' | 'about' | 'warning'>;
 
 /** The line's 12-week change (median of its items, 5+) that makes it rising or falling. */
 export const LINE_MOVE = 0.1;
@@ -26,6 +68,8 @@ export const AGAINST_LINE = 0.15;
 export const SALES_UP = 1.5;
 export const SALES_DOWN = 0.6;
 export const SALES_MIN = 10;
+/** A quick rise: the last 14 days' price this far above the 60 days before (S27). */
+export const QUICK_RISE = 0.2;
 /** The last 90 days' change against similar items' at the same age (3+), from day 120 to 3 years. */
 export const AGAINST_AGE = 0.2;
 export const AGE_MIN_ITEMS = 3;
@@ -53,6 +97,10 @@ export interface OpportunityMember {
   id: string;
   line: string | null;
   set?: string | null;
+  /** For signal plug-ins: the item's kind, the condition studied, its other conditions' prices. */
+  kind?: string | null;
+  bucket?: string | null;
+  others?: Record<string, DayPrice[]>;
   release: string | null;
   series: DayPrice[];
 }
@@ -75,6 +123,8 @@ export interface OpportunityNumbers {
   salesBefore: number | null;
   /** The last 90 days' change, and similar items' typical change at the same age. */
   age: { days: number; change: number; typical: number; items: number } | null;
+  /** The last 14 days' price against the 60 days before them (null without both). */
+  jump14?: number | null;
 }
 
 const DAY = 86_400_000;
@@ -151,16 +201,57 @@ class Indexed {
  * when 5+ of its items have prices, else its own line likewise, else the whole group.
  */
 export class OpportunityGroup {
-  private readonly items: Map<string, { member: OpportunityMember; s: Indexed }>;
+  private readonly items: Map<
+    string,
+    { member: OpportunityMember; s: Indexed; others: Map<string, Indexed> }
+  >;
   private readonly fits = new Map<string, number | null>();
   private readonly lines = new Map<string, OpportunityNumbers['line84']>();
 
-  constructor(members: OpportunityMember[]) {
+  constructor(
+    members: OpportunityMember[],
+    private readonly rules: SignalRule[] = [],
+  ) {
     this.items = new Map(
       members
         .filter((m) => m.series.length)
-        .map((m) => [m.id, { member: m, s: new Indexed(m.series) }]),
+        .map((m) => [
+          m.id,
+          {
+            member: m,
+            s: new Indexed(m.series),
+            others: new Map(Object.entries(m.others ?? {}).map(([b, s]) => [b, new Indexed(s)])),
+          },
+        ]),
     );
+  }
+
+  /** The signals on for an item on a day: the built-in ones and the plug-ins' that apply. */
+  signals(id: string, day: string | number, n: OpportunityNumbers): OpportunitySignal[] {
+    const on: OpportunitySignal[] = signalsOn(n);
+    const item = this.items.get(id);
+    if (!item || !this.rules.length) return on;
+    const end = typeof day === 'number' ? day : dayNumber(day);
+    const { member, s, others } = item;
+    const studied = member.bucket ?? '';
+    const view: SignalItem = {
+      kind: member.kind ?? null,
+      bucket: member.bucket ?? null,
+      numbers: n,
+      price: (bucket, days) =>
+        (bucket ?? '') === studied
+          ? s.price(end, days)
+          : (others.get(bucket ?? '')?.price(end, days) ?? null),
+    };
+    for (const rule of this.rules) {
+      if (rule.kinds && !rule.kinds.includes(member.kind ?? '')) continue;
+      try {
+        if (rule.on(view)) on.push(rule.key);
+      } catch {
+        // A plug-in's error leaves its signal off.
+      }
+    }
+    return on;
   }
 
   get size(): number {
@@ -234,6 +325,11 @@ export class OpportunityGroup {
       sales30: s.sales(end - 29, end),
       salesBefore: s.first! <= end - 119 ? s.sales(end - 119, end - 30) / 3 : null,
       age,
+      jump14: (() => {
+        const recent = s.price(end, 14);
+        const before = s.price(end - 14, 60);
+        return recent && before ? recent / before - 1 : null;
+      })(),
     };
   }
 
@@ -257,7 +353,7 @@ export class OpportunityGroup {
         const later = d + OPPORTUNITY_HORIZON + 7 <= end ? s.around(d + OPPORTUNITY_HORIZON) : null;
         const change = later === null ? null : later / n.price - 1;
         if (change !== null) any.push(change);
-        const today = new Set(signalsOn(n));
+        const today = new Set(this.signals(id, d, n));
         for (const key of today) {
           if (on.has(key)) continue;
           const t = bySignal.get(key) ?? { signals: 0, changes: [] };
@@ -307,6 +403,7 @@ export function signalsOn(n: OpportunityNumbers): OpportunitySignal[] {
     if (n.age.change >= n.age.typical + AGAINST_AGE) on.push('strong_for_age');
     if (n.age.change <= n.age.typical - AGAINST_AGE) on.push('weak_for_age');
   }
+  if ((n.jump14 ?? 0) >= QUICK_RISE) on.push('quick_rise');
   return on;
 }
 
@@ -327,8 +424,10 @@ export interface OpportunityTests {
   signals: Partial<Record<OpportunitySignal, OpportunityTest>>;
 }
 
-const isWarning = (key: OpportunitySignal) =>
-  (OPPORTUNITY_WARNINGS as readonly string[]).includes(key);
+/** Warnings: the built-in ones, and the plug-ins' marked so. */
+const isWarning = (key: OpportunitySignal, rules: readonly SignalRuleInfo[] = []) =>
+  (OPPORTUNITY_WARNINGS as readonly string[]).includes(key) ||
+  rules.some((r) => r.key === key && r.warning);
 
 /**
  * How far a signal beat buying on any day (share higher 90 days later, in points; negative for a
@@ -337,17 +436,19 @@ const isWarning = (key: OpportunitySignal) =>
 export function provenEdge(
   tests: OpportunityTests | undefined,
   key: OpportunitySignal,
+  rules: readonly SignalRuleInfo[] = [],
 ): number | null {
   const t = tests?.signals[key];
   if (!tests || !t || t.checked < PROVEN_MIN_CHECKS || tests.any.checked === 0) return null;
   const edge = t.higher / t.checked - tests.any.higher / tests.any.checked;
-  return (isWarning(key) ? edge <= -PROVEN_POINTS : edge >= PROVEN_POINTS) ? edge : null;
+  return (isWarning(key, rules) ? edge <= -PROVEN_POINTS : edge >= PROVEN_POINTS) ? edge : null;
 }
 
 /** Proven signals and warnings on for an item, and its rank: proven signals first, then edges. */
 export function rankOpportunity(
   on: readonly OpportunitySignal[],
   tests: OpportunityTests | undefined,
+  rules: readonly SignalRuleInfo[] = [],
 ): {
   proven: OpportunitySignal[];
   warnings: OpportunitySignal[];
@@ -359,9 +460,9 @@ export function rankOpportunity(
   const unproven: OpportunitySignal[] = [];
   let score = 0;
   for (const key of on) {
-    const edge = provenEdge(tests, key);
+    const edge = provenEdge(tests, key, rules);
     if (edge === null) unproven.push(key);
-    else if (isWarning(key)) warnings.push(key);
+    else if (isWarning(key, rules)) warnings.push(key);
     else proven.push(key);
     if (edge !== null) score += edge;
   }
