@@ -704,7 +704,7 @@ export function AddGlossary() {
   const t = useTranslations('stores');
   const [code, setCode] = useState('');
   const [meaning, setMeaning] = useState('');
-  const [product, setProduct] = useState(false);
+  const [kind, setKind] = useState<'other' | 'product' | 'chain'>('other');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return (
@@ -713,7 +713,7 @@ export function AddGlossary() {
       onSubmit={(e) => {
         e.preventDefault();
         startTransition(async () => {
-          const r = await addGlossaryAction(code, meaning, product);
+          const r = await addGlossaryAction(code, meaning, kind);
           setError(r.error ? t(`addError.${r.error}`) : null);
           if (!r.error) {
             setCode('');
@@ -734,15 +734,16 @@ export function AddGlossary() {
         placeholder={t('meaning')}
         className="h-8 min-w-48 flex-1"
       />
-      <label className="flex items-center gap-1.5 text-xs">
-        <input
-          type="checkbox"
-          checked={product}
-          onChange={(e) => setProduct(e.target.checked)}
-          className="size-4"
-        />
-        {t('isProduct')}
-      </label>
+      <NativeSelect
+        value={kind}
+        onChange={(e) => setKind(e.target.value as typeof kind)}
+        className="h-8 w-32"
+        aria-label={t('codeKind')}
+      >
+        <option value="other">{t('codeKindOther')}</option>
+        <option value="product">{t('isProduct')}</option>
+        <option value="chain">{t('codeKindChain')}</option>
+      </NativeSelect>
       <Button type="submit" size="sm" disabled={pending}>
         {t('add')}
       </Button>

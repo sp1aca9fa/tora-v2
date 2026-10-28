@@ -40,7 +40,10 @@ someone reading a language with no label of its own gets the English one, and wi
 chain and name as written.
 
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
-"none", a chain's mark, a product), each with its meaning; `product: true` marks a product. The
+"none", a product, a chain), each with its meaning; `product: true` marks a product, `chain:
+true` a chain's name or mark (its meaning the chain's name): a post naming a chain and only areas
+reads as that chain's branch there ("Arcade · Harbor"), with no store at all as a branch not
+named. The
 Stores page shows every code with what it stands for, and admins can add other codes there,
 products ticked as such, and turn off a list's or feed's code (a board's own list can be out of
 date) or turn it back on.

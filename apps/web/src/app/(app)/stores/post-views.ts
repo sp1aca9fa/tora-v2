@@ -3,6 +3,7 @@ import {
   type CodeMeaning,
   PLACE,
   type StoreArea,
+  chainsInPost,
   codesInPost,
   localDate,
   productsInPost,
@@ -126,6 +127,21 @@ export async function toViews(
     db,
     posts.map((p) => p.id),
   );
+  /**
+   * The stores a post names; a chain it names with only areas is its branch there ("Arcade ·
+   * Harbor"), with no store at all a branch not named.
+   */
+  const postNames = (p: StorePost) => {
+    const named = p.storeIds.flatMap((id) => byId.get(id) ?? []);
+    const chains = chainsInPost(p.text, glossary);
+    if (!chains.length || named.some((s) => s.chain !== PLACE)) {
+      return named.map((s) => storeLabel(t, locale, s));
+    }
+    if (!named.length) return chains.map((chain) => t('chainNoBranch', { chain }));
+    return named.flatMap((s) =>
+      chains.map((chain) => t('chainAt', { chain, place: storeLabelIn(s, locale) ?? s.name })),
+    );
+  };
   return posts.map((p) => ({
     id: p.id,
     ref: `${p.source}|${p.externalId}`,
@@ -135,10 +151,7 @@ export async function toViews(
     at: p.postedAt.slice(5, 16).replace('T', ' '),
     postedAt: p.postedAt,
     author: p.author,
-    names: p.storeIds.flatMap((id) => {
-      const s = byId.get(id);
-      return s ? [storeLabel(t, locale, s)] : [];
-    }),
+    names: postNames(p),
     mine: p.storeIds.some((id) => inArea.has(id)),
     decoded: [
       ...codesInPost(p.text, [...storeCodesOf(p.storeIds), ...otherCodes]),

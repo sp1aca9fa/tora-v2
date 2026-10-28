@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activeArea,
   codeIndex,
+  chainsInPost,
   codesInPost,
   locationsOf,
   distanceKm,
@@ -151,6 +152,16 @@ it('spells out the codes of a post in the order written, the longer code first',
     codes[0],
   ]);
   expect(codesInPost('KTAX', codes)).toEqual([]);
+});
+
+it('finds the chains a post names, once each', () => {
+  const glossary = [
+    { code: '▲', meaning: 'Arcade', chain: true },
+    { code: 'アーケード', meaning: 'Arcade', chain: true },
+    { code: '🍐', meaning: 'none' },
+  ];
+  expect(chainsInPost('▲港町 アーケード 🍐', glossary)).toEqual(['Arcade']);
+  expect(chainsInPost('港町 🍐', glossary)).toEqual([]);
 });
 
 it('lists the codes that are more than the name, with what they stand for', () => {

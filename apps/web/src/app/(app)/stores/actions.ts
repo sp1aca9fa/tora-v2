@@ -202,14 +202,18 @@ export async function forgetBoardAction(key: string) {
 export async function addGlossaryAction(
   code: string,
   meaning: string,
-  product = false,
+  kind: 'other' | 'product' | 'chain' = 'other',
 ): Promise<{ error?: string }> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return { error: 'admin' };
   const c = code.normalize('NFKC').trim();
   const m = meaning.trim();
   if (!c || !m || c.length > 20 || m.length > 200) return { error: 'glossary' };
-  await addGlossary(db, { code: c, meaning: m, ...(product === true ? { product: true } : {}) });
+  await addGlossary(db, {
+    code: c,
+    meaning: m,
+    ...(kind === 'product' ? { product: true } : kind === 'chain' ? { chain: true } : {}),
+  });
   await recordAdminChange(db, user.id, 'glossaryAdded', { code: c, meaning: m }, '/stores/area');
   revalidatePath('/stores');
   return {};

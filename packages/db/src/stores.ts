@@ -4,6 +4,7 @@ import {
   type CodeMeaning,
   DEFAULT_FEED_PREFS,
   PLACE,
+  chainsInPost,
   type StoreEntry,
   linesNotice,
   localDate,
@@ -983,6 +984,8 @@ export async function sendStoreNotices(
       chosen.flatMap((p) => {
         const ids = p.storeIds.filter((id) => area.has(id));
         const areasOnly = ids.every((id) => byId.get(id)?.chain === PLACE);
+        // A chain named with only areas: its branch there.
+        const chains = areasOnly ? chainsInPost(p.text, glossary) : [];
         let products = named(p.text);
         if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
         return ids.map((id) => {
@@ -996,7 +999,11 @@ export async function sendStoreNotices(
               title: title(at),
               url: base ? `${base}/stores?open=${encodeURIComponent(row)}` : null,
             },
-            store: storeLabel(byId.get(id)!, t, locale),
+            store: chains.length
+              ? chains
+                  .map((c) => `${c} · ${storeLabelIn(byId.get(id)!, locale) ?? byId.get(id)!.name}`)
+                  .join(', ')
+              : storeLabel(byId.get(id)!, t, locale),
             products,
             text: p.text,
             // "18:00", as the Now page shows it.

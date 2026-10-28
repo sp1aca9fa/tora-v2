@@ -185,6 +185,11 @@ export interface CodeMeaning {
   meaning: string;
   /** A product ("X1": Expansion X1), named in notices next to the store. */
   product?: boolean;
+  /**
+   * A chain's name or mark, the meaning its name ("▲": Arcade): a post naming it and only areas
+   * (or no store) is that chain's branch there ("Arcade · Harbor").
+   */
+  chain?: boolean;
 }
 
 /**
@@ -256,6 +261,18 @@ export function codesInPost(text: string, codes: CodeMeaning[]): CodeMeaning[] {
     .sort((a, b) => a.at - b.at)
     .map((x) => x.c)
     .filter((c) => !seen.has(`${c.code}|${c.meaning}`) && seen.add(`${c.code}|${c.meaning}`));
+}
+
+/** The chains a post names by their names or marks (once each, in the order written). */
+export function chainsInPost(text: string, glossary: CodeMeaning[]): string[] {
+  return [
+    ...new Set(
+      codesInPost(
+        text,
+        glossary.filter((g) => g.chain),
+      ).map((g) => g.meaning),
+    ),
+  ];
 }
 
 /** Width and emoji variation marks aside, case kept (product codes "b" and "B" differ). */
