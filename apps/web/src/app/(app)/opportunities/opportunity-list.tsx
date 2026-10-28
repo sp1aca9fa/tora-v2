@@ -58,9 +58,10 @@ export function OpportunityList({
       {note && <p className="max-w-3xl text-xs text-muted-foreground">{note}</p>}
     </li>
   );
+  if (!total) return <p className="text-sm text-muted-foreground">{t('noneWithSignals')}</p>;
   return (
     <>
-      <ul className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+      <ul className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {proven > 0 && heading(t('provenTitle', { count: proven }))}
         {rows.map((o, i) => (
           <Fragment key={o.productId}>

@@ -55,9 +55,12 @@ export interface OpportunityNumbers {
   /** The item's fitted 12-week change, and its line's (the median of 5+ items; `line` null: the group). */
   own84: number | null;
   line84: { change: number; items: number; line: string | null } | null;
-  /** Sales in the last 30 days, and the monthly rate of the 90 days before. */
+  /**
+   * Sales in the last 30 days, and the monthly rate of the 90 days before (null when its sales
+   * were collected for less than 120 days: an item just added would look as if sales picked up).
+   */
   sales30: number;
-  salesBefore: number;
+  salesBefore: number | null;
   /** The last 90 days' change, and similar items' typical change at the same age. */
   age: { days: number; change: number; typical: number; items: number } | null;
 }
@@ -206,7 +209,7 @@ export class OpportunityGroup {
       own84: this.fit(id, end),
       line84: this.lineChange(member.line, end),
       sales30: s.sales(end - 29, end),
-      salesBefore: s.sales(end - 119, end - 30) / 3,
+      salesBefore: s.first! <= end - 119 ? s.sales(end - 119, end - 30) / 3 : null,
       age,
     };
   }
@@ -270,8 +273,13 @@ export function signalsOn(n: OpportunityNumbers): OpportunitySignal[] {
     if (n.own84 >= line + AGAINST_LINE) on.push('leader');
     if (line >= LINE_MOVE && n.own84 <= line - AGAINST_LINE) on.push('laggard');
   }
-  if (n.sales30 >= SALES_MIN && n.sales30 >= SALES_UP * n.salesBefore) on.push('sales_up');
-  if (n.salesBefore >= SALES_MIN && n.sales30 <= SALES_DOWN * n.salesBefore) on.push('sales_down');
+  const before = n.salesBefore;
+  if (before !== null && n.sales30 >= SALES_MIN && n.sales30 >= SALES_UP * before) {
+    on.push('sales_up');
+  }
+  if (before !== null && before >= SALES_MIN && n.sales30 <= SALES_DOWN * before) {
+    on.push('sales_down');
+  }
   if (n.age) {
     if (n.age.change >= n.age.typical + AGAINST_AGE) on.push('strong_for_age');
     if (n.age.change <= n.age.typical - AGAINST_AGE) on.push('weak_for_age');

@@ -120,7 +120,7 @@ it('ranks proven items first, then the rest nearest their target, in batches', a
   const bySignal = (await opportunityCards(
     db,
     user,
-    { type: 'sealed', signal: 'sales_up' },
+    { type: 'sealed', signals: ['sales_up'] },
     0,
     20,
     now,

@@ -42,7 +42,8 @@ chain and name as written.
 A list can also carry a `glossary`: codes posters use that are no store or place (a state such as
 "none", a chain's mark, a product), each with its meaning; `product: true` marks a product. The
 Stores page shows every code with what it stands for, and admins can add other codes there,
-products ticked as such.
+products ticked as such, and turn off a list's or feed's code (a board's own list can be out of
+date) or turn it back on.
 
 Product codes are named in notices next to the store ("メガストア 港町 · スノーセット"),
 then the post as written. An admin's codes and emoji codes count anywhere in a post (Latin ones as

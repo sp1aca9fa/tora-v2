@@ -1133,20 +1133,44 @@ export async function saveGlossary(db: Db, key: string, entries: CodeMeaning[]):
   await saveSetting(db, GLOSSARY_KEY, { ...all, [key]: entries });
 }
 
-/** The other codes: the plug-ins' and the admins' (marked by hand). */
+/** The plug-ins' and feeds' codes an admin turned off (a board's own list can be out of date). */
+const HIDDEN_GLOSSARY_KEY = 'storeGlossaryHidden';
+
+/**
+ * The other codes: the plug-ins' and feeds' and the admins' (marked by hand). Those an admin
+ * turned off are left out, or marked with `withHidden`.
+ */
 export async function storeGlossary(
   db: Pick<Db, 'select'>,
-): Promise<(CodeMeaning & { byHand: boolean })[]> {
-  const [lists, own] = await Promise.all([
+  withHidden = false,
+): Promise<(CodeMeaning & { byHand: boolean; hidden?: boolean })[]> {
+  const [lists, own, off] = await Promise.all([
     readSetting<Record<string, CodeMeaning[]>>(db, GLOSSARY_KEY),
     readSetting<CodeMeaning[]>(db, ADMIN_GLOSSARY_KEY),
+    readSetting<string[]>(db, HIDDEN_GLOSSARY_KEY),
   ]);
+  const hidden = new Set(off ?? []);
   return [
     ...Object.values(lists ?? {})
       .flat()
-      .map((e) => ({ ...e, byHand: false })),
+      .flatMap((e) =>
+        !hidden.has(e.code)
+          ? [{ ...e, byHand: false }]
+          : withHidden
+            ? [{ ...e, byHand: false, hidden: true }]
+            : [],
+      ),
     ...(own ?? []).map((e) => ({ ...e, byHand: true })),
   ];
+}
+
+/** Turns a plug-in's or feed's code off, or back on. */
+export async function hideGlossary(db: Db, code: string, hide: boolean): Promise<void> {
+  const off = (await readSetting<string[]>(db, HIDDEN_GLOSSARY_KEY)) ?? [];
+  await saveSetting(db, HIDDEN_GLOSSARY_KEY, [
+    ...off.filter((c) => c !== code),
+    ...(hide ? [code] : []),
+  ]);
 }
 
 /** An other code an admin adds (a code given again replaces its meaning). */

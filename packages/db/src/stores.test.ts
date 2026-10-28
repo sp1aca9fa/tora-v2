@@ -24,6 +24,7 @@ import {
   receivePush,
   storesState,
   recentPosts,
+  hideGlossary,
   removeGlossary,
   removeStore,
   saveGlossary,
@@ -527,6 +528,14 @@ it("keeps the plug-ins' other codes and the admins' apart", async () => {
     { code: '■', meaning: 'another product', byHand: true },
   ]);
   await removeGlossary(db, '■');
+  expect((await storeGlossary(db)).map((e) => e.code)).toEqual(['□']);
+  // A plug-in's code an admin turned off: left out, listed with `withHidden`, back on.
+  await hideGlossary(db, '□', true);
+  expect(await storeGlossary(db)).toEqual([]);
+  expect(await storeGlossary(db, true)).toEqual([
+    { code: '□', meaning: 'none', byHand: false, hidden: true },
+  ]);
+  await hideGlossary(db, '□', false);
   expect((await storeGlossary(db)).map((e) => e.code)).toEqual(['□']);
 });
 

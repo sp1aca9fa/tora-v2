@@ -16,16 +16,24 @@ export const BATCH = 20;
 
 export interface CardsFilter {
   type: string | null;
-  signal: OpportunitySignal | null;
+  /** Items with every one of these on (`?signal=a,b`). */
+  signals: OpportunitySignal[];
 }
 
 /** A filter from the address or a client: unknown values dropped. */
-export function cleanFilter(f: { type?: unknown; signal?: unknown }): CardsFilter {
+export function cleanFilter(f: {
+  type?: unknown;
+  signal?: unknown;
+  signals?: unknown;
+}): CardsFilter {
+  const asked = Array.isArray(f.signals)
+    ? f.signals
+    : typeof f.signal === 'string'
+      ? f.signal.split(',')
+      : [];
   return {
     type: typeof f.type === 'string' && f.type.length < 40 ? f.type : null,
-    signal: (OPPORTUNITY_SIGNALS as readonly unknown[]).includes(f.signal)
-      ? (f.signal as OpportunitySignal)
-      : null,
+    signals: OPPORTUNITY_SIGNALS.filter((k) => asked.includes(k)),
   };
 }
 
@@ -89,7 +97,7 @@ function rowOf(t: T, money: (n: number) => string, o: OpportunityCard): Opportun
       items: (key.endsWith('_age') ? n.age?.items : n.line84?.items) ?? 0,
       own: n.own84 !== null ? signed(n.own84) : '-',
       sales30: n.sales30,
-      before: Math.round(n.salesBefore),
+      before: Math.round(n.salesBefore ?? 0),
       change: n.age ? signed(n.age.change) : '-',
       typical: n.age ? signed(n.age.typical) : '-',
       days: n.age?.days ?? 0,

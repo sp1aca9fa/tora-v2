@@ -26,8 +26,13 @@ export default async function WorthALookPage({
   }
   const type = data.type;
   const signals = data.summary.signals[type] ?? [];
-  const href = (q: { type: string; signal?: string | null }) =>
-    `/opportunities?type=${encodeURIComponent(q.type)}${q.signal ? `&signal=${q.signal}` : ''}`;
+  const href = (q: { type: string; signals?: string[] }) =>
+    `/opportunities?type=${encodeURIComponent(q.type)}${q.signals?.length ? `&signal=${q.signals.join(',')}` : ''}`;
+  /** The chosen signals with this one added, or taken out. */
+  const toggled = (key: string) =>
+    filter.signals.some((k) => k === key)
+      ? filter.signals.filter((k) => k !== key)
+      : [...filter.signals, key];
   const chip = (active: boolean) =>
     cn(
       'rounded-full border px-3 py-1 text-sm transition-colors',
@@ -41,7 +46,7 @@ export default async function WorthALookPage({
     const r = g?.tests.signals[s.key];
     return r?.checked ? `${Math.round((r.higher / r.checked) * 100)}%` : '';
   };
-  const chosen = signals.find((s) => s.key === filter.signal);
+  const chosen = signals.filter((s) => filter.signals.includes(s.key));
 
   return (
     <div className="space-y-4">
@@ -61,30 +66,42 @@ export default async function WorthALookPage({
         {signals.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-xs text-muted-foreground">{t('opportunities.signalsHere')}</span>
-            {signals.map((s) => (
-              <Link
-                key={s.key}
-                href={href({ type, signal: s.key === filter.signal ? null : s.key })}
-                aria-current={s.key === filter.signal ? 'true' : undefined}
-                className={cn(chip(s.key === filter.signal), 'py-0.5 text-xs')}
-              >
-                {t(`opportunities.signal.${s.key}`)}{' '}
-                <span className="tabular-nums">{share(s)}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-        {chosen && (
-          <ul className="max-w-3xl space-y-0.5 text-xs text-muted-foreground">
-            {chosen.groups.map((g) => {
-              const sample = data.groupItems[g.group];
+            {signals.map((s) => {
+              const on = filter.signals.includes(s.key);
               return (
-                <li key={g.group}>
-                  {sample && <span className="text-foreground">{groupLabel(t, sample)}: </span>}
-                  {recordText(t, g.tests, chosen.key)}
-                </li>
+                <Link
+                  key={s.key}
+                  href={href({ type, signals: toggled(s.key) })}
+                  aria-pressed={on}
+                  className={cn(
+                    chip(on),
+                    'py-0.5 text-xs',
+                    s.warning && !on && 'text-amber-800 dark:text-amber-300',
+                  )}
+                >
+                  {t(`opportunities.signal.${s.key}`)}{' '}
+                  <span className="tabular-nums">{share(s)}</span>
+                </Link>
               );
             })}
+          </div>
+        )}
+        {chosen.length > 0 && (
+          <ul className="max-w-3xl space-y-0.5 text-xs text-muted-foreground">
+            {chosen.flatMap((c) =>
+              c.groups.map((g) => {
+                const sample = data.groupItems[g.group];
+                return (
+                  <li key={`${c.key}|${g.group}`}>
+                    <span className="text-foreground">
+                      {t(`opportunities.signal.${c.key}`)}
+                      {sample && <> · {groupLabel(t, sample)}</>}:{' '}
+                    </span>
+                    {recordText(t, g.tests, c.key)}
+                  </li>
+                );
+              }),
+            )}
           </ul>
         )}
         <p className="text-xs text-muted-foreground">
@@ -92,11 +109,11 @@ export default async function WorthALookPage({
         </p>
       </div>
       <OpportunityList
-        key={`${type}|${filter.signal ?? ''}`}
+        key={`${type}|${filter.signals.join()}`}
         initial={data.rows}
         total={data.total}
         proven={data.proven}
-        filter={{ type, signal: filter.signal }}
+        filter={{ type, signals: filter.signals }}
         labels={{
           now: t('opportunities.now'),
           target: t('opportunities.target'),

@@ -46,6 +46,8 @@ describe('signalsOn', () => {
     expect(signalsOn(numbers({ sales30: 15, salesBefore: 10 }))).toEqual(['sales_up']);
     expect(signalsOn(numbers({ sales30: 9, salesBefore: 4 }))).toEqual([]);
     expect(signalsOn(numbers({ sales30: 6, salesBefore: 10 }))).toEqual(['sales_down']);
+    // Sales collected for less than 120 days: no comparison.
+    expect(signalsOn(numbers({ sales30: 150, salesBefore: null }))).toEqual([]);
     expect(
       signalsOn(numbers({ age: { days: 200, change: 0.3, typical: 0.05, items: 3 } })),
     ).toEqual(['strong_for_age']);

@@ -8,8 +8,9 @@ past prices only and is never a sure thing.
 ## Where it shows
 
 - **Opportunities** (menu, after Watchlist), four sub pages with their own address:
-  - **Worth a look** (`/opportunities`): chips per item type and per signal proven in it (a tap
-    filters the list and shows the signal's record per group), then every item of the type best
+  - **Worth a look** (`/opportunities`): chips per item type and per signal proven in it,
+    warnings too (tap one or more: the list keeps the items with all of them on, and each one's
+    record per group shows), then every item of the type best
     first: those with a proven signal (by score), then apart those without (by their signals not
     proven yet); equal scores nearest their target first. 20 items come from the server at a time
     as the list is scrolled. A card shows the picture, the name, owned / watching / suggested, its
@@ -60,7 +61,7 @@ condition):
 | Line rising / falling (warning)      | The median 12-week change of the item's set line (5+ items; else the whole group) is +10 % or more / -10 % or less                                       |
 | Leads its line                       | The item's 12-week change is 15 points or more above its line's                                                                                          |
 | Lags a rising line                   | The line is rising and the item is 15 points or more under it                                                                                            |
-| Sales picking up / slowing (warning) | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales)                                             |
+| Sales picking up / slowing (warning) | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |
 | Strong / weak for its age            | The item's last 90 days are 20 points above / under similar items' at the same age since release (3+ items; day 120 to 3 years; real release dates only) |
 
 Facts, not tested: the lowest ask on the same site as the prices, 15-50 % under the recent price

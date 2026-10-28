@@ -1827,6 +1827,8 @@
       "productMerged": "Duplicate item merged",
       "glossaryAdded": "Code meaning added",
       "glossaryRemoved": "Code meaning removed",
+      "glossaryHidden": "Code turned off",
+      "glossaryShown": "Code turned back on",
       "trackingHours": "Board tracker hours",
       "trackHour": "Board tracker: an hour outside the hours",
       "trackUntilStart": "Board tracker: until the start of the hours"
@@ -1971,7 +1973,8 @@
         "until": "Pick a date."
       }
     },
-    "signalsHere": "Proven here:",
+    "signalsHere": "Proven here (tap one or more):",
+    "noneWithSignals": "No item has all of these on today.",
     "provenTitle": "With a proven signal ({count})",
     "restTitle": "No proven signal ({count})",
     "restNote": "Ranked by their signals not proven yet, then by how near their target they are.",
@@ -2323,6 +2326,9 @@
     "noProductCodes": "None yet: the board's list comes with the feed's next push.",
     "isProduct": "Product",
     "fromFeed": "board list",
+    "codeOff": "Turn off",
+    "codeOn": "Turn on",
+    "codeIsOff": "off",
     "code": "Code",
     "meaning": "Meaning",
     "areaOf": "{name} (area)",

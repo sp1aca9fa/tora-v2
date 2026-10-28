@@ -26,6 +26,7 @@ import {
   addStoreAction,
   forgetBoardAction,
   newFeedTokenAction,
+  hideGlossaryAction,
   removeGlossaryAction,
   removeStoreAction,
   saveFeedBoardsAction,
@@ -762,6 +763,22 @@ export function RemoveGlossary({ code }: { code: string }) {
       onClick={() => startTransition(() => removeGlossaryAction(code))}
     >
       {t('remove')}
+    </button>
+  );
+}
+
+/** Turns a store list's or feed's code off, or back on (admins). */
+export function HideGlossary({ code, hidden }: { code: string; hidden: boolean }) {
+  const t = useTranslations('stores');
+  const [pending, startTransition] = useTransition();
+  return (
+    <button
+      type="button"
+      className="text-xs text-muted-foreground underline"
+      disabled={pending}
+      onClick={() => startTransition(() => hideGlossaryAction(code, !hidden))}
+    >
+      {t(hidden ? 'codeOn' : 'codeOff')}
     </button>
   );
 }

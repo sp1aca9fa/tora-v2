@@ -18,6 +18,7 @@ import {
   forgetBoard,
   newFeedToken,
   recordAdminChange,
+  hideGlossary,
   removeGlossary,
   removeStore,
   saveTrackingHours,
@@ -219,6 +220,22 @@ export async function removeGlossaryAction(code: string) {
   if (user.role !== 'admin') return;
   await removeGlossary(db, String(code));
   await recordAdminChange(db, user.id, 'glossaryRemoved', { code: String(code) }, '/stores/area');
+  revalidatePath('/stores');
+}
+
+/** Turns a store list's or feed's code off (out of date, wrong), or back on (admins). */
+export async function hideGlossaryAction(code: string, hide: boolean) {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  const c = String(code);
+  await hideGlossary(db, c, hide === true);
+  await recordAdminChange(
+    db,
+    user.id,
+    hide === true ? 'glossaryHidden' : 'glossaryShown',
+    { code: c },
+    '/stores/codes',
+  );
   revalidatePath('/stores');
 }
 

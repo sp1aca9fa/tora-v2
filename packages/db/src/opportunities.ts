@@ -291,11 +291,12 @@ export interface OpportunityCard extends Opportunity {
 /** The types and the signals proven in each, for the page's chips. */
 export interface OpportunitySummary {
   types: { type: string; items: number; proven: number }[];
-  /** Per type, each signal proven in one of its groups (warnings aside), with those groups. */
+  /** Per type, each signal proven in one of its groups (warnings too), with those groups. */
   signals: Record<
     string,
     {
       key: OpportunitySignal;
+      warning: boolean;
       groups: { group: string; tests: OpportunityTests; sample: string }[];
     }[]
   >;
@@ -307,13 +308,14 @@ const gap = (c: { now: number | null; target: number | null }) =>
 
 /**
  * The Worth a look list of an item type (S26), `limit` items from `offset`: those with a proven
- * signal first, by score, then the rest by score; equal scores nearest their target first. With a
- * signal, only the items it is proven on. The summary counts every type.
+ * signal first, by score, then the rest by score; equal scores nearest their target first. With
+ * signals, only the items every one of them is on and proven for (warnings too). The summary counts
+ * every type.
  */
 export async function opportunityCards(
   db: Db,
   user: Pick<User, 'id' | 'preferences'>,
-  filter: { type: string | null; signal?: OpportunitySignal | null },
+  filter: { type: string | null; signals?: OpportunitySignal[] },
   offset: number,
   limit: number,
   now = new Date(),
@@ -338,9 +340,9 @@ export async function opportunityCards(
     if (o.proven.length) t.proven++;
     if (!o.tests) continue;
     const list = (summary.signals[o.itemType] ??= []);
-    for (const key of o.proven) {
+    for (const key of [...o.proven, ...o.warnings]) {
       let sig = list.find((x) => x.key === key);
-      if (!sig) list.push((sig = { key, groups: [] }));
+      if (!sig) list.push((sig = { key, warning: o.warnings.includes(key), groups: [] }));
       if (!sig.groups.some((g) => g.group === o.group)) {
         sig.groups.push({ group: o.group, tests: o.tests, sample: o.productId });
       }
@@ -352,7 +354,9 @@ export async function opportunityCards(
     ? filter.type
     : (summary.types[0]?.type ?? null);
   const list = saved.items.filter(
-    (o) => o.itemType === type && (!filter.signal || o.proven.includes(filter.signal)),
+    (o) =>
+      o.itemType === type &&
+      (filter.signals ?? []).every((k) => o.proven.includes(k) || o.warnings.includes(k)),
   );
   const [owned, watched] = await Promise.all([
     db

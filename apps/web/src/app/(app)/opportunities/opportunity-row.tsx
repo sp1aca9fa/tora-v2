@@ -61,7 +61,7 @@ export function OpportunityRow({
   labels: OpportunityLabels;
 }) {
   return (
-    <li className="space-y-2 rounded-xl border bg-card px-3 py-3">
+    <li className="flex flex-col gap-2 rounded-xl border bg-card px-3 py-3">
       <Link href={o.href} className="flex items-start gap-3 rounded-md hover:bg-accent/50">
         <ProductImage product={o.product} version={o.version} className="size-16 shrink-0" />
         <div className="min-w-0 flex-1 space-y-0.5">
@@ -131,7 +131,7 @@ export function OpportunityRow({
         </p>
       )}
       {!o.watching && (
-        <Button asChild size="sm" variant="outline">
+        <Button asChild size="sm" variant="outline" className="mt-auto self-start">
           <Link href={`/watchlist/add?product=${o.productId}`}>
             <Binoculars /> {labels.watch}
           </Link>

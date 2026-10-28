@@ -47,7 +47,7 @@
 | S14 | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-24): `pnpm perf` and `pnpm stress-data` built; baseline within targets at today's size; fixes measured on medium and large (nav badge, Portfolio insights, nightly snapshot memory, Items and Opportunities load as you scroll, no page skeleton); every page within the targets on the owner's data and on large (2026-10-25); next the user's check (phone and PC) |
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs, collector faults, edge cases (input, imports) and layout at 7 views done (seven bugs fixed, an eighth from the owner's use); `pnpm check:all` added; bug log reviewed with the user (quiet-source warning and two-tab protection built); next the user's check |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress (2026-10-25): first pass done (every guide read against the app, links and commands checked); both gaps found moved to Open issues (user, 2026-10-26) |
-| S26 | Opportunities as sub pages: Worth a look, Popular now, Signals, Buy plan; cards with tags and a target price; every item ranked, loaded as you scroll; a singles ranking and the top 60 as candidates | built 2026-10-27 (no migration; the singles ranking and the targets fill in with the next collect), awaiting the user's check; crawled on the real-data test copy (10 pages, phone, wide and dark: no errors; the menu's Actions count was too faint, fixed) |
+| S26 | Opportunities as sub pages: Worth a look, Popular now, Signals, Buy plan; cards with tags and a target price; every item ranked, loaded as you scroll; a singles ranking and the top 60 as candidates | built 2026-10-27 (no migration; the singles ranking and the targets fill in with the next collect); crawled on the real-data test copy (10 pages, phone, wide and dark: no errors; the menu's Actions count was too faint, fixed); the user's check in progress (2026-10-28: first fixes built, the next round being planned) |
 
 ### Decision log
 
@@ -1017,6 +1017,16 @@ Decided 2026-10-27 (user, decision log). Built on S13 (signals, tests, rankings,
 - Collect: buy timing numbers for every item with signal numbers (the target needs them); `CANDIDATE_TOP` 60; the private SNKRDUNK singles ranking.
 
 Acceptance: the user's check on phone and PC.
+
+### The user's check (2026-10-28)
+
+First notes (more to come with the next round):
+
+1. "Only 3 cards worth a look": on 10-28's numbers 43 cards have a proven signal. Every Pokemon single carries the proven warning "line falling" (singles' median 12 weeks: about -27 %), which outweighs their other signals. Also found: a suggested item collected for a few days showed "sales picking up" (151 sales in 30 days against none before); now the sales comparison needs 120 days of collected sales.
+2. Cards in a row differed in height (a listing line, wrapped tags): rows now share their height, Watch at the bottom.
+3. Several signals at once: the signal chips take one or more (`?signal=a,b`), warnings too; the list keeps the items with all of them on.
+4. A board's own product list can be out of date (a code naming a product no longer sold): admins turn a list's or feed's code off on Stores > Codes, and back on (Activity logs it).
+5. A UX review before the owner's check: `docs/ux-review.md`, given to a fresh reviewer with only screenshots and one line per page.
 
 ## S18: Documentation pass
 

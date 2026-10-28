@@ -3,7 +3,14 @@ import { cachedStores, storeCodes, storeGlossary } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { authed } from '@/lib/auth/guard';
-import { AddGlossary, AddStoreForm, RemoveGlossary, StoreCodesList } from '../store-area';
+import { cn } from '@/lib/utils';
+import {
+  AddGlossary,
+  AddStoreForm,
+  HideGlossary,
+  RemoveGlossary,
+  StoreCodesList,
+} from '../store-area';
 import { storeViews } from '../store-views';
 
 /**
@@ -16,14 +23,23 @@ export default async function StoreCodesPage() {
   const [t, all, codesList, views] = await Promise.all([
     getTranslations('stores'),
     cachedStores(db),
-    storeGlossary(db),
+    storeGlossary(db, true),
     admin ? storeViews(db) : null,
   ]);
-  // The admins' product codes first (they win over the board's list's).
-  const products = codesList
+  // The admins' product codes first (they win over the board's list's); turned off ones last.
+  const listed = codesList.filter((g) => admin || !g.hidden);
+  const products = listed
     .filter((g) => g.product)
-    .sort((a, b) => Number(b.byHand) - Number(a.byHand));
-  const glossary = codesList.filter((g) => !g.product);
+    .sort((a, b) => Number(!!a.hidden) - Number(!!b.hidden) || Number(b.byHand) - Number(a.byHand));
+  const glossary = listed.filter((g) => !g.product);
+  /** Remove (an admin's code) or turn off / on (a store list's or feed's). */
+  const change = (g: (typeof codesList)[number]) =>
+    admin &&
+    (g.byHand ? (
+      <RemoveGlossary code={g.code} />
+    ) : (
+      <HideGlossary code={g.code} hidden={!!g.hidden} />
+    ));
   const codes = codeIndex(all.map((s) => ({ ...s, codes: storeCodes(s) })));
   const label = (s: (typeof all)[number]) =>
     s.chain === PLACE
@@ -62,15 +78,17 @@ export default async function StoreCodesPage() {
                 <table className="w-full text-sm">
                   <tbody>
                     {products.map((g) => (
-                      <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
+                      <tr
+                        key={`${g.code}|${g.byHand}`}
+                        className={cn('border-t align-top', g.hidden && 'opacity-60')}
+                      >
                         <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
                         <td className="py-1.5 text-xs text-muted-foreground">
                           {g.meaning}
                           {!g.byHand && ` · ${t('fromFeed')}`}
+                          {g.hidden && ` · ${t('codeIsOff')}`}
                         </td>
-                        <td className="py-1.5 text-right">
-                          {admin && g.byHand && <RemoveGlossary code={g.code} />}
-                        </td>
+                        <td className="py-1.5 text-right">{change(g)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -86,12 +104,16 @@ export default async function StoreCodesPage() {
               <table className="w-full text-sm">
                 <tbody>
                   {glossary.map((g) => (
-                    <tr key={`${g.code}|${g.byHand}`} className="border-t align-top">
+                    <tr
+                      key={`${g.code}|${g.byHand}`}
+                      className={cn('border-t align-top', g.hidden && 'opacity-60')}
+                    >
                       <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
-                      <td className="py-1.5 text-xs text-muted-foreground">{g.meaning}</td>
-                      <td className="py-1.5 text-right">
-                        {admin && g.byHand && <RemoveGlossary code={g.code} />}
+                      <td className="py-1.5 text-xs text-muted-foreground">
+                        {g.meaning}
+                        {g.hidden && ` · ${t('codeIsOff')}`}
                       </td>
+                      <td className="py-1.5 text-right">{change(g)}</td>
                     </tr>
                   ))}
                 </tbody>
