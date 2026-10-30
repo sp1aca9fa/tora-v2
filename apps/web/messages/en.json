@@ -2464,13 +2464,19 @@
     "codeKindChain": "Chain",
     "codeKindLottery": "Lottery word",
     "lottery": {
-      "intro": "Posts using a lottery word ({words}), newest first, kept 30 days like every post. Mark the ones you want: Interested, Applied, or Hide to take one off the list.",
+      "intro": "Posts using {words}, newest first, kept 30 days.",
       "noWords": "No lottery words yet. An admin adds them on Codes (kind: Lottery word), e.g. the word posters use for a lottery sale.",
       "shown": {
-        "open": "All but hidden",
+        "open": "All",
         "interested": "Interested",
         "applied": "Applied",
         "hidden": "Hidden"
+      },
+      "empty": {
+        "open": "No lottery posts in the last 30 days.",
+        "interested": "Nothing marked Interested. Tap Interested on a post to keep it here.",
+        "applied": "Nothing marked Applied. Tap Applied on a post once you have applied.",
+        "hidden": "Nothing hidden."
       },
       "interested": "Interested",
       "applied": "Applied",

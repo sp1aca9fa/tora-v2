@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 const TABS = [
@@ -21,8 +21,18 @@ const TABS = [
 export function StoresNav() {
   const t = useTranslations('stores.tab');
   const pathname = usePathname();
+  const nav = useRef<HTMLElement>(null);
+  // On a phone the row scrolls: the current tab in view, even the last ones.
+  useEffect(() => {
+    nav.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [pathname]);
   return (
-    <nav className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav
+      ref={nav}
+      className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {TABS.map(([name, href]) => (
         <Link
           key={name}

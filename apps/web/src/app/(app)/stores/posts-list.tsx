@@ -40,15 +40,15 @@ function LotteryMarks({ postId, mark: saved }: { postId: string; mark: LotteryMa
               startTransition(() => lotteryMarkAction(postId, next));
             }}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+              'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors',
               on
                 ? m === 'hidden'
                   ? 'border-foreground/40 bg-muted font-medium'
                   : 'border-primary bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent',
+                : 'border-foreground/25 hover:bg-accent',
             )}
           >
-            <Icon className="size-3" aria-hidden />
+            <Icon className="size-3.5" aria-hidden />
             {t(on && m === 'hidden' ? 'lottery.unhide' : `lottery.${m}`)}
           </button>
         );
@@ -183,7 +183,13 @@ export function PostsList({
     return () => observer.disconnect();
   }, [posts.length, more, loading, filter]);
 
-  if (!posts.length) return <p className="text-sm text-muted-foreground">{t('noPosts')}</p>;
+  if (!posts.length) {
+    return (
+      <p className="py-3 text-sm text-muted-foreground">
+        {filter.lottery ? t(`lottery.empty.${filter.lottery}`) : t('noPosts')}
+      </p>
+    );
+  }
   return (
     <>
       <ul className="divide-y">

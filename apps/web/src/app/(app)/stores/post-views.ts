@@ -95,6 +95,9 @@ export async function postViews(
   const inArea = storesInArea(area, await cachedStores(db), localDate());
   // Lotteries: the posts using a lottery word, by the person's marks.
   const marks = lottery && opts.userId ? await lotteryMarksOf(db, opts.userId) : null;
+  const words = lottery
+    ? (await storeGlossary(db)).filter((g) => g.lottery).map((g) => g.code)
+    : null;
   const marked = (m: LotteryMark) => [...(marks ?? [])].flatMap(([id, x]) => (x === m ? [id] : []));
   const { posts, more } = await postsPage(db, {
     offset: opts.offset,
@@ -102,16 +105,23 @@ export async function postViews(
     storeIds: storeIds ?? (show === 'area' ? [...inArea] : undefined),
     named: show === 'named' || undefined,
     chain,
-    ...(lottery
+    ...(lottery && words
       ? {
-          words: (await storeGlossary(db)).filter((g) => g.lottery).map((g) => g.code),
+          words,
           ...(lottery === 'open' ? { notIds: marked('hidden') } : { postIds: marked(lottery) }),
         }
       : {}),
   });
   const views = await toViews(db, area, posts);
   return {
-    posts: marks ? views.map((v) => ({ ...v, lottery: { mark: marks.get(v.id) ?? null } })) : views,
+    // Every post here uses a lottery word: spelling it out again says nothing.
+    posts: words
+      ? views.map((v) => ({
+          ...v,
+          decoded: v.decoded.filter((d) => !words.includes(d.code)),
+          lottery: { mark: marks?.get(v.id) ?? null },
+        }))
+      : views,
     more,
   };
 }
