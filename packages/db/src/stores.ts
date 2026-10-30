@@ -6,6 +6,7 @@ import {
   PLACE,
   chainsInPost,
   type StoreEntry,
+  fillText,
   linesNotice,
   localDate,
   locationsOf,
@@ -608,9 +609,6 @@ export async function receivePush(
   return { fresh, first: !known, gap, ...base };
 }
 
-const fill = (text: string, params: Record<string, string | number>) =>
-  text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? ''));
-
 /**
  * What the feed's own person is told about a push (no silent failures): the feed speaks again
  * after a silence, posts that may have been missed, and recent posts naming no store or place
@@ -646,7 +644,7 @@ export async function sendFeedMessages(
   const status: { text: string; role: 'info' | 'warning' }[] = [];
   if (received.connected)
     status.push({
-      text: fill(
+      text: fillText(
         t.feedConnected ??
           'Tora: connected to the browser feed ({source}), tracking these boards: {boards}',
         { source: received.connected.source, boards: received.connected.boards.join(', ') },
@@ -657,14 +655,14 @@ export async function sendFeedMessages(
     status.push({ text: t.feedBack ?? 'Tora: the store feed is sending again.', role: 'info' });
   if (received.boardBack)
     status.push({
-      text: fill(t.boardBack ?? 'Tora: the {board} board gives posts again.', {
+      text: fillText(t.boardBack ?? 'Tora: the {board} board gives posts again.', {
         board: received.boardBack,
       }),
       role: 'info',
     });
   if (received.gap)
     status.push({
-      text: fill(
+      text: fillText(
         t.feedGap ??
           'Tora: {posts} new posts at once on the {chain} board: some posts may have been missed between two visits.',
         { posts: received.gap.posts, chain: received.gap.chain ?? '-' },
@@ -739,7 +737,7 @@ async function checkBoards(
   const t = await textsFor(db, user, ctx);
   const base = await appUrl(db);
   const lines = quiet.map(([key, b]) =>
-    fill(
+    fillText(
       t.boardSilent ??
         'Tora: the {board} board has given no posts since {since} (last visit {at}, {posts} posts read), while the feed runs: no notices from it until it does.',
       {
@@ -828,24 +826,24 @@ export async function checkFeeds(
     const sinceText = shortAt(new Date(since).toISOString());
     const text =
       alerted !== null
-        ? fill(
+        ? fillText(
             t.feedStillSilent ??
               'Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).',
             { since: sinceText, hours: Math.floor(minutes / 60) },
           )
         : startedAt > lastSeen && tracking.since && Date.parse(tracking.since) === startedAt
-          ? fill(
+          ? fillText(
               t.feedSilentTracking ??
                 'Tora: the store feed has sent nothing since tracking started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
               { started: sinceText, minutes, last: shortAt(token.lastSeenAt) },
             )
           : startedAt > lastSeen
-            ? fill(
+            ? fillText(
                 t.feedSilentStart ??
                   'Tora: the store feed has sent nothing since the server started at {started} ({minutes} min; its last push: {last}). No store notices until it sends. Check the feed (for a userscript: its browser tab).',
                 { started: sinceText, minutes, last: shortAt(token.lastSeenAt) },
               )
-            : fill(
+            : fillText(
                 t.feedSilent ??
                   'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
                 { source: token.lastSource ?? '-', since: sinceText, minutes },
@@ -894,7 +892,7 @@ let prunedAt = 0;
 function storeLabel(store: Store, t: AlertTexts, locale: string): string {
   const label = storeLabelIn(store, locale);
   return store.chain === PLACE
-    ? fill(t.storeArea ?? '{name} area', { name: label ?? store.name })
+    ? fillText(t.storeArea ?? '{name} area', { name: label ?? store.name })
     : (label ?? [store.chainLabel, store.name].filter(Boolean).join(' '));
 }
 

@@ -3,6 +3,7 @@ import {
   type Notice,
   type StorePostData,
   discordPayloads,
+  fillText,
   noticeExamples,
   plainText,
   storeNotice,
@@ -180,4 +181,22 @@ describe('notices', () => {
     expect(examples.test.cards[0]!.body).toBe('Hello');
     expect(examples.buy.cards[0]!.body).toContain('¥48000');
   });
+});
+
+it('fills placeholders and plural counts as the messages write them', () => {
+  const gone =
+    '{count, plural, =0 {no listing} one {# listing was} other {# listings were}} set aside';
+  expect([0, 1, 1200].map((count) => fillText(gone, { count }))).toEqual([
+    'no listing set aside',
+    '1 listing was set aside',
+    '1,200 listings were set aside',
+  ]);
+  expect(
+    fillText('{source}: {n, plural, one {# item from {source}} other {# items}}', {
+      source: 'megastore',
+      n: 1,
+    }),
+  ).toBe('megastore: 1 item from megastore');
+  // Unknown values stay empty; braces that are no placeholder stay as written.
+  expect(fillText('{a} {b} {c d}', { a: 1 })).toBe('1  {c d}');
 });

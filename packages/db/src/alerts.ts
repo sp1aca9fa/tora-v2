@@ -24,6 +24,7 @@ import {
   type SignalStats,
   alertPrefs,
   baseCurrency,
+  fillText,
   fromMinor,
   judge,
   localDate,
@@ -77,9 +78,6 @@ export interface AlertContext {
   /** Logs what was sent (the CLI). */
   log?: (message: string) => void;
 }
-
-const fill = (text: string, params: Record<string, string | number> = {}) =>
-  text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? ''));
 
 /** A stored time as the people read it: `YYYY-MM-DD HH:mm`. */
 const shortTime = (iso: string) => iso.slice(0, 16).replace('T', ' ');
@@ -836,7 +834,7 @@ function failureCard(
   if (entry.kind === 'collect') {
     lines.push(
       d.exitCode
-        ? fill(t.collectStopped!, {
+        ? fillText(t.collectStopped!, {
             code: Number(d.exitCode),
             reason: String(d.error ?? `exit code ${Number(d.exitCode)}`),
           })
@@ -845,26 +843,31 @@ function failureCard(
     for (const s of (d.sources as { source: string; status: string }[] | undefined) ?? []) {
       if (s.status !== 'ok')
         lines.push(
-          fill(t.sourceLine!, { source: s.source, status: t[`status_${s.status}`] ?? s.status }),
+          fillText(t.sourceLine!, {
+            source: s.source,
+            status: t[`status_${s.status}`] ?? s.status,
+          }),
         );
     }
     if (t.logHint) lines.push(t.logHint);
   } else if (entry.kind === 'backup') {
-    lines.push(fill(t.backupFailed!, { error: String(d.error ?? '') }));
+    lines.push(fillText(t.backupFailed!, { error: String(d.error ?? '') }));
   } else if (entry.kind === 'check') {
     if (entry.action === 'listings_gone') {
       const listings = (d.listings as { source: string; name: string; error: string }[]) ?? [];
-      lines.push(fill(t.listingsGone!, { count: listings.length }));
+      lines.push(fillText(t.listingsGone!, { count: listings.length }));
       for (const l of listings.slice(0, 20))
-        lines.push(fill(t.listingGoneLine!, { source: l.source, name: l.name, error: l.error }));
+        lines.push(
+          fillText(t.listingGoneLine!, { source: l.source, name: l.name, error: l.error }),
+        );
     } else if (entry.action === 'quiet_source') {
-      lines.push(fill(t.sourceQuiet!, { sources: ((d.sources as string[]) ?? []).join(', ') }));
+      lines.push(fillText(t.sourceQuiet!, { sources: ((d.sources as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'self_check') {
-      lines.push(fill(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
+      lines.push(fillText(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'db_budget') {
       const millions = (n: unknown) => (Number(n ?? 0) / 1e6).toFixed(1);
       lines.push(
-        fill(t.dbBudget!, {
+        fillText(t.dbBudget!, {
           read: millions(d.read),
           projected: millions(d.projected),
           budget: millions(d.budget),
@@ -875,7 +878,7 @@ function failureCard(
         hours: Number(d.hours ?? 0),
         last: d.last ? shortTime(String(d.last)) : '-',
       };
-      lines.push(fill(entry.action === 'no_backup' ? t.noBackup! : t.noCollect!, params));
+      lines.push(fillText(entry.action === 'no_backup' ? t.noBackup! : t.noCollect!, params));
     }
   }
   return {
@@ -959,7 +962,7 @@ export async function alertServerUpdate(
       db,
       admin.id,
       lines('admin', null, [
-        { text: fill(t.updateFailed!, { step: failed, from, to }), role: 'bad' },
+        { text: fillText(t.updateFailed!, { step: failed, from, to }), role: 'bad' },
       ]),
       ctx,
     );
@@ -1055,25 +1058,25 @@ export async function alertLoginFailure(
 
   const user = failure.userId ? await getUserById(db, failure.userId) : null;
   const text = (t: AlertTexts) => {
-    const why = fill(t[`login_${failure.reason}`] ?? failure.reason, {
+    const why = fillText(t[`login_${failure.reason}`] ?? failure.reason, {
       devices: (failure.devices ?? []).join(', '),
     });
     return [
-      fill(t.loginFailed ?? 'Tora: a sign-in to {user} failed: {why}', {
+      fillText(t.loginFailed ?? 'Tora: a sign-in to {user} failed: {why}', {
         // A name nobody has, as its length only: it may be a password typed in the name field.
         user: user
           ? user.username
-          : fill(t.loginUnknownName ?? 'a name of {n} characters', {
+          : fillText(t.loginUnknownName ?? 'a name of {n} characters', {
               n: [...failure.username].length,
             }),
         why,
       }),
-      fill(t.loginFrom ?? 'From {ip} ({device}), {at}.', {
+      fillText(t.loginFrom ?? 'From {ip} ({device}), {at}.', {
         ip: failure.ip,
         device: failure.device,
         at: shortTime(toLocalIso(now)),
       }),
-      held ? fill(t.loginHeld ?? '{n} more failed since the last message.', { n: held }) : '',
+      held ? fillText(t.loginHeld ?? '{n} more failed since the last message.', { n: held }) : '',
       // The password was right: someone else knowing it is the urgent case. Admins told for
       // someone else get their own advice.
       user
@@ -1232,7 +1235,7 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         const n = notAdded(e);
         if (n.existing + n.skipped + n.problem === 0) continue;
         cards.push({
-          text: fill(t.summaryImport!, {
+          text: fillText(t.summaryImport!, {
             method: t[`method_${e.action}`] ?? e.action ?? '',
             ...n,
           }),
@@ -1248,7 +1251,7 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
       const count = actionTotal(items);
       if (count) {
         cards.push({
-          text: fill(t.summaryActions!, { count }),
+          text: fillText(t.summaryActions!, { count }),
           role: 'info',
           url: linkUrl(base, '/actions'),
         });
@@ -1257,7 +1260,7 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
       const gone = user.role === 'admin' ? (await productsWithBrokenListings(db)).length : 0;
       if (gone) {
         cards.push({
-          text: fill(t.summaryGone!, { count: gone }),
+          text: fillText(t.summaryGone!, { count: gone }),
           role: 'warning',
           url: linkUrl(base, '/actions'),
         });
@@ -1271,7 +1274,7 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         text: drops
           .map(
             (d) =>
-              fill(t.summaryDrop ?? '{name}: {price}, {pct} in 7 days', {
+              fillText(t.summaryDrop ?? '{name}: {price}, {pct} in 7 days', {
                 name: d.product.name + (d.bucket ? ` (${conditionWords(d.bucket)})` : ''),
                 price: money(d.fair),
                 pct: `${Math.round(d.change * 100)}%`,

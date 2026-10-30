@@ -96,7 +96,7 @@ const TEXTS: Record<string, Record<string, string>> = {
     test: 'test',
     connected: 'connected',
     collectFailed: 'collect failed',
-    listingsGone: '{count} set aside',
+    listingsGone: '{count, plural, one {# listing} other {# listings}} set aside',
     listingGoneLine: '{source}: {name}',
     collectStopped: 'collect stopped {code}',
     sourceLine: '{source}: {status}',
@@ -197,7 +197,7 @@ it('tells admins about listings set aside, though the run did not fail', async (
     detail: { listings: [{ source: 'snkrdunk', productId: 'p1', name: 'Box', error: 'HTTP 404' }] },
   });
   expect(await alertFailures(db, ctx, since)).toBe(1);
-  expect(sent.at(-1)!.text).toBe('1 set aside\nsnkrdunk: Box');
+  expect(sent.at(-1)!.text).toBe('1 listing set aside\nsnkrdunk: Box');
 });
 
 it('says so when nothing ran for over a day, once', async () => {

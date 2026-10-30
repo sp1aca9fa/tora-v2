@@ -181,9 +181,59 @@ export interface NoticePrefs {
 
 export type NoticeTexts = Record<string, string>;
 
-/** Fills {placeholders}; a placeholder with no value stays empty. */
-export const fillText = (text: string, params: Record<string, string | number>) =>
-  text.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? ''));
+/** The index of the `}` closing the `{` at `open`, or -1. */
+function closing(text: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * `{n, plural, =0 {...} one {...} other {...}}` as the messages write it: an exact `=n` first,
+ * else English's categories (one for 1; Spanish agrees, Japanese texts use no plural); `#` is n.
+ */
+function plural(n: number, options: string, params: Record<string, string | number>): string {
+  const forms = new Map<string, string>();
+  for (let i = 0; i < options.length;) {
+    const key = options.slice(i).match(/^\s*(=?\w+)\s*\{/);
+    if (!key) break;
+    const open = i + key[0].length - 1;
+    const close = closing(options, open);
+    if (close < 0) break;
+    forms.set(key[1]!, options.slice(open + 1, close));
+    i = close + 1;
+  }
+  const form =
+    forms.get(`=${n}`) ?? forms.get(new Intl.PluralRules('en').select(n)) ?? forms.get('other');
+  return fillText((form ?? '').replace(/#/g, new Intl.NumberFormat('en').format(n)), params);
+}
+
+/**
+ * Fills {placeholders} and {n, plural, ...} counts; a placeholder with no value stays empty, other
+ * braces are kept as written.
+ */
+export function fillText(text: string, params: Record<string, string | number>): string {
+  let out = '';
+  let at = 0;
+  for (let open = text.indexOf('{'); open >= 0; open = text.indexOf('{', at)) {
+    const close = closing(text, open);
+    if (close < 0) break;
+    const inner = text.slice(open + 1, close);
+    const count = inner.match(/^\s*(\w+)\s*,\s*plural\s*,([\s\S]*)$/);
+    out +=
+      text.slice(at, open) +
+      (/^\w+$/.test(inner)
+        ? String(params[inner] ?? '')
+        : count
+          ? plural(Number(params[count[1]!] ?? 0), count[2]!, params)
+          : `{${fillText(inner, params)}}`);
+    at = close + 1;
+  }
+  return out + text.slice(at);
+}
 
 /** The notice with the parts its style leaves out removed. */
 export function styled(n: Notice, style?: NoticeStyle): Notice {
