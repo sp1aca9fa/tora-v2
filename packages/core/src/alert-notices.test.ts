@@ -199,4 +199,23 @@ it('fills placeholders and plural counts as the messages write them', () => {
   ).toBe('megastore: 1 item from megastore');
   // Unknown values stay empty; braces that are no placeholder stay as written.
   expect(fillText('{a} {b} {c d}', { a: 1 })).toBe('1  {c d}');
+  // A lone brace does not stop the placeholders after it.
+  expect(fillText('a { {b}', { b: 'X' })).toBe('a { X');
+  // Spanish forms; a missing count is 0; # inside a nested plural is that plural's own count.
+  const es = '{count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}';
+  expect([fillText(es, { count: 1 }), fillText(es, {})]).toEqual([
+    'se apartó 1 anuncio',
+    'se apartaron 0 anuncios',
+  ]);
+  expect(
+    fillText('{a, plural, other {# in {b, plural, one {# box} other {# boxes}}}}', { a: 3, b: 1 }),
+  ).toBe('3 in 1 box');
+  // A plural that does not parse, has no other, or no number is kept as written.
+  expect(
+    [
+      ['{n, plural, one {x}}', 1],
+      ['{n, plural, one {x', 1],
+      ['{n, plural, other {# x}}', 'many'],
+    ].map(([text, n]) => fillText(String(text), { n: n! }) === text),
+  ).toEqual([true, true, true]);
 });

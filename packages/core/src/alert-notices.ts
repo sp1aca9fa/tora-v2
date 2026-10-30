@@ -193,34 +193,52 @@ function closing(text: string, open: number): number {
 
 /**
  * `{n, plural, =0 {...} one {...} other {...}}` as the messages write it: an exact `=n` first,
- * else English's categories (one for 1; Spanish agrees, Japanese texts use no plural); `#` is n.
+ * else English's categories (one for 1; Spanish agrees, Japanese texts use no plural); `#` is n
+ * (not inside a nested placeholder). Null when the options do not parse or have no `other`.
  */
-function plural(n: number, options: string, params: Record<string, string | number>): string {
+function plural(
+  n: number,
+  options: string,
+  params: Record<string, string | number>,
+): string | null {
   const forms = new Map<string, string>();
-  for (let i = 0; i < options.length;) {
+  for (let i = 0; options.slice(i).trim();) {
     const key = options.slice(i).match(/^\s*(=?\w+)\s*\{/);
-    if (!key) break;
-    const open = i + key[0].length - 1;
-    const close = closing(options, open);
-    if (close < 0) break;
-    forms.set(key[1]!, options.slice(open + 1, close));
+    const open = key ? i + key[0].length - 1 : -1;
+    const close = key ? closing(options, open) : -1;
+    if (close < 0) return null;
+    forms.set(key![1]!, options.slice(open + 1, close));
     i = close + 1;
   }
+  if (!Number.isFinite(n) || !forms.has('other')) return null;
   const form =
-    forms.get(`=${n}`) ?? forms.get(new Intl.PluralRules('en').select(n)) ?? forms.get('other');
-  return fillText((form ?? '').replace(/#/g, new Intl.NumberFormat('en').format(n)), params);
+    forms.get(`=${n}`) ?? forms.get(new Intl.PluralRules('en').select(n)) ?? forms.get('other')!;
+  let depth = 0;
+  const counted = [...form]
+    .map((c) => {
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+      return c === '#' && depth === 0 ? new Intl.NumberFormat('en').format(n) : c;
+    })
+    .join('');
+  return fillText(counted, params);
 }
 
 /**
  * Fills {placeholders} and {n, plural, ...} counts; a placeholder with no value stays empty, other
- * braces are kept as written.
+ * braces (and a plural that does not parse) are kept as written.
  */
 export function fillText(text: string, params: Record<string, string | number>): string {
   let out = '';
   let at = 0;
   for (let open = text.indexOf('{'); open >= 0; open = text.indexOf('{', at)) {
     const close = closing(text, open);
-    if (close < 0) break;
+    if (close < 0) {
+      // A lone brace is text; the placeholders after it are still filled.
+      out += text.slice(at, open + 1);
+      at = open + 1;
+      continue;
+    }
     const inner = text.slice(open + 1, close);
     const count = inner.match(/^\s*(\w+)\s*,\s*plural\s*,([\s\S]*)$/);
     out +=
@@ -228,7 +246,7 @@ export function fillText(text: string, params: Record<string, string | number>):
       (/^\w+$/.test(inner)
         ? String(params[inner] ?? '')
         : count
-          ? plural(Number(params[count[1]!] ?? 0), count[2]!, params)
+          ? (plural(Number(params[count[1]!] ?? 0), count[2]!, params) ?? `{${inner}}`)
           : `{${fillText(inner, params)}}`);
     at = close + 1;
   }
