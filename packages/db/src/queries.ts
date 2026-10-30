@@ -194,11 +194,12 @@ export async function matchingProducts(
         name: products.name,
         alias: products.nameAlias,
         set: products.setName,
+        code: products.setCode,
       })
       .from(products)
       .where(inArray(products.id, unique.slice(i, i + 5000)));
     for (const r of rows) {
-      if (match([r.name, r.alias, r.set].filter(Boolean).join(' '))) found.add(r.id);
+      if (match([r.name, r.alias, r.set, r.code].filter(Boolean).join(' '))) found.add(r.id);
     }
   }
   return found;

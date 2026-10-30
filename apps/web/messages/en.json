@@ -112,15 +112,24 @@
     }
   },
   "spread": {
-    "intro": "How your collection's value is spread: market value, or cost for a lot with no price yet. A group with {heavy} or more of it is heavy (not a franchise: collecting one is normal), so is one item with {item} or more. Under each type and set list, those you hold under {little} of where Tora has items worth a look.",
+    "intro": "Where your collection's value of {total} sits.",
+    "atCost": "{amount} of it is at cost: {count, plural, one {# lot has} other {# lots have}} no market price yet.",
+    "howTitle": "How this works",
+    "how": "Each lot counts at its market value, or at its cost with no price yet. A group holding {heavy} or more of the value is marked heavy (not a franchise: collecting one is normal, nor the only group there is), so is one item with {item} or more. Under item types and sets: those you hold under {little} of where Tora has items worth a look.",
     "empty": "Nothing to spread yet: add items you own with a cost or a price.",
     "heavyItems": "Items holding much of the value on their own",
     "heavy": "Heavy: {share} of the value in one group.",
+    "franchiseNote": "Collecting mostly one franchise is normal: no group here is marked heavy.",
     "more": "{count, plural, one {# more group} other {# more groups}}: {share}.",
-    "little": "Held little, with items worth a look:",
-    "littleItem": "{name} ({share}): {count} worth a look",
-    "noSet": "No set",
-    "unknown": "Unknown",
+    "little": "You hold little of these, Tora has items worth a look (as of {day}):",
+    "littleItem": "{name}: you hold {share}, {count} worth a look",
+    "noSet": "No set recorded",
+    "unknown": {
+      "type": "Unknown",
+      "franchise": "No franchise recorded",
+      "era": "Release date missing",
+      "price": "Unknown"
+    },
     "before2016": "Before 2016",
     "dimension": {
       "type": "Item type",

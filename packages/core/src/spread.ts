@@ -13,8 +13,9 @@ export const SPREAD_LITTLE_SHARE = 0.05;
 
 export interface SpreadLot {
   productId: string;
-  /** The lot's value (market, or cost when it has none) and its units. */
+  /** The lot's value (market, or cost when it has none: `atCost`) and its units. */
   value: number;
+  atCost: boolean;
   units: number;
   /** Its groups; null for unknown. */
   type: string;
@@ -33,9 +34,66 @@ export interface SpreadGroup {
 
 export interface Spread {
   total: number;
+  /** Of the total, the lots with no market value counted at cost. */
+  atCost: number;
+  atCostLots: number;
   dimensions: Record<SpreadDimension, SpreadGroup[]>;
   /** Items holding a heavy share on their own, biggest first. */
   heavyItems: { productId: string; value: number; share: number }[];
+}
+
+/**
+ * A set's group: its franchise and its name (else its code), so two franchises' "Promo" sets stay
+ * apart; null for none. `spreadSetName` gives the name back.
+ */
+export function spreadSetKey(
+  franchise: string | null,
+  setName: string | null,
+  setCode: string | null,
+) {
+  const set = setName ?? setCode;
+  return set ? `${franchise ?? ''}|${set}` : null;
+}
+export const spreadSetName = (key: string) => key.slice(key.indexOf('|') + 1);
+
+/** A lot and its item, valued (S8): what the spread reads. */
+export interface SpreadRow {
+  holding: { quantity: number; costTotalBase: number; countInValue: boolean };
+  /** The item's type (`productClass`). */
+  type: string;
+  product: {
+    id: string;
+    franchise: string | null;
+    setName: string | null;
+    setCode: string | null;
+    releaseDate: string | null;
+  };
+  valueBase: number | null;
+}
+
+/**
+ * The lots the spread counts: those counted in value (S8), at market value or at cost when they
+ * have none (as the value chart). `franchiseOf` merges a franchise's names ("ポケモン" is pokemon).
+ */
+export function spreadLots(
+  rows: readonly SpreadRow[],
+  franchiseOf: (franchise: string | null) => string | null = (f) => f,
+): SpreadLot[] {
+  return rows
+    .filter((r) => r.holding.countInValue)
+    .map(({ holding, product, valueBase, type }) => {
+      const franchise = franchiseOf(product.franchise);
+      return {
+        productId: product.id,
+        value: valueBase ?? holding.costTotalBase,
+        atCost: valueBase === null,
+        units: holding.quantity,
+        type,
+        franchise,
+        set: spreadSetKey(franchise, product.setName, product.setCode),
+        released: product.releaseDate,
+      };
+    });
 }
 
 /** A release year's era: before 2016, 2016-2019, 2020-2022, then each year; '' unknown. */
@@ -85,22 +143,33 @@ export function spreadOf(lots: readonly SpreadLot[]): Spread {
     return [...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   };
   const dimensions = Object.fromEntries(
-    SPREAD_DIMENSIONS.map((d) => [
-      d,
-      sum((l) => keyOf(l, d)).map(([key, value]) => ({
-        key,
-        value,
-        share: share(value),
-        // An unknown group is not a concentration of anything.
-        heavy: d !== 'franchise' && key !== '' && share(value) >= SPREAD_HEAVY_SHARE,
-      })),
-    ]),
+    SPREAD_DIMENSIONS.map((d) => {
+      const groups = sum((l) => keyOf(l, d));
+      // An unknown group is not a concentration of anything, nor is the only group there is.
+      const known = groups.filter(([key]) => key !== '').length;
+      return [
+        d,
+        groups.map(([key, value]) => ({
+          key,
+          value,
+          share: share(value),
+          heavy: d !== 'franchise' && key !== '' && known > 1 && share(value) >= SPREAD_HEAVY_SHARE,
+        })),
+      ];
+    }),
   ) as Record<SpreadDimension, SpreadGroup[]>;
   const heavyItems = sum((l) => l.productId)
     .map(([productId, value]) => ({ productId, value, share: share(value) }))
     // One item alone is not a spread to judge.
     .filter((i) => i.share >= SPREAD_HEAVY_ITEM && i.share < 1);
-  return { total, dimensions, heavyItems };
+  const cost = counted.filter((l) => l.atCost);
+  return {
+    total,
+    atCost: cost.reduce((s, l) => s + l.value, 0),
+    atCostLots: cost.length,
+    dimensions,
+    heavyItems,
+  };
 }
 
 /**

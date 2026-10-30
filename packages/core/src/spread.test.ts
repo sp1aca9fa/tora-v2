@@ -1,9 +1,18 @@
 import { expect, it } from 'vitest';
-import { type SpreadLot, eraOf, heldLittle, priceLevelOf, spreadOf } from './spread';
+import {
+  type SpreadLot,
+  eraOf,
+  heldLittle,
+  priceLevelOf,
+  spreadLots,
+  spreadOf,
+  spreadSetName,
+} from './spread';
 
 const lot = (over: Partial<SpreadLot>): SpreadLot => ({
   productId: 'p',
   value: 1000,
+  atCost: false,
   units: 1,
   type: 'card',
   franchise: 'pokemon',
@@ -73,4 +82,43 @@ it('points to groups held little that have items worth a look', () => {
 it('has nothing to say about an empty collection', () => {
   const s = spreadOf([]);
   expect([s.total, s.dimensions.type, s.heavyItems]).toEqual([0, [], []]);
+});
+
+it('counts lots counted in value, at cost with no market price, sets apart by franchise', () => {
+  const product = (id: string, franchise: string | null, setName: string | null) => ({
+    id,
+    franchise,
+    setName,
+    setCode: null,
+    releaseDate: null,
+  });
+  const holding = { quantity: 1, costTotalBase: 4000, countInValue: true };
+  const type = 'sealed';
+  const lots = spreadLots(
+    [
+      { holding, product: product('a', 'pokemon', 'Promo'), valueBase: 6000, type },
+      { holding, product: product('b', 'ポケモン', 'Promo'), valueBase: null, type },
+      { holding, product: product('c', 'one_piece', 'Promo'), valueBase: 5000, type },
+      {
+        holding: { ...holding, countInValue: false },
+        product: product('d', null, null),
+        valueBase: 9,
+        type,
+      },
+    ],
+    (f) => (f === 'ポケモン' ? 'pokemon' : f),
+  );
+  expect(lots.map((l) => [l.productId, l.value, l.atCost, l.franchise, l.set])).toEqual([
+    ['a', 6000, false, 'pokemon', 'pokemon|Promo'],
+    ['b', 4000, true, 'pokemon', 'pokemon|Promo'],
+    ['c', 5000, false, 'one_piece', 'one_piece|Promo'],
+  ]);
+  const s = spreadOf(lots);
+  expect([s.atCost, s.atCostLots]).toEqual([4000, 1]);
+  expect(s.dimensions.set.map((g) => [spreadSetName(g.key), g.value])).toEqual([
+    ['Promo', 10_000],
+    ['Promo', 5000],
+  ]);
+  // The only item type there is: not heavy.
+  expect(s.dimensions.type).toMatchObject([{ key: 'sealed', share: 1, heavy: false }]);
 });
