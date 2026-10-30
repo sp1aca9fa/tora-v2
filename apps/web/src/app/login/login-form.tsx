@@ -39,7 +39,7 @@ export function LoginForm({ next, step }: { next: string; step: 'password' | 'co
               type="password"
               autoComplete="current-password"
               required
-              aria-invalid={state.error === 'signIn' || undefined}
+              aria-invalid={state.step === 'password' || undefined}
             />
           </div>
         </>
@@ -55,7 +55,7 @@ export function LoginForm({ next, step }: { next: string; step: 'password' | 'co
             required
             autoFocus
             className="text-center text-lg tracking-[0.3em]"
-            aria-invalid={state.error === 'invalid' || undefined}
+            aria-invalid={state.step === 'code' || undefined}
           />
           <p className="text-xs text-muted-foreground">{t('codeHint')}</p>
         </div>

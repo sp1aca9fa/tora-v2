@@ -47,12 +47,8 @@
     "codeHint": "From your authenticator app. Lost it? Enter one of your backup codes instead.",
     "startOver": "Start over",
     "errors": {
-      "signIn": "Wrong username or password, or this account is already signed in on 2 devices or not set up yet. Sign out on one of its devices, or ask the admin.",
-      "invalid": "That did not match. Try again.",
-      "locked": "Too many attempts. Try again later.",
-      "notConfigured": "Login is not configured (AUTH_SECRET missing, see README).",
-      "deviceLimit": "This account is already signed in on 2 devices. Sign out of one in Settings on another device, or ask the admin (Settings > Admin > Accounts).",
-      "expired": "The sign-in took too long. Start over."
+      "failed": "Login failed. If the account has alert channels, the reason was sent there.",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing, see README)."
     }
   },
   "portfolio": {
@@ -1543,7 +1539,19 @@
     "updateFailed": "Tora: the server could not update to {to} (step: {step}). It went back to {from} and keeps running. The server's log: ~/.local/state/tora/update.log",
     "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone 3 nights in a row. Those items get no new prices from it until someone links their new page (Actions).",
     "listingGoneLine": "{source}: {name} ({error})",
-    "summaryGone": "{count, plural, one {# item waits} other {# items wait}} for a new page link (its old one is gone)"
+    "summaryGone": "{count, plural, one {# item waits} other {# items wait}} for a new page link (its old one is gone)",
+    "loginFailed": "Tora: a sign-in to {user} failed: {why}",
+    "loginFrom": "From {ip} ({device}), {at}.",
+    "loginHeld": "{n} more failed since the last message.",
+    "loginNotYou": "If this was not you: nothing got in.",
+    "loginPasswordKnown": "The password was right: if this was not you, change it (Settings > Account) and check Settings > Devices.",
+    "login_password": "wrong password.",
+    "login_disabled": "the account is turned off (an admin can turn it on in Settings > Admin > Accounts).",
+    "login_notSetUp": "the account is not set up yet (its setup link was not finished).",
+    "login_devices": "the account is already signed in on 2 devices ({devices}). Sign out of one in Settings > Devices on the other, or ask the admin.",
+    "login_code": "wrong authenticator or backup code.",
+    "login_locked": "too many failed attempts; sign-ins from there wait up to an hour.",
+    "login_unknownUser": "no account has that name."
   },
   "alerts": {
     "title": "Alerts",

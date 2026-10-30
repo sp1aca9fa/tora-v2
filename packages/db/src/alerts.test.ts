@@ -9,6 +9,7 @@ import { listActivity, recordActivity } from './activity';
 import {
   type AlertContext,
   addDiscordChannel,
+  alertLoginFailure,
   alertServerEvent,
   alertFailures,
   channelsOf,
@@ -115,6 +116,10 @@ const TEXTS: Record<string, Record<string, string>> = {
     buyTarget: '{name}: ask {price} {source} under {target}',
     summaryDrops: 'drops',
     summaryDrop: '{name}: {price} {pct}',
+    login_password: 'wrong password.',
+    login_code: 'wrong code.',
+    loginNotYou: 'Not you?',
+    loginPasswordKnown: 'Password was right.',
   },
   ja: { summaryTitle: 'まとめ' },
 };
@@ -387,6 +392,28 @@ it('runs the morning check once a day from 08:00 on a long-lived server', async 
   expect(sent.map((s) => s.text)).toEqual(['no collect for 55 h']);
   expect(await morningCheck(db, ctx, new Date('2026-10-21T08:04:00+09:00'))).toBe(false);
   expect(await morningCheck(db, ctx, new Date('2026-10-22T08:00:00+09:00'))).toBe(true);
+});
+
+it('tells why a sign-in failed: the account, else admins; one message per 15 minutes', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const at = (minutes: number) =>
+    new Date(Date.parse('2026-10-30T10:00:00+09:00') + minutes * 60_000);
+  const from = { ip: '203.0.113.9', device: 'Firefox on Linux' };
+  // The member has no channel: admins are told.
+  const who = { userId: member, username: 'member', ...from };
+  expect(await alertLoginFailure(db, ctx, { reason: 'password', ...who }, at(0))).toBe(1);
+  expect(sent.at(-1)!.text).toMatch(
+    /member failed: wrong password\. From 203\.0\.113\.9 .*Not you\?/,
+  );
+  // Held back, then counted in the next.
+  expect(await alertLoginFailure(db, ctx, { reason: 'password', ...who }, at(1))).toBe(0);
+  expect(await alertLoginFailure(db, ctx, { reason: 'code', ...who }, at(16))).toBe(1);
+  expect(sent.at(-1)!.text).toMatch(/wrong code\..*1 more failed.*Password was right\./);
+  // A name nobody has travels shortened (it may be a password typed in the wrong field).
+  const unknown = { userId: null, username: 'secretpass', ...from };
+  expect(await alertLoginFailure(db, ctx, { reason: 'unknownUser', ...unknown }, at(0))).toBe(1);
+  expect(sent.at(-1)!.text).toContain('se... (10)');
+  expect(sent.at(-1)!.text).not.toContain('secretpass');
 });
 
 it("logs a server's own events, and tells admins only when asked", async () => {

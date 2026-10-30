@@ -59,6 +59,7 @@ import {
   watches,
 } from './schema';
 import { productsWithBrokenListings, quietSources } from './sources';
+import { getUserById } from './users';
 import { latestSignals } from './signals';
 import { currentSupply, lowestAsk } from './supply';
 
@@ -1004,6 +1005,87 @@ export async function alertServerEvent(
       ctx,
     );
   }
+  return sent;
+}
+
+/** Why a sign-in failed: told to the account's channels, never on the page (2026-10-30). */
+export type LoginFailureReason =
+  'password' | 'disabled' | 'notSetUp' | 'devices' | 'code' | 'locked' | 'unknownUser';
+
+/** At most one sign-in alert per account (or for unknown names) in this time; the rest counted. */
+export const LOGIN_ALERT_QUIET_MS = 15 * 60_000;
+const loginAlerted = new Map<string, { at: number; held: number }>();
+
+/** A name nobody has, shortened: a password typed in the name field must not travel. */
+const maskedName = (name: string) => `${[...name].slice(0, 2).join('')}... (${[...name].length})`;
+
+/**
+ * A failed sign-in (2026-10-30): the page says only that it failed; the reason, where it came
+ * from and when go to the account's channels (an account without channels, a disabled one or an
+ * unknown name: to admins). One message per account per 15 minutes, the ones held back counted
+ * in the next (the lockout caps attempts, not "too many attempts" answers).
+ */
+export async function alertLoginFailure(
+  db: Db,
+  ctx: AlertContext,
+  failure: {
+    reason: LoginFailureReason;
+    userId: string | null;
+    /** As typed (normalized). */
+    username: string;
+    ip: string;
+    device: string;
+    /** For `devices`: the account's devices now. */
+    devices?: string[];
+  },
+  now = new Date(),
+): Promise<number> {
+  const key = failure.userId ?? '';
+  const last = loginAlerted.get(key);
+  if (last && now.getTime() - last.at < LOGIN_ALERT_QUIET_MS) {
+    last.held++;
+    return 0;
+  }
+  const held = last?.held ?? 0;
+  loginAlerted.set(key, { at: now.getTime(), held: 0 });
+
+  const user = failure.userId ? await getUserById(db, failure.userId) : null;
+  const text = (t: AlertTexts) => {
+    const why = fill(t[`login_${failure.reason}`] ?? failure.reason, {
+      devices: (failure.devices ?? []).join(', '),
+    });
+    // The password was right: someone else knowing it is the urgent case.
+    const passed = failure.reason === 'devices' || failure.reason === 'code';
+    return [
+      fill(t.loginFailed ?? 'Tora: a sign-in to {user} failed: {why}', {
+        user: user ? user.username : maskedName(failure.username),
+        why,
+      }),
+      fill(t.loginFrom ?? 'From {ip} ({device}), {at}.', {
+        ip: failure.ip,
+        device: failure.device,
+        at: shortTime(toLocalIso(now)),
+      }),
+      held ? fill(t.loginHeld ?? '{n} more failed since the last message.', { n: held }) : '',
+      user ? ((passed ? t.loginPasswordKnown : t.loginNotYou) ?? '') : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  };
+  const send = async (to: User) =>
+    sendToUser(
+      db,
+      to.id,
+      lines('admin', null, [{ text: text(await textsFor(db, to, ctx)), role: 'bad' }]),
+      ctx,
+    );
+
+  if (user && !user.disabledAt) {
+    const sent = await send(user);
+    if (sent) return sent;
+  }
+  let sent = 0;
+  for (const admin of await adminsToAlert(db)) sent += await send(admin);
   return sent;
 }
 
