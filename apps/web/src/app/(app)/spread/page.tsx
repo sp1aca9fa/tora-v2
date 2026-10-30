@@ -82,11 +82,16 @@ export default async function SpreadPage() {
     type: heldLittle(spread.dimensions.type, worth.types),
     set: heldLittle(spread.dimensions.set, new Map([...worth.sets].map(([k, s]) => [k, s.count]))),
   } as const;
-  // A set's items worth a look of one type open on that type's list.
+  // A set's items worth a look of one type open on that type's list; a set name another
+  // franchise shares too only by its type, as the search would find both.
+  const shared = (key: string) =>
+    [...worth.sets.keys()].filter((k) => spreadSetName(k) === spreadSetName(key)).length > 1;
   const link = (d: 'type' | 'set', key: string) => {
     if (d === 'type') return `/opportunities?type=${encodeURIComponent(key)}`;
     const types = [...(worth.sets.get(key)?.types ?? [])];
-    return `/opportunities?q=${encodeURIComponent(spreadSetName(key))}${types.length === 1 ? `&type=${encodeURIComponent(types[0]!)}` : ''}`;
+    const type = types.length === 1 ? `type=${encodeURIComponent(types[0]!)}` : '';
+    if (shared(key) && type) return `/opportunities?${type}`;
+    return `/opportunities?q=${encodeURIComponent(spreadSetName(key))}${type && `&${type}`}`;
   };
 
   return (
