@@ -19,3 +19,6 @@ next-env.d.ts
 
 *:Zone.Identifier
 .DS_Store
+
+# Agent run logs (specs, logs; kept locally)
+.agent-runs/
