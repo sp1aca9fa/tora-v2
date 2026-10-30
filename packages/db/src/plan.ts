@@ -9,9 +9,9 @@ import {
   strategyOf,
   suggestsCondition,
 } from '@tora/core';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, like } from 'drizzle-orm';
 import type { Db } from './client';
-import { type Product, type User, products, watches } from './schema';
+import { type Product, type User, holdings, products, watches } from './schema';
 import { loadOpportunities, withMarket, worthALook } from './opportunities';
 import { latestSignals } from './signals';
 
@@ -117,4 +117,31 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
       },
     ];
   });
+}
+
+/**
+ * What a person bought in a month (S27, a monthly plan): their lots acquired that month by
+ * purchase (sold since or not), at cost in the base currency, and the items they are of.
+ * `month` is `YYYY-MM` in the admin's time zone, as lots' acquired times are written.
+ */
+export async function spentInMonth(
+  db: Db,
+  userId: string,
+  month: string,
+): Promise<{ total: number; lots: number; productIds: string[] }> {
+  const rows = await db
+    .select({ productId: holdings.productId, cost: holdings.costTotalBase })
+    .from(holdings)
+    .where(
+      and(
+        eq(holdings.userId, userId),
+        eq(holdings.acquisitionType, 'purchase'),
+        like(holdings.acquiredAt, `${month}-%`),
+      ),
+    );
+  return {
+    total: rows.reduce((sum, r) => sum + r.cost, 0),
+    lots: rows.length,
+    productIds: [...new Set(rows.map((r) => r.productId))],
+  };
 }

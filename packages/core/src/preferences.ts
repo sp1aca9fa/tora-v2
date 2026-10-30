@@ -53,8 +53,16 @@ export interface UserPreferences {
   storeFeed?: StoreFeedPrefs;
   /** How the person's notices look and read (Settings > Alerts > Customize notices). */
   notices?: NoticePrefs;
-  /** A budget and a date for buying (S13): the items ticked, each item and condition. */
-  buyPlan?: { budget: number; until: string; items: { productId: string; bucket: string }[] };
+  /**
+   * A budget and a date for buying (S13): the items ticked, each item and condition. `monthly`
+   * (S27): the budget is an amount for each month, the date this month's last day.
+   */
+  buyPlan?: {
+    budget: number;
+    until: string;
+    items: { productId: string; bucket: string }[];
+    monthly?: boolean;
+  };
 }
 
 /** What a person is sent (S17); each kind on unless switched off. */

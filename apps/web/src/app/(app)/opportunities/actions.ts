@@ -12,11 +12,12 @@ import { authed } from '@/lib/auth/guard';
 import { type CardsFilter, cleanFilter, cleanSearch, loadCards } from './cards';
 import { loadPopular } from './popular-rows';
 
-/** Saves the person's budget, date and ticked items (S13 part 4). */
+/** Saves the person's budget (once or each month, S27), date and ticked items (S13 part 4). */
 export async function savePlanAction(plan: {
   budget: number;
   until: string;
   items: { productId: string; bucket: string }[];
+  monthly?: boolean;
 }): Promise<{ error?: string }> {
   const { db, user } = await authed();
   const budget = Math.round(Number(plan.budget));
@@ -27,7 +28,11 @@ export async function savePlanAction(plan: {
     .filter((i) => i && typeof i.productId === 'string' && typeof i.bucket === 'string')
     .slice(0, 200)
     .map((i) => ({ productId: i.productId, bucket: i.bucket }));
-  await setPreferences(db, user.id, { buyPlan: { budget, until: plan.until, items } });
+  const monthly = plan.monthly === true;
+  await setPreferences(db, user.id, {
+    // A monthly plan has no date of its own: it runs to each month's end.
+    buyPlan: { budget, until: monthly ? '' : plan.until, items, monthly },
+  });
   revalidatePath('/opportunities', 'layout');
   return {};
 }

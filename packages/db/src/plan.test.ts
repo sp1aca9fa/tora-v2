@@ -5,8 +5,8 @@ import { beforeEach, expect, it } from 'vitest';
 import { localDate, toLocalIso } from '@tora/core';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
-import { createProduct } from './mutations';
-import { buyPlanFor } from './plan';
+import { createHolding, createProduct } from './mutations';
+import { buyPlanFor, spentInMonth } from './plan';
 import { signals } from './schema';
 import { getUserById, createUser, setPreferences } from './users';
 import { addWatch } from './watches';
@@ -83,4 +83,31 @@ it("offers the person's watches and plan items with when to buy and at what pric
     ['Box', 'now', 8800, ['watch', 'plan'], true],
     ['Other', 'none', null, ['plan'], true],
   ]);
+});
+
+it("counts a month's purchases only, at cost, sold or not (a monthly plan)", async () => {
+  const box = {
+    productId: (await createProduct(db, uid, { category: 'tcg', kind: 'booster_box', name: 'Box' }))
+      .id,
+  };
+  const lot = (costTotalBase: number, acquiredAt: string, more = {}) =>
+    createHolding(db, uid, box, { quantity: 1, costTotalBase, acquiredAt, ...more });
+  await lot(5000, '2026-10-01T00:10:00.000+09:00');
+  await lot(3000, '2026-10-31T23:50:00.000+09:00');
+  await lot(9000, '2026-10-15T12:00:00.000+09:00', { acquisitionType: 'gift' });
+  await lot(7000, '2026-09-30T23:59:00.000+09:00');
+  const other = (
+    await createUser(db, 'b', { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] })
+  ).user.id;
+  await createHolding(db, other, box, {
+    quantity: 1,
+    costTotalBase: 4000,
+    acquiredAt: '2026-10-02T12:00:00.000+09:00',
+  });
+  expect(await spentInMonth(db, uid, '2026-10')).toEqual({
+    total: 8000,
+    lots: 2,
+    productIds: [box.productId],
+  });
+  expect((await spentInMonth(db, uid, '2026-11')).lots).toBe(0);
 });

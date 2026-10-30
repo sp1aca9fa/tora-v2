@@ -4,6 +4,7 @@ import {
   type MixOption,
   type PlanStep,
   checkPlan,
+  monthEnd,
   nameSearch,
   suggestMix,
   swapInMix,
@@ -35,18 +36,24 @@ export interface PlanRow {
  * A budget and a date (S13 part 4): each item offered with when to buy and at what price; the
  * person ticks items and sees whether they fit, or has a varied mix suggested (S27) and swaps its
  * picks. A name search (`q`) narrows the list and the mix; ticked items it hides still count.
- * Saved with Save.
+ * Every month (S27): the budget is a monthly amount, this month's purchases count against it and
+ * the plan runs to the month's end. Saved with Save.
  */
 export function PlanCard({
   rows,
   budget: savedBudget,
   until: savedUntil,
+  monthly: savedMonthly,
+  spent,
   today,
   q,
 }: {
   rows: PlanRow[];
   budget: number | null;
   until: string | null;
+  monthly: boolean;
+  /** This month's purchases: their cost, how many lots, the items. */
+  spent: { total: number; lots: number; productIds: string[] };
   today: string;
   q: string | null;
 }) {
@@ -55,6 +62,7 @@ export function PlanCard({
   const money = useMoney();
   const [budget, setBudget] = useState(money.input(savedBudget));
   const [until, setUntil] = useState(savedUntil ?? '');
+  const [monthly, setMonthly] = useState(savedMonthly);
   const [ticked, setTicked] = useState(
     new Set(rows.filter((r) => r.ticked).map((r) => `${r.productId}|${r.bucket}`)),
   );
@@ -63,27 +71,33 @@ export function PlanCard({
   const [suggested, setSuggested] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   const amount = money.parse(budget);
+  // A monthly plan: what is left of this month's amount, by the month's last day.
+  const room = amount !== null && monthly ? amount - spent.total : amount;
+  const by = monthly ? monthEnd(today) : until;
+  const bought = new Set(monthly ? spent.productIds : []);
   const chosen = rows.filter((r) => ticked.has(`${r.productId}|${r.bucket}`));
+  // Ticked items bought this month are in what was spent, not counted again.
+  const toBuy = chosen.filter((r) => !bought.has(r.productId));
   const check = useMemo(
     () =>
-      amount !== null
+      room !== null
         ? checkPlan(
-            chosen.map((r) => r.step),
-            amount,
-            until || '9999-12-31',
+            toBuy.map((r) => r.step),
+            room,
+            by || '9999-12-31',
           )
         : null,
-    [chosen, amount, until],
+    [toBuy, room, by],
   );
   const match = q ? nameSearch(q) : null;
   const searched = match ? rows.filter((r) => match(r.name)) : rows;
   const options = searched.map((r) => r.mix);
   const suggest = () => {
-    if (amount === null) return;
-    const mix = suggestMix(options, amount, until || null);
+    if (room === null) return;
+    const mix = suggestMix(options, Math.max(0, room), by || null);
     setTicked(new Set(mix));
     setSuggested(new Set(mix));
-    const spent = mix.reduce(
+    const used = mix.reduce(
       (sum, k) => sum + (options.find((o) => o.key === k)?.step.price ?? 0),
       0,
     );
@@ -91,14 +105,14 @@ export function PlanCard({
     setMessage(
       !mix.length
         ? t('plan.noMix')
-        : spent < amount * 0.7
+        : used < room * 0.7
           ? t('plan.thinMix', { count: mix.length })
           : null,
     );
   };
   const swap = (key: string) => {
-    if (amount === null) return;
-    const next = swapInMix(options, [...ticked], key, amount, until || null);
+    if (room === null) return;
+    const next = swapInMix(options, [...ticked], key, Math.max(0, room), by || null);
     if (!next) {
       setMessage(t('plan.noSwap'));
       return;
@@ -149,16 +163,27 @@ export function PlanCard({
             className="h-9 w-36"
           />
         </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-muted-foreground">{t('plan.until')}</span>
-          <Input
-            type="date"
-            value={until}
-            min={today}
-            onChange={(e) => setUntil(e.target.value)}
-            className="h-9 w-44"
+        <label className="flex h-9 items-center gap-2">
+          <input
+            type="checkbox"
+            className="size-4"
+            checked={monthly}
+            onChange={(e) => setMonthly(e.target.checked)}
           />
+          <span>{t('plan.monthly')}</span>
         </label>
+        {!monthly && (
+          <label className="space-y-1">
+            <span className="block text-xs text-muted-foreground">{t('plan.until')}</span>
+            <Input
+              type="date"
+              value={until}
+              min={today}
+              onChange={(e) => setUntil(e.target.value)}
+              className="h-9 w-44"
+            />
+          </label>
+        )}
         <Button size="sm" disabled={amount === null} onClick={suggest}>
           {t('plan.suggest')}
         </Button>
@@ -166,6 +191,18 @@ export function PlanCard({
           <span className="text-xs text-muted-foreground">{t('plan.needBudget')}</span>
         )}
       </div>
+      {monthly && amount !== null && (
+        <p className={cn('text-sm', room !== null && room < 0 && 'text-destructive')}>
+          {t('plan.month', {
+            spent: money(spent.total),
+            count: spent.lots,
+            left: money(Math.abs(room ?? 0)),
+            budget: money(amount),
+            over: room !== null && room < 0 ? 'over' : 'left',
+            by: monthEnd(today),
+          })}
+        </p>
+      )}
       {q && (
         <p className="text-xs text-muted-foreground">
           {t('plan.searched', { shown: shown.length, all: offered(rows).length, q })}{' '}
@@ -185,7 +222,8 @@ export function PlanCard({
         <ul className="grid gap-2 text-sm lg:grid-cols-2 2xl:grid-cols-3">
           {sorted.map((r) => {
             const key = `${r.productId}|${r.bucket}`;
-            const late = !!until && r.step.when === 'from' && (r.step.day ?? '') > until;
+            const late = !!by && r.step.when === 'from' && (r.step.day ?? '') > by;
+            const boughtNow = bought.has(r.productId) && ticked.has(key);
             return (
               <li key={key} className="flex items-start gap-3 rounded-lg border px-3 py-2">
                 <input
@@ -218,6 +256,11 @@ export function PlanCard({
                   {r.signals.length > 0 && (
                     <p className="text-xs text-emerald-700 dark:text-emerald-400">
                       {r.signals.join(' · ')}
+                    </p>
+                  )}
+                  {boughtNow && (
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      {t('plan.boughtMonth')}
                     </p>
                   )}
                   {suggested.has(key) && ticked.has(key) && (
@@ -263,7 +306,7 @@ export function PlanCard({
             )}
           >
             {t('plan.total', {
-              count: chosen.length,
+              count: toBuy.length,
               total: money(check.total),
               left: money(Math.abs(check.left)),
               over: check.left < 0 ? 'over' : 'left',
@@ -281,6 +324,7 @@ export function PlanCard({
               const r = await savePlanAction({
                 budget: amount ?? 0,
                 until,
+                monthly,
                 items: chosen.map((c) => ({ productId: c.productId, bucket: c.bucket })),
               });
               setMessage(r.error ? t(`plan.error.${r.error}`) : t('plan.saved'));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type MixOption, checkPlan, planStep, suggestMix, swapInMix } from './plan';
+import { type MixOption, checkPlan, monthEnd, planStep, suggestMix, swapInMix } from './plan';
 import type { SignalStats } from './signals';
 
 const stats = (over: Partial<SignalStats>): SignalStats => ({
@@ -127,4 +127,13 @@ describe('suggestMix and swapInMix', () => {
     expect(swapInMix(options, mix, 'b', 70000, null)).toBe('c');
     expect(swapInMix(options, ['d', 'a', 'b', 'c'], 'b', 70000, null)).toBeNull();
   });
+});
+
+it("gives a month's last day (a monthly plan runs to it)", () => {
+  expect(['2026-10-31', '2026-11-01', '2028-02-10', '2026-12-15'].map(monthEnd)).toEqual([
+    '2026-10-31',
+    '2026-11-30',
+    '2028-02-29',
+    '2026-12-31',
+  ]);
 });

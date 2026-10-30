@@ -49,6 +49,12 @@ export function planStep(stats: SignalStats, choice: StrategyChoice, today: stri
     : { when: 'under', day: null, price: top, reason: 'above_zone' };
 }
 
+/** A day's month's last day (S27, a monthly plan runs to it). */
+export function monthEnd(day: string): string {
+  const [y, m] = day.split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
 /** The ticked items against the budget and the date. */
 export interface PlanCheck {
   total: number;

@@ -1992,7 +1992,7 @@
     },
     "plan": {
       "searched": "{shown} of {all} items match \"{q}\". Suggest a mix picks from these; ticked items not shown still count.",
-      "intro": "Set a budget, then tick what to buy or let Tora suggest a mix.",
+      "intro": "Set a budget, once or for every month, then tick what to buy or let Tora suggest a mix.",
       "howTitle": "How the mix is picked",
       "how": "Only items worth a look or on your watchlist, best first: the best of each item type, then the next best of any type. No item over 40% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
       "needBudget": "Enter a budget to get a suggestion.",
@@ -2004,6 +2004,9 @@
       "thinMix": "Only {count, plural, one {# item has} other {# items have}} a reason to buy within this budget (worth a look, or on your watchlist): the rest is left free rather than filled with items nothing points to.",
       "budget": "Budget ({symbol})",
       "until": "Buy by (optional)",
+      "monthly": "Every month",
+      "month": "This month (to {by}): {count, plural, =0 {nothing bought yet} one {{spent} on # buy} other {{spent} on # buys}}, {left} {over, select, over {over the amount} other {left of {budget}}}.",
+      "boughtMonth": "Bought this month",
       "save": "Save",
       "saved": "Saved.",
       "empty": "Nothing to plan yet: items with a proven signal and your watches show here.",

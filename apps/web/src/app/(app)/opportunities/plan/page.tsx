@@ -1,11 +1,14 @@
 import { localDate } from '@tora/core';
-import { buyPlanFor, loadOpportunities } from '@tora/db';
+import { buyPlanFor, loadOpportunities, spentInMonth } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cleanSearch, signalLabel } from '../cards';
 import { PlanCard } from '../plan-card';
 
-/** The buy plan (S13 part 4, as a sub page S26; a suggested mix and a name search S27). */
+/**
+ * The buy plan (S13 part 4, as a sub page S26; a suggested mix, a name search and a monthly amount
+ * S27).
+ */
 export default async function PlanPage({
   searchParams,
 }: {
@@ -13,10 +16,13 @@ export default async function PlanPage({
 }) {
   const { db, user } = await authed();
   const q = cleanSearch((await searchParams).q);
-  const [plan, saved, t] = await Promise.all([
+  const today = localDate();
+  const [plan, saved, t, spent] = await Promise.all([
     buyPlanFor(db, user),
     loadOpportunities(db),
     getTranslations(),
+    // This month's purchases count against a monthly amount (S27).
+    spentInMonth(db, user.id, today.slice(0, 7)),
   ]);
   const rules = saved?.rules ?? [];
   return (
@@ -41,7 +47,9 @@ export default async function PlanPage({
       }))}
       budget={user.preferences?.buyPlan?.budget ?? null}
       until={user.preferences?.buyPlan?.until || null}
-      today={localDate()}
+      monthly={user.preferences?.buyPlan?.monthly === true}
+      spent={spent}
+      today={today}
       q={q}
     />
   );
