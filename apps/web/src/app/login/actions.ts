@@ -76,8 +76,17 @@ async function failed(
   return { error: 'failed', step };
 }
 
-/** Verifying a fixed hash for unknown usernames keeps the response time the same. */
-let dummyHash: Promise<string> | undefined;
+/**
+ * Verifying a fixed hash for unknown usernames keeps the response time the same. The time it took
+ * to make is how long a locked-out sign-in waits instead of hashing (2026-10-31).
+ */
+let dummy: Promise<{ hash: string; ms: number }> | undefined;
+
+async function makeDummy() {
+  const start = performance.now();
+  const hash = await hashPassword('unused-dummy-password');
+  return { hash, ms: performance.now() - start };
+}
 
 /**
  * Step 1: username + password. On success, a short-lived cookie unlocks step 2. A wrong
@@ -98,12 +107,21 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const user = username ? await getUserByUsername(db, username) : null;
   const password = String(formData.get('password') ?? '');
   const usable = user?.passwordHash && !user.disabledAt ? user : null;
-  dummyHash ??= hashPassword('unused-dummy-password');
-  // The same work locked out or not: the answer's timing tells nothing either.
-  const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummyHash));
+  dummy ??= makeDummy();
+  if (await isLockedOut(db, key)) {
+    // No hash while locked out, so a flood of guesses costs only timers; the wait keeps the
+    // answer's timing like a checked password's. The password stays unknown.
+    const { ms } = await dummy;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return failed(
+      'locked',
+      { userId: user?.id ?? null, username, passwordKnown: false },
+      'password',
+    );
+  }
+  const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummy).hash);
   const devices = await listDevices(db, usable?.id ?? '');
   const who = { userId: user?.id ?? null, username, passwordKnown: ok && !!usable };
-  if (await isLockedOut(db, key)) return failed('locked', who, 'password');
   await recordAttempt(db, key, ok && Boolean(usable));
   if (!user) return failed('unknownUser', who, 'password');
   if (!usable) return failed(user.disabledAt ? 'disabled' : 'notSetUp', who, 'password');
