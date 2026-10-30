@@ -23,6 +23,7 @@ import {
   markTotpStepUsed,
   registerDevice,
 } from '@tora/db';
+import { isIP } from 'node:net';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
@@ -45,7 +46,8 @@ import {
 
 /** The page only says a sign-in failed; why goes to the account's channels (2026-10-30). */
 export type LoginState = {
-  error?: 'failed' | 'notConfigured';
+  /** `expired`: step 1 must be done again (said plainly: only someone past it sees it). */
+  error?: 'failed' | 'expired' | 'notConfigured';
   /** Which step failed (marks its field). */
   step?: 'password' | 'code';
 };
@@ -56,10 +58,12 @@ export type LoginState = {
  */
 async function failed(
   reason: LoginFailureReason,
-  who: { userId: string | null; username: string; devices?: string[] },
+  who: { userId: string | null; username: string; devices?: string[]; passwordKnown: boolean },
   step: LoginState['step'],
 ): Promise<LoginState> {
-  const [ip, h] = await Promise.all([clientIp(), headers()]);
+  const [raw, h] = await Promise.all([clientIp(), headers()]);
+  // Only an address goes into the message: the header may carry any text a client sent.
+  const ip = isIP(raw) ? raw : 'unknown';
   const device = deviceLabel(h.get('user-agent'));
   const ctx = alertContext();
   if (ctx) {
@@ -92,14 +96,14 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     usernameHash: username ? keyedHash(username, config.secret) : null,
   };
   const user = username ? await getUserByUsername(db, username) : null;
-  const who = { userId: user?.id ?? null, username };
-  if (await isLockedOut(db, key)) return failed('locked', who, 'password');
-
   const password = String(formData.get('password') ?? '');
   const usable = user?.passwordHash && !user.disabledAt ? user : null;
   dummyHash ??= hashPassword('unused-dummy-password');
+  // The same work locked out or not: the answer's timing tells nothing either.
   const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummyHash));
   const devices = await listDevices(db, usable?.id ?? '');
+  const who = { userId: user?.id ?? null, username, passwordKnown: ok && !!usable };
+  if (await isLockedOut(db, key)) return failed('locked', who, 'password');
   await recordAttempt(db, key, ok && Boolean(usable));
   if (!user) return failed('unknownUser', who, 'password');
   if (!usable) return failed(user.disabledAt ? 'disabled' : 'notSetUp', who, 'password');
@@ -127,8 +131,9 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
   const userId = await verifyMfaToken(jar.get(MFA_COOKIE)?.value, config);
   const user = userId ? await getUserById(db, userId) : null;
   // The step 1 cookie ran out (or the account changed meanwhile): start over, nothing to tell.
-  if (!user?.totpSecretEnc || user.disabledAt) return { error: 'failed', step: 'code' };
-  const who = { userId: user.id, username: user.username };
+  if (!user?.totpSecretEnc || user.disabledAt) return { error: 'expired', step: 'code' };
+  // Past step 1: the password was right.
+  const who = { userId: user.id, username: user.username, passwordKnown: true };
 
   const key = {
     ipHash: keyedHash(await clientIp(), config.secret),

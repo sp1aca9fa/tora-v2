@@ -44,7 +44,7 @@ import {
 } from './schema';
 import { addWatch } from './watches';
 import { TEST_SOURCES } from './testing';
-import { createUser } from './users';
+import { createUser, setUserDisabled } from './users';
 
 const SECRET = 'test-secret-0123456789abcdef0123456789';
 const HOOK = 'https://discord.com/api/webhooks/123/abc-DEF_1';
@@ -120,6 +120,8 @@ const TEXTS: Record<string, Record<string, string>> = {
     login_code: 'wrong code.',
     loginNotYou: 'Not you?',
     loginPasswordKnown: 'Password was right.',
+    loginPasswordKnownAdmin: 'Admins: password was right.',
+    login_devices: 'on 2 devices ({devices}).',
   },
   ja: { summaryTitle: 'まとめ' },
 };
@@ -399,21 +401,38 @@ it('tells why a sign-in failed: the account, else admins; one message per 15 min
   const at = (minutes: number) =>
     new Date(Date.parse('2026-10-30T10:00:00+09:00') + minutes * 60_000);
   const from = { ip: '203.0.113.9', device: 'Firefox on Linux' };
-  // The member has no channel: admins are told.
-  const who = { userId: member, username: 'member', ...from };
-  expect(await alertLoginFailure(db, ctx, { reason: 'password', ...who }, at(0))).toBe(1);
-  expect(sent.at(-1)!.text).toMatch(
-    /member failed: wrong password\. From 203\.0\.113\.9 .*Not you\?/,
-  );
-  // Held back, then counted in the next.
-  expect(await alertLoginFailure(db, ctx, { reason: 'password', ...who }, at(1))).toBe(0);
-  expect(await alertLoginFailure(db, ctx, { reason: 'code', ...who }, at(16))).toBe(1);
-  expect(sent.at(-1)!.text).toMatch(/wrong code\..*1 more failed.*Password was right\./);
-  // A name nobody has travels shortened (it may be a password typed in the wrong field).
-  const unknown = { userId: null, username: 'secretpass', ...from };
+  const who = { userId: member, username: 'member', ...from, passwordKnown: false };
+  const send = (over: Partial<Parameters<typeof alertLoginFailure>[2]>, minutes: number) =>
+    alertLoginFailure(db, ctx, { reason: 'password', ...who, ...over }, at(minutes));
+  // The member has no channel: admins are told, with admins' advice.
+  expect(await send({}, 0)).toBe(1);
+  expect(sent.at(-1)!.text).toMatch(/member failed: wrong password\. From 203\.0\.113\.9 /);
+  // Held back, but a failure with the right password has its own slot.
+  expect(await send({}, 1)).toBe(0);
+  expect(await send({ reason: 'code', passwordKnown: true }, 2)).toBe(1);
+  expect(sent.at(-1)!.text).toMatch(/wrong code\..*Admins: password was right\./);
+  expect(await send({}, 16)).toBe(1);
+  expect(sent.at(-1)!.text).toContain('1 more failed');
+  // With a channel of their own, the member is told (their advice), admins are not.
+  await addDiscordChannel(db, member, `${HOOK}2`, SECRET, fakeFetch);
+  const before = sent.length;
+  const devices = {
+    reason: 'devices' as const,
+    passwordKnown: true,
+    devices: ['iPhone', 'Mac'],
+  };
+  expect(await send(devices, 40)).toBe(1);
+  expect(sent.length).toBe(before + 1);
+  expect(sent.at(-1)!.text).toMatch(/2 devices \(iPhone, Mac\)\..*Password was right\./);
+  // A turned-off account: admins again.
+  await setUserDisabled(db, member, true);
+  expect(await send({}, 60)).toBe(1);
+  expect(sent.at(-1)!.text).not.toContain('Not you?');
+  // A name nobody has travels as its length only (it may be a password in the wrong field).
+  const unknown = { ...who, userId: null, username: 'secretpass' };
   expect(await alertLoginFailure(db, ctx, { reason: 'unknownUser', ...unknown }, at(0))).toBe(1);
-  expect(sent.at(-1)!.text).toContain('se... (10)');
-  expect(sent.at(-1)!.text).not.toContain('secretpass');
+  expect(sent.at(-1)!.text).toContain('a name of 10 characters');
+  expect(sent.at(-1)!.text).not.toContain('secret');
 });
 
 it("logs a server's own events, and tells admins only when asked", async () => {

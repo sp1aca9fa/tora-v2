@@ -1012,12 +1012,14 @@ export async function alertServerEvent(
 export type LoginFailureReason =
   'password' | 'disabled' | 'notSetUp' | 'devices' | 'code' | 'locked' | 'unknownUser';
 
-/** At most one sign-in alert per account (or for unknown names) in this time; the rest counted. */
+/**
+ * At most one sign-in alert per account in this time (failures with the right password apart,
+ * so they are never held behind a wrong one; one more for unknown names); the rest counted. Kept
+ * in the server process: one process on a self-hosted server; on a hosting platform each
+ * instance keeps its own, so more may go out there.
+ */
 export const LOGIN_ALERT_QUIET_MS = 15 * 60_000;
 const loginAlerted = new Map<string, { at: number; held: number }>();
-
-/** A name nobody has, shortened: a password typed in the name field must not travel. */
-const maskedName = (name: string) => `${[...name].slice(0, 2).join('')}... (${[...name].length})`;
 
 /**
  * A failed sign-in (2026-10-30): the page says only that it failed; the reason, where it came
@@ -1037,10 +1039,12 @@ export async function alertLoginFailure(
     device: string;
     /** For `devices`: the account's devices now. */
     devices?: string[];
+    /** The password was right (a failure after it): someone else may know it. */
+    passwordKnown: boolean;
   },
   now = new Date(),
 ): Promise<number> {
-  const key = failure.userId ?? '';
+  const key = `${failure.userId ?? ''}${failure.passwordKnown ? ':known' : ''}`;
   const last = loginAlerted.get(key);
   if (last && now.getTime() - last.at < LOGIN_ALERT_QUIET_MS) {
     last.held++;
@@ -1054,11 +1058,14 @@ export async function alertLoginFailure(
     const why = fill(t[`login_${failure.reason}`] ?? failure.reason, {
       devices: (failure.devices ?? []).join(', '),
     });
-    // The password was right: someone else knowing it is the urgent case.
-    const passed = failure.reason === 'devices' || failure.reason === 'code';
     return [
       fill(t.loginFailed ?? 'Tora: a sign-in to {user} failed: {why}', {
-        user: user ? user.username : maskedName(failure.username),
+        // A name nobody has, as its length only: it may be a password typed in the name field.
+        user: user
+          ? user.username
+          : fill(t.loginUnknownName ?? 'a name of {n} characters', {
+              n: [...failure.username].length,
+            }),
         why,
       }),
       fill(t.loginFrom ?? 'From {ip} ({device}), {at}.', {
@@ -1067,18 +1074,31 @@ export async function alertLoginFailure(
         at: shortTime(toLocalIso(now)),
       }),
       held ? fill(t.loginHeld ?? '{n} more failed since the last message.', { n: held }) : '',
-      user ? ((passed ? t.loginPasswordKnown : t.loginNotYou) ?? '') : '',
+      // The password was right: someone else knowing it is the urgent case. Admins told for
+      // someone else get their own advice.
+      user
+        ? ((failure.passwordKnown
+            ? own
+              ? t.loginPasswordKnown
+              : t.loginPasswordKnownAdmin
+            : own
+              ? t.loginNotYou
+              : '') ?? '')
+        : '',
     ]
       .filter(Boolean)
       .join(' ');
   };
-  const send = async (to: User) =>
-    sendToUser(
+  let own = false;
+  const send = async (to: User) => {
+    own = to.id === user?.id;
+    return sendToUser(
       db,
       to.id,
       lines('admin', null, [{ text: text(await textsFor(db, to, ctx)), role: 'bad' }]),
       ctx,
     );
+  };
 
   if (user && !user.disabledAt) {
     const sent = await send(user);
