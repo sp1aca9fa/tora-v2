@@ -5,6 +5,7 @@ import {
   type PlanStep,
   checkPlan,
   monthEnd,
+  monthlyRoom,
   nameSearch,
   suggestMix,
   swapInMix,
@@ -52,8 +53,8 @@ export function PlanCard({
   budget: number | null;
   until: string | null;
   monthly: boolean;
-  /** This month's purchases: their cost, how many lots, the items. */
-  spent: { total: number; lots: number; productIds: string[] };
+  /** This month's purchases: their cost, how many lots (with no cost), their keys. */
+  spent: { total: number; lots: number; noCost: number; keys: string[] };
   today: string;
   q: string | null;
 }) {
@@ -72,12 +73,13 @@ export function PlanCard({
   const [pending, startTransition] = useTransition();
   const amount = money.parse(budget);
   // A monthly plan: what is left of this month's amount, by the month's last day.
-  const room = amount !== null && monthly ? amount - spent.total : amount;
   const by = monthly ? monthEnd(today) : until;
-  const bought = new Set(monthly ? spent.productIds : []);
+  const bought = new Set(monthly ? spent.keys : []);
+  const month = amount !== null ? monthlyRoom(amount, spent.total, bought, ticked) : null;
+  const room = monthly ? (month?.room ?? null) : amount;
   const chosen = rows.filter((r) => ticked.has(`${r.productId}|${r.bucket}`));
   // Ticked items bought this month are in what was spent, not counted again.
-  const toBuy = chosen.filter((r) => !bought.has(r.productId));
+  const toBuy = chosen.filter((r) => !bought.has(`${r.productId}|${r.bucket}`));
   const check = useMemo(
     () =>
       room !== null
@@ -91,11 +93,13 @@ export function PlanCard({
   );
   const match = q ? nameSearch(q) : null;
   const searched = match ? rows.filter((r) => match(r.name)) : rows;
-  const options = searched.map((r) => r.mix);
+  // Items bought this month are not offered again.
+  const options = searched.filter((r) => !bought.has(r.mix.key)).map((r) => r.mix);
   const suggest = () => {
     if (room === null) return;
     const mix = suggestMix(options, Math.max(0, room), by || null);
-    setTicked(new Set(mix));
+    // Ticked items bought this month stay ticked (they are in what was spent).
+    setTicked(new Set([...mix, ...[...ticked].filter((k) => bought.has(k))]));
     setSuggested(new Set(mix));
     const used = mix.reduce(
       (sum, k) => sum + (options.find((o) => o.key === k)?.step.price ?? 0),
@@ -112,7 +116,13 @@ export function PlanCard({
   };
   const swap = (key: string) => {
     if (room === null) return;
-    const next = swapInMix(options, [...ticked], key, Math.max(0, room), by || null);
+    const next = swapInMix(
+      options,
+      month && monthly ? month.toBuy : [...ticked],
+      key,
+      Math.max(0, room),
+      by || null,
+    );
     if (!next) {
       setMessage(t('plan.noSwap'));
       return;
@@ -133,6 +143,15 @@ export function PlanCard({
       (a.step.day ?? '').localeCompare(b.step.day ?? '') ||
       a.name.localeCompare(b.name),
   );
+  // What to buy now, what to wait on (a day, a price), what has no price yet (S27).
+  const groups = (
+    [
+      ['now', sorted.filter((r) => r.step.when === 'now')],
+      ['wait', sorted.filter((r) => r.step.when === 'from' || r.step.when === 'under')],
+      ['none', sorted.filter((r) => r.step.when === 'none')],
+    ] as const
+  ).filter(([, list]) => list.length > 0);
+  const boughtTicked = chosen.length - toBuy.length;
   const whenText = (s: PlanStep) =>
     s.when === 'now'
       ? t('plan.now')
@@ -191,17 +210,34 @@ export function PlanCard({
           <span className="text-xs text-muted-foreground">{t('plan.needBudget')}</span>
         )}
       </div>
-      {monthly && amount !== null && (
-        <p className={cn('text-sm', room !== null && room < 0 && 'text-destructive')}>
-          {t('plan.month', {
-            spent: money(spent.total),
-            count: spent.lots,
-            left: money(Math.abs(room ?? 0)),
-            budget: money(amount),
-            over: room !== null && room < 0 ? 'over' : 'left',
-            by: monthEnd(today),
-          })}
-        </p>
+      {monthly && <p className="text-xs text-muted-foreground">{t('plan.monthlyNote')}</p>}
+      {monthly && amount !== null && room !== null && (
+        <div className="max-w-md space-y-1">
+          <p className="text-sm">
+            <span
+              className={cn('text-base font-semibold tabular-nums', room < 0 && 'text-destructive')}
+            >
+              {t(room < 0 ? 'plan.monthOver' : 'plan.monthLeft', { left: money(Math.abs(room)) })}
+            </span>{' '}
+            <span className="text-muted-foreground">
+              {t('plan.monthSpent', {
+                spent: money(spent.total),
+                budget: money(amount),
+                count: spent.lots,
+                end: monthEnd(today).slice(5).replace('-', '/'),
+              })}
+              {spent.noCost > 0 && ` ${t('plan.noCost', { count: spent.noCost })}`}
+            </span>
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn('h-full', room < 0 ? 'bg-destructive' : 'bg-primary')}
+              style={{
+                width: `${amount > 0 ? Math.min(100, (spent.total / amount) * 100) : 100}%`,
+              }}
+            />
+          </div>
+        </div>
       )}
       {q && (
         <p className="text-xs text-muted-foreground">
@@ -216,88 +252,96 @@ export function PlanCard({
           {q ? t('search.none', { q }) : t('plan.empty')}
         </p>
       ) : (
-        <h3 className="text-xs font-medium text-muted-foreground">{t('plan.listFrom')}</h3>
+        <p className="text-xs text-muted-foreground">{t('plan.listFrom')}</p>
       )}
-      {shown.length > 0 && (
-        <ul className="grid gap-2 text-sm lg:grid-cols-2 2xl:grid-cols-3">
-          {sorted.map((r) => {
-            const key = `${r.productId}|${r.bucket}`;
-            const late = !!by && r.step.when === 'from' && (r.step.day ?? '') > by;
-            const boughtNow = bought.has(r.productId) && ticked.has(key);
-            return (
-              <li key={key} className="flex items-start gap-3 rounded-lg border px-3 py-2">
-                <input
-                  type="checkbox"
-                  className="mt-1 size-4"
-                  checked={ticked.has(key)}
-                  onChange={(e) => {
-                    const next = new Set(ticked);
-                    if (e.target.checked) next.add(key);
-                    else next.delete(key);
-                    setTicked(next);
-                  }}
-                />
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/products/${r.productId}/buy${r.bucket ? `?condition=${encodeURIComponent(r.bucket)}` : ''}`}
-                    className="line-clamp-2 hover:underline"
-                  >
-                    {r.name}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">
-                    {[
-                      r.bucket && bucketLabel(r.bucket, tAll),
-                      ...r.from.map((f) => t(`plan.fromKind.${f}`)),
-                      !r.from.length && t('plan.fromKind.mix'),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                  {r.signals.length > 0 && (
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                      {r.signals.join(' · ')}
-                    </p>
-                  )}
-                  {boughtNow && (
-                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                      {t('plan.boughtMonth')}
-                    </p>
-                  )}
-                  {suggested.has(key) && ticked.has(key) && (
-                    <button
-                      type="button"
-                      className="text-xs text-muted-foreground underline"
-                      onClick={() => swap(key)}
+      {groups.map(([group, list]) => (
+        <div key={group} className="space-y-2">
+          <h3 className="text-sm font-medium">
+            {t(`plan.group.${group}`, { count: list.length })}
+          </h3>
+          {group === 'none' && (
+            <p className="text-xs text-muted-foreground">{t('plan.groupNoneNote')}</p>
+          )}
+          <ul className="grid gap-2 text-sm lg:grid-cols-2 2xl:grid-cols-3">
+            {list.map((r) => {
+              const key = `${r.productId}|${r.bucket}`;
+              const late = !!by && r.step.when === 'from' && (r.step.day ?? '') > by;
+              const boughtNow = bought.has(key) && ticked.has(key);
+              return (
+                <li key={key} className="flex items-start gap-3 rounded-lg border px-3 py-2">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4"
+                    checked={ticked.has(key)}
+                    onChange={(e) => {
+                      const next = new Set(ticked);
+                      if (e.target.checked) next.add(key);
+                      else next.delete(key);
+                      setTicked(next);
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/products/${r.productId}/buy${r.bucket ? `?condition=${encodeURIComponent(r.bucket)}` : ''}`}
+                      className="line-clamp-2 hover:underline"
                     >
-                      {t('plan.swap')}
-                    </button>
-                  )}
-                </div>
-                <div className="shrink-0 text-right text-xs">
-                  <p
-                    className={cn(
-                      'font-medium',
-                      r.step.when === 'now' && 'text-emerald-700 dark:text-emerald-400',
-                      late && 'text-amber-700 dark:text-amber-300',
+                      {r.name}
+                    </Link>
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        r.bucket && bucketLabel(r.bucket, tAll),
+                        ...r.from.map((f) => t(`plan.fromKind.${f}`)),
+                        !r.from.length && t('plan.fromKind.mix'),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                    {r.signals.length > 0 && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                        {r.signals.join(' · ')}
+                      </p>
                     )}
-                  >
-                    {whenText(r.step)}
-                  </p>
-                  {r.step.price !== null && r.step.when !== 'under' && (
-                    <p className="tabular-nums">{money(r.step.price)}</p>
-                  )}
-                  <p className="text-muted-foreground">
-                    {r.step.when === 'none'
-                      ? t('plan.notCounted')
-                      : t(`plan.reason.${r.step.reason}`)}
-                  </p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <div className="flex flex-wrap items-center gap-3">
+                    {boughtNow && (
+                      <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        {t('plan.boughtMonth')}
+                      </p>
+                    )}
+                    {suggested.has(key) && ticked.has(key) && (
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground underline"
+                        onClick={() => swap(key)}
+                      >
+                        {t('plan.swap')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right text-xs">
+                    <p
+                      className={cn(
+                        'font-medium',
+                        r.step.when === 'now' && 'text-emerald-700 dark:text-emerald-400',
+                        late && 'text-amber-700 dark:text-amber-300',
+                      )}
+                    >
+                      {whenText(r.step)}
+                    </p>
+                    {r.step.price !== null && r.step.when !== 'under' && (
+                      <p className="tabular-nums">{money(r.step.price)}</p>
+                    )}
+                    <p className="text-muted-foreground">
+                      {r.step.when === 'none'
+                        ? t('plan.notCounted')
+                        : t(`plan.reason.${r.step.reason}`)}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center gap-3 rounded-lg border bg-card/95 p-3 backdrop-blur md:bottom-4">
         {check && (
           <p
             className={cn(
@@ -311,6 +355,7 @@ export function PlanCard({
               left: money(Math.abs(check.left)),
               over: check.left < 0 ? 'over' : 'left',
             })}
+            {boughtTicked > 0 && ` ${t('plan.boughtCount', { count: boughtTicked })}`}
             {check.late > 0 && ` ${t('plan.late', { count: check.late })}`}
             {check.undated > 0 && ` ${t('plan.undated', { count: check.undated })}`}
           </p>

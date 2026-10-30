@@ -3,6 +3,7 @@
 import {
   type OpportunitySignal,
   type PlanStep,
+  deriveBucket,
   localDate,
   planStep,
   productClass,
@@ -121,27 +122,38 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
 
 /**
  * What a person bought in a month (S27, a monthly plan): their lots acquired that month by
- * purchase (sold since or not), at cost in the base currency, and the items they are of.
- * `month` is `YYYY-MM` in the admin's time zone, as lots' acquired times are written.
+ * purchase and counted in cost (not things bought to use; sold since or not), at cost in the base
+ * currency. `keys`: each lot's `productId|bucket` and `productId|` (a plan item in any condition).
+ * `noCost`: lots with no cost written (counted as 0). `month` is `YYYY-MM` in the admin's time
+ * zone, as lots' acquired times are written.
  */
 export async function spentInMonth(
   db: Db,
   userId: string,
   month: string,
-): Promise<{ total: number; lots: number; productIds: string[] }> {
+): Promise<{ total: number; lots: number; noCost: number; keys: string[] }> {
   const rows = await db
-    .select({ productId: holdings.productId, cost: holdings.costTotalBase })
+    .select({ holding: holdings, product: products })
     .from(holdings)
+    .innerJoin(products, eq(products.id, holdings.productId))
     .where(
       and(
         eq(holdings.userId, userId),
         eq(holdings.acquisitionType, 'purchase'),
+        eq(holdings.countInCost, true),
         like(holdings.acquiredAt, `${month}-%`),
       ),
     );
+  const keys = new Set<string>();
+  for (const { holding, product } of rows) {
+    keys.add(`${product.id}|`);
+    const bucket = deriveBucket({ productClass: productClass(product), ...holding });
+    if (bucket) keys.add(`${product.id}|${bucket}`);
+  }
   return {
-    total: rows.reduce((sum, r) => sum + r.cost, 0),
+    total: rows.reduce((sum, r) => sum + r.holding.costTotalBase, 0),
     lots: rows.length,
-    productIds: [...new Set(rows.map((r) => r.productId))],
+    noCost: rows.filter((r) => r.holding.costTotalBase === 0).length,
+    keys: [...keys],
   };
 }

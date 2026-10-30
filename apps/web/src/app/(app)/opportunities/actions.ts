@@ -28,10 +28,9 @@ export async function savePlanAction(plan: {
     .filter((i) => i && typeof i.productId === 'string' && typeof i.bucket === 'string')
     .slice(0, 200)
     .map((i) => ({ productId: i.productId, bucket: i.bucket }));
-  const monthly = plan.monthly === true;
+  // A monthly plan runs to each month's end; the date is kept for when it is turned off.
   await setPreferences(db, user.id, {
-    // A monthly plan has no date of its own: it runs to each month's end.
-    buyPlan: { budget, until: monthly ? '' : plan.until, items, monthly },
+    buyPlan: { budget, until: plan.until, items, monthly: plan.monthly === true },
   });
   revalidatePath('/opportunities', 'layout');
   return {};

@@ -55,6 +55,20 @@ export function monthEnd(day: string): string {
   return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
 
+/**
+ * A monthly plan (S27): what is left of the month's amount once its purchases are counted, and
+ * the ticked keys still to buy. Keys bought this month (`productId|bucket`, and `productId|` for
+ * any condition) are in what was spent: not counted again, nor offered to a mix or a swap.
+ */
+export function monthlyRoom(
+  amount: number,
+  spent: number,
+  bought: ReadonlySet<string>,
+  ticked: Iterable<string>,
+): { room: number; toBuy: string[] } {
+  return { room: amount - spent, toBuy: [...ticked].filter((k) => !bought.has(k)) };
+}
+
 /** The ticked items against the budget and the date. */
 export interface PlanCheck {
   total: number;

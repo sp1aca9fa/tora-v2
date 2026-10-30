@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { type MixOption, checkPlan, monthEnd, planStep, suggestMix, swapInMix } from './plan';
+import {
+  type MixOption,
+  checkPlan,
+  monthEnd,
+  monthlyRoom,
+  planStep,
+  suggestMix,
+  swapInMix,
+} from './plan';
 import type { SignalStats } from './signals';
 
 const stats = (over: Partial<SignalStats>): SignalStats => ({
@@ -136,4 +144,15 @@ it("gives a month's last day (a monthly plan runs to it)", () => {
     '2028-02-29',
     '2026-12-31',
   ]);
+});
+
+it('leaves ticked items bought this month out of what is left to buy', () => {
+  // A loose copy bought: the plan's PSA 10 of the same card is still to buy; a box in any condition
+  // (bucket '') is bought.
+  const bought = new Set(['card|', 'card|raw:A', 'box|', 'box|sealed:shrink']);
+  expect(monthlyRoom(30000, 12000, bought, ['card|graded:PSA:10', 'box|', 'other|'])).toEqual({
+    room: 18000,
+    toBuy: ['card|graded:PSA:10', 'other|'],
+  });
+  expect(monthlyRoom(10000, 12000, new Set(), []).room).toBe(-2000);
 });
