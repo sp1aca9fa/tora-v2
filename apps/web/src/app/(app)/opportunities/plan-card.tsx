@@ -79,7 +79,8 @@ export function PlanCard({
   const room = monthly ? (month?.room ?? null) : amount;
   const chosen = rows.filter((r) => ticked.has(`${r.productId}|${r.bucket}`));
   // Ticked items bought this month are in what was spent, not counted again.
-  const toBuy = chosen.filter((r) => !bought.has(`${r.productId}|${r.bucket}`));
+  const still = new Set(month && monthly ? month.toBuy : ticked);
+  const toBuy = chosen.filter((r) => still.has(`${r.productId}|${r.bucket}`));
   const check = useMemo(
     () =>
       room !== null
