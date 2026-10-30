@@ -34,10 +34,14 @@ loadRootEnv();
 const config = dbConfigFromEnv(process.env, { allowClaude: true });
 const db = createDb(config, 'mcp');
 // The analysis copy follows the nightly backup, so a migration pushed since is missing until the
-// next one: say so and go on (only tools reading the new tables fail) instead of not starting.
+// next one: say so and go on instead of not starting (tools or start-up queries using it may fail).
 const pending = await pendingMigrations(db);
 if (pending.length > 0) {
-  console.error(`Database is missing migration(s): ${pending.join(', ')}; tools using them fail.`);
+  console.error(
+    `Database is missing migration(s): ${pending.join(', ')}; anything using them fails. ${
+      isRemoteUrl(config.url) ? 'Run `pnpm db:migrate`.' : 'The next backup copy brings them.'
+    }`,
+  );
 }
 // Times written follow the admin's time zone (S16 part 5).
 await loadTimeZone(db);
