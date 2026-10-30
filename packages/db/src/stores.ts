@@ -23,7 +23,7 @@ import {
   trackingState,
   withinHours,
 } from '@tora/core';
-import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   type AlertContext,
@@ -37,9 +37,12 @@ import type { Db } from './client';
 import { readSetting, saveSetting } from './registry';
 import {
   type BoardState,
+  LOTTERY_MARKS,
+  type LotteryMark,
   type Store,
   type StorePost,
   feedTokens,
+  lotteryMarks,
   storeNotices,
   storePostImages,
   storePosts,
@@ -1315,10 +1318,18 @@ export async function postsPage(
     named?: boolean;
     since?: string;
     chain?: string | null;
+    /** Only posts using one of these words (a lottery's), and only these posts or not these. */
+    words?: string[];
+    postIds?: string[];
+    notIds?: string[];
   },
 ): Promise<{ posts: StorePost[]; more: boolean }> {
   const ids = opts.storeIds;
   if (ids && !ids.length) return { posts: [], more: false };
+  if ((opts.words && !opts.words.length) || (opts.postIds && !opts.postIds.length)) {
+    return { posts: [], more: false };
+  }
+  const like = (w: string) => `%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const rows = await db
     .select()
     .from(storePosts)
@@ -1341,10 +1352,66 @@ export async function postsPage(
           : opts.chain === null
             ? isNull(storePosts.chain)
             : eq(storePosts.chain, opts.chain),
+        opts.words
+          ? or(...opts.words.map((w) => sql`${storePosts.text} LIKE ${like(w)} ESCAPE '\\'`))
+          : undefined,
+        opts.postIds ? inArray(storePosts.id, opts.postIds) : undefined,
+        opts.notIds?.length ? notInArray(storePosts.id, opts.notIds) : undefined,
       ),
     )
     .orderBy(desc(storePosts.postedAt))
     .limit(opts.limit + 1)
     .offset(opts.offset);
   return { posts: rows.slice(0, opts.limit), more: rows.length > opts.limit };
+}
+
+// ---- Lotteries (2026-10-31) ----
+
+export { LOTTERY_MARKS };
+
+/** A person's marks on lottery posts, by post id (all of them without `postIds`). */
+export async function lotteryMarksOf(
+  db: Pick<Db, 'select'>,
+  userId: string,
+  postIds?: string[],
+): Promise<Map<string, LotteryMark>> {
+  if (postIds && !postIds.length) return new Map();
+  const rows = await db
+    .select({ postId: lotteryMarks.postId, mark: lotteryMarks.mark })
+    .from(lotteryMarks)
+    .where(
+      and(
+        eq(lotteryMarks.userId, userId),
+        postIds ? inArray(lotteryMarks.postId, postIds) : undefined,
+      ),
+    );
+  return new Map(rows.map((r) => [r.postId, r.mark]));
+}
+
+/** Marks a lottery post for a person (interested, applied, hidden), or clears the mark (null). */
+export async function setLotteryMark(
+  db: Db,
+  userId: string,
+  postId: string,
+  mark: LotteryMark | null,
+): Promise<void> {
+  if (!mark) {
+    await db
+      .delete(lotteryMarks)
+      .where(and(eq(lotteryMarks.userId, userId), eq(lotteryMarks.postId, postId)));
+    return;
+  }
+  const [post] = await db
+    .select({ id: storePosts.id })
+    .from(storePosts)
+    .where(eq(storePosts.id, postId));
+  if (!post) return;
+  const now = toLocalIso();
+  await db
+    .insert(lotteryMarks)
+    .values({ userId, postId, mark, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [lotteryMarks.userId, lotteryMarks.postId],
+      set: { mark, updatedAt: now },
+    });
 }

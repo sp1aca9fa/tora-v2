@@ -112,6 +112,7 @@ export default async function StoreCodesPage() {
                       <td className="py-1.5 text-xs text-muted-foreground">
                         {g.meaning}
                         {g.chain && ` · ${t('chainCode')}`}
+                        {g.lottery && ` · ${t('codeKindLottery')}`}
                         {g.hidden && ` · ${t('codeIsOff')}`}
                       </td>
                       <td className="py-1.5 text-right">{change(g)}</td>

@@ -11,12 +11,13 @@ const TABS = [
   ['byStore', '/stores/by-store'],
   ['byLocation', '/stores/by-location'],
   ['posts', '/stores/posts'],
+  ['lotteries', '/stores/lotteries'],
   ['area', '/stores/area'],
   ['codes', '/stores/codes'],
   ['feed', '/stores/feed'],
 ] as const;
 
-/** The Stores sub pages (S25): Now, By store, By location, All posts, Area, Codes, Feed. */
+/** The Stores sub pages (S25): Now, By store, By location, All posts, Lotteries, Area, Codes, Feed. */
 export function StoresNav() {
   const t = useTranslations('stores.tab');
   const pathname = usePathname();

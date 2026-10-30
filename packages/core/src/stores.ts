@@ -190,6 +190,8 @@ export interface CodeMeaning {
    * (or no store) is that chain's branch there ("Arcade · Harbor").
    */
   chain?: boolean;
+  /** A word for a lottery ("raffle", "draw"): posts using it are listed on Stores > Lotteries. */
+  lottery?: boolean;
 }
 
 /**

@@ -12,8 +12,10 @@ import {
 } from '@tora/core';
 import {
   type Db,
+  type LotteryMark,
   type Store,
   cachedStores,
+  lotteryMarksOf,
   postImageIds,
   postsPage,
   storeCodes,
@@ -60,7 +62,13 @@ export interface PostView {
   url: string | null;
   /** Its pictures (the app's addresses), for a week. */
   images: string[];
+  /** On the Lotteries list: the person's mark (null: none yet). */
+  lottery?: { mark: LotteryMark | null };
 }
+
+/** The Lotteries list's choices: open ones (not hidden), those marked so, or the hidden. */
+export const LOTTERY_SHOWN = ['open', 'interested', 'applied', 'hidden'] as const;
+export type LotteryShown = (typeof LOTTERY_SHOWN)[number];
 
 /** Which posts the All posts list shows: the area's, those naming any store, or every one. */
 export type PostsShown = 'area' | 'named' | 'all';
@@ -73,24 +81,39 @@ export interface PostsFilter {
   show?: PostsShown;
   chain?: string | null;
   storeIds?: string[];
+  /** The Lotteries list (posts using a lottery word), by the person's marks. */
+  lottery?: LotteryShown;
 }
 
 /** A batch of posts, newest first, ready to show. */
 export async function postViews(
   db: Db,
   area: StoreArea | null,
-  opts: { offset: number; filter: PostsFilter },
+  opts: { offset: number; filter: PostsFilter; userId?: string },
 ): Promise<{ posts: PostView[]; more: boolean }> {
-  const { show, chain, storeIds } = opts.filter;
+  const { show, chain, storeIds, lottery } = opts.filter;
   const inArea = storesInArea(area, await cachedStores(db), localDate());
+  // Lotteries: the posts using a lottery word, by the person's marks.
+  const marks = lottery && opts.userId ? await lotteryMarksOf(db, opts.userId) : null;
+  const marked = (m: LotteryMark) => [...(marks ?? [])].flatMap(([id, x]) => (x === m ? [id] : []));
   const { posts, more } = await postsPage(db, {
     offset: opts.offset,
     limit: POSTS_BATCH,
     storeIds: storeIds ?? (show === 'area' ? [...inArea] : undefined),
     named: show === 'named' || undefined,
     chain,
+    ...(lottery
+      ? {
+          words: (await storeGlossary(db)).filter((g) => g.lottery).map((g) => g.code),
+          ...(lottery === 'open' ? { notIds: marked('hidden') } : { postIds: marked(lottery) }),
+        }
+      : {}),
   });
-  return { posts: await toViews(db, area, posts), more };
+  const views = await toViews(db, area, posts);
+  return {
+    posts: marks ? views.map((v) => ({ ...v, lottery: { mark: marks.get(v.id) ?? null } })) : views,
+    more,
+  };
 }
 
 /** Posts ready to show: the stores they name, their products and pictures. */

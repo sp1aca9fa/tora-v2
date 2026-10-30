@@ -704,7 +704,7 @@ export function AddGlossary() {
   const t = useTranslations('stores');
   const [code, setCode] = useState('');
   const [meaning, setMeaning] = useState('');
-  const [kind, setKind] = useState<'other' | 'product' | 'chain'>('other');
+  const [kind, setKind] = useState<'other' | 'product' | 'chain' | 'lottery'>('other');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return (
@@ -743,6 +743,7 @@ export function AddGlossary() {
         <option value="other">{t('codeKindOther')}</option>
         <option value="product">{t('isProduct')}</option>
         <option value="chain">{t('codeKindChain')}</option>
+        <option value="lottery">{t('codeKindLottery')}</option>
       </NativeSelect>
       <Button type="submit" size="sm" disabled={pending}>
         {t('add')}

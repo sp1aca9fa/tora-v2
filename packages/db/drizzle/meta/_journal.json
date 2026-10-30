@@ -484,6 +484,13 @@
       "when": 1793188614144,
       "tag": "0068_product_reprint",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "6",
+      "when": 1793374812853,
+      "tag": "0069_lottery_marks",
+      "breakpoints": true
     }
   ]
 }

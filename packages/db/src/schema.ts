@@ -1308,6 +1308,27 @@ export const feedTokens = sqliteTable(
   (t) => [index('feed_tokens_hash_idx').on(t.tokenHash)],
 );
 
+/**
+ * A person's mark on a lottery post (Stores > Lotteries, 2026-10-31): interested, applied, or
+ * hidden from the list. Goes with the post (posts are kept 30 days).
+ */
+export const lotteryMarks = sqliteTable(
+  'lottery_marks',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    postId: text('post_id')
+      .notNull()
+      .references(() => storePosts.id, { onDelete: 'cascade' }),
+    mark: text('mark').notNull().$type<LotteryMark>(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('lottery_marks_uq').on(t.userId, t.postId)],
+);
+export const LOTTERY_MARKS = ['interested', 'applied', 'hidden'] as const;
+export type LotteryMark = (typeof LOTTERY_MARKS)[number];
+
 /** The last store notice a person was sent per store: posts close together make one notice. */
 export const storeNotices = sqliteTable(
   'store_notices',

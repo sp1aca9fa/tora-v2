@@ -25,10 +25,12 @@ import {
   setPreferences,
   setStoreCodes,
   trackNow,
+  LOTTERY_MARKS,
+  setLotteryMark,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
-import { type PostsFilter, postViews } from './post-views';
+import { LOTTERY_SHOWN, type PostsFilter, postViews } from './post-views';
 
 function cleanChoice(c: unknown): StoreAreaChoice | null {
   const v = c as Partial<StoreAreaChoice> | null;
@@ -202,7 +204,7 @@ export async function forgetBoardAction(key: string) {
 export async function addGlossaryAction(
   code: string,
   meaning: string,
-  kind: 'other' | 'product' | 'chain' = 'other',
+  kind: 'other' | 'product' | 'chain' | 'lottery' = 'other',
 ): Promise<{ error?: string }> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return { error: 'admin' };
@@ -212,7 +214,13 @@ export async function addGlossaryAction(
   await addGlossary(db, {
     code: c,
     meaning: m,
-    ...(kind === 'product' ? { product: true } : kind === 'chain' ? { chain: true } : {}),
+    ...(kind === 'product'
+      ? { product: true }
+      : kind === 'chain'
+        ? { chain: true }
+        : kind === 'lottery'
+          ? { lottery: true }
+          : {}),
   });
   await recordAdminChange(db, user.id, 'glossaryAdded', { code: c, meaning: m }, '/stores/area');
   revalidatePath('/stores');
@@ -309,7 +317,9 @@ export async function morePostsAction(offset: number, filter: PostsFilter) {
   const { db, user } = await authed();
   return postViews(db, user.preferences?.storeArea ?? null, {
     offset: Math.max(0, Math.floor(offset) || 0),
+    userId: user.id,
     filter: {
+      lottery: LOTTERY_SHOWN.find((s) => s === filter.lottery),
       show: (['area', 'named', 'all'] as const).find((s) => s === filter.show),
       chain: typeof filter.chain === 'string' || filter.chain === null ? filter.chain : undefined,
       storeIds: Array.isArray(filter.storeIds)
@@ -317,4 +327,13 @@ export async function morePostsAction(offset: number, filter: PostsFilter) {
         : undefined,
     },
   });
+}
+
+/** Marks a lottery post for the person (interested, applied, hidden), or clears it (2026-10-31). */
+export async function lotteryMarkAction(postId: string, mark: string | null) {
+  const { db, user } = await authed();
+  const chosen = LOTTERY_MARKS.find((m) => m === mark) ?? null;
+  if (mark !== null && !chosen) return;
+  await setLotteryMark(db, user.id, String(postId), chosen);
+  revalidatePath('/stores/lotteries');
 }

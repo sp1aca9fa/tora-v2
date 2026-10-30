@@ -16,6 +16,7 @@ import {
   feedTokenUser,
   feedTracking,
   listStores,
+  lotteryMarksOf,
   newFeedToken,
   postsPage,
   postImageIds,
@@ -32,6 +33,7 @@ import {
   saveTrackingHours,
   sendFeedMessages,
   sendStoreNotices,
+  setLotteryMark,
   setStoreCodes,
   rematchPosts,
   storeCodes,
@@ -594,6 +596,33 @@ it('takes what the feed says it saw: posts on the page and a page turned over', 
     now,
   );
   expect(turned.gap).toEqual({ chain: 'megastore', posts: 1 });
+});
+
+it("lists lottery posts by their words, with each person's marks", async () => {
+  await newFeedToken(db, uid);
+  const posts = [
+    post('l1', 'MID raffle today', 3),
+    post('l2', 'nothing', 2),
+    post('l3', '50%_raffle', 1),
+  ];
+  await receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts }, now);
+  const ids = (r: { posts: { externalId: string }[] }) => r.posts.map((p) => p.externalId);
+  const words = ['raffle'];
+  expect(ids(await postsPage(db, { offset: 0, limit: 10, words }))).toEqual(['l3', 'l1']);
+  // LIKE's own characters in a word are plain text.
+  expect(ids(await postsPage(db, { offset: 0, limit: 10, words: ['%_r'] }))).toEqual(['l3']);
+  expect(ids(await postsPage(db, { offset: 0, limit: 10, words: [] }))).toEqual([]);
+  const [l1] = (await postsPage(db, { offset: 0, limit: 10, words: ['MID'] })).posts;
+  await setLotteryMark(db, uid, l1!.id, 'hidden');
+  await setLotteryMark(db, uid, 'no-such-post', 'applied');
+  expect([...(await lotteryMarksOf(db, uid))]).toEqual([[l1!.id, 'hidden']]);
+  expect(ids(await postsPage(db, { offset: 0, limit: 10, words, notIds: [l1!.id] }))).toEqual([
+    'l3',
+  ]);
+  await setLotteryMark(db, uid, l1!.id, 'applied');
+  expect([...(await lotteryMarksOf(db, uid))]).toEqual([[l1!.id, 'applied']]);
+  await setLotteryMark(db, uid, l1!.id, null);
+  expect((await lotteryMarksOf(db, uid)).size).toBe(0);
 });
 
 it('pages the posts, newest first, all or those of some stores', async () => {

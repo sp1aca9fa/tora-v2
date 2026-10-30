@@ -48,6 +48,7 @@
     "startOver": "Start over",
     "errors": {
       "failed": "Login failed. If the account has alert channels, the reason was sent there.",
+      "expired": "The sign-in took too long. Start over.",
       "notConfigured": "Login is not configured (AUTH_SECRET missing, see README)."
     }
   },
@@ -1545,13 +1546,15 @@
     "loginHeld": "{n} more failed since the last message.",
     "loginNotYou": "If this was not you: nothing got in.",
     "loginPasswordKnown": "The password was right: if this was not you, change it (Settings > Account) and check Settings > Devices.",
+    "loginPasswordKnownAdmin": "The password was right: if this was not its owner, turn the account off or give it a new setup link (Settings > Admin > Accounts).",
     "login_password": "wrong password.",
     "login_disabled": "the account is turned off (an admin can turn it on in Settings > Admin > Accounts).",
     "login_notSetUp": "the account is not set up yet (its setup link was not finished).",
     "login_devices": "the account is already signed in on 2 devices ({devices}). Sign out of one in Settings > Devices on the other, or ask the admin.",
     "login_code": "wrong authenticator or backup code.",
     "login_locked": "too many failed attempts; sign-ins from there wait up to an hour.",
-    "login_unknownUser": "no account has that name."
+    "login_unknownUser": "no account has that name.",
+    "loginUnknownName": "a name of {n} characters (not shown: it may be a password typed in the wrong field)"
   },
   "alerts": {
     "title": "Alerts",
@@ -2459,6 +2462,21 @@
     "codeKind": "What it is",
     "codeKindOther": "Other",
     "codeKindChain": "Chain",
+    "codeKindLottery": "Lottery word",
+    "lottery": {
+      "intro": "Posts using a lottery word ({words}), newest first, kept 30 days like every post. Mark the ones you want: Interested, Applied, or Hide to take one off the list.",
+      "noWords": "No lottery words yet. An admin adds them on Codes (kind: Lottery word), e.g. the word posters use for a lottery sale.",
+      "shown": {
+        "open": "All but hidden",
+        "interested": "Interested",
+        "applied": "Applied",
+        "hidden": "Hidden"
+      },
+      "interested": "Interested",
+      "applied": "Applied",
+      "hidden": "Hide",
+      "unhide": "Hidden: show again"
+    },
     "chainCode": "chain",
     "fromFeed": "board list",
     "codeOff": "Turn off",
@@ -2474,6 +2492,7 @@
       "byStore": "By store",
       "byLocation": "By location",
       "posts": "All posts",
+      "lotteries": "Lotteries",
       "area": "Area",
       "codes": "Codes",
       "feed": "Feed"

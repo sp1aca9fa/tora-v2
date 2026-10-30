@@ -1,9 +1,11 @@
 'use client';
 
+import type { LotteryMark } from '@tora/db';
+import { Check, EyeOff, Star } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, useTransition } from 'react';
 import { cn } from '@/lib/utils';
-import { morePostsAction } from './actions';
+import { lotteryMarkAction, morePostsAction } from './actions';
 import type { PostView, PostsFilter } from './post-views';
 import { threads } from './threads';
 
@@ -12,6 +14,48 @@ import { threads } from './threads';
  * moment when shown, their replies unfolded. Null elsewhere.
  */
 export const FreshSince = createContext<string | null>(null);
+
+/** A lottery post's marks (Stores > Lotteries): interested, applied, hidden; a second tap clears. */
+function LotteryMarks({ postId, mark: saved }: { postId: string; mark: LotteryMark | null }) {
+  const t = useTranslations('stores');
+  const [mark, setMark] = useState(saved);
+  const [, startTransition] = useTransition();
+  const options = [
+    ['interested', Star],
+    ['applied', Check],
+    ['hidden', EyeOff],
+  ] as const;
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      {options.map(([m, Icon]) => {
+        const on = mark === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={on}
+            onClick={() => {
+              const next = on ? null : m;
+              setMark(next);
+              startTransition(() => lotteryMarkAction(postId, next));
+            }}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+              on
+                ? m === 'hidden'
+                  ? 'border-foreground/40 bg-muted font-medium'
+                  : 'border-primary bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent',
+            )}
+          >
+            <Icon className="size-3" aria-hidden />
+            {t(on && m === 'hidden' ? 'lottery.unhide' : `lottery.${m}`)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * One post: the stores it names first (left out under a store's own heading), then who, the
@@ -68,6 +112,7 @@ export function PostItem({
             ))}
           </p>
         )}
+        {p.lottery && <LotteryMarks postId={p.id} mark={p.lottery.mark} />}
         {p.images.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {p.images.map((src) => (
