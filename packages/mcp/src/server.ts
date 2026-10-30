@@ -10,7 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { type Db, createDb, getUserByUsername, listUsers, loadTimeZone } from '@tora/db';
 import { analysisCopyPath } from '@tora/db/backup';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
-import { exitIfUnmigrated } from '@tora/db/migrate';
+import { pendingMigrations } from '@tora/db/migrate';
 import { stat } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
@@ -33,7 +33,12 @@ loadRootEnv();
 // Allowed under Claude Code: these tools read a few hundred rows; query_sql reads the analysis copy.
 const config = dbConfigFromEnv(process.env, { allowClaude: true });
 const db = createDb(config, 'mcp');
-await exitIfUnmigrated(db);
+// The analysis copy follows the nightly backup, so a migration pushed since is missing until the
+// next one: say so and go on (only tools reading the new tables fail) instead of not starting.
+const pending = await pendingMigrations(db);
+if (pending.length > 0) {
+  console.error(`Database is missing migration(s): ${pending.join(', ')}; tools using them fail.`);
+}
 // Times written follow the admin's time zone (S16 part 5).
 await loadTimeZone(db);
 const username = (values.user as string | undefined) ?? process.env.TORA_USER;
