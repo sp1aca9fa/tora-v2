@@ -78,10 +78,7 @@
     "spentShort": "spent {amount}",
     "lotsValued": "{valued} of {total} lots valued",
     "inclOpened": "incl. {amount} in opened items",
-    "tab": {
-      "summary": "Summary",
-      "items": "Items"
-    },
+    "tab": { "summary": "Summary", "items": "Items", "spread": "Spread" },
     "units": "{count, plural, one {# unit} other {# units}}",
     "itemCount": "{count, plural, one {# item} other {# items}}",
     "insights": {
@@ -112,6 +109,31 @@
       },
       "market": "All tracked items",
       "noData": "No data for this period yet."
+    }
+  },
+  "spread": {
+    "intro": "How your collection's value is spread: market value, or cost for a lot with no price yet. A group with {heavy} or more of it is heavy (not a franchise: collecting one is normal), so is one item with {item} or more. Under each type and set list, those you hold under {little} of where Tora has items worth a look.",
+    "empty": "Nothing to spread yet: add items you own with a cost or a price.",
+    "heavyItems": "Items holding much of the value on their own",
+    "heavy": "Heavy: {share} of the value in one group.",
+    "more": "{count, plural, one {# more group} other {# more groups}}: {share}.",
+    "little": "Held little, with items worth a look:",
+    "littleItem": "{name} ({share}): {count} worth a look",
+    "noSet": "No set",
+    "unknown": "Unknown",
+    "before2016": "Before 2016",
+    "dimension": {
+      "type": "Item type",
+      "franchise": "Franchise",
+      "set": "Set",
+      "era": "Released",
+      "price": "Price of one"
+    },
+    "price": {
+      "lt1k": "Under {a}",
+      "lt10k": "{a} to {b}",
+      "lt100k": "{b} to {c}",
+      "gte100k": "{c} and more"
     }
   },
   "inventory": {

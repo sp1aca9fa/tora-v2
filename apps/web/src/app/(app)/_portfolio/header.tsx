@@ -17,7 +17,7 @@ export const signedAmount = (money: Money, n: number) =>
 
 /**
  * The top of both Portfolio tabs (requirements S8): the totals, the Actions line, and the
- * Summary / Items tabs.
+ * Summary / Items / Spread tabs.
  */
 export async function PortfolioHeader({
   totals,
@@ -26,7 +26,7 @@ export async function PortfolioHeader({
 }: {
   totals: Totals;
   actions: ActionItem[];
-  tab: 'summary' | 'items';
+  tab: 'summary' | 'items' | 'spread';
 }) {
   const money = await getMoney();
   const t = await getTranslations();
@@ -96,10 +96,10 @@ export async function PortfolioHeader({
       )}
 
       <nav className="flex gap-1 border-b" aria-label={t('portfolio.title')}>
-        {(['summary', 'items'] as const).map((key) => (
+        {(['summary', 'items', 'spread'] as const).map((key) => (
           <Link
             key={key}
-            href={key === 'summary' ? '/' : '/items'}
+            href={key === 'summary' ? '/' : `/${key}`}
             aria-current={tab === key ? 'page' : undefined}
             className={cn(
               '-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors',

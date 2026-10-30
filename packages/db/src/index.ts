@@ -35,6 +35,7 @@ export * from './opportunities';
 export * from './popularity';
 export * from './rankings';
 export * from './plan';
+export * from './spread';
 export * from './schedule';
 export * from './opening';
 export * from './stores';

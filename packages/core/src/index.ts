@@ -24,4 +24,5 @@ export * from './stores';
 export * from './tracking';
 export * from './opportunities';
 export * from './plan';
+export * from './spread';
 export * from './alert-notices';
