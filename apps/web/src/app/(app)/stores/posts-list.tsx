@@ -35,9 +35,13 @@ function LotteryMarks({ postId, mark: saved }: { postId: string; mark: LotteryMa
             type="button"
             aria-pressed={on}
             onClick={() => {
-              const next = on ? null : m;
+              const [had, next] = [mark, on ? null : m];
               setMark(next);
-              startTransition(() => lotteryMarkAction(postId, next));
+              startTransition(async () => {
+                // Not saved (the post is gone, or no connection): the button says so.
+                const ok = await lotteryMarkAction(postId, next).catch(() => false);
+                if (!ok) setMark(had);
+              });
             }}
             className={cn(
               'inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors',
@@ -170,7 +174,8 @@ export function PostsList({
         if (!entry?.isIntersecting || loading) return;
         setLoading(true);
         try {
-          const next = await morePostsAction(posts.length, filter);
+          const last = posts[posts.length - 1]!;
+          const next = await morePostsAction({ postedAt: last.postedAt, id: last.id }, filter);
           setPosts((had) => [...had, ...next.posts.filter((p) => !had.some((h) => h.id === p.id))]);
           setMore(next.more);
         } finally {
@@ -181,7 +186,7 @@ export function PostsList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [posts.length, more, loading, filter]);
+  }, [posts, more, loading, filter]);
 
   if (!posts.length) {
     return (

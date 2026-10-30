@@ -1322,6 +1322,11 @@ export async function postsPage(
     words?: string[];
     postIds?: string[];
     notIds?: string[];
+    /**
+     * Only posts after this one in the list (the last one shown): the next page stays right when
+     * posts come in or leave the list (a lottery marked) meanwhile, where an offset would skip.
+     */
+    before?: { postedAt: string; id: string };
   },
 ): Promise<{ posts: StorePost[]; more: boolean }> {
   const ids = opts.storeIds;
@@ -1357,9 +1362,15 @@ export async function postsPage(
           : undefined,
         opts.postIds ? inArray(storePosts.id, opts.postIds) : undefined,
         opts.notIds?.length ? notInArray(storePosts.id, opts.notIds) : undefined,
+        opts.before
+          ? or(
+              lt(storePosts.postedAt, opts.before.postedAt),
+              and(eq(storePosts.postedAt, opts.before.postedAt), lt(storePosts.id, opts.before.id)),
+            )
+          : undefined,
       ),
     )
-    .orderBy(desc(storePosts.postedAt))
+    .orderBy(desc(storePosts.postedAt), desc(storePosts.id))
     .limit(opts.limit + 1)
     .offset(opts.offset);
   return { posts: rows.slice(0, opts.limit), more: rows.length > opts.limit };
@@ -1388,24 +1399,28 @@ export async function lotteryMarksOf(
   return new Map(rows.map((r) => [r.postId, r.mark]));
 }
 
-/** Marks a lottery post for a person (interested, applied, hidden), or clears the mark (null). */
+/**
+ * Marks a lottery post for a person (interested, applied, hidden), or clears the mark (null);
+ * false when the post is gone.
+ */
 export async function setLotteryMark(
   db: Db,
   userId: string,
   postId: string,
   mark: LotteryMark | null,
-): Promise<void> {
+): Promise<boolean> {
   if (!mark) {
     await db
       .delete(lotteryMarks)
       .where(and(eq(lotteryMarks.userId, userId), eq(lotteryMarks.postId, postId)));
-    return;
+    return true;
   }
   const [post] = await db
     .select({ id: storePosts.id })
     .from(storePosts)
     .where(eq(storePosts.id, postId));
-  if (!post) return;
+  // Gone meanwhile (posts are kept 30 days): nothing to mark.
+  if (!post) return false;
   const now = toLocalIso();
   await db
     .insert(lotteryMarks)
@@ -1414,4 +1429,5 @@ export async function setLotteryMark(
       target: [lotteryMarks.userId, lotteryMarks.postId],
       set: { mark, updatedAt: now },
     });
+  return true;
 }

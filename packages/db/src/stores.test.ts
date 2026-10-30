@@ -636,6 +636,15 @@ it('pages the posts, newest first, all or those of some stores', async () => {
   expect([first.posts.map((p) => p.externalId), first.more]).toEqual([['p4', 'p3'], true]);
   const last = await postsPage(db, { offset: 4, limit: 2 });
   expect([last.posts.map((p) => p.externalId), last.more]).toEqual([['p0'], false]);
+  // After the last one shown: right even when a post left the list meanwhile.
+  const [, shown] = first.posts;
+  const after = await postsPage(db, {
+    offset: 0,
+    limit: 2,
+    before: shown!,
+    notIds: [first.posts[0]!.id],
+  });
+  expect(after.posts.map((p) => p.externalId)).toEqual(['p2', 'p1']);
   const mine = await postsPage(db, { offset: 0, limit: 10, storeIds: [chuo!.id] });
   expect(mine.posts.map((p) => p.externalId)).toEqual(['p3', 'p1']);
   const named = await postsPage(db, { offset: 0, limit: 10, named: true });

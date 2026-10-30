@@ -89,7 +89,12 @@ export interface PostsFilter {
 export async function postViews(
   db: Db,
   area: StoreArea | null,
-  opts: { offset: number; filter: PostsFilter; userId?: string },
+  opts: {
+    offset: number;
+    filter: PostsFilter;
+    userId?: string;
+    before?: { postedAt: string; id: string };
+  },
 ): Promise<{ posts: PostView[]; more: boolean }> {
   const { show, chain, storeIds, lottery } = opts.filter;
   const inArea = storesInArea(area, await cachedStores(db), localDate());
@@ -101,6 +106,7 @@ export async function postViews(
   const marked = (m: LotteryMark) => [...(marks ?? [])].flatMap(([id, x]) => (x === m ? [id] : []));
   const { posts, more } = await postsPage(db, {
     offset: opts.offset,
+    before: opts.before,
     limit: POSTS_BATCH,
     storeIds: storeIds ?? (show === 'area' ? [...inArea] : undefined),
     named: show === 'named' || undefined,

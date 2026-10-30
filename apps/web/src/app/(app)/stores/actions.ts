@@ -313,10 +313,14 @@ export async function trackNowAction(kind: 'hour' | 'untilStart') {
 }
 
 /** The next posts as the list is scrolled (S25). */
-export async function morePostsAction(offset: number, filter: PostsFilter) {
+export async function morePostsAction(
+  after: { postedAt: string; id: string },
+  filter: PostsFilter,
+) {
   const { db, user } = await authed();
   return postViews(db, user.preferences?.storeArea ?? null, {
-    offset: Math.max(0, Math.floor(offset) || 0),
+    offset: 0,
+    before: { postedAt: String(after?.postedAt ?? ''), id: String(after?.id ?? '') },
     userId: user.id,
     filter: {
       lottery: LOTTERY_SHOWN.find((s) => s === filter.lottery),
@@ -330,10 +334,11 @@ export async function morePostsAction(offset: number, filter: PostsFilter) {
 }
 
 /** Marks a lottery post for the person (interested, applied, hidden), or clears it (2026-10-31). */
-export async function lotteryMarkAction(postId: string, mark: string | null) {
+export async function lotteryMarkAction(postId: string, mark: string | null): Promise<boolean> {
   const { db, user } = await authed();
   const chosen = LOTTERY_MARKS.find((m) => m === mark) ?? null;
-  if (mark !== null && !chosen) return;
-  await setLotteryMark(db, user.id, String(postId), chosen);
-  revalidatePath('/stores/lotteries');
+  if (mark !== null && !chosen) return false;
+  // No page refresh: the button shows the mark already, and a refresh would drop the post
+  // from under the person's finger.
+  return setLotteryMark(db, user.id, String(postId), chosen);
 }
