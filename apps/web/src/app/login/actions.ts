@@ -121,8 +121,9 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       'password',
     );
   }
+  const stored = usable?.passwordHash ?? (await dummy).hash;
   const start = performance.now();
-  const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummy).hash);
+  const ok = await verifyPassword(password, stored);
   const devices = await listDevices(db, usable?.id ?? '');
   const who = { userId: user?.id ?? null, username, passwordKnown: ok && !!usable };
   await recordAttempt(db, key, ok && Boolean(usable));
