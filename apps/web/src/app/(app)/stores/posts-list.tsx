@@ -20,6 +20,8 @@ function LotteryMarks({ postId, mark: saved }: { postId: string; mark: LotteryMa
   const t = useTranslations('stores');
   const [mark, setMark] = useState(saved);
   const [, startTransition] = useTransition();
+  // Only the latest tap's failure rolls back: an older one's would undo a newer mark.
+  const taps = useRef(0);
   const options = [
     ['interested', Star],
     ['applied', Check],
@@ -35,12 +37,12 @@ function LotteryMarks({ postId, mark: saved }: { postId: string; mark: LotteryMa
             type="button"
             aria-pressed={on}
             onClick={() => {
-              const [had, next] = [mark, on ? null : m];
+              const [had, next, tap] = [mark, on ? null : m, ++taps.current];
               setMark(next);
               startTransition(async () => {
                 // Not saved (the post is gone, or no connection): the button says so.
                 const ok = await lotteryMarkAction(postId, next).catch(() => false);
-                if (!ok) setMark(had);
+                if (!ok && tap === taps.current) setMark(had);
               });
             }}
             className={cn(
