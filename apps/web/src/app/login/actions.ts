@@ -76,11 +76,13 @@ async function failed(
   return { error: 'failed', step };
 }
 
-/**
- * Verifying a fixed hash for unknown usernames keeps the response time the same. The time it took
- * to make is how long a locked-out sign-in waits instead of hashing (2026-10-31).
- */
+/** Verifying a fixed hash for unknown usernames keeps the response time the same. */
 let dummy: Promise<{ hash: string; ms: number }> | undefined;
+/**
+ * How long the last checked sign-in took (hash, devices, attempt saved): a locked-out one waits
+ * as long instead of hashing (2026-10-31), the dummy's own time before any was checked.
+ */
+let lastCheckMs: number | undefined;
 
 async function makeDummy() {
   const start = performance.now();
@@ -111,7 +113,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   if (await isLockedOut(db, key)) {
     // No hash while locked out, so a flood of guesses costs only timers; the wait keeps the
     // answer's timing like a checked password's. The password stays unknown.
-    const { ms } = await dummy;
+    const ms = lastCheckMs ?? (await dummy).ms;
     await new Promise((resolve) => setTimeout(resolve, ms));
     return failed(
       'locked',
@@ -119,10 +121,12 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
       'password',
     );
   }
+  const start = performance.now();
   const ok = await verifyPassword(password, usable?.passwordHash ?? (await dummy).hash);
   const devices = await listDevices(db, usable?.id ?? '');
   const who = { userId: user?.id ?? null, username, passwordKnown: ok && !!usable };
   await recordAttempt(db, key, ok && Boolean(usable));
+  lastCheckMs = performance.now() - start;
   if (!user) return failed('unknownUser', who, 'password');
   if (!usable) return failed(user.disabledAt ? 'disabled' : 'notSetUp', who, 'password');
   if (!ok) return failed('password', who, 'password');
