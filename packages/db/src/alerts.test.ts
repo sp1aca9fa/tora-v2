@@ -1,5 +1,5 @@
 import { decryptSecret } from '@tora/auth';
-import { storeNotice, toLocalIso } from '@tora/core';
+import { linesNotice, storeNotice, toLocalIso } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -127,6 +127,30 @@ const TEXTS: Record<string, Record<string, string>> = {
 };
 const ctx: AlertContext = { secret: SECRET, texts: (l) => TEXTS[l] ?? {}, fetch: fakeFetch };
 
+/** A notice of one line. */
+const linesNoticeOf = (text: string) => linesNotice('admin', null, [{ text, role: 'info' }], null);
+
+/** A day's numbers of a watched item (Steady's zone: under 9,500). */
+const signalStats = (fair: number) => ({
+  fair,
+  sales30: 5,
+  days180: 40,
+  days365: 80,
+  usual180: 10_000,
+  q25d180: 9_500,
+  q75d180: 10_500,
+  q10d365: 9_000,
+  cheaperThan180: 0.8,
+  trend14: 0,
+  trend28: 0,
+  trend84: 0,
+  ask: null,
+  ageDays: null,
+  releaseFrom: null,
+  market: null,
+  pattern: null,
+});
+
 beforeEach(async () => {
   const dir = await mkdtemp(join(tmpdir(), 'tora-alerts-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
@@ -185,6 +209,25 @@ it('sends a failed run to admins once a day, never to members', async () => {
   expect(sent).toHaveLength(1);
   const entries = await db.select().from(activity);
   expect(entries.every((e) => e.alertedAt)).toBe(true);
+});
+
+it('tries a failure again at the next run when no channel took it', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const since = toLocalIso(new Date(Date.now() - 60_000));
+  await recordActivity(db, { kind: 'backup', level: 'failed', detail: { error: 'disk full' } });
+  failDiscord = true;
+  expect(await alertFailures(db, ctx, since)).toBe(0);
+  expect((await db.select().from(activity)).some((e) => e.alertedAt)).toBe(false);
+  failDiscord = false;
+  expect(await alertFailures(db, ctx, since)).toBe(1);
+  expect(sent.map((s) => s.text)).toEqual(['backup failed: disk full']);
+  expect((await db.select().from(activity)).every((e) => e.alertedAt)).toBe(true);
+});
+
+it('marks failures alerted when no admin has a channel (nothing to try again)', async () => {
+  await recordActivity(db, { kind: 'backup', level: 'failed', detail: { error: 'disk full' } });
+  expect(await alertFailures(db, ctx, toLocalIso(new Date(Date.now() - 60_000)))).toBe(0);
+  expect((await db.select().from(activity)).every((e) => e.alertedAt)).toBe(true);
 });
 
 it('tells admins about listings set aside, though the run did not fail', async () => {
@@ -284,31 +327,12 @@ it('alerts a watch entering the buy zone or with an ask under its target, again 
     { productId: product.id },
     { packagingState: 'sealed_shrink', targetPriceBase: 9000 },
   );
-  const stats = (fair: number) => ({
-    fair,
-    sales30: 5,
-    days180: 40,
-    days365: 80,
-    usual180: 10_000,
-    q25d180: 9_500,
-    q75d180: 10_500,
-    q10d365: 9_000,
-    cheaperThan180: 0.8,
-    trend14: 0,
-    trend28: 0,
-    trend84: 0,
-    ask: null,
-    ageDays: null,
-    releaseFrom: null,
-    market: null,
-    pattern: null,
-  });
   const night = async (day: string, fair: number, ask: number) => {
     await db.delete(signals);
     await db.delete(supply);
     await db
       .insert(signals)
-      .values({ productId: product.id, bucket: watch.bucket, day, stats: stats(fair) });
+      .values({ productId: product.id, bucket: watch.bucket, day, stats: signalStats(fair) });
     await db.insert(supply).values({
       productId: product.id,
       source: 'snkrdunk',
@@ -341,6 +365,90 @@ it('alerts a watch entering the buy zone or with an ask under its target, again 
   });
   const [after] = await db.select().from(watches);
   expect(after!.alertState).toEqual(before!.alertState);
+});
+
+it("keeps a watch's alert memory until a channel took the alert; asks under half the fair value are no target alert", async () => {
+  await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
+  const product = await createProduct(db, member, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Box',
+    franchise: 'pokemon',
+    region: 'jp',
+  });
+  const { watch } = await addWatch(
+    db,
+    member,
+    { productId: product.id },
+    { packagingState: 'sealed_shrink', targetPriceBase: 9000 },
+  );
+  const day = '2026-11-01';
+  const now = new Date(`${day}T12:00:00Z`);
+  const ask = (source: string, lowestAskBase: number) => ({
+    productId: product.id,
+    source,
+    bucket: watch.bucket,
+    day,
+    lowestAskBase,
+    fetchedAt: `${day}T03:00:00`,
+  });
+  // Fair 18,000 (no good price): Mercari's 5,000 is under half of it, SNKRDUNK's 9,000 is not.
+  await db
+    .insert(signals)
+    .values({ productId: product.id, bucket: watch.bucket, day, stats: signalStats(18_000) });
+  await db.insert(supply).values([ask('mercari', 5_000), ask('snkrdunk', 9_000)]);
+  failDiscord = true;
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 1 });
+  expect((await db.select().from(watches))[0]!.alertState ?? {}).toEqual({});
+  // A rerun the same day, with the channel back: sent, then remembered.
+  failDiscord = false;
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 1, alerts: 1 });
+  expect(sent.map((s) => s.text)).toEqual(['-# buy\nBox\nask ¥9,000 SNKRDUNK under ¥9,000']);
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
+});
+
+it('keeps a mentioned Discord message within 2000 characters', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const record = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (init?.method) bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+    return fakeFetch(input, init);
+  }) as typeof fetch;
+  const { id } = (await addDiscordChannel(db, member, HOOK, SECRET, record)) as { id: string };
+  await setChannelMention(db, member, id, '123456789012345678');
+  await db
+    .update(users)
+    .set({ preferences: { notices: { styles: { admin: { format: 'plain' } } } } })
+    .where(eq(users.id, member));
+  await sendToUser(db, member, linesNoticeOf('x'.repeat(2500)), { ...ctx, fetch: record });
+  const content = String(bodies.at(-1)!.content);
+  expect(content).toMatch(/^<@123456789012345678>\nx/);
+  expect(content).toHaveLength(2000);
+});
+
+it('sends Telegram HTML it cannot read again as plain text, once', async () => {
+  const tried: { parse?: string; text: string }[] = [];
+  const picky = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith('/sendMessage')) {
+      const body = JSON.parse(String(init!.body)) as { parse_mode?: string; text: string };
+      tried.push({ parse: body.parse_mode, text: body.text });
+      if (body.parse_mode === 'HTML')
+        return Response.json(
+          { ok: false, description: "Bad Request: can't parse entities" },
+          { status: 400 },
+        );
+    }
+    return fakeFetch(input, init);
+  }) as typeof fetch;
+  await setTelegramBot(db, '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ', SECRET, fakeFetch);
+  telegramUpdates = [
+    { message: { text: `/start ${telegramCode(member, SECRET)}`, chat: { id: 42 } } },
+  ];
+  await connectTelegram(db, member, ctx);
+  sent = [];
+  expect(await sendToUser(db, member, linesNoticeOf('a & b'), { ...ctx, fetch: picky })).toBe(1);
+  expect(tried.map((t) => t.parse ?? 'plain')).toEqual(['HTML', 'plain']);
+  expect(sent).toEqual([{ to: 'telegram:42', text: 'a & b' }]);
 });
 
 it('connects a Telegram chat from the code sent to the bot', async () => {

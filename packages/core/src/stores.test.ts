@@ -118,6 +118,9 @@ it('tells hours apart, also past midnight', () => {
   expect(withinHours('23:00', '08:00', '23:00')).toBe(false);
   expect(withinHours('01:00', '22:00', '02:00')).toBe(true);
   expect(withinHours('12:00', '22:00', '02:00')).toBe(false);
+  // The same time twice: all day.
+  expect(withinHours('12:00', '00:00', '00:00')).toBe(true);
+  expect(withinHours('00:00', '08:00', '08:00')).toBe(true);
 });
 
 it("names a place when no store of the board's chain matched", () => {

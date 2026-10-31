@@ -8,6 +8,7 @@
 import { decryptSecret, encryptSecret, keyedHash } from '@tora/auth';
 import {
   ALERT_QUIET_DAYS,
+  ASK_FLOOR,
   type AlertState,
   type BuyAlertData,
   type Notice,
@@ -120,7 +121,10 @@ async function telegram(
     result?: unknown;
     description?: string;
   } | null;
-  if (!json?.ok) throw new Error(json?.description ?? `Telegram answered ${res.status}`);
+  if (!json?.ok)
+    throw Object.assign(new Error(json?.description ?? `Telegram answered ${res.status}`), {
+      status: res.status,
+    });
   return json.result;
 }
 
@@ -404,25 +408,34 @@ async function deliver(
             ),
           )
       : [];
-    const result = (await telegram(
-      token,
-      'sendMessage',
-      {
-        chat_id: target,
-        text: send.slice(0, 4096),
-        ...(send === html ? { parse_mode: 'HTML' } : {}),
-        link_preview_options: { is_disabled: true },
-        ...(answer
-          ? {
-              reply_parameters: {
-                message_id: Number(answer.id),
-                allow_sending_without_reply: true,
-              },
-            }
-          : {}),
-      },
-      fetchFn,
-    )) as { message_id?: number } | null;
+    const sendMessage = async (text: string, asHtml: boolean) =>
+      (await telegram(
+        token,
+        'sendMessage',
+        {
+          chat_id: target,
+          text: text.slice(0, 4096),
+          ...(asHtml ? { parse_mode: 'HTML' } : {}),
+          link_preview_options: { is_disabled: true },
+          ...(answer
+            ? {
+                reply_parameters: {
+                  message_id: Number(answer.id),
+                  allow_sending_without_reply: true,
+                },
+              }
+            : {}),
+        },
+        fetchFn,
+      )) as { message_id?: number } | null;
+    let result: { message_id?: number } | null;
+    try {
+      result = await sendMessage(send, send === html);
+    } catch (error) {
+      // HTML Telegram cannot read (400: can't parse entities) goes again once as plain text.
+      if (send !== html || !part || (error as { status?: number }).status !== 400) throw error;
+      result = await sendMessage(plainText(part, style), false);
+    }
     if (card?.keys?.length && result?.message_id) {
       const sentAt = toLocalIso();
       for (const postKey of card.keys) {
@@ -465,7 +478,8 @@ function mentioned(body: Record<string, unknown>, channel: AlertChannel): Record
   if (!channel.mention) return body;
   return {
     ...body,
-    content: [`<@${channel.mention}>`, body.content].filter(Boolean).join('\n'),
+    // Discord takes 2000 characters at most, the mention included (cut after it, never before).
+    content: [`<@${channel.mention}>`, body.content].filter(Boolean).join('\n').slice(0, 2000),
     allowed_mentions: { parse: [], users: [channel.mention] },
   };
 }
@@ -550,8 +564,11 @@ async function discordForum(
     .where(and(eq(noticeMessages.channelId, channel.id), lt(noticeMessages.sentAt, keep)));
 }
 
-/** Bytes of pictures sent in one message at most (Discord's and Telegram's limits allow more). */
-const IMAGE_BATCH_BYTES = 20_000_000;
+/**
+ * Bytes of pictures sent in one message at most: Discord takes 10 MB a message (a server without
+ * boosts); Telegram's limits allow more.
+ */
+const IMAGE_BATCH_BYTES = { discord: 10_000_000, telegram: 20_000_000 } as const;
 
 /**
  * A notice's pictures, after its text, in as few messages as their size allows. A picture that
@@ -566,10 +583,11 @@ async function sendImages(
 ): Promise<void> {
   const fetchFn = ctx.fetch ?? fetch;
   const batches: NoticeImage[][] = [];
+  const most = IMAGE_BATCH_BYTES[channel.kind];
   for (const img of images) {
     const last = batches.at(-1);
     const size = (last ?? []).reduce((n, i) => n + i.bytes.length, 0);
-    if (last && last.length < 10 && size + img.bytes.length <= IMAGE_BATCH_BYTES) last.push(img);
+    if (last && last.length < 10 && size + img.bytes.length <= most) last.push(img);
     else batches.push([img]);
   }
   const file = (img: NoticeImage) =>
@@ -914,7 +932,9 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
   let sent = 0;
   if (toSend.length) {
     const base = await appUrl(db);
+    let reachable = false;
     for (const admin of await adminsToAlert(db)) {
+      if ((await channelsOf(db, admin.id)).length) reachable = true;
       const t = await textsFor(db, admin, ctx);
       sent += await sendToUser(
         db,
@@ -926,6 +946,15 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
         ),
         ctx,
       );
+    }
+    // Every channel failed: not marked, so the next run tries again (no admin with a channel:
+    // nothing to try again).
+    if (reachable && sent === 0) {
+      await markAlerted(
+        db,
+        entries.filter((e) => !toSend.includes(e)).map((e) => e.id),
+      );
+      return 0;
     }
     for (const e of toSend) sentToday[e.action ? `${e.kind}:${e.action}` : e.kind] = today;
     await saveSetting(db, 'alertsSentToday', sentToday);
@@ -1176,9 +1205,23 @@ export async function morningCheck(db: Db, ctx: AlertContext, now = new Date()):
   const day = local.slice(0, 10);
   if ((await readSetting<string>(db, 'morningCheckDay')) === day) return false;
   await saveSetting(db, 'morningCheckDay', day);
-  await checkMissedRuns(db, ctx, now);
-  await sendSummaries(db, ctx, now);
-  await pruneAlertLog(db, now);
+  // One step failing never skips the others (the day is already marked done); the first error
+  // is thrown after them, for the caller's log.
+  const steps = [
+    ['missed runs', () => checkMissedRuns(db, ctx, now)],
+    ['summaries', () => sendSummaries(db, ctx, now)],
+    ['history', () => pruneAlertLog(db, now)],
+  ] as const;
+  let failed: unknown = null;
+  for (const [name, step] of steps) {
+    try {
+      await step();
+    } catch (error) {
+      ctx.log?.(`alerts: morning check (${name}) failed: ${errorText(error)}`);
+      failed ??= error;
+    }
+  }
+  if (failed) throw failed;
   return true;
 }
 
@@ -1315,7 +1358,7 @@ type WatchAlertState = { zone?: AlertState; target?: AlertState };
  * and a watch whose lowest ask went under its target. Each again only after 14 days out. Only
  * today's numbers count (a collect that failed says nothing). Every watch's memory is kept up to
  * date, also for people without a channel or with these alerts off, so turning them on later
- * does not send old news.
+ * does not send old news; a watch whose alert no channel took keeps its old memory (tried again).
  */
 export async function sendWatchAlerts(
   db: Db,
@@ -1343,7 +1386,11 @@ export async function sendWatchAlerts(
   const sourceLabel = new Map(
     (await loadSourceRegistry(db)).sources.map((s) => [s.key, s.label] as const),
   );
-  const byUser = new Map<string, { user: User; items: BuyAlertData[] }>();
+  const byUser = new Map<
+    string,
+    { user: User; items: BuyAlertData[]; states: { id: string; state: WatchAlertState }[] }
+  >();
+  const reachable = new Map<string, boolean>();
   let alerts = 0;
   for (const { watch, product, user } of rows) {
     const state: WatchAlertState = { ...(watch.alertState ?? {}) };
@@ -1375,9 +1422,16 @@ export async function sendWatchAlerts(
         });
       }
     }
-    // Today's asks only: a source that read nothing tonight says nothing.
+    // Today's asks only: a source that read nothing tonight says nothing. An ask under half the
+    // fair value is more likely something else (parts, one pack), as on Opportunities (S27);
+    // without a fair value every ask counts.
+    const fair = (signal?.stats as SignalStats | undefined)?.fair ?? null;
     const ask = lowestAsk(
-      (supply.get(product.id) ?? []).filter((r) => r.day === today),
+      (supply.get(product.id) ?? []).filter(
+        (r) =>
+          r.day === today &&
+          (fair === null || r.lowestAskBase === null || r.lowestAskBase >= fair * ASK_FLOOR),
+      ),
       watch.bucket,
     );
     if (watch.targetPriceBase && ask) {
@@ -1396,19 +1450,33 @@ export async function sendWatchAlerts(
         });
       }
     }
-    if (JSON.stringify(state) !== JSON.stringify(watch.alertState ?? {})) {
+    const changed = JSON.stringify(state) !== JSON.stringify(watch.alertState ?? {});
+    const buy = items.length > 0 && alertPrefs(user.preferences).buy;
+    if (buy && !reachable.has(user.id)) {
+      reachable.set(user.id, (await channelsOf(db, user.id)).length > 0);
+    }
+    // A watch with an alert for someone with a channel keeps its old memory until a channel took
+    // the alert (a failed send goes again on a rerun); every other watch's memory is kept now.
+    const held = buy && reachable.get(user.id) === true;
+    if (changed && !held) {
       await db.update(watches).set({ alertState: state }).where(eq(watches.id, watch.id));
     }
-    if (items.length === 0 || !alertPrefs(user.preferences).buy) continue;
+    if (!buy) continue;
     alerts += items.length;
-    const entry = byUser.get(user.id) ?? { user, items: [] };
+    const entry = byUser.get(user.id) ?? { user, items: [], states: [] };
     entry.items.push(...items);
+    if (changed && held) entry.states.push({ id: watch.id, state });
     byUser.set(user.id, entry);
   }
   let sent = 0;
-  for (const { user, items } of byUser.values()) {
+  for (const { user, items, states } of byUser.values()) {
     const t = await textsFor(db, user, ctx);
-    sent += await sendToUser(db, user.id, buyNotice(t, items), ctx);
+    const delivered = await sendToUser(db, user.id, buyNotice(t, items), ctx);
+    if (delivered === 0) continue;
+    sent += delivered;
+    for (const s of states) {
+      await db.update(watches).set({ alertState: s.state }).where(eq(watches.id, s.id));
+    }
   }
   return { sent, alerts };
 }

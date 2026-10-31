@@ -69,6 +69,11 @@ describe('notices', () => {
     expect(plain!.embeds).toBeUndefined();
   });
 
+  it('keeps a quote in a link inside its Telegram href', () => {
+    const html = telegramHtml({ ...m, link: 'https://tora.test/s?q="x"><b>' });
+    expect(html).toContain('<a href="https://tora.test/s?q=&quot;x&quot;&gt;&lt;b&gt;">');
+  });
+
   it('writes Telegram HTML (no colors) and plain text', () => {
     expect(telegramHtml(m)).toBe(
       [

@@ -313,4 +313,13 @@ describe('out of print and reprints', () => {
     expect(group.signals('again', '2025-10-31', n)).toEqual([]);
     expect(group.signals('again', '2025-11-01', n)).toEqual(['reprint_coming']);
   });
+
+  it('tests a mark only from its day: one without a day was not known on past days', () => {
+    // series: 400 days from 2025-01-01; the tests run every 7th day from day 120.
+    const t = group.tests('2026-02-04');
+    expect(t.signals.out_of_print).toBeUndefined();
+    expect(t.signals.reprint_coming?.signals).toBe(1);
+    // Today the undated mark is on.
+    expect(group.signals('gone', '2026-02-04', n)).toEqual(['out_of_print']);
+  });
 });

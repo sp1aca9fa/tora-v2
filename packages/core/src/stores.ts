@@ -174,9 +174,13 @@ export interface StoreFeedPrefs {
 export const FEED_SILENT_MINUTES = [5, 10, 15, 30, 60];
 export const DEFAULT_FEED_PREFS = { silentMinutes: 10, from: '08:00', to: '23:00', unknown: true };
 
-/** Whether a local time ("21:30") is within hours that may pass midnight ("22:00"-"02:00"). */
+/**
+ * Whether a local time ("21:30") is within hours that may pass midnight ("22:00"-"02:00"); the
+ * same time twice ("00:00"-"00:00") is all day.
+ */
 export function withinHours(time: string, from: string, to: string): boolean {
-  return from <= to ? time >= from && time < to : time >= from || time < to;
+  if (from === to) return true;
+  return from < to ? time >= from && time < to : time >= from || time < to;
 }
 
 /** A code posters use that is no store or place: a state, a chain's mark, a product. */

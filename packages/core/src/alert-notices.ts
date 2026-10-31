@@ -407,7 +407,7 @@ export function discordPayloads(n: Notice, style?: NoticeStyle): Record<string, 
 }
 
 const htmlEscape = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** A quote this long or longer is folded on Telegram (opened with a tap). */
 const FOLD_CHARS = 200;

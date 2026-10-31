@@ -147,7 +147,8 @@ export async function refreshOpportunities(
         }
       }
     }
-    // Out of print or a reprint coming: the admin's mark, else a plug-in's guess (from always).
+    // Out of print or a reprint coming: the admin's mark, else a plug-in's guess (no day: on today,
+    // left out of the tests, which cannot know when it became known).
     let hint: 'none' | 'likely' | null = null;
     if (!p.reprint) {
       for (const guess of reprintHints) {

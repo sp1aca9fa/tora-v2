@@ -1029,6 +1029,9 @@ export async function sendStoreNotices(
       )
       .slice(0, IMAGES_PER_NOTICE);
     if (images.length) message.images = images;
+    // The quiet time starts only when a channel took the notice (a failed send goes again).
+    if (!(await sendToUser(db, user.id, message, ctx))) continue;
+    sent++;
     for (const id of told) {
       await db
         .insert(storeNotices)
@@ -1038,7 +1041,6 @@ export async function sendStoreNotices(
           set: { sentAt: toLocalIso(now) },
         });
     }
-    if (await sendToUser(db, user.id, message, ctx)) sent++;
   }
   return sent;
 }

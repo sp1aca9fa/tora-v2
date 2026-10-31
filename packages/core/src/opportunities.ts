@@ -256,15 +256,24 @@ export class OpportunityGroup {
     );
   }
 
-  /** The signals on for an item on a day: the built-in ones and the plug-ins' that apply. */
-  signals(id: string, day: string | number, n: OpportunityNumbers): OpportunitySignal[] {
+  /**
+   * The signals on for an item on a day: the built-in ones and the plug-ins' that apply. `past`
+   * (the tests): a reprint mark or hint without a day says nothing about past days (it was not
+   * known then), so it counts only from its day; today it is on.
+   */
+  signals(
+    id: string,
+    day: string | number,
+    n: OpportunityNumbers,
+    past = false,
+  ): OpportunitySignal[] {
     const on: OpportunitySignal[] = signalsOn(n);
     const item = this.items.get(id);
     if (!item) return on;
     const end = typeof day === 'number' ? day : dayNumber(day);
     const { member, s, others } = item;
     const reprint = member.reprint;
-    if (reprint && (!reprint.since || dayNumber(reprint.since) <= end)) {
+    if (reprint && (reprint.since ? dayNumber(reprint.since) <= end : !past)) {
       on.push(reprint.status === 'none' ? 'out_of_print' : 'reprint_coming');
     }
     if (!this.rules.length) return on;
@@ -397,7 +406,7 @@ export class OpportunityGroup {
         const later = d + OPPORTUNITY_HORIZON + 7 <= end ? s.around(d + OPPORTUNITY_HORIZON) : null;
         const change = later === null ? null : later / n.price - 1;
         if (change !== null) any.push(change);
-        const today = new Set(this.signals(id, d, n));
+        const today = new Set(this.signals(id, d, n, true));
         for (const key of today) {
           if (on.has(key)) continue;
           const t = bySignal.get(key) ?? { signals: 0, changes: [] };

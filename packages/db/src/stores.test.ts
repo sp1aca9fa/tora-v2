@@ -254,6 +254,24 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
 });
 
+it("starts a store's quiet time only when a channel took its notice", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  const push = (posts: ReturnType<typeof post>[]) =>
+    receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts }, now);
+  await push([post('1', 'KTA 販売中')]);
+  const refused = (async () => new Response('no', { status: 500 })) as unknown as typeof fetch;
+  const r = await push([post('2', 'KTA 販売中')]);
+  expect(await sendStoreNotices(db, r, { ...ctx, fetch: refused }, now)).toBe(0);
+  // The next post about the same store goes out: nothing was told.
+  const again = await push([post('3', 'KTA まだある')]);
+  expect(await sendStoreNotices(db, again, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('KTA まだある');
+});
+
 it("keeps a post's pictures a week and sends them after its notice", async () => {
   await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
   await setPreferences(db, uid, {
