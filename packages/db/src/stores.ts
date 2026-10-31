@@ -1341,6 +1341,14 @@ export async function postsPage(
     return { posts: [], more: false };
   }
   const like = (w: string) => `%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  // Codes are saved width-folded (NFKC) and posts are not: a word matches written either way.
+  const spellings = (w: string) => {
+    const plain = w.normalize('NFKC').replace(/[\uFE0E\uFE0F]/g, '');
+    const wide = plain.replace(/[\x21-\x7e]/g, (c) =>
+      String.fromCharCode(c.charCodeAt(0) + 0xfee0),
+    );
+    return [...new Set([plain, wide])];
+  };
   const rows = await db
     .select()
     .from(storePosts)
@@ -1364,11 +1372,15 @@ export async function postsPage(
             ? isNull(storePosts.chain)
             : eq(storePosts.chain, opts.chain),
         opts.words
-          ? or(...opts.words.map((w) => sql`${storePosts.text} LIKE ${like(w)} ESCAPE '\\'`))
+          ? or(
+              ...opts.words
+                .flatMap(spellings)
+                .map((w) => sql`${storePosts.text} LIKE ${like(w)} ESCAPE '\\'`),
+            )
           : undefined,
-        ...(opts.notWords ?? []).map(
-          (w) => sql`${storePosts.text} NOT LIKE ${like(w)} ESCAPE '\\'`,
-        ),
+        ...(opts.notWords ?? [])
+          .flatMap(spellings)
+          .map((w) => sql`${storePosts.text} NOT LIKE ${like(w)} ESCAPE '\\'`),
         opts.replies === false ? isNull(storePosts.replyTo) : undefined,
         opts.postIds ? inArray(storePosts.id, opts.postIds) : undefined,
         opts.notIds?.length ? notInArray(storePosts.id, opts.notIds) : undefined,

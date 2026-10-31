@@ -640,6 +640,7 @@ it("lists lottery posts by their words, with each person's marks", async () => {
       posts: [
         { ...post('l4', 'raffle too', 0), replyTo: 'l1' },
         post('l5', 'only the raffle queue', 0),
+        post('l6', 'raffle？', 0),
       ],
     },
     now,
@@ -649,6 +650,7 @@ it("lists lottery posts by their words, with each person's marks", async () => {
     'l3',
     'l4',
     'l5',
+    'l6',
   ]);
   expect(
     ids(
@@ -656,7 +658,7 @@ it("lists lottery posts by their words, with each person's marks", async () => {
         offset: 0,
         limit: 10,
         words,
-        notWords: ['raffle queue', 'x'],
+        notWords: ['raffle queue', '?'],
         replies: false,
       }),
     ),
@@ -673,7 +675,7 @@ it("lists lottery posts by their words, with each person's marks", async () => {
         words,
         notIds: [l1!.id],
         replies: false,
-        notWords: ['queue'],
+        notWords: ['queue', '?'],
       }),
     ),
   ).toEqual(['l3']);
