@@ -219,7 +219,8 @@ it('tries a failure again at the next run when no channel took it', async () => 
   expect(await alertFailures(db, ctx, since)).toBe(0);
   expect((await db.select().from(activity)).some((e) => e.alertedAt)).toBe(false);
   failDiscord = false;
-  expect(await alertFailures(db, ctx, since)).toBe(1);
+  // The next call's own window starts after the failure: still sent.
+  expect(await alertFailures(db, ctx, toLocalIso(new Date(Date.now() + 60_000)))).toBe(1);
   expect(sent.map((s) => s.text)).toEqual(['backup failed: disk full']);
   expect((await db.select().from(activity)).every((e) => e.alertedAt)).toBe(true);
 });

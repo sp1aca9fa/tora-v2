@@ -911,10 +911,14 @@ function failureCard(
  * once a day per kind (the schedule retries every hour); marks them alerted.
  */
 export async function alertFailures(db: Db, ctx: AlertContext, since: string): Promise<number> {
+  // A day back at least: an entry no channel took (all down) is sent by a later call, whose own
+  // `since` is newer.
+  const dayBack = toLocalIso(new Date(Date.now() - 24 * 3_600_000));
+  const from = dayBack < since ? dayBack : since;
   const entries = (
     await Promise.all(
       (['collect', 'backup', 'check'] as const).map((kind) =>
-        unalerted(db, { kind, userId: null, since }),
+        unalerted(db, { kind, userId: null, since: from }),
       ),
     )
   )
