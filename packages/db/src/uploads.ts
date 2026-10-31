@@ -8,8 +8,12 @@ import { importUploads } from './schema';
 export const UPLOAD_MAX_FILES = 30;
 export const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
 
-/** A batch read for longer than this is taken as failed (its reader died or was stopped). */
-export const UPLOAD_READING_STALE_MS = 30 * 60_000;
+/**
+ * A batch read for longer than this is taken as failed (its reader died or was stopped). Nothing
+ * refreshes a claim during the read, so it is far longer than any read; a reader that outlives it
+ * finds its claim taken and does not import ({@link renewUploadClaim}).
+ */
+export const UPLOAD_READING_STALE_MS = 6 * 60 * 60_000;
 
 /** Batches stuck in `reading` past {@link UPLOAD_READING_STALE_MS}: failed in effect. */
 const stuck = (now: Date) =>
@@ -56,7 +60,8 @@ export async function finishUploadBatch(db: Db, userId: string, batchId: string)
 
 /**
  * Claims a waiting (or stuck) batch for reading (so the app and the home PC never read one
- * twice): its files, or null when someone else took it.
+ * twice): its files, or null when someone else took it. The files' `updatedAt` is the claim's
+ * token for {@link renewUploadClaim} and {@link finishUploadRead}.
  */
 export async function claimUploadBatch(db: Db, batchId: string, now = new Date()) {
   const claimed = await db
@@ -80,11 +85,41 @@ export async function waitingUploadBatches(
   return rows;
 }
 
-/** A batch was read (or failed): its files' data is dropped. */
+/**
+ * Checks that the batch is still this reader's (still `reading` under the token its claim set)
+ * and renews the claim: the new token, or null when the claim went stale and someone else took
+ * the batch (then the reader must not import it, or the purchases land twice).
+ */
+export async function renewUploadClaim(
+  db: Db,
+  batchId: string,
+  token: string,
+  now = new Date(),
+): Promise<string | null> {
+  const next = toLocalIso(now);
+  const rows = await db
+    .update(importUploads)
+    .set({ updatedAt: next })
+    .where(
+      and(
+        eq(importUploads.batchId, batchId),
+        eq(importUploads.status, 'reading'),
+        eq(importUploads.updatedAt, token),
+      ),
+    )
+    .returning({ id: importUploads.id });
+  return rows.length ? next : null;
+}
+
+/**
+ * A batch was read (or failed): its files' data is dropped. With the reader's claim token, only
+ * while the claim is still its own (a reader that lost it does not overwrite the next one's).
+ */
 export async function finishUploadRead(
   db: Db,
   batchId: string,
   result: { status: 'done' | 'failed'; message: string; importRunId?: string | null },
+  claim?: string,
 ): Promise<void> {
   await db
     .update(importUploads)
@@ -95,7 +130,14 @@ export async function finishUploadRead(
       data: result.status === 'done' ? '' : undefined,
       updatedAt: toLocalIso(),
     })
-    .where(eq(importUploads.batchId, batchId));
+    .where(
+      and(
+        eq(importUploads.batchId, batchId),
+        claim === undefined
+          ? undefined
+          : and(eq(importUploads.status, 'reading'), eq(importUploads.updatedAt, claim)),
+      ),
+    );
 }
 
 /** A failed (or stuck) batch goes back to waiting (tried again on the next run). */

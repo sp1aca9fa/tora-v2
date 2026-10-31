@@ -1,7 +1,9 @@
 import { TEST_SOURCES } from '@tora/db/testing';
 import {
   type Db,
+  UPLOAD_READING_STALE_MS,
   addUpload,
+  claimUploadBatch,
   createDb,
   createUser,
   finishUploadBatch,
@@ -120,4 +122,33 @@ it('keeps a batch that could not be read, to try again', async () => {
   expect(batch).toMatchObject({ status: 'failed', message: 'claude exited with 1' });
   const [stored] = await db.select().from(schema.importUploads);
   expect(stored!.data).not.toBe('');
+});
+
+it('does not import a batch whose claim another reader took during the read', async () => {
+  let second: Awaited<ReturnType<typeof claimUploadBatch>> = null;
+  const ask: AskClaude = async <T>(o: { files?: string[] }) => {
+    // The read outlives its claim: the home PC takes the batch as stuck.
+    second = await claimUploadBatch(
+      db,
+      'batch-0003',
+      new Date(Date.now() + UPLOAD_READING_STALE_MS + 60_000),
+    );
+    return {
+      output: { rows: (o.files ?? []).map(row) } as T,
+      costUsd: 0.001,
+      tokens: 100,
+      modelName: 'claude-haiku-5-5',
+    };
+  };
+  await addUpload(db, userId, 'batch-0003', { name: 'a.png', data: Buffer.from('png') });
+  await finishUploadBatch(db, userId, 'batch-0003');
+  const logged: string[] = [];
+  expect(await readUploadBatch(db, 'batch-0003', ask, (m) => logged.push(m))).toBeNull();
+  expect(second).toHaveLength(1);
+  expect(logged.join()).toMatch(/claim was taken/);
+  // Nothing imported, no import run; the batch stays with the second reader.
+  expect(await pendingImportReview(db, userId)).toEqual([]);
+  expect(await db.select().from(schema.importRuns)).toEqual([]);
+  const [batch] = await uploadBatchesOf(db, userId);
+  expect(batch).toMatchObject({ status: 'reading', importRunId: null });
 });

@@ -143,8 +143,13 @@ export interface BackupResult {
  * one by one, its parent after that table was done): the copy becomes a consistent, slightly
  * earlier state, which a database enforcing references accepts on restore. Repeats until none are
  * left (a dropped lot leaves its events orphaned). The copy has references off: no cascades.
+ *
+ * Only rows created during the copy are dropped: a row from before it whose parent is missing
+ * was re-pointed mid-copy (say, merged into a product created after its table was copied), and
+ * dropping it would lose real data from the backup. Then (or when the table has no time column
+ * to tell) the backup fails, and the next run tries again (requirements S6).
  */
-async function dropOrphans(c: Client): Promise<number> {
+async function dropOrphans(c: Client, startedAt: Date): Promise<number> {
   let dropped = 0;
   for (;;) {
     const rs = await c.execute('PRAGMA foreign_key_check');
@@ -155,6 +160,7 @@ async function dropOrphans(c: Client): Promise<number> {
       ids.add(Number(r[1]));
       byTable.set(String(r[0]), ids);
     }
+    for (const [table, ids] of byTable) await checkWrittenDuringCopy(c, table, ids, startedAt);
     const statements: InStatement[] = [];
     for (const [table, ids] of byTable) {
       for (const id of ids) {
@@ -167,21 +173,70 @@ async function dropOrphans(c: Client): Promise<number> {
 }
 
 /**
+ * When a row was written: `created_at`, else the column tables without one stamp on insert (feed
+ * posts are received, notices and messages sent, box cards read, lottery marks set).
+ */
+const WRITTEN_AT = ['created_at', 'received_at', 'sent_at', 'read_at', 'updated_at'];
+
+/** Throws unless every one of these rows of `table` was written at or after `startedAt`. */
+async function checkWrittenDuringCopy(
+  c: Client,
+  table: string,
+  ids: Set<number>,
+  startedAt: Date,
+): Promise<void> {
+  const fail = (why: string) => {
+    throw new Error(
+      `${table}: ${why} points at a row missing from the copy (changed during the backup); ` +
+        'try again',
+    );
+  };
+  const columns = await c.execute({
+    sql: 'SELECT name FROM pragma_table_info(?)',
+    args: [table],
+  });
+  const names = new Set(columns.rows.map((r) => String(r[0])));
+  const column = WRITTEN_AT.find((n) => names.has(n));
+  if (!column) fail('a row with no creation time');
+  const list = [...ids];
+  for (let i = 0; i < list.length; i += 500) {
+    const chunk = list.slice(i, i + 500);
+    const rs = await c.execute({
+      sql: `SELECT rowid, ${quote(column!)} FROM ${quote(table)}
+        WHERE rowid IN (${chunk.map(() => '?').join(', ')})`,
+      args: chunk,
+    });
+    const created = new Map(rs.rows.map((r) => [Number(r[0]), r[1]]));
+    for (const id of chunk) {
+      const at = created.get(id);
+      const ms = typeof at === 'string' ? Date.parse(at) : NaN;
+      // Unknown stays unknown: a row whose creation time cannot be read is not taken as new.
+      if (Number.isNaN(ms) || ms < startedAt.getTime()) fail('a row from before the backup');
+    }
+  }
+}
+
+/**
  * Writes a compressed SQLite copy of the database to `file` (the whole file appears at once: a
  * copy cut short never looks complete).
  */
-export async function backupDatabase(source: Client, file: string): Promise<BackupResult> {
+export async function backupDatabase(
+  source: Client,
+  file: string,
+  startedAt = new Date(),
+): Promise<BackupResult> {
   const work = await mkdtemp(join(tmpdir(), 'tora-backup-'));
   try {
     const copy = join(work, 'tora.db');
     const target = createClient({ url: `file:${copy}` });
     // References off while copying (libsql turns them on): a row written mid-copy without its
-    // parent would otherwise fail the whole backup. dropOrphans then removes such rows.
+    // parent would otherwise fail the whole backup. dropOrphans then removes such rows (only
+    // those created since `startedAt`).
     await target.execute('PRAGMA foreign_keys = OFF');
     let result: { tables: number; rows: number; orphans: number };
     try {
       const copied = await copyDatabase(source, target);
-      const orphans = await dropOrphans(target);
+      const orphans = await dropOrphans(target, startedAt);
       result = { tables: copied.tables, rows: copied.rows - orphans, orphans };
       const check = await target.execute('PRAGMA integrity_check');
       if (String(check.rows[0]?.[0]) !== 'ok') throw new Error('the copy failed its check');

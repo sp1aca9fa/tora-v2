@@ -124,7 +124,8 @@ it('leaves out rows whose parent was not copied, so a restore with references on
     'write',
   );
   const file = join(dir, backupName('2026-10-18'));
-  const backup = await backupDatabase(live, file);
+  // The copy started an hour before those rows were written.
+  const backup = await backupDatabase(live, file, new Date('2026-10-01T11:00:00.000+09:00'));
   expect(backup.orphans).toBe(3);
 
   const target = createClient({ url: `file:${join(dir, 'restored.db')}` });
@@ -141,6 +142,26 @@ it('leaves out rows whose parent was not copied, so a restore with references on
   expect((await copy.all<{ n: number }>(lots))[0]!.n).toBe(
     (await db.all<{ n: number }>(lots))[0]!.n - 1,
   );
+});
+
+it('fails instead of dropping a row from before the copy whose parent is missing', async () => {
+  await seedCollection(db, userId);
+  // As if re-pointed mid-copy: an existing lot merged into a product created after the products
+  // table was copied. Dropping it would lose the lot from the backup.
+  const live = createClient({ url: `file:${join(dir, 'live.db')}` });
+  await live.execute('PRAGMA foreign_keys = OFF');
+  const [lot] = (await live.execute('SELECT id, created_at FROM holdings LIMIT 1')).rows;
+  await live.execute({
+    sql: `UPDATE holdings SET product_id = 'new-product' WHERE id = ?`,
+    args: [lot![0]!],
+  });
+  const file = join(dir, backupName('2026-10-18'));
+  const startedAt = new Date(Date.parse(String(lot![1])) + 60_000);
+  await expect(backupDatabase(live, file, startedAt)).rejects.toThrow(
+    /holdings: a row from before the backup/,
+  );
+  // No copy is left that looks complete; the next run tries again.
+  expect(await listBackups(dir)).toEqual([]);
 });
 
 it('unpacks the latest backup as the analysis copy, only when newer', async () => {

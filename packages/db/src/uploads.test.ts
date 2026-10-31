@@ -12,6 +12,8 @@ import {
   addUpload,
   claimUploadBatch,
   finishUploadBatch,
+  finishUploadRead,
+  renewUploadClaim,
   retryUploadBatch,
   waitingUploadBatches,
 } from './uploads';
@@ -33,7 +35,7 @@ beforeEach(async () => {
 const statusOf = async () =>
   (await db.select().from(importUploads).where(eq(importUploads.batchId, 'b')))[0]!.status;
 
-it('takes a batch stuck in reading as failed after 30 minutes', async () => {
+it('takes a batch stuck in reading as failed after 6 hours', async () => {
   await addUpload(db, userId, 'b', { name: 'order.pdf', data: Buffer.from('x') });
   await finishUploadBatch(db, userId, 'b');
   const start = new Date('2026-10-31T10:00:00+09:00');
@@ -60,4 +62,26 @@ it('takes a batch stuck in reading as failed after 30 minutes', async () => {
   expect(toLocalIso(later)).toBe(
     (await db.select().from(importUploads).where(eq(importUploads.batchId, 'b')))[0]!.updatedAt,
   );
+});
+
+it('lets a read import only while its claim is its own', async () => {
+  await addUpload(db, userId, 'b', { name: 'order.pdf', data: Buffer.from('x') });
+  await finishUploadBatch(db, userId, 'b');
+  const start = new Date('2026-10-31T10:00:00+09:00');
+  const first = (await claimUploadBatch(db, 'b', start))![0]!.updatedAt;
+  const renewed = await renewUploadClaim(db, 'b', first, new Date(start.getTime() + 60_000));
+  expect(renewed).toBe(toLocalIso(new Date(start.getTime() + 60_000)));
+  // The old token no longer holds once renewed.
+  expect(await renewUploadClaim(db, 'b', first)).toBeNull();
+
+  // The first read outlives its claim; a second reader takes the batch.
+  const late = new Date(start.getTime() + 60_000 + UPLOAD_READING_STALE_MS + 60_000);
+  const second = (await claimUploadBatch(db, 'b', late))![0]!.updatedAt;
+  expect(await renewUploadClaim(db, 'b', renewed!, late)).toBeNull();
+  // Its failure does not overwrite the second read.
+  await finishUploadRead(db, 'b', { status: 'failed', message: 'x' }, renewed!);
+  expect(await statusOf()).toBe('reading');
+  expect(await renewUploadClaim(db, 'b', second, late)).toBe(second);
+  await finishUploadRead(db, 'b', { status: 'done', message: 'ok' }, second);
+  expect(await statusOf()).toBe('done');
 });

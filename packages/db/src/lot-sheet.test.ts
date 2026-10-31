@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
-import { beforeEach, expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { accountData } from './account-data';
 import { type Db, createDb } from './client';
 import {
@@ -28,11 +28,31 @@ import { seedCollection } from './seed';
 import { TEST_SOURCES } from './testing';
 import { createUser } from './users';
 
+// Lets a test make the finder of items made earlier in an import fail after a lot was made.
+const finder = vi.hoisted(() => ({ failAdd: false }));
+vi.mock('./purchases', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./purchases')>();
+  return {
+    ...actual,
+    sameProductFinder: (d: Db) => {
+      const f = actual.sameProductFinder(d);
+      return {
+        ...f,
+        add: async (p: Parameters<typeof f.add>[0]) => {
+          if (finder.failAdd) throw new Error('finder broke');
+          return f.add(p);
+        },
+      };
+    },
+  };
+});
+
 let db: Db;
 let a: string;
 let b: string;
 
 beforeEach(async () => {
+  finder.failAdd = false;
   const dir = await mkdtemp(join(tmpdir(), 'tora-sheet-'));
   db = createDb({ url: `file:${join(dir, 'test.db')}` });
   await migrateDb(db);
@@ -356,6 +376,30 @@ it('keeps the log and counts when an import stops on an unexpected error', async
   ]);
 });
 
+it('logs a row whose lot was made as imported when a later step of it fails', async () => {
+  const rows = [
+    ['item', 'category', 'kind', 'quantity', 'cost'],
+    ['ミュウ', 'トレカ', 'シングル', '1', '3000'],
+    ['ミュウツー', 'トレカ', 'シングル', '1', '4000'],
+  ];
+  const plan = await planSheet(db, a, readSheet(rows, column)!, keyOf);
+  finder.failAdd = true;
+  await expect(applySheet(db, a, plan, 'mine.csv')).rejects.toThrow(/finder broke/);
+  const [run] = await db.select().from(importRuns).where(eq(importRuns.userId, a));
+  expect(run!.counts).toEqual({ imported: 1, failed: 1 });
+  const log = await db
+    .select()
+    .from(importRows)
+    .where(eq(importRows.importRunId, run!.id))
+    .orderBy(importRows.position);
+  const lots = await db.select().from(holdings).where(eq(holdings.userId, a));
+  expect(lots).toHaveLength(1);
+  expect(log.map((r) => [r.detail, r.outcome, r.reason, r.holdingId])).toEqual([
+    ['line:2', 'imported', null, lots[0]!.id],
+    ['line:3', 'problem', 'interrupted', null],
+  ]);
+});
+
 it("reads a cost only with the base currency's own sign", () => {
   expect(sheetAmount('¥12,000', 'JPY')).toBe(12_000);
   expect(sheetAmount('￥１２，０００', 'JPY')).toBe(12_000);
@@ -367,11 +411,23 @@ it("reads a cost only with the base currency's own sign", () => {
   expect(sheetAmount('€30', 'JPY')).toBeNaN();
   expect(sheetAmount('USD 30', 'JPY')).toBeNaN();
   expect(sheetAmount('¥', 'JPY')).toBeNaN();
-  // In cents on a euro install.
-  expect(sheetAmount('€1250', 'EUR')).toBe(1250);
-  expect(sheetAmount('¥1250', 'EUR')).toBeNaN();
+  // Yen has no smaller unit: a decimal point must come out whole.
+  expect(sheetAmount('12000.0', 'JPY')).toBe(12_000);
+  expect(sheetAmount('¥12.5', 'JPY')).toBeNaN();
+  // Only thousands separators, never a decimal comma.
+  expect(sheetAmount('12,50', 'JPY')).toBeNaN();
+  expect(sheetAmount('-500', 'JPY')).toBeNaN();
+  // A plain whole number is in cents (the download's own); a sign or a point means dollars.
+  expect(sheetAmount('1250', 'USD')).toBe(1250);
+  expect(sheetAmount('$12', 'USD')).toBe(1200);
+  expect(sheetAmount('12.50', 'USD')).toBe(1250);
+  expect(sheetAmount('$1,234.5', 'USD')).toBe(123_450);
+  expect(sheetAmount('0.29', 'USD')).toBe(29);
+  expect(sheetAmount('$12.505', 'USD')).toBeNaN();
+  expect(sheetAmount('12.500', 'USD')).toBe(1250);
+  expect(sheetAmount('¥1250', 'USD')).toBeNaN();
+  expect(sheetAmount('€12.50', 'EUR')).toBe(1250);
   expect(sheetAmount('1250円', 'EUR')).toBeNaN();
-  expect(sheetAmount('$1250', 'USD')).toBe(1250);
 });
 
 it('downloads the account data without collected prices or secrets', async () => {

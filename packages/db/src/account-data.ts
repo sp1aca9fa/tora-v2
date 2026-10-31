@@ -297,6 +297,9 @@ export async function loadAccountData(
     }
   };
   // Checked again inside the write transaction: two tabs loading the same file load it once.
+  // The transaction takes the write lock at its start (drizzle's libsql driver opens every one in
+  // libsql's "write" mode, BEGIN IMMEDIATE, and ignores `{ behavior }`), so the second tab waits
+  // for the first and then finds the account filled, rather than failing on a lock upgrade.
   const notEmpty = new Error('notEmpty');
   try {
     await db.transaction(async (tx) => {

@@ -12,6 +12,7 @@ import {
   type Names,
   type Taxonomy,
   categoryDef,
+  currencyDigits,
   fieldsFor,
   holdingFieldsFor,
   itemTypeOf,
@@ -337,16 +338,36 @@ function baseSigns(base: string): string[] {
 }
 
 /**
- * A whole number in the base's smallest unit from a spreadsheet cell ("¥12,000", "１２０００",
- * "12000.0"). Amounts are stored in the base (requirements S16): another currency's sign ("$30" on
- * a yen install) is not converted nor read as yen, it gives NaN (the row is a bad_cost problem).
+ * A whole number in the base's smallest unit from a spreadsheet cell. Amounts are stored in the
+ * base (requirements S16): another currency's sign ("$30" on a yen install) is not converted nor
+ * read as the base, it gives NaN (the row is a bad_cost problem).
+ *
+ * A plain whole number ("1250", what the download writes) is already in the smallest unit. A cell
+ * with the base's sign or a decimal point ("$12", "12.50", "¥12,000") is in main units and is
+ * scaled by the currency's digits ("$12" is 1200 cents, "¥12,000" is 12000 yen); one that does not
+ * come out whole in the smallest unit ("$12.505", "¥12.5") is NaN, never rounded.
  */
 export function sheetAmount(cell: string | undefined, base: string): number | null {
   if (!cell) return null;
-  let text = cell.normalize('NFKC').replace(/[,\s]/g, '');
-  for (const sign of baseSigns(base)) text = text.split(sign).join('');
-  const n = text ? Number(text) : NaN;
-  return Number.isFinite(n) && n >= 0 && Number.isInteger(n) ? n : NaN;
+  let text = cell.normalize('NFKC').replace(/\s/g, '');
+  let signed = false;
+  for (const sign of baseSigns(base)) {
+    if (text.includes(sign)) signed = true;
+    text = text.split(sign).join('');
+  }
+  // Commas only as thousands separators ("12,50" is not read as 1250).
+  const m = text.match(/^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d*))?$/);
+  if (!m) return NaN;
+  const whole = m[1]!.replace(/,/g, '');
+  const fraction = m[2];
+  if (!signed && fraction === undefined)
+    return Number.isSafeInteger(Number(whole)) ? Number(whole) : NaN;
+  // Main units, scaled on the digits as text (no floating point: 0.29 * 100 is not 29).
+  const digits = currencyDigits(base);
+  const extra = (fraction ?? '').slice(digits);
+  if (/[^0]/.test(extra)) return NaN;
+  const n = Number(whole + (fraction ?? '').slice(0, digits).padEnd(digits, '0'));
+  return Number.isSafeInteger(n) ? n : NaN;
 }
 
 /** A day from a cell ("2026-10-16", "2026/10/16", "2026/1/5"). */
@@ -642,8 +663,11 @@ export async function applySheet(
   const log: ImportRowLog[] = [];
   const sameProduct = sameProductFinder(db);
   // Rows handled so far: an unexpected error still leaves the import's log and counts, the rows
-  // it did not reach marked as not imported (the lots already added stay, in Review).
+  // it did not reach marked as not imported (the lots already added stay, in Review). `logged`:
+  // the rows whose outcome is in the log (a row whose lot was made counts, even when what follows
+  // fails).
   let done = 0;
+  let logged = 0;
   try {
     for (; done < entries.length; done++) {
       const e = entries[done]!;
@@ -674,12 +698,12 @@ export async function applySheet(
         const same = await sameProduct.find(ref.product);
         if (same) ref = { productId: same.id };
       }
+      let made: Product | null = null;
       try {
         const { holding, product } = await createHolding(db, userId, ref, {
           ...lot.input,
           importRunId: runId,
         });
-        if ('product' in ref) await sameProduct.add(product);
         add('imported');
         log.push({
           ...row,
@@ -688,6 +712,8 @@ export async function applySheet(
           reason: e.type === 'existing' ? 'added_anyway' : null,
           holdingId: holding.id,
         });
+        logged = done + 1;
+        if ('product' in ref) made = product;
       } catch (error) {
         if (!(error instanceof DomainError)) throw error;
         const duplicate = error.code === 'duplicate_order';
@@ -700,9 +726,10 @@ export async function applySheet(
           holdingId: duplicate ? (error.message === error.code ? null : error.message) : null,
         });
       }
+      if (made) await sameProduct.add(made);
     }
   } finally {
-    for (const e of entries.slice(done)) {
+    for (const e of entries.slice(Math.max(done, logged))) {
       add('failed');
       log.push({
         title: e.item,

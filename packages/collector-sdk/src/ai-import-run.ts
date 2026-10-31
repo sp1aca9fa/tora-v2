@@ -1,7 +1,13 @@
 // Reading files uploaded in the app (requirements S8 step 5): the same import through Claude as
 // `pnpm import-ai`, for one batch of uploads, by the app (Claude API) or the home PC (`claude -p`).
 // Everything read lands in Imports > Review, as with the command.
-import { type Db, claimUploadBatch, finishUploadRead, waitingUploadBatches } from '@tora/db';
+import {
+  type Db,
+  claimUploadBatch,
+  finishUploadRead,
+  renewUploadClaim,
+  waitingUploadBatches,
+} from '@tora/db';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,7 +20,8 @@ const safeName = (name: string, i: number) =>
 
 /**
  * Reads one batch of uploaded files and imports what it finds into the review. Returns null when
- * the batch was not waiting (someone else is reading it).
+ * the batch was not waiting (someone else is reading it), or when this read outlived its claim and
+ * someone else took the batch (then nothing is imported: the other read imports it once).
  */
 export async function readUploadBatch(
   db: Db,
@@ -24,6 +31,7 @@ export async function readUploadBatch(
 ): Promise<{ status: 'done' | 'failed'; message: string } | null> {
   const files = await claimUploadBatch(db, batchId);
   if (!files) return null;
+  let claim = files[0]!.updatedAt;
   const userId = files[0]!.userId;
   const dir = await mkdtemp(join(tmpdir(), 'tora-upload-'));
   try {
@@ -38,6 +46,12 @@ export async function readUploadBatch(
     const read = await readPurchases(ctx, dir, names, ask, { log });
     // No date at all: the day it was uploaded, checked in review.
     const plan = await planAiImport(db, userId, read, ctx.products, () => files[0]!.createdAt);
+    const renewed = await renewUploadClaim(db, batchId, claim);
+    if (!renewed) {
+      log(`upload ${batchId}: its claim was taken by another reader; not imported here`);
+      return null;
+    }
+    claim = renewed;
     const outcome = await applyAiImport(
       db,
       userId,
@@ -47,15 +61,21 @@ export async function readUploadBatch(
     const message = Object.entries(outcome.counts)
       .map(([k, n]) => `${n} ${k}`)
       .join(', ');
-    await finishUploadRead(db, batchId, {
-      status: 'done',
-      message: message || 'nothing to import',
-      importRunId: outcome.runId,
-    });
+    await finishUploadRead(
+      db,
+      batchId,
+      { status: 'done', message: message || 'nothing to import', importRunId: outcome.runId },
+      claim,
+    );
     return { status: 'done', message };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await finishUploadRead(db, batchId, { status: 'failed', message: message.slice(0, 500) });
+    await finishUploadRead(
+      db,
+      batchId,
+      { status: 'failed', message: message.slice(0, 500) },
+      claim,
+    );
     log(`upload ${batchId} failed: ${message}`);
     return { status: 'failed', message };
   } finally {
