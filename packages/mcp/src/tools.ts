@@ -675,92 +675,174 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
 // read-only SQL
 
 /**
- * One read-only SELECT (or WITH ... SELECT), run in a read transaction (writes fail) with a row
- * limit. Not scoped to the user: the database holds this household's data only.
+ * Tables with a row per source (sales, asks, timing signals, link candidates): read through a
+ * version without the rows of the sources kept from AI.
  */
-const SQL_WORDS = new Set([
-  'where',
-  'join',
-  'left',
-  'right',
-  'inner',
-  'outer',
-  'cross',
-  'on',
-  'group',
-  'order',
-  'limit',
-  'union',
-  'except',
-  'intersect',
-  'having',
-  'window',
-  'natural',
-  'using',
-  'as',
-]);
+const SALES_TABLES = [
+  'price_observations',
+  'price_days_dirty',
+  'supply',
+  'signals',
+  'source_candidates',
+];
+/** Tables mixing every source's data in one row: never read through `query_sql`. */
+const PACKED_TABLES: Record<string, string> = {
+  item_sales: "holds every source's sales together: read price_observations instead.",
+  holding_values:
+    "holds each lot's value per day from every source: read portfolio_charts instead.",
+};
 
 /**
- * Tables with a row per source (sales, asks, timing signals): read through a version without the
- * sources kept from AI.
+ * Tables whose rows are kept but some columns are rebuilt without the sources kept from AI:
+ * column name to the expression replacing it (`l` is the quoted list of those sources).
  */
-const SALES_TABLES = ['price_observations', 'price_days_dirty', 'supply', 'signals'];
-/** Tables mixing every source's sales in one row: never read through `query_sql`. */
-const PACKED_TABLES = ['item_sales'];
+const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
+  // Every row stays (which items have which listings); the trades last seen there and the
+  // collector's opaque progress (which may hold page data) are left out for those sources.
+  product_sources: {
+    recent_sales: (l) => `case when source in (${l}) then null else recent_sales end`,
+    state: (l) => `case when source in (${l}) then null else state end`,
+  },
+  // A saved value (BucketValue in @tora/db valuation.ts) carries the last sale, the buy price and
+  // a summary per source besides the valuation: those of the sources are taken out.
+  bucket_values: {
+    value: (l) =>
+      `json_set(value, ` +
+      `'$.last', case when json_extract(value, '$.last.source') in (${l}) then null ` +
+      `else json(json_extract(value, '$.last')) end, ` +
+      `'$.buylist', case when json_extract(value, '$.buylist.source') in (${l}) then null ` +
+      `else json(json_extract(value, '$.buylist')) end, ` +
+      `'$.sources', json((select json_group_array(json(s.value)) ` +
+      `from json_each(main.bucket_values.value, '$.sources') s ` +
+      `where coalesce(json_extract(s.value, '$.source'), '') not in (${l}))))`,
+  },
+};
+
+/** Rows left out (besides the sales tables' rows of those sources). */
+const ROW_FILTERS: Record<string, (l: string) => string> = {
+  // Valued from those sources' sales: the whole value is theirs.
+  bucket_values: (l) => `coalesce(json_extract(value, '$.valuation.source'), '') not in (${l})`,
+};
+
+/** Tables `withoutSources` rebuilds columns of: their column names are needed (`columns`). */
+export const REBUILT_TABLES = Object.keys(HIDDEN_COLUMNS);
+
+/** The query as SQLite reads it, with its comments blanked (quoted text and names kept). */
+function withoutComments(text: string): string {
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i]!;
+    if (c === "'" || c === '"' || c === '`' || c === '[') {
+      const close = c === '[' ? ']' : c;
+      let j = i + 1;
+      for (;;) {
+        j = text.indexOf(close, j);
+        if (j === -1) {
+          j = text.length;
+          break;
+        }
+        // A doubled quote is a quote inside the text.
+        if (close !== ']' && text[j + 1] === close) {
+          j += 2;
+          continue;
+        }
+        j += 1;
+        break;
+      }
+      out += text.slice(i, j);
+      i = j;
+    } else if (text.startsWith('--', i)) {
+      const end = text.indexOf('\n', i);
+      i = end === -1 ? text.length : end;
+      out += ' ';
+    } else if (text.startsWith('/*', i)) {
+      const end = text.indexOf('*/', i + 2);
+      i = end === -1 ? text.length : end + 2;
+      out += ' ';
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
 
 /**
- * The query with each read of a sales table (`SALES_TABLES`) replaced by its rows without the
- * given sources (keeping the alias). Refused when a table is reached another way (a schema
- * prefix, quotes).
+ * The query reading the tables that hold the given sources' data through versions without it
+ * (requirements S4b; the sources' terms forbid giving their data to AI models): a common table
+ * expression with each table's own name, which SQLite reads instead of the table everywhere in
+ * the query. Only a schema prefix (`main.`) reaches the real table: refused, like the tables that
+ * mix sources in a row. A query's own CTE named like a guarded table fails (a duplicate name).
+ * `columns` lists the columns of the tables in `REBUILT_TABLES`.
  */
 export function withoutSources(
   text: string,
   sources: string[],
+  columns: Record<string, string[]> = {},
 ): { sql: string } | { error: string } {
   if (sources.length === 0) return { sql: text };
-  for (const table of PACKED_TABLES) {
-    if (new RegExp(`\\b${table}\\b`, 'i').test(text)) {
-      return {
-        error: `${table} holds every source's sales together: read price_observations instead.`,
-      };
-    }
+  const mentions = (table: string) => new RegExp(`\\b${table}\\b`, 'i').test(text);
+  for (const [table, why] of Object.entries(PACKED_TABLES)) {
+    if (mentions(table)) return { error: `${table} ${why}` };
+  }
+  const code = withoutComments(text);
+  if (/(?:\b|["'`[])(?:main|temp)["'`\]]?\s*\./i.test(code)) {
+    return { error: 'Read tables by their plain name (no main. or temp. prefix).' };
+  }
+  // Raw database pages and index samples would show every row.
+  if (/\bsqlite_(?:dbpage|stat\d)\b/i.test(code)) {
+    return { error: 'sqlite_dbpage and sqlite_stat tables are not readable here.' };
   }
   const list = sources.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
-  let sql = text;
+  const guards: string[] = [];
   for (const table of SALES_TABLES) {
-    if (new RegExp(`\\b\\w+\\s*\\.\\s*${table}\\b|["\`[]${table}\\b`, 'i').test(sql)) {
-      return { error: `Read ${table} by its plain name.` };
-    }
-    const guarded = `(select * from ${table} where source is null or source not in (${list}))`;
-    sql = sql.replace(
-      new RegExp(`\\b(from|join)\\s+${table}\\b(?:\\s+(?:as\\s+)?(\\w+))?`, 'gi'),
-      (_m, kw: string, alias?: string) => {
-        const keep = alias && !SQL_WORDS.has(alias.toLowerCase());
-        const name = keep ? alias : table;
-        return `${kw} ${guarded} as ${name}${keep ? '' : alias ? ` ${alias}` : ''}`;
-      },
+    if (!mentions(table)) continue;
+    guards.push(
+      `${table} as (select * from main.${table} where source is null or source not in (${list}))`,
     );
-    // Any other mention (a comma join, a subquery's bare name) would read it unguarded.
-    const rest = sql
-      .split(guarded)
-      .join('')
-      .replace(new RegExp(`\\bas\\s+${table}\\b`, 'gi'), '');
-    if (new RegExp(`\\b${table}\\b`, 'i').test(rest)) {
-      return { error: `Read ${table} only right after FROM or JOIN (no comma joins).` };
-    }
   }
-  return { sql };
+  for (const [table, hidden] of Object.entries(HIDDEN_COLUMNS)) {
+    if (!mentions(table)) continue;
+    const names = columns[table] ?? [];
+    if (!names.length) return { error: `${table} cannot be read now (its columns are unknown).` };
+    const select = names
+      .map((n) => (hidden[n] ? `${hidden[n](list)} as "${n}"` : `"${n.replace(/"/g, '""')}"`))
+      .join(', ');
+    const where = ROW_FILTERS[table] ? ` where ${ROW_FILTERS[table](list)}` : '';
+    guards.push(`${table} as (select ${select} from main.${table}${where})`);
+  }
+  if (!guards.length) return { sql: text };
+  // A query with its own WITH list gets the guards first in it (they read no CTE).
+  const own = /^with(?:\s+recursive)?\b/i.exec(text);
+  return own
+    ? { sql: `${own[0]} ${guards.join(', ')},${text.slice(own[0].length)}` }
+    : { sql: `with ${guards.join(', ')} ${text}` };
 }
 
+/**
+ * One read-only SELECT (or WITH ... SELECT), run in a read transaction (writes fail) with a row
+ * limit. Not scoped to the user: the database holds this household's data only.
+ */
 export async function querySql(db: Db, sql: string, limit = 200) {
   const text = sql.trim().replace(/;\s*$/, '');
   if (!/^(select|with)\b/i.test(text) || text.includes(';')) {
     return { error: 'Only one SELECT (or WITH ... SELECT) statement is allowed.' };
   }
-  // Sources whose terms forbid giving their data to AI models: every read of their sales goes
-  // through a version of the table without them.
+  // Sources whose terms forbid giving their data to AI models: every read of their data goes
+  // through a version of the table without it.
   const noAi = noAiSources(await loadSourceRegistry(db));
-  const guarded = withoutSources(text, noAi);
+  const columns: Record<string, string[]> = {};
+  if (noAi.length) {
+    for (const table of REBUILT_TABLES) {
+      const rs = await db.$client.execute({
+        sql: 'select name from pragma_table_info(?)',
+        args: [table],
+      });
+      columns[table] = rs.rows.map((r) => String(r.name));
+    }
+  }
+  const guarded = withoutSources(text, noAi, columns);
   if ('error' in guarded) return guarded;
   const tx = await db.$client.transaction('read');
   try {

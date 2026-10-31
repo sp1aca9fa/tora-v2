@@ -6,6 +6,7 @@ import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { submitWith } from '@/lib/submit-form';
 import { type SetupState, completeSetupAction } from '../actions';
 
 /** The setup link's form: what its kind asks for, then the backup codes once. */
@@ -46,7 +47,9 @@ export function SetupForm({
     );
 
   return (
-    <form action={action} className="space-y-4">
+    // Submitted by hand so a mismatch or a bad code keeps the passwords typed; POST if sent before
+    // the page is ready, so they never land in the address.
+    <form method="post" onSubmit={submitWith(action)} className="space-y-4">
       <input type="hidden" name="token" value={token} />
       {kind !== '2fa' && (
         <>

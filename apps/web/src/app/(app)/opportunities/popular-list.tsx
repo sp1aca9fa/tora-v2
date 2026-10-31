@@ -3,6 +3,7 @@
 import type { PopularBy } from '@tora/db';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { morePopularAction } from './actions';
 import { PopularRow } from './popular-row';
 import type { PopularRowData } from './popular-rows';
@@ -24,14 +25,16 @@ export function PopularList({
   const t = useTranslations('opportunities');
   const [rows, setRows] = useState(initial);
   const [loading, setLoading] = useState(false);
-  // Set when the server had nothing new (or failed), so the list does not ask again forever.
+  // Set when the server had nothing new, so the list does not ask again forever.
   const [done, setDone] = useState(false);
+  // A failed ask (offline, a server error): asked again only from the button, not in a loop.
+  const [failed, setFailed] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const more = !done && rows.length < total;
 
   useEffect(() => {
     const el = end.current;
-    if (!el || !more) return;
+    if (!el || !more || failed) return;
     const observer = new IntersectionObserver(
       async ([entry]) => {
         if (!entry?.isIntersecting || loading) return;
@@ -42,7 +45,7 @@ export function PopularList({
           if (!fresh.length) setDone(true);
           setRows((had) => [...had, ...fresh.filter((r) => !had.some((h) => h.key === r.key))]);
         } catch {
-          setDone(true);
+          setFailed(true);
         } finally {
           setLoading(false);
         }
@@ -51,7 +54,7 @@ export function PopularList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rows, more, loading, type, by, q]);
+  }, [rows, more, failed, loading, type, by, q]);
 
   const labels = { tora: t('toraView'), worth: t('toraWorth') };
   return (
@@ -62,7 +65,17 @@ export function PopularList({
         ))}
       </ul>
       <div ref={end} className="py-4 text-center text-sm text-muted-foreground">
-        {more ? (loading ? t('loading') : t('more', { count: total - rows.length })) : ''}
+        {!more ? (
+          ''
+        ) : failed ? (
+          <Button variant="outline" size="sm" onClick={() => setFailed(false)}>
+            {t('loadMore')}
+          </Button>
+        ) : loading ? (
+          t('loading')
+        ) : (
+          t('more', { count: total - rows.length })
+        )}
       </div>
     </>
   );

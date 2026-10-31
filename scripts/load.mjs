@@ -74,6 +74,8 @@ export async function runLoad() {
   }
   const at = new Date().toISOString();
   const sessions = [];
+  // Every device added, kept apart from the sessions so one added before a failed step is removed.
+  const devices = [];
   let elapsed = 0;
   const times = new Map(PAGES.map(([name]) => [name, []]));
   const failed = new Map();
@@ -85,6 +87,7 @@ export async function runLoad() {
         sql: `INSERT INTO user_devices (id, user_id, label, last_seen_at, created_at, updated_at) VALUES (?, ?, 'load test', ?, ?, ?)`,
         args: [device, user.id, at, at, at],
       });
+      devices.push(device);
       const fingerprint = createHash('sha256')
         .update(`${user.password_hash ?? ''}|${user.totp_secret_enc ?? ''}`)
         .digest('base64url')
@@ -131,8 +134,13 @@ export async function runLoad() {
     );
     elapsed = (performance.now() - started) / 1000;
   } finally {
-    for (const s of sessions)
-      await db.execute({ sql: 'DELETE FROM user_devices WHERE id = ?', args: [s.device] });
+    for (const device of devices) {
+      try {
+        await db.execute({ sql: 'DELETE FROM user_devices WHERE id = ?', args: [device] });
+      } catch (e) {
+        console.error(`Could not remove the test device ${device}: ${e.message}`);
+      }
+    }
     db.close();
   }
 

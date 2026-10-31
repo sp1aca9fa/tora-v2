@@ -177,7 +177,13 @@ export function DiscordForm() {
     {},
   );
   return (
-    <form ref={formRef} onSubmit={submitWith(formAction)} className="space-y-2 text-sm">
+    // POST if sent before the page is ready: the webhook link never lands in the address.
+    <form
+      ref={formRef}
+      method="post"
+      onSubmit={submitWith(formAction)}
+      className="space-y-2 text-sm"
+    >
       <p className="text-muted-foreground">{t('discordHelp')}</p>
       <div className="flex flex-wrap gap-2">
         <Input
@@ -276,7 +282,13 @@ export function BotForm({ bot }: { bot: string | null }) {
   return (
     <div className="space-y-3 text-sm">
       {bot && <p>{t('botSet', { bot })}</p>}
-      <form ref={formRef} onSubmit={submitWith(formAction)} className="flex flex-wrap gap-2">
+      {/* POST if sent before the page is ready: the token never lands in the address. */}
+      <form
+        ref={formRef}
+        method="post"
+        onSubmit={submitWith(formAction)}
+        className="flex flex-wrap gap-2"
+      >
         <Input
           name="token"
           type="password"
