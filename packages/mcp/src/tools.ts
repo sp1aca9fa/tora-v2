@@ -684,6 +684,8 @@ const SALES_TABLES = [
   'supply',
   'signals',
   'source_candidates',
+  'rankings',
+  'opening_cards',
 ];
 /** Tables mixing every source's data in one row: never read through `query_sql`. */
 const PACKED_TABLES: Record<string, string> = {
@@ -715,6 +717,13 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
       `'$.sources', json((select json_group_array(json(s.value)) ` +
       `from json_each(main.bucket_values.value, '$.sources') s ` +
       `where coalesce(json_extract(s.value, '$.source'), '') not in (${l}))))`,
+  },
+  // Each lot's recent values by day (the same values as holding_values): totals in `series` stay.
+  portfolio_charts: { recent: () => 'null' },
+  // Sent messages may quote a price or ask of any source: only kinds that never do keep their text.
+  alert_log: {
+    text: () =>
+      `case when kind in ('store', 'storeUnknown', 'feed', 'admin', 'test') then text end`,
   },
 };
 

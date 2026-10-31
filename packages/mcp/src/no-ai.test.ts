@@ -194,4 +194,17 @@ describe('query_sql on a database holding a noAi source', () => {
     ]);
     expect(JSON.stringify(value)).not.toContain('ebay');
   });
+
+  it('leaves out lots per day, price-bearing messages, and rankings of those sources', async () => {
+    const r = withoutSources(
+      'select recent from portfolio_charts union all select text from alert_log',
+      ['ebay'],
+      { portfolio_charts: ['user_id', 'recent'], alert_log: ['kind', 'text'] },
+    );
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sql).toContain('null as "recent"');
+    expect(r.sql).toMatch(/case when kind in \('store'.*then text end as "text"/);
+    const ranked = withoutSources('select * from rankings', ['ebay']);
+    expect(ranked).toHaveProperty('sql', expect.stringContaining('from main.rankings where'));
+  });
 });
