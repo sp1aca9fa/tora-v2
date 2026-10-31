@@ -28,6 +28,7 @@ import {
   refreshSignals,
   refreshTradeCounts,
   runSnapshots,
+  rankingsSavedOn,
   readSetting,
   startRun,
   saveSetting,
@@ -254,11 +255,25 @@ async function refused(source: string, step: string) {
 }
 if (withRankings) {
   progress.next('rankings');
-  const readable = usedRankings.filter((r) => !blocked.has(r.source));
+  const notBlocked = usedRankings.filter((r) => !blocked.has(r.source));
+  // Each ranking is read once a day (S13): a retry of the night's run (exit 2, a failed
+  // collector) leaves those saved today alone, unless asked with --refresh.
+  const savedToday = values.refresh
+    ? new Set<string>()
+    : await rankingsSavedOn(
+        db,
+        notBlocked.map((r) => r.key),
+      ).catch((error: unknown) => {
+        log(`rankings: today's check stopped (${errorText(error)}), all read`);
+        return new Set<string>();
+      });
+  const readable = notBlocked.filter((r) => !savedToday.has(r.key));
   const locks = readable.map((r) => lockSource(r.source));
   try {
-    if (readable.length === 0) {
+    if (notBlocked.length === 0) {
       log('rankings: skipped, their sites blocked an earlier run today (tried again tomorrow)');
+    } else if (readable.length === 0) {
+      log('rankings: skipped, already read today');
     } else if (locks.some((l) => 'heldBy' in l)) {
       log('rankings: skipped, another collect is reading the same site');
     } else {

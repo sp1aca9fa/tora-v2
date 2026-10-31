@@ -179,6 +179,23 @@ export async function saveRanking(
   return { saved: rows.length, matched, candidates };
 }
 
+/**
+ * The rankings among `keys` already saved for `now`'s day (S13: each read once a day), so a
+ * retry of the night's collect leaves them alone.
+ */
+export async function rankingsSavedOn(
+  db: Pick<Db, 'selectDistinct'>,
+  keys: string[],
+  now = new Date(),
+): Promise<Set<string>> {
+  if (!keys.length) return new Set();
+  const rows = await db
+    .selectDistinct({ ranking: rankings.ranking })
+    .from(rankings)
+    .where(and(eq(rankings.day, localDate(now)), inArray(rankings.ranking, keys)));
+  return new Set(rows.map((r) => r.ranking));
+}
+
 /** Items in a ranking's top within the last 30 days: candidates are collected while there. */
 export async function rankedProductIds(
   db: Pick<Db, 'selectDistinct'>,

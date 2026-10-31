@@ -10,6 +10,7 @@ import {
   type RankedEntry,
   latestRanks,
   rankedProductIds,
+  rankingsSavedOn,
   rankingBoards,
   saveRanking,
   saveRankingSources,
@@ -106,4 +107,19 @@ it('matches ranked items to known ones and makes candidates of the top ones nobo
     [2, 'Box A', false, false, 1],
     [3, '拡張パック「Box B」ボックス', true, false, 2],
   ]);
+});
+
+it('tells which rankings were already saved today', async () => {
+  expect(await rankingsSavedOn(db, [], day('2026-10-02'))).toEqual(new Set());
+  await saveRanking(db, info, [box('1', 'A')], day('2026-10-01'));
+  // Saved yesterday only: due today.
+  expect(await rankingsSavedOn(db, ['site-boxes', 'site-cards'], day('2026-10-02'))).toEqual(
+    new Set(),
+  );
+  await saveRanking(db, info, [box('1', 'A')], day('2026-10-02'));
+  expect(await rankingsSavedOn(db, ['site-boxes', 'site-cards'], day('2026-10-02'))).toEqual(
+    new Set(['site-boxes']),
+  );
+  // Another ranking's key is not asked about.
+  expect(await rankingsSavedOn(db, ['site-cards'], day('2026-10-02'))).toEqual(new Set());
 });
