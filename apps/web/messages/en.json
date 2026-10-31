@@ -2511,8 +2511,10 @@
     "codeKindOther": "Other",
     "codeKindChain": "Chain",
     "codeKindLottery": "Lottery word",
+    "codeKindNotLottery": "Not a lottery",
     "lottery": {
-      "intro": "Posts using {words}, newest first, kept 30 days.",
+      "intro": "First posts (not replies) using {words}, newest first, kept 30 days.",
+      "leftOut": "Posts with {words} are left out (Codes, kind: Not a lottery).",
       "noWords": "No lottery words yet. An admin adds them on Codes (kind: Lottery word), e.g. the word posters use for a lottery sale.",
       "shown": {
         "open": "All",

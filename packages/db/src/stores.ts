@@ -925,7 +925,7 @@ export async function sendStoreNotices(
   const glossary = await storeGlossary(db);
   const others = [
     ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
-    ...glossary.filter((g) => !g.product).map((g) => g.code),
+    ...glossary.filter((g) => !g.product && !g.notLottery).map((g) => g.code),
   ];
   const named = (text: string) => productsInPost(text, glossary, others).map((g) => g.meaning);
   // A reply naming no product takes its thread's (the first post's).
@@ -1318,8 +1318,14 @@ export async function postsPage(
     named?: boolean;
     since?: string;
     chain?: string | null;
-    /** Only posts using one of these words (a lottery's), and only these posts or not these. */
+    /**
+     * Only posts using one of these words (a lottery's) and none of `notWords`, and only these
+     * posts or not these.
+     */
     words?: string[];
+    notWords?: string[];
+    /** false: only first posts, no replies. */
+    replies?: boolean;
     postIds?: string[];
     notIds?: string[];
     /**
@@ -1360,6 +1366,10 @@ export async function postsPage(
         opts.words
           ? or(...opts.words.map((w) => sql`${storePosts.text} LIKE ${like(w)} ESCAPE '\\'`))
           : undefined,
+        ...(opts.notWords ?? []).map(
+          (w) => sql`${storePosts.text} NOT LIKE ${like(w)} ESCAPE '\\'`,
+        ),
+        opts.replies === false ? isNull(storePosts.replyTo) : undefined,
         opts.postIds ? inArray(storePosts.id, opts.postIds) : undefined,
         opts.notIds?.length ? notInArray(storePosts.id, opts.notIds) : undefined,
         opts.before

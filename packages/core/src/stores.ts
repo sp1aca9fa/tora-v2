@@ -196,6 +196,11 @@ export interface CodeMeaning {
   chain?: boolean;
   /** A word for a lottery ("raffle", "draw"): posts using it are listed on Stores > Lotteries. */
   lottery?: boolean;
+  /**
+   * A phrase of posts that only mention a lottery ("only the raffle", "raffle queue"): posts using
+   * it are left off Stores > Lotteries (2026-10-31). Never shown as a post's code.
+   */
+  notLottery?: boolean;
 }
 
 /**

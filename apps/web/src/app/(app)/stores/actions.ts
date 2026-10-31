@@ -204,7 +204,7 @@ export async function forgetBoardAction(key: string) {
 export async function addGlossaryAction(
   code: string,
   meaning: string,
-  kind: 'other' | 'product' | 'chain' | 'lottery' = 'other',
+  kind: 'other' | 'product' | 'chain' | 'lottery' | 'notLottery' = 'other',
 ): Promise<{ error?: string }> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return { error: 'admin' };
@@ -220,7 +220,9 @@ export async function addGlossaryAction(
         ? { chain: true }
         : kind === 'lottery'
           ? { lottery: true }
-          : {}),
+          : kind === 'notLottery'
+            ? { notLottery: true }
+            : {}),
   });
   await recordAdminChange(db, user.id, 'glossaryAdded', { code: c, meaning: m }, '/stores/area');
   revalidatePath('/stores');

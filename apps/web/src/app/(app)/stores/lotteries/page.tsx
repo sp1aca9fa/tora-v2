@@ -29,6 +29,7 @@ export default async function LotteriesPage({
     }),
   ]);
   const lotteryWords = words.filter((w) => w.lottery).map((w) => w.code);
+  const notLottery = words.filter((w) => w.notLottery).map((w) => w.code);
   const chip = (active: boolean) =>
     cn(
       'rounded-full border px-2.5 py-1 text-xs',
@@ -40,7 +41,8 @@ export default async function LotteriesPage({
       <AutoRefresh on="post" />
       <p className="max-w-3xl text-sm text-muted-foreground">
         {lotteryWords.length
-          ? t('lottery.intro', { words: lotteryWords.join(', ') })
+          ? t('lottery.intro', { words: lotteryWords.join(', ') }) +
+            (notLottery.length ? ` ${t('lottery.leftOut', { words: notLottery.join(', ') })}` : '')
           : t('lottery.noWords')}
       </p>
       <div className="flex flex-wrap gap-1.5">

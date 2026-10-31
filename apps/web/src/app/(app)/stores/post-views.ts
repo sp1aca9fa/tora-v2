@@ -100,9 +100,8 @@ export async function postViews(
   const inArea = storesInArea(area, await cachedStores(db), localDate());
   // Lotteries: the posts using a lottery word, by the person's marks.
   const marks = lottery && opts.userId ? await lotteryMarksOf(db, opts.userId) : null;
-  const words = lottery
-    ? (await storeGlossary(db)).filter((g) => g.lottery).map((g) => g.code)
-    : null;
+  const glossary = lottery ? await storeGlossary(db) : null;
+  const words = glossary?.filter((g) => g.lottery).map((g) => g.code) ?? null;
   const marked = (m: LotteryMark) => [...(marks ?? [])].flatMap(([id, x]) => (x === m ? [id] : []));
   const { posts, more } = await postsPage(db, {
     offset: opts.offset,
@@ -114,6 +113,10 @@ export async function postViews(
     ...(lottery && words
       ? {
           words,
+          // A lottery's own announcement (2026-10-31): replies and posts that only mention one
+          // ("nothing but the lottery") are chatter.
+          notWords: glossary!.filter((g) => g.notLottery).map((g) => g.code),
+          replies: false,
           ...(lottery === 'open' ? { notIds: marked('hidden') } : { postIds: marked(lottery) }),
         }
       : {}),
@@ -146,11 +149,11 @@ export async function toViews(
   ]);
   const others = [
     ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
-    ...glossary.filter((g) => !g.product).map((g) => g.code),
+    ...glossary.filter((g) => !g.product && !g.notLottery).map((g) => g.code),
   ];
   const inArea = storesInArea(area, all, localDate());
   const byId = new Map(all.map((s) => [s.id, s]));
-  const otherCodes = glossary.filter((g) => !g.product);
+  const otherCodes = glossary.filter((g) => !g.product && !g.notLottery);
   // A post's stores' codes (not the ones that are just their name), with the store they name.
   const storeCodesOf = (ids: string[]): CodeMeaning[] =>
     ids.flatMap((id) => {

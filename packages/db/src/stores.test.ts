@@ -630,13 +630,53 @@ it("lists lottery posts by their words, with each person's marks", async () => {
   // LIKE's own characters in a word are plain text.
   expect(ids(await postsPage(db, { offset: 0, limit: 10, words: ['%_r'] }))).toEqual(['l3']);
   expect(ids(await postsPage(db, { offset: 0, limit: 10, words: [] }))).toEqual([]);
+  // A lottery's own posts: no replies, none only mentioning one.
+  await receivePush(
+    db,
+    uid,
+    {
+      source: 'myboard',
+      chain: 'megastore',
+      posts: [
+        { ...post('l4', 'raffle too', 0), replyTo: 'l1' },
+        post('l5', 'only the raffle queue', 0),
+      ],
+    },
+    now,
+  );
+  expect(ids(await postsPage(db, { offset: 0, limit: 10, words })).toSorted()).toEqual([
+    'l1',
+    'l3',
+    'l4',
+    'l5',
+  ]);
+  expect(
+    ids(
+      await postsPage(db, {
+        offset: 0,
+        limit: 10,
+        words,
+        notWords: ['raffle queue', 'x'],
+        replies: false,
+      }),
+    ),
+  ).toEqual(['l3', 'l1']);
   const [l1] = (await postsPage(db, { offset: 0, limit: 10, words: ['MID'] })).posts;
   await setLotteryMark(db, uid, l1!.id, 'hidden');
   await setLotteryMark(db, uid, 'no-such-post', 'applied');
   expect([...(await lotteryMarksOf(db, uid))]).toEqual([[l1!.id, 'hidden']]);
-  expect(ids(await postsPage(db, { offset: 0, limit: 10, words, notIds: [l1!.id] }))).toEqual([
-    'l3',
-  ]);
+  expect(
+    ids(
+      await postsPage(db, {
+        offset: 0,
+        limit: 10,
+        words,
+        notIds: [l1!.id],
+        replies: false,
+        notWords: ['queue'],
+      }),
+    ),
+  ).toEqual(['l3']);
   await setLotteryMark(db, uid, l1!.id, 'applied');
   expect([...(await lotteryMarksOf(db, uid))]).toEqual([[l1!.id, 'applied']]);
   await setLotteryMark(db, uid, l1!.id, null);
