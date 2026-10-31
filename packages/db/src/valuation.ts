@@ -22,6 +22,7 @@ import {
   trend,
   valuationOrder,
   marketCurrency,
+  sourceInfo,
   valueUnit,
   type Pools,
   conditionPools,
@@ -108,6 +109,19 @@ export interface MarketData {
 /** The currency of the prices a valuation uses (the primary market's). */
 const valuedCurrency = async (db: Db) => marketCurrency(await loadSourceRegistry(db));
 
+/**
+ * Whether a listing's recent sales are valued: its source's currency is the primary market's (or
+ * not described), the same rule as the stored sales (other markets are only compared).
+ */
+async function valuedSource(db: Db): Promise<(source: string) => boolean> {
+  const registry = await loadSourceRegistry(db);
+  const currency = marketCurrency(registry);
+  return (source) => {
+    const own = sourceInfo(registry, source)?.currency;
+    return !own || own === currency;
+  };
+}
+
 /** The registry's valuation order per item type, and the condition lists' pool groups. */
 async function valuationSettings(
   db: Db,
@@ -124,6 +138,7 @@ async function valuationSettings(
 
 /** Each product's manual prices (of the user; none for null) and its listings' recent sales. */
 async function manualAndRecent(db: Db, userId: string | null, productIds: string[]) {
+  const valued = await valuedSource(db);
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
   for (let i = 0; i < productIds.length; i += 200) {
@@ -144,6 +159,7 @@ async function manualAndRecent(db: Db, userId: string | null, productIds: string
       .from(productSources)
       .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
     for (const l of links) {
+      if (!valued(l.source)) continue;
       const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
@@ -209,6 +225,7 @@ export async function rawMarketData(
   if (productIds.length === 0)
     return { observations, recent, manual, ...(await valuationSettings(db)) };
   const currency = await valuedCurrency(db);
+  const valued = await valuedSource(db);
   for (let i = 0; i < productIds.length; i += 200) {
     const ids = productIds.slice(i, i + 200);
     const rows = await db
@@ -254,6 +271,7 @@ export async function rawMarketData(
       .from(productSources)
       .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
     for (const l of links) {
+      if (!valued(l.source)) continue;
       const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
@@ -768,12 +786,35 @@ export async function boxView(db: Db, userId: string, holdingId: string, now = n
     now,
   );
   const asReceived = valueHolding(box.holding, box.product, market, now, receivedBucket);
+  // What sold pulls brought in: the sale's total less its fees (requirements section 6, box view).
+  const soldIds = pulls.filter((p) => p.holding.status === 'sold').map((p) => p.holding.id);
+  const soldFor = new Map(
+    (soldIds.length
+      ? await db
+          .select({
+            holdingId: holdingEvents.holdingId,
+            amountBase: holdingEvents.amountBase,
+            feesBase: holdingEvents.feesBase,
+          })
+          .from(holdingEvents)
+          .where(and(inArray(holdingEvents.holdingId, soldIds), eq(holdingEvents.type, 'sold')))
+      : []
+    ).map((e) => [e.holdingId, e.amountBase === null ? null : e.amountBase - (e.feesBase ?? 0)]),
+  );
   const pullRows = pulls.map((p) => ({
     ...p,
     valuation: valueHolding(p.holding, p.product, market, now),
   }));
-  // Pulls that were sold count at their sale price; others at current value.
-  const pullsValueBase = pullRows.reduce((sum, p) => sum + (p.valuation.valueBase ?? 0), 0);
+  // Pulls that were sold count at their sale price (net of fees; unknown when the sale has no
+  // amount), lost ones at nothing; others at current value.
+  const counted = pullRows.map((p) =>
+    p.holding.status === 'sold'
+      ? (soldFor.get(p.holding.id) ?? null)
+      : p.holding.status === 'lost'
+        ? 0
+        : p.valuation.valueBase,
+  );
+  const pullsValueBase = counted.reduce<number>((sum, v) => sum + (v ?? 0), 0);
   return {
     box,
     receivedState,
@@ -782,7 +823,7 @@ export async function boxView(db: Db, userId: string, holdingId: string, now = n
     asReceived,
     pulls: pullRows,
     pullsValueBase,
-    pullsValued: pullRows.filter((p) => p.valuation.valueBase !== null).length,
+    pullsValued: counted.filter((v) => v !== null).length,
     netBase: pullsValueBase - box.holding.costTotalBase,
   };
 }
@@ -1392,11 +1433,11 @@ interface SavedMarketMovers {
 }
 const MARKET_MOVERS_KEY = 'marketMovers';
 
-/** A lot with its values by day (only the value, `[0]`, is read). */
+/** A lot with its values by day (only the value, `[0]`, and the method, `[1]`, are read). */
 type MoverLot = {
   holding: Holding;
   product: Product;
-  days: Record<string, Pick<DayValue, 0>>;
+  days: Record<string, Pick<DayValue, 0 | 1>>;
 };
 
 /** Items worth under ¥1,000 then, and items that did not move, are left out (noise). */
@@ -1430,13 +1471,20 @@ function shownMovers(list: Mover[]): Mover[] {
 const daysBefore = (day: string, days: number) =>
   localDate(new Date(localTime(day, '12:00:00.000').getTime() - days * DAY));
 
-/** Lots' values on `day` and `days` before, where both are known. */
+/**
+ * Lots' values on `day` and `days` before, where both are known from the market: a day valued at
+ * a person's own manual price is theirs alone (requirements S8), so it is left out of the movers
+ * every user sees.
+ */
 function bothDays(lots: MoverLot[], day: string, days: number) {
   const then = daysBefore(day, days);
   return lots.flatMap((lot) => {
-    const now = lot.days[day]?.[0];
-    const before = lot.days[then]?.[0];
-    return now == null || before == null ? [] : [{ ...lot, now, before }];
+    const now = lot.days[day];
+    const before = lot.days[then];
+    if (now?.[1] === 'manual' || before?.[1] === 'manual') return [];
+    return now?.[0] == null || before?.[0] == null
+      ? []
+      : [{ ...lot, now: now[0], before: before[0] }];
   });
 }
 

@@ -85,6 +85,50 @@ it("offers the person's watches and plan items with when to buy and at what pric
   ]);
 });
 
+it("dates a new release's wait from the day its numbers were worked out", async () => {
+  const product = await createProduct(db, uid, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'Box',
+    franchise: 'pokemon',
+    region: 'jp',
+  });
+  await addWatch(db, uid, { productId: product.id }, { packagingState: 'sealed_shrink' });
+  const now = new Date('2026-10-21T12:00:00+09:00');
+  // Numbers two days old: 30 days after release then, the usual low 120 days after.
+  await db.insert(signals).values({
+    productId: product.id,
+    bucket: 'sealed:shrink',
+    day: '2026-10-19',
+    source: 'snkrdunk',
+    stats: {
+      fair: 8800,
+      sales30: 20,
+      days180: 100,
+      days365: 200,
+      usual180: 10000,
+      q25d180: 9000,
+      q75d180: 11000,
+      q10d365: 8000,
+      cheaperThan180: 0.5,
+      trend14: 0,
+      trend28: 0,
+      trend84: 0,
+      ask: null,
+      ageDays: 30,
+      releaseFrom: 'set',
+      lowAge: { age: 120, items: 4, line: null },
+      market: null,
+      pattern: null,
+    },
+    createdAt: toLocalIso(now),
+    updatedAt: toLocalIso(now),
+  });
+  const [item] = await buyPlanFor(db, (await getUserById(db, uid))!, now);
+  // 90 days after 2026-10-19, not after today.
+  expect(item?.step).toMatchObject({ when: 'from', day: '2027-01-17' });
+});
+
 it("counts a month's purchases for the collection only, at cost, sold or not", async () => {
   const box = {
     productId: (await createProduct(db, uid, { category: 'tcg', kind: 'booster_box', name: 'Box' }))

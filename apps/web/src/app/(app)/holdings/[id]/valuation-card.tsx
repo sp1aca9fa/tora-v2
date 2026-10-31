@@ -1,3 +1,4 @@
+import { trackingMode } from '@tora/core';
 import { type Db, type Holding, type Product, valueHoldings } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,11 @@ export async function ValuationCard({
     }
     return format.dateTime(at, { dateStyle: 'medium' });
   };
-  const pl = v.valueBase === null ? null : v.valueBase - holding.costTotalBase;
+  // P/L only for an investment lot, as the Portfolio counts it (requirements S8).
+  const pl =
+    v.valueBase === null || trackingMode(holding) !== 'investment'
+      ? null
+      : v.valueBase - holding.costTotalBase;
 
   return (
     <Card>

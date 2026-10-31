@@ -19,15 +19,25 @@ export interface PlanStep {
 const addDays = (day: string, n: number) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
-/** An item's step in a plan, from its saved numbers and the person's strategy. */
-export function planStep(stats: SignalStats, choice: StrategyChoice, today: string): PlanStep {
+/**
+ * An item's step in a plan, from its saved numbers and the person's strategy. `statsDay`: the day
+ * the numbers were worked out (up to a few days before `today`), the day their age is on.
+ */
+export function planStep(
+  stats: SignalStats,
+  choice: StrategyChoice,
+  today: string,
+  statsDay = today,
+): PlanStep {
   const j = judge(stats, choice);
   const top = j.zone.top;
   if (stats.fair === null) return { when: 'none', day: null, price: null, reason: 'no_price' };
   if (j.newRelease && stats.ageDays !== null) {
+    const from = addDays(statsDay, j.waitDays - stats.ageDays);
     return {
       when: 'from',
-      day: addDays(today, j.waitDays - stats.ageDays),
+      // Numbers a few days old may put the day in the past: from today then.
+      day: from < today ? today : from,
       price: top,
       reason: 'new_release',
     };

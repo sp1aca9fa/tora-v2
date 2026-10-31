@@ -96,9 +96,10 @@ export async function buyPlanFor(db: Db, user: User, now = new Date()): Promise<
   return list.flatMap((w) => {
     const product = byId.get(w.productId);
     if (!product) return [];
-    const stats = signals.get(`${w.productId}|${w.bucket}`)?.stats;
-    const step: PlanStep = stats
-      ? planStep(stats, strategyOf(user.preferences, productClass(product)), today)
+    const row = signals.get(`${w.productId}|${w.bucket}`);
+    // The row may be a few days old: its age is on its own day.
+    const step: PlanStep = row
+      ? planStep(row.stats, strategyOf(user.preferences, productClass(product)), today, row.day)
       : { when: 'none', day: null, price: null, reason: 'no_price' };
     const o = ranked.get(`${w.productId}|${w.bucket}`);
     return [

@@ -57,6 +57,20 @@ describe('planStep', () => {
         today,
       ),
     ).toEqual({ when: 'from', day: '2027-01-19', price: 9000, reason: 'new_release' });
+    // Numbers worked out two days ago: their age is on that day, so the wait ends two days sooner.
+    expect(
+      planStep(
+        stats({
+          fair: 8800,
+          ageDays: 30,
+          releaseFrom: 'set',
+          lowAge: { age: 120, items: 4, line: null },
+        }),
+        steady,
+        today,
+        '2026-10-19',
+      ).day,
+    ).toBe('2027-01-17');
     expect(
       planStep(stats({ fair: 8800, trend14: -0.1, trend28: -0.1 }), steady, today),
     ).toMatchObject({

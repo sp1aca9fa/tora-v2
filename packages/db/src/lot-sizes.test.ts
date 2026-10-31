@@ -6,6 +6,7 @@ import { type Db, createDb } from './client';
 import { inferLotSizes } from './lot-sizes';
 import { migrateDb } from './migrate';
 import { createProduct } from './mutations';
+import { setCurrencySettings } from './registry';
 import { priceObservations } from './schema';
 import { createUser } from './users';
 
@@ -77,4 +78,36 @@ it('divides trades priced at a multiple of the going rate, and is re-runnable', 
   expect(
     (await db.select().from(priceObservations)).find((r) => r.externalRef === 'g')?.priceBase,
   ).toBe(10_000);
+});
+
+it('reads a lot price in its own currency, converted to a non-yen base with its rate', async () => {
+  await setCurrencySettings(db, { base: 'EUR', rates: { USD: { manual: 0.9 } } });
+  // Dollar trades, 0.9 euro per dollar: one unit is $100 (90 euros).
+  const usd = (
+    ref: string,
+    day: string,
+    cents: number,
+    inferred: boolean,
+    fxRate: number | null,
+  ) => ({
+    ...trade(ref, day, Math.round(cents * 0.9), inferred),
+    priceOriginal: cents,
+    currency: 'USD',
+    fxRate,
+  });
+  await db.insert(priceObservations).values([
+    usd('a', '01', 10_000, false, 0.9),
+    usd('b', '01', 10_000, false, 0.9),
+    usd('c', '02', 10_000, false, 0.9),
+    usd('lot', '02', 30_000, true, 0.9),
+    // A foreign price with no rate: unknown, left as it is.
+    usd('norate', '02', 30_000, true, null),
+  ]);
+  await inferLotSizes(db, { now: new Date('2026-10-05T12:00:00+09:00'), full: true });
+  const price = new Map(
+    (await db.select().from(priceObservations)).map((r) => [r.externalRef, r.priceBase]),
+  );
+  // $300 is 270 euros, three units of 90 (in dollars against euro references it was 3.33 units).
+  expect(price.get('lot')).toBe(9_000);
+  expect(price.get('norate')).toBe(27_000);
 });

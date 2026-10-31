@@ -22,6 +22,7 @@ import {
   estimatedPullCosts,
   clearManualPrice,
   loadMarketData,
+  rawMarketData,
   moversByPeriod,
   tradeCounts,
   portfolioSeries,
@@ -36,7 +37,14 @@ import {
   valueHoldings,
 } from './valuation';
 import { refreshItemSales } from './item-sales';
-import { holdings, portfolioCharts, priceObservations, products } from './schema';
+import {
+  holdings,
+  manualPrices,
+  portfolioCharts,
+  priceObservations,
+  productSources,
+  products,
+} from './schema';
 import { and, eq } from 'drizzle-orm';
 import { setObservationExcluded } from './sources';
 
@@ -145,6 +153,52 @@ describe('box view (scenario 5)', () => {
   });
 });
 
+describe('box view, sold and lost pulls', () => {
+  it('counts sold pulls at their sale less fees and lost ones at nothing', async () => {
+    const { box, pika, mew } = await scenario();
+    // One of the two ミュウ sold for 1,500 with 200 in fees; ピカチュウ lost.
+    await sellHolding(db, uid, mew.holding.id, {
+      quantity: 1,
+      priceBase: 1_500,
+      feesBase: 200,
+      occurredAt: ago(1),
+    });
+    await db.update(holdings).set({ status: 'lost' }).where(eq(holdings.id, pika.holding.id));
+    const view = await boxView(db, uid, box.holding.id, now);
+    expect(view?.pulls).toHaveLength(3);
+    expect(view?.pullsValueBase).toBe(925 + 1_300 + 0);
+    expect(view?.pullsValued).toBe(3);
+    expect(view?.netBase).toBe(925 + 1_300 - 5_400);
+  });
+});
+
+describe('recent sales', () => {
+  it("values only the primary market's listings' recent sales, as the stored sales", async () => {
+    // The Japanese sources in yen, TCGplayer in dollars (another market: only compared).
+    await saveSourceInfos(
+      db,
+      TEST_SOURCES.map((s) => ({ ...s, currency: s.key === 'tcgcsv' ? 'USD' : 'JPY' })),
+    );
+    const { pika } = await scenario();
+    const sale = { bucket: 'raw:A', priceBase: 3_000, observedAt: ago(0) };
+    await db.insert(productSources).values([
+      { productId: pika.product.id, source: 'snkrdunk', externalId: 'a', recentSales: [sale] },
+      {
+        productId: pika.product.id,
+        source: 'tcgcsv',
+        externalId: 'b',
+        recentSales: [{ ...sale, priceBase: 90_000 }],
+      },
+    ]);
+    for (const market of [
+      await loadMarketData(db, uid, [pika.product.id], now),
+      await rawMarketData(db, uid, [pika.product.id], now),
+    ]) {
+      expect(market.recent.get(pika.product.id)?.map((r) => r.source)).toEqual(['snkrdunk']);
+    }
+  });
+});
+
 describe('portfolio (scenario 7)', () => {
   it('totals spent, value and unrealized P/L over owned holdings', async () => {
     const { amiibo } = await scenario();
@@ -229,6 +283,30 @@ describe('portfolio (scenario 7)', () => {
     const again = await runSnapshots(db, now);
     expect(again.removed).toBe(20);
     expect(again.rows).toBe(0);
+  });
+
+  it("leaves a person's manual prices out of the market movers everyone sees", async () => {
+    const { pika } = await scenario();
+    await runSnapshots(db, now);
+    const marketIds = async () =>
+      [...(await moversByPeriod(db, uid, INSIGHT_PERIODS)).market.values()]
+        .flat()
+        .map((m) => m.product.id);
+    // From the market: ピカチュウ went from 2,000 to 3,100.
+    expect(await marketIds()).toContain(pika.product.id);
+    // Alice's own prices for it, moving from 5,000 to 8,000: hers alone, not the market's.
+    await db.insert(manualPrices).values([
+      {
+        userId: uid,
+        productId: pika.product.id,
+        bucket: 'raw:A',
+        priceBase: 5_000,
+        setAt: ago(58),
+      },
+      { userId: uid, productId: pika.product.id, bucket: 'raw:A', priceBase: 8_000, setAt: ago(3) },
+    ]);
+    await runSnapshots(db, now);
+    expect(await marketIds()).not.toContain(pika.product.id);
   });
 
   it('estimates pull costs from the opened box, for reference', async () => {

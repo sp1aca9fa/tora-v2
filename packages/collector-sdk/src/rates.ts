@@ -45,3 +45,32 @@ export async function updateRates(
   }
   return out;
 }
+
+/** A fetched rate this many days old is reported by the collect (it is still used). */
+export const STALE_RATE_DAYS = 7;
+
+/**
+ * Fetched rates whose latest stored day is more than `STALE_RATE_DAYS` before today: prices keep
+ * being converted with it (S16), so the collect says so. Typed rates apply until changed and are
+ * left out; a pair with no rate at all is reported by `updateRates`.
+ */
+export async function staleRates(
+  db: Db,
+  sources: RateSource[],
+  now: Date = new Date(),
+): Promise<{ from: string; to: string; latest: string; days: number }[]> {
+  const registry = await loadSourceRegistry(db);
+  const base = baseCurrency(registry);
+  const settings = registry.currency ?? { base };
+  const today = localDate(now);
+  const out = [];
+  for (const code of ratedCurrencies(settings, registry.sources)) {
+    const setting = rateSettingFor(settings, sources, code);
+    if (setting && 'manual' in setting) continue;
+    const latest = await latestFxDate(db, ratePair(code, base));
+    if (!latest) continue;
+    const days = Math.round((Date.parse(today) - Date.parse(latest)) / 86_400_000);
+    if (days > STALE_RATE_DAYS) out.push({ from: code, to: base, latest, days });
+  }
+  return out;
+}

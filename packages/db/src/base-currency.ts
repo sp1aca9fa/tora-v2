@@ -13,6 +13,7 @@ import type { Db } from './client';
 import { DomainError } from './mutations';
 import { fxRateOn } from './fx';
 import { refreshItemSales } from './item-sales';
+import type { SavedOpportunities } from './opportunities';
 import { runSnapshots } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting, setCurrencySettings } from './registry';
 import { fxRates, holdingEvents, productSources, suggestions } from './schema';
@@ -85,6 +86,27 @@ async function convertIdentityMinCost(db: Db, factor: number | null): Promise<vo
     'markets',
     factor === null ? rest : { ...rest, identityMinCost: Math.round(identityMinCost * factor) },
   );
+}
+
+/**
+ * The saved opportunities' prices (fair price, lowest ask, shop buy price; per unit in the base),
+ * converted with `factor` (today's rate: they are today's). Converted in place rather than worked
+ * out again: the nightly run's signal plug-ins (S27) are not loaded here, and their signals would
+ * be lost until the next night.
+ */
+async function convertOpportunities(db: Db, factor: number): Promise<void> {
+  const saved = await readSetting<SavedOpportunities>(db, 'opportunities');
+  if (!saved) return;
+  const round = (v: number | null) => (v === null ? null : Math.round(v * factor));
+  await saveSetting(db, 'opportunities', {
+    ...saved,
+    items: saved.items.map((item) => ({
+      ...item,
+      numbers: { ...item.numbers, price: round(item.numbers.price) },
+      ask: item.ask && { ...item.ask, price: Math.round(item.ask.price * factor) },
+      buylist: item.buylist && { ...item.buylist, price: Math.round(item.buylist.price * factor) },
+    })),
+  } satisfies SavedOpportunities);
 }
 
 /**
@@ -231,6 +253,7 @@ export async function changeBaseCurrency(db: Db, to: string, now = new Date()): 
   if (toSetting) rates[from] = 'manual' in toSetting ? { manual: 1 / toSetting.manual } : toSetting;
   await setCurrencySettings(db, { base: to, rates });
   await convertIdentityMinCost(db, await factor(today));
+  await convertOpportunities(db, await factor(today));
   await refreshItemSales(db, { full: true });
   // The value history, from the converted sales (each at its own day's rate).
   await runSnapshots(db, now);

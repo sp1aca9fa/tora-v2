@@ -10,7 +10,7 @@ import { type Db, createDb } from './client';
 import { fxRateOn, saveFxRates } from './fx';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
-import { loadSourceRegistry, saveSetting, setCurrencySettings } from './registry';
+import { loadSourceRegistry, readSetting, saveSetting, setCurrencySettings } from './registry';
 import {
   holdings,
   priceObservations,
@@ -133,6 +133,37 @@ it('keeps the identity cost threshold in the base currency', async () => {
   );
   await changeBaseCurrency(db, 'JPY', new Date('2026-10-03T12:00:00Z'));
   expect((await loadSourceRegistry(db)).markets?.identityMinCost).toBe(8333);
+});
+
+it("converts the saved opportunities' prices with today's rate, keeping the plug-ins' signals", async () => {
+  await setCurrencySettings(db, { base: 'EUR', rates: {} });
+  await saveFxRates(db, 'JPYEUR', [{ date: '2026-10-01', rate: 0.006 }]);
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'Box' } },
+    { quantity: 1, costTotalBase: 1000, acquiredAt: '2026-10-02T12:00:00.000+09:00' },
+  );
+  const item = (price: number | null, ask: number | null, buylist: number | null) => ({
+    productId: 'p',
+    numbers: { price, sales30: 3 },
+    on: ['plugin-rule'],
+    ask: ask === null ? null : { price: ask, source: 'shop', url: null },
+    buylist: buylist === null ? null : { price: buylist, source: 'shop', day: '2026-10-02' },
+  });
+  const rules = [{ key: 'plugin-rule', label: 'Plug-in', about: '', warning: false }];
+  await saveSetting(db, 'opportunities', {
+    day: '2026-10-03',
+    tests: {},
+    items: [item(6_000, 3_000, 1_200), item(null, null, null)],
+    rules,
+  });
+  await changeBaseCurrency(db, 'JPY', new Date('2026-10-03T12:00:00Z'));
+  // 60 euros at 0.006 euro per yen: ¥10,000.
+  expect(await readSetting(db, 'opportunities')).toMatchObject({
+    items: [item(10_000, 5_000, 2_000), item(null, null, null)],
+    rules,
+  });
 });
 
 it('asks admins to finish the setup until the currency and time zone are chosen, even as they are', async () => {

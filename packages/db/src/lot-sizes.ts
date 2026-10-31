@@ -1,7 +1,7 @@
 // Applies estimated lot sizes to stored trades whose source did not report them (see
 // `estimateLotSize`). Re-runnable: each trade is recomputed from its original lot price, against
 // the trades of the same product, source and condition within a few days of it.
-import { estimateLotSize, localDate, toLocalIso } from '@tora/core';
+import { baseCurrency, convertMinor, estimateLotSize, localDate, toLocalIso } from '@tora/core';
 import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadItemSales, refreshItemSales } from './item-sales';
@@ -31,7 +31,23 @@ export async function inferLotSizes(
   const full = !!options.full || !(now.getTime() - lastFull < FULL_EVERY);
   const recentFrom = localDate(new Date(now.getTime() - RECENT_DAYS * DAY));
   const readFrom = localDate(new Date(now.getTime() - (RECENT_DAYS + REFERENCE_DAYS + 1) * DAY));
-  const sourceKeys = (await loadSourceRegistry(db)).sources.map((s) => s.key);
+  const registry = await loadSourceRegistry(db);
+  const sourceKeys = registry.sources.map((s) => s.key);
+  const base = baseCurrency(registry);
+  // The lot price is in the source's currency (requirements S16): in the base with the rate kept
+  // on the trade (none: it was the base already). A foreign price with no rate stays unknown.
+  const lotInBase = (r: {
+    priceOriginal: number | null;
+    currency: string | null;
+    fxRate: number | null;
+  }) =>
+    r.priceOriginal === null
+      ? null
+      : !r.currency || r.currency === base
+        ? r.priceOriginal
+        : r.fxRate === null
+          ? null
+          : convertMinor(r.priceOriginal, r.currency, base, r.fxRate);
   // Items with estimated lots among their kept sales (from the packed item sales, any marked days
   // updated first).
   await refreshItemSales(db, { marksOnly: true });
@@ -57,6 +73,8 @@ export async function inferLotSizes(
         observedAt: priceObservations.observedAt,
         priceBase: priceObservations.priceBase,
         priceOriginal: priceObservations.priceOriginal,
+        currency: priceObservations.currency,
+        fxRate: priceObservations.fxRate,
         quantityInferred: priceObservations.quantityInferred,
       })
       .from(priceObservations)
@@ -83,26 +101,30 @@ export async function inferLotSizes(
     }
     for (const group of groups.values()) {
       const trades = group
-        .map((r) => ({
-          ...r,
-          t: Date.parse(r.observedAt),
-          // What one unit sold for, as far as is known: reported lots are already per unit;
-          // unreported ones are mostly single units, so their lot price is the reference.
-          reference: r.quantityInferred ? (r.priceOriginal ?? r.priceBase) : r.priceBase,
-        }))
+        .map((r) => {
+          const lot = lotInBase(r);
+          return {
+            ...r,
+            lot,
+            t: Date.parse(r.observedAt),
+            // What one unit sold for, as far as is known: reported lots are already per unit;
+            // unreported ones are mostly single units, so their lot price is the reference.
+            reference: r.quantityInferred ? (lot ?? r.priceBase) : r.priceBase,
+          };
+        })
         .sort((a, b) => a.t - b.t);
       let from = 0;
       let to = 0;
       for (const [index, trade] of trades.entries()) {
         while (trades[from]!.t < trade.t - REFERENCE_DAYS * DAY) from++;
         while (to < trades.length && trades[to]!.t <= trade.t + REFERENCE_DAYS * DAY) to++;
-        if (!trade.quantityInferred || trade.priceOriginal === null) continue;
+        if (!trade.quantityInferred || trade.lot === null) continue;
         if (!full && trade.observedAt < recentFrom) continue;
         checked++;
         const references: number[] = [];
         for (let j = from; j < to; j++) if (j !== index) references.push(trades[j]!.reference);
-        const units = estimateLotSize(trade.priceOriginal, references);
-        const priceBase = Math.round(trade.priceOriginal / units);
+        const units = estimateLotSize(trade.lot, references);
+        const priceBase = Math.round(trade.lot / units);
         if (priceBase !== trade.priceBase) {
           updates.push({ id: trade.id, priceBase });
           changed.add(trade.productId);

@@ -3,6 +3,7 @@ import {
   createDb,
   fxRateOn,
   latestFxDate,
+  saveFxRates,
   saveSourceInfos,
   setCurrencySettings,
 } from '@tora/db';
@@ -13,7 +14,7 @@ import { join } from 'node:path';
 import { beforeEach, expect, it } from 'vitest';
 import { PoliteHttp } from './http';
 import { MissingRateError, baseConverter } from './money';
-import { updateRates } from './rates';
+import { staleRates, updateRates } from './rates';
 import type { RateSource } from './types';
 
 let db: Db;
@@ -82,4 +83,18 @@ it('skips currencies with a typed rate and fetches pairs to another base', async
   const out = await updateRates(db, [source], new PoliteHttp(), new Date('2026-10-12T03:00:00Z'));
   expect(out.map((o) => o.pair)).toEqual(['USDEUR']);
   expect(asked.map((a) => a[0])).toEqual(['USDEUR']);
+});
+
+it('reports fetched rates more than 7 days old, not typed ones nor pairs with none', async () => {
+  await saveFxRates(db, 'USDJPY', [{ date: '2026-10-01', rate: 150 }]);
+  expect(await staleRates(db, [source], new Date('2026-10-08T03:00:00Z'))).toEqual([]);
+  expect(await staleRates(db, [source], new Date('2026-10-09T03:00:00Z'))).toEqual([
+    { from: 'USD', to: 'JPY', latest: '2026-10-01', days: 8 },
+  ]);
+  // A typed rate applies until changed.
+  await setCurrencySettings(db, { base: 'JPY', rates: { USD: { manual: 150 } } });
+  expect(await staleRates(db, [source], new Date('2026-10-20T03:00:00Z'))).toEqual([]);
+  // No rate stored: updateRates says so.
+  await setCurrencySettings(db, { base: 'EUR', rates: {} });
+  expect(await staleRates(db, [source], new Date('2026-10-20T03:00:00Z'))).toEqual([]);
 });
