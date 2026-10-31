@@ -168,6 +168,9 @@ describe('box view, sold and lost pulls', () => {
     expect(view?.pulls).toHaveLength(3);
     expect(view?.pullsValueBase).toBe(925 + 1_300 + 0);
     expect(view?.pullsValued).toBe(3);
+    expect(view?.pulls.map((p) => p.countedBase ?? -1).toSorted((a, b) => a - b)).toEqual([
+      0, 925, 1_300,
+    ]);
     expect(view?.netBase).toBe(925 + 1_300 - 5_400);
   });
 });

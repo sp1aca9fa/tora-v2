@@ -95,7 +95,7 @@ export async function BoxCard({
           <p className="text-sm text-muted-foreground">{t('holding.noPulls')}</p>
         ) : (
           <ul className="divide-y text-sm">
-            {view.pulls.map(({ holding, product, valuation }) => (
+            {view.pulls.map(({ holding, product, valuation, countedBase }) => (
               <li key={holding.id}>
                 <Link
                   href={`/holdings/${holding.id}`}
@@ -118,7 +118,7 @@ export async function BoxCard({
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block tabular-nums">
-                      {valuation.valueBase === null ? '-' : money(valuation.valueBase)}
+                      {countedBase === null ? '-' : money(countedBase)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       <ConfidenceBadge confidence={valuation.confidence} />

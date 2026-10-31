@@ -801,19 +801,19 @@ export async function boxView(db: Db, userId: string, holdingId: string, now = n
       : []
     ).map((e) => [e.holdingId, e.amountBase === null ? null : e.amountBase - (e.feesBase ?? 0)]),
   );
-  const pullRows = pulls.map((p) => ({
-    ...p,
-    valuation: valueHolding(p.holding, p.product, market, now),
-  }));
   // Pulls that were sold count at their sale price (net of fees; unknown when the sale has no
-  // amount), lost ones at nothing; others at current value.
-  const counted = pullRows.map((p) =>
-    p.holding.status === 'sold'
-      ? (soldFor.get(p.holding.id) ?? null)
-      : p.holding.status === 'lost'
-        ? 0
-        : p.valuation.valueBase,
-  );
+  // amount), lost ones at nothing; others at current value. Each row shows what it counts.
+  const pullRows = pulls.map((p) => {
+    const valuation = valueHolding(p.holding, p.product, market, now);
+    const countedBase =
+      p.holding.status === 'sold'
+        ? (soldFor.get(p.holding.id) ?? null)
+        : p.holding.status === 'lost'
+          ? 0
+          : valuation.valueBase;
+    return { ...p, valuation, countedBase };
+  });
+  const counted = pullRows.map((p) => p.countedBase);
   const pullsValueBase = counted.reduce<number>((sum, v) => sum + (v ?? 0), 0);
   return {
     box,
