@@ -16,7 +16,7 @@ const SAMPLE_NOTE = 'Sample seed data. Edit or delete.';
 const at = (date: string) => toLocalIso(localTime(date, '12:00:00.000'));
 
 export async function seedDemoUser(db: Db, authSecret: string) {
-  const backup = generateBackupCodes();
+  const backup = generateBackupCodes(authSecret);
   const { user } = await createUser(
     db,
     DEMO_USERNAME,

@@ -1,3 +1,4 @@
+import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
 import {
   type AuthConfig,
@@ -34,12 +35,23 @@ describe('session tokens', () => {
   });
 
   it('keeps MFA and session tokens apart', async () => {
-    const mfa = await createMfaToken(config, 'U1');
-    expect(await verifyMfaToken(mfa, config)).toBe('U1');
+    const mfa = await createMfaToken(config, 'U1', 'fp');
+    expect(await verifyMfaToken(mfa, config)).toEqual({ userId: 'U1', fingerprint: 'fp' });
     expect(await verifySessionToken(mfa, config)).toBeNull();
     expect(await verifyMfaToken(await createSessionToken(config, claims), config)).toBeNull();
-    const stale = await createMfaToken(config, 'U1', new Date(Date.now() - 11 * 60 * 1000));
+    const stale = await createMfaToken(config, 'U1', 'fp', new Date(Date.now() - 11 * 60 * 1000));
     expect(await verifyMfaToken(stale, config)).toBeNull();
+  });
+
+  it('refuses an MFA token without the credentials fingerprint (made before it was kept)', async () => {
+    const old = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject('U1')
+      .setAudience('mfa')
+      .setIssuedAt()
+      .setExpirationTime('10m')
+      .sign(new TextEncoder().encode(config.secret));
+    expect(await verifyMfaToken(old, config)).toBeNull();
   });
 
   it('fingerprints change with the password or the 2FA secret', () => {
@@ -60,6 +72,12 @@ describe('helpers', () => {
     expect(safeNextPath('/settings')).toBe('/settings');
     expect(safeNextPath('//evil.com')).toBe('/');
     expect(safeNextPath('/\\evil.com')).toBe('/');
+    expect(safeNextPath('/\t/evil.com')).toBe('/');
+    expect(safeNextPath('/\n/evil.com')).toBe('/');
+    expect(safeNextPath('/\r\n/evil.com')).toBe('/');
+    expect(safeNextPath('/x\u007f')).toBe('/');
+    expect(safeNextPath('/settings\\x')).toBe('/');
+    expect(safeNextPath('/items?q=a%20b#top')).toBe('/items?q=a%20b#top');
     expect(safeNextPath('https://evil.com')).toBe('/');
     expect(safeNextPath('/login/verify')).toBe('/');
     expect(safeNextPath(null)).toBe('/');

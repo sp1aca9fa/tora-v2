@@ -81,9 +81,18 @@ export async function verifySessionToken(
   }
 }
 
-/** Short-lived proof that step 1 (password) succeeded, for the authenticator step. */
-export async function createMfaToken(config: AuthConfig, userId: string, now = new Date()) {
-  return new SignJWT({})
+/**
+ * Short-lived proof that step 1 (password) succeeded, for the authenticator step. It carries the
+ * credentials' fingerprint, as the session does: after a password change or 2FA reset a step 1
+ * done before it no longer opens step 2.
+ */
+export async function createMfaToken(
+  config: AuthConfig,
+  userId: string,
+  fingerprint: string,
+  now = new Date(),
+) {
+  return new SignJWT({ fp: fingerprint })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)
     .setAudience('mfa')
@@ -95,14 +104,15 @@ export async function createMfaToken(config: AuthConfig, userId: string, now = n
 export async function verifyMfaToken(
   token: string | undefined,
   config: AuthConfig | null,
-): Promise<string | null> {
+): Promise<{ userId: string; fingerprint: string } | null> {
   if (!token || !config) return null;
   try {
     const { payload } = await jwtVerify(token, key(config.secret), {
       algorithms: ['HS256'],
       audience: 'mfa',
     });
-    return payload.sub ?? null;
+    if (!payload.sub || typeof payload.fp !== 'string') return null;
+    return { userId: payload.sub, fingerprint: payload.fp };
   } catch {
     return null;
   }
@@ -120,10 +130,17 @@ export function sessionCookieOptions(maxAge = SESSION_MAX_AGE_SECONDS) {
   };
 }
 
-/** Only same-origin relative paths, to avoid open redirects after login. */
+/**
+ * Only same-origin relative paths, to avoid open redirects after login. Browsers drop tabs and
+ * newlines from a URL and read a backslash as a slash, so `/<tab>/evil.com` or `/\evil.com`
+ * would leave the site: any control character or backslash gives the home page.
+ */
 export function safeNextPath(next: unknown): string {
   if (typeof next !== 'string' || !next.startsWith('/') || next.startsWith('//')) return '/';
-  if (next.startsWith('/\\') || next.startsWith('/login')) return '/';
+  if (next.startsWith('/login')) return '/';
+  for (const c of next) {
+    if (c <= '\u001f' || c === '\u007f' || c === '\\') return '/';
+  }
   return next;
 }
 

@@ -105,7 +105,7 @@ async function enrollAuthenticator(username: string) {
     if (attempt >= 3) fail('Code did not match. Nothing was saved; run the command again.');
     console.log('That code did not match, try again (check the phone clock is automatic).');
   }
-  const backup = generateBackupCodes();
+  const backup = generateBackupCodes(authSecret);
   return { totpSecretEnc: encryptSecret(secret, authSecret), backup };
 }
 

@@ -12,6 +12,7 @@ import {
 } from '@tora/auth';
 import {
   completeSetup,
+  consumeBackupCode,
   getDb,
   loadTimeZone,
   markTotpStepUsed,
@@ -19,7 +20,7 @@ import {
   setupByToken,
 } from '@tora/db';
 import { clientIp } from '@/lib/auth/admin-code';
-import { isLockedOut, recordAttempt } from '@/lib/auth/lockout';
+import { beginAttempt } from '@/lib/auth/lockout';
 import { authConfigFromEnv } from '@/lib/auth/session';
 
 /** As `pnpm user` asks (the page says so too). */
@@ -49,24 +50,34 @@ export async function completeSetupAction(_prev: SetupState, form: FormData): Pr
     ipHash: keyedHash(await clientIp(), config.secret),
     usernameHash: keyedHash(user.username, config.secret),
   };
-  if (await isLockedOut(db, key)) return { error: 'locked' };
+  const attempt = await beginAttempt(db, key);
+  if (!attempt) return { error: 'locked' };
 
   const newPassword = setup.kind !== '2fa';
   const newAuthenticator = setup.kind !== 'password';
   const password = String(form.get('password') ?? '');
   if (newPassword) {
-    if (password.length < MIN_PASSWORD) return { error: 'short' };
-    if (password !== String(form.get('repeat') ?? '')) return { error: 'mismatch' };
+    // Form errors guess nothing: they do not count toward the lockout.
+    const error =
+      password.length < MIN_PASSWORD
+        ? 'short'
+        : password !== String(form.get('repeat') ?? '')
+          ? 'mismatch'
+          : null;
+    if (error) {
+      await attempt.drop();
+      return { error };
+    }
   }
 
   // The factor kept proves it is the person.
   const current = String(form.get('current') ?? '');
-  let backupIndex = -1;
   if (setup.kind === 'password') {
     let ok = false;
     if (looksLikeBackupCode(current)) {
-      backupIndex = matchBackupCode(current.trim(), user.backupCodeHashes);
-      ok = backupIndex >= 0;
+      // Used up here, atomically (as at sign-in): one code proves it once, even in parallel.
+      const hash = matchBackupCode(current.trim(), user.backupCodeHashes, config.secret);
+      ok = hash !== null && (await consumeBackupCode(db, user.id, hash));
     } else if (user.totpSecretEnc) {
       const step = verifyTotp(decryptSecret(user.totpSecretEnc, config.secret), current.trim(), {
         lastUsedStep: user.totpLastStep,
@@ -74,7 +85,7 @@ export async function completeSetupAction(_prev: SetupState, form: FormData): Pr
       ok = step !== null && (await markTotpStepUsed(db, user.id, step));
     }
     if (!ok) {
-      await recordAttempt(db, key, false);
+      await attempt.settle(false);
       return { error: 'invalid' };
     }
   }
@@ -82,7 +93,7 @@ export async function completeSetupAction(_prev: SetupState, form: FormData): Pr
     setup.kind === '2fa' &&
     !(user.passwordHash && (await verifyPassword(current, user.passwordHash)))
   ) {
-    await recordAttempt(db, key, false);
+    await attempt.settle(false);
     return { error: 'invalid' };
   }
   if (newAuthenticator) {
@@ -91,23 +102,23 @@ export async function completeSetupAction(_prev: SetupState, form: FormData): Pr
       !offered ||
       verifyTotp(decryptSecret(offered, config.secret), String(form.get('code') ?? '')) === null
     ) {
-      await recordAttempt(db, key, false);
+      await attempt.settle(false);
       return { error: 'newCode' };
     }
   }
 
-  const backup = newAuthenticator ? generateBackupCodes() : null;
+  const backup = newAuthenticator ? generateBackupCodes(config.secret) : null;
   const done = await completeSetup(db, setup.id, {
     ...(newPassword ? { passwordHash: await hashPassword(password) } : {}),
     ...(newAuthenticator ? { totpSecretEnc: setup.totpSecretEnc! } : {}),
-    ...(backup
-      ? { backupCodeHashes: backup.hashes }
-      : backupIndex >= 0
-        ? { backupCodeHashes: user.backupCodeHashes.filter((_, i) => i !== backupIndex) }
-        : {}),
+    ...(backup ? { backupCodeHashes: backup.hashes } : {}),
   });
-  if (!done) return { error: 'expired' };
-  await recordAttempt(db, key, true);
+  if (!done) {
+    // The link was used meanwhile: nothing saved, no failure counted (as before any check).
+    await attempt.drop();
+    return { error: 'expired' };
+  }
+  await attempt.settle(true);
   await recordAdminChange(db, user.id, 'userSetupDone', { user: user.username, setup: setup.kind });
   return { done: true, backupCodes: backup?.codes };
 }

@@ -11,6 +11,7 @@ import {
   matchBackupCode,
   normalizeUsername,
   otpauthUri,
+  sha256,
   totpCode,
   totpStep,
   verifyPassword,
@@ -71,11 +72,28 @@ describe('secrets at rest', () => {
 });
 
 describe('backup codes', () => {
-  it('match once by hash, ignoring case and dashes', () => {
-    const { codes, hashes } = generateBackupCodes();
+  const secret = 'a'.repeat(32);
+
+  it('match by keyed hash, ignoring case and dashes', () => {
+    const { codes, hashes } = generateBackupCodes(secret);
     expect(codes).toHaveLength(8);
-    expect(matchBackupCode(codes[3]!.toUpperCase().replace('-', ' '), hashes)).toBe(3);
-    expect(matchBackupCode('aaaaa-bbbbb', hashes)).toBe(-1);
+    expect(matchBackupCode(codes[3]!.toUpperCase().replace('-', ' '), hashes, secret)).toBe(
+      hashes[3],
+    );
+    expect(matchBackupCode('aaaaa-bbbbb', hashes, secret)).toBeNull();
+    expect(matchBackupCode('short', hashes, secret)).toBeNull();
+  });
+
+  it('store no plain hash, and need the secret to match', () => {
+    const { codes, hashes } = generateBackupCodes(secret);
+    expect(hashes[0]).not.toBe(sha256(codes[0]!.replace('-', '')));
+    expect(matchBackupCode(codes[0]!, hashes, 'b'.repeat(32))).toBeNull();
+  });
+
+  it('still match codes stored as a plain hash before the keyed one', () => {
+    const old = [sha256('abcdefghjk'), sha256('mnpqrstuvw')];
+    expect(matchBackupCode('MNPQR-STUVW', old, secret)).toBe(old[1]);
+    expect(matchBackupCode('aaaaa-bbbbb', old, secret)).toBeNull();
   });
 });
 

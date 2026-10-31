@@ -4,6 +4,7 @@
 import { loadAccountData } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { currentSession } from '@/lib/auth/guard';
+import { readTextUpTo } from '@/lib/read-body';
 
 /** A collection of several thousand lots is about 12 MB. */
 const MAX_BYTES = 50_000_000;
@@ -17,9 +18,11 @@ export async function POST(request: Request) {
   if (Number(request.headers.get('content-length') ?? 0) > MAX_BYTES) {
     return Response.json({ error: 'tooBig' }, { status: 413 });
   }
+  const text = await readTextUpTo(request, MAX_BYTES);
+  if (text === null) return Response.json({ error: 'tooBig' }, { status: 413 });
   let file: unknown;
   try {
-    file = JSON.parse(await request.text());
+    file = JSON.parse(text);
   } catch {
     return Response.json({ error: 'format' }, { status: 400 });
   }

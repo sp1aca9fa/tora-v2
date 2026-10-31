@@ -31,31 +31,34 @@ async function failures(db: Db, now: Date, windowMs: number, where?: ReturnType<
   return row?.n ?? 0;
 }
 
-/** IP and username are stored only as keyed hashes. */
-export async function isLockedOut(
-  db: Db,
-  key: { ipHash: string; usernameHash?: string | null },
-  now = new Date(),
-): Promise<boolean> {
+type AttemptKey = { ipHash: string; usernameHash?: string | null };
+
+/** `own`: the caller's own attempt already counted as a failure (see `beginAttempt`). */
+async function overLimit(db: Db, key: AttemptKey, now: Date, own: 0 | 1): Promise<boolean> {
   if (
     (await failures(db, now, IP_WINDOW_MS, eq(loginAttempts.ipHash, key.ipHash))) >=
-    MAX_FAILURES_PER_IP
+    MAX_FAILURES_PER_IP + own
   ) {
     return true;
   }
   if (
     key.usernameHash &&
     (await failures(db, now, HOUR_MS, eq(loginAttempts.usernameHash, key.usernameHash))) >=
-      MAX_FAILURES_PER_USERNAME
+      MAX_FAILURES_PER_USERNAME + own
   ) {
     return true;
   }
-  return (await failures(db, now, HOUR_MS)) >= MAX_FAILURES_GLOBAL;
+  return (await failures(db, now, HOUR_MS)) >= MAX_FAILURES_GLOBAL + own;
+}
+
+/** IP and username are stored only as keyed hashes. */
+export async function isLockedOut(db: Db, key: AttemptKey, now = new Date()): Promise<boolean> {
+  return overLimit(db, key, now, 0);
 }
 
 export async function recordAttempt(
   db: Db,
-  key: { ipHash: string; usernameHash?: string | null },
+  key: AttemptKey,
   success: boolean,
   now = new Date(),
 ): Promise<void> {
@@ -65,5 +68,56 @@ export async function recordAttempt(
     success,
     attemptedAt: toLocalIso(now),
   });
+  await prune(db, now);
+}
+
+async function prune(db: Db, now: Date) {
   await db.delete(loginAttempts).where(lt(loginAttempts.attemptedAt, since(now, RETENTION_MS)));
+}
+
+export interface Attempt {
+  /** Saves how the check went. */
+  settle(success: boolean): Promise<void>;
+  /** Forgets the attempt: it guessed nothing (a form error before any check). */
+  drop(): Promise<void>;
+}
+
+/**
+ * Starts a password or code check, or null when locked out. The attempt is saved as failed
+ * before the check and the limits are counted with it, so parallel requests cannot all pass
+ * the lockout before any failure is saved: at most the limit's worth are checked at once. A
+ * locked-out attempt is forgotten, as before (it checked nothing). Requirements section 3,
+ * Auth: failed attempts counted per IP and per username, with temporary lockout.
+ */
+export async function beginAttempt(
+  db: Db,
+  key: AttemptKey,
+  now = new Date(),
+): Promise<Attempt | null> {
+  const [row] = await db
+    .insert(loginAttempts)
+    .values({
+      ipHash: key.ipHash,
+      usernameHash: key.usernameHash ?? null,
+      success: false,
+      attemptedAt: toLocalIso(now),
+    })
+    .returning({ id: loginAttempts.id });
+  const id = row!.id;
+  const drop = async () => {
+    await db.delete(loginAttempts).where(eq(loginAttempts.id, id));
+  };
+  if (await overLimit(db, key, now, 1)) {
+    await drop();
+    return null;
+  }
+  return {
+    async settle(success) {
+      if (success) {
+        await db.update(loginAttempts).set({ success }).where(eq(loginAttempts.id, id));
+      }
+      await prune(db, now);
+    },
+    drop,
+  };
 }

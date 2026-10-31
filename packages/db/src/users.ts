@@ -7,7 +7,7 @@ import {
   type UserPreferences,
   toLocalIso,
 } from '@tora/core';
-import { and, asc, count, eq, isNull, lt, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { holdings, type User, type UserDevice, userDevices, users } from './schema';
 
@@ -110,11 +110,30 @@ export async function markTotpStepUsed(db: Db, userId: string, step: number): Pr
   return rows.length > 0;
 }
 
-export async function consumeBackupCode(db: Db, userId: string, index: number): Promise<void> {
-  const user = await getUserById(db, userId);
-  if (!user) return;
-  const remaining = user.backupCodeHashes.filter((_, i) => i !== index);
-  await db.update(users).set({ backupCodeHashes: remaining }).where(eq(users.id, userId));
+/**
+ * Uses up one backup code, found by its stored hash, before it lets anyone in: the list is only
+ * written over if it is still the one read, so two sign-ins with the same code cannot both pass
+ * and a code another sign-in used meanwhile is never put back. False when the code is not
+ * there (any more).
+ */
+export async function consumeBackupCode(db: Db, userId: string, hash: string): Promise<boolean> {
+  // A retry only when another code was used between the read and the write.
+  for (let tries = 0; tries < 5; tries++) {
+    const [row] = await db
+      .select({ raw: sql<string>`${users.backupCodeHashes}` })
+      .from(users)
+      .where(eq(users.id, userId));
+    if (!row) return false;
+    const hashes = JSON.parse(row.raw) as string[];
+    if (!hashes.includes(hash)) return false;
+    const done = await db
+      .update(users)
+      .set({ backupCodeHashes: hashes.filter((h) => h !== hash) })
+      .where(and(eq(users.id, userId), sql`${users.backupCodeHashes} = ${row.raw}`))
+      .returning({ id: users.id });
+    if (done.length > 0) return true;
+  }
+  return false;
 }
 
 export async function listDevices(

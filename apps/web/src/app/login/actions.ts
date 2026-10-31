@@ -29,7 +29,7 @@ import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { alertContext } from '@/lib/alert-context';
 import { clientIp } from '@/lib/auth/admin-code';
-import { isLockedOut, recordAttempt } from '@/lib/auth/lockout';
+import { beginAttempt } from '@/lib/auth/lockout';
 import {
   MFA_COOKIE,
   MFA_MAX_AGE_SECONDS,
@@ -110,7 +110,8 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const password = String(formData.get('password') ?? '');
   const usable = user?.passwordHash && !user.disabledAt ? user : null;
   dummy ??= makeDummy();
-  if (await isLockedOut(db, key)) {
+  const attempt = await beginAttempt(db, key);
+  if (!attempt) {
     // No hash while locked out, so a flood of guesses costs only timers; the wait keeps the
     // answer's timing like a checked password's. The password stays unknown.
     const ms = lastCheckMs ?? (await dummy).ms;
@@ -126,7 +127,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const ok = await verifyPassword(password, stored);
   const devices = await listDevices(db, usable?.id ?? '');
   const who = { userId: user?.id ?? null, username, passwordKnown: ok && !!usable };
-  await recordAttempt(db, key, ok && Boolean(usable));
+  await attempt.settle(ok && Boolean(usable));
   lastCheckMs = performance.now() - start;
   if (!user) return failed('unknownUser', who, 'password');
   if (!usable) return failed(user.disabledAt ? 'disabled' : 'notSetUp', who, 'password');
@@ -136,7 +137,8 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return failed('devices', { ...who, devices: devices.map((d) => d.label ?? '-') }, 'password');
   }
 
-  (await cookies()).set(MFA_COOKIE, await createMfaToken(config, usable.id), {
+  const mfa = await createMfaToken(config, usable.id, credentialFingerprint(usable));
+  (await cookies()).set(MFA_COOKIE, mfa, {
     ...sessionCookieOptions(MFA_MAX_AGE_SECONDS),
     path: '/login',
   });
@@ -151,10 +153,17 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
   const db = getDb();
   await loadTimeZone(db);
   const jar = await cookies();
-  const userId = await verifyMfaToken(jar.get(MFA_COOKIE)?.value, config);
-  const user = userId ? await getUserById(db, userId) : null;
-  // The step 1 cookie ran out (or the account changed meanwhile): start over, nothing to tell.
-  if (!user?.totpSecretEnc || user.disabledAt) return { error: 'expired', step: 'code' };
+  const pending = await verifyMfaToken(jar.get(MFA_COOKIE)?.value, config);
+  const user = pending ? await getUserById(db, pending.userId) : null;
+  // The step 1 cookie ran out (or the account, its password or authenticator changed meanwhile):
+  // start over, nothing to tell.
+  if (
+    !user?.totpSecretEnc ||
+    user.disabledAt ||
+    credentialFingerprint(user) !== pending?.fingerprint
+  ) {
+    return { error: 'expired', step: 'code' };
+  }
   // Past step 1: the password was right.
   const who = { userId: user.id, username: user.username, passwordKnown: true };
 
@@ -162,21 +171,22 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
     ipHash: keyedHash(await clientIp(), config.secret),
     usernameHash: keyedHash(user.username, config.secret),
   };
-  if (await isLockedOut(db, key)) return failed('locked', who, 'code');
+  const attempt = await beginAttempt(db, key);
+  if (!attempt) return failed('locked', who, 'code');
 
   const code = String(formData.get('code') ?? '').trim();
-  let backupIndex = -1;
   let ok = false;
   if (looksLikeBackupCode(code)) {
-    backupIndex = matchBackupCode(code, user.backupCodeHashes);
-    ok = backupIndex >= 0;
+    // Used up before the device is registered: one code signs in once, even in parallel.
+    const hash = matchBackupCode(code, user.backupCodeHashes, config.secret);
+    ok = hash !== null && (await consumeBackupCode(db, user.id, hash));
   } else {
     const step = verifyTotp(decryptSecret(user.totpSecretEnc, config.secret), code, {
       lastUsedStep: user.totpLastStep,
     });
     ok = step !== null && (await markTotpStepUsed(db, user.id, step));
   }
-  await recordAttempt(db, key, ok);
+  await attempt.settle(ok);
   if (!ok) return failed('code', who, 'code');
 
   const device = await registerDevice(
@@ -188,7 +198,6 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
     const devices = await listDevices(db, user.id);
     return failed('devices', { ...who, devices: devices.map((d) => d.label ?? '-') }, 'code');
   }
-  if (backupIndex >= 0) await consumeBackupCode(db, user.id, backupIndex);
 
   jar.set(
     SESSION_COOKIE,

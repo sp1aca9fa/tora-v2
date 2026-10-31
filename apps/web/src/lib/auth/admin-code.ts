@@ -3,7 +3,7 @@ import { decryptSecret, keyedHash, verifyTotp } from '@tora/auth';
 import { markTotpStepUsed } from '@tora/db';
 import { headers } from 'next/headers';
 import type { Session } from './guard';
-import { isLockedOut, recordAttempt } from './lockout';
+import { beginAttempt } from './lockout';
 import { authConfigFromEnv } from './session';
 
 /** The client's IP as the platform gives it (a hosting platform's edge or the server's proxy sets these headers). */
@@ -25,12 +25,13 @@ export async function checkAdminCode({ db, user }: Session, code: string): Promi
     ipHash: keyedHash(await clientIp(), config.secret),
     usernameHash: keyedHash(user.username, config.secret),
   };
-  if (await isLockedOut(db, key)) return 'locked';
+  const attempt = await beginAttempt(db, key);
+  if (!attempt) return 'locked';
   const step = verifyTotp(decryptSecret(user.totpSecretEnc, config.secret), code.trim(), {
     lastUsedStep: user.totpLastStep,
   });
   const ok = step !== null && (await markTotpStepUsed(db, user.id, step));
-  await recordAttempt(db, key, ok);
+  await attempt.settle(ok);
   return ok ? 'ok' : 'invalid';
 }
 
