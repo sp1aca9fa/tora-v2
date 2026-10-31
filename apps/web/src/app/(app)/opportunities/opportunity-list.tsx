@@ -28,8 +28,10 @@ export function OpportunityList({
   const t = useTranslations('opportunities');
   const [rows, setRows] = useState(initial);
   const [loading, setLoading] = useState(false);
+  // Set when the server had nothing new (or failed), so the list does not ask again forever.
+  const [done, setDone] = useState(false);
   const end = useRef<HTMLDivElement>(null);
-  const more = rows.length < total;
+  const more = !done && rows.length < total;
 
   useEffect(() => {
     const el = end.current;
@@ -40,10 +42,14 @@ export function OpportunityList({
         setLoading(true);
         try {
           const next = await moreOpportunitiesAction(filter, rows.length);
+          const fresh = next.filter((r) => !rows.some((h) => h.productId === r.productId));
+          if (!fresh.length) setDone(true);
           setRows((had) => [
             ...had,
-            ...next.filter((r) => !had.some((h) => h.productId === r.productId)),
+            ...fresh.filter((r) => !had.some((h) => h.productId === r.productId)),
           ]);
+        } catch {
+          setDone(true);
         } finally {
           setLoading(false);
         }
@@ -52,7 +58,7 @@ export function OpportunityList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rows.length, more, loading, filter]);
+  }, [rows, more, loading, filter]);
 
   const heading = (title: string, note?: string) => (
     <li className="space-y-0.5 pt-2 first:pt-0 lg:col-span-2 2xl:col-span-3">

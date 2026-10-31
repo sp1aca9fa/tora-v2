@@ -12,6 +12,7 @@ import { ProductPicker } from '@/components/product-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
+import { submitWith } from '@/lib/submit-form';
 import type { PullState } from '../actions';
 
 /**
@@ -29,12 +30,14 @@ export function PullLogger({
   const [existing, setExisting] = useState<ProductSummary | null>(null);
   // What is being typed, to suggest cards already registered.
   const [typed, setTyped] = useState({ name: '', number: '' });
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState(
     async (prev: PullState, formData: FormData) => {
       const next = await action(prev, formData);
       if (next.added !== prev.added) {
         setExisting(null);
         setTyped({ name: '', number: '' });
+        formRef.current?.reset();
       }
       return next;
     },
@@ -48,7 +51,7 @@ export function PullLogger({
   }, [state.added]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} onSubmit={submitWith(formAction)} className="space-y-4">
       <input type="hidden" name="date" value={today} />
       <input type="hidden" name="productId" value={existing?.id ?? ''} />
 

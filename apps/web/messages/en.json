@@ -1221,6 +1221,7 @@
     "none": "No rate source",
     "manual": "Typed rate",
     "typedLabel": "1 {code} =",
+    "rateInvalid": "Enter a number above zero, like 0.0067 or 1,234.5.",
     "save": "Save",
     "manualInfo": "Used from today until changed; earlier days keep their rates.",
     "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running.",

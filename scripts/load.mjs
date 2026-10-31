@@ -67,66 +67,74 @@ export async function runLoad() {
        WHERE u.disabled_at IS NULL AND u.password_hash IS NOT NULL GROUP BY u.id ORDER BY count(*) DESC`,
     )
   ).rows;
+  if (users.length === 0) {
+    console.error('No account with lots to sign in as. Use a test install with data.');
+    db.close();
+    process.exit(1);
+  }
   const at = new Date().toISOString();
   const sessions = [];
-  for (let i = 0; i < people; i++) {
-    const user = users[i % users.length];
-    const device = `load${randomBytes(10).toString('hex')}`;
-    await db.execute({
-      sql: `INSERT INTO user_devices (id, user_id, label, last_seen_at, created_at, updated_at) VALUES (?, ?, 'load test', ?, ?, ?)`,
-      args: [device, user.id, at, at, at],
-    });
-    const fingerprint = createHash('sha256')
-      .update(`${user.password_hash ?? ''}|${user.totp_secret_enc ?? ''}`)
-      .digest('base64url')
-      .slice(0, 16);
-    const pick = async (sql) => (await db.execute({ sql, args: [user.id] })).rows[0]?.id ?? null;
-    sessions.push({
-      device,
-      cookie: `tora_session=${sessionToken(secret, user.id, device, fingerprint)}`,
-      item: await pick(
-        `SELECT product_id AS id FROM holdings WHERE user_id = ? AND status = 'owned' LIMIT 1`,
-      ),
-      lot: await pick(`SELECT id FROM holdings WHERE user_id = ? AND status = 'owned' LIMIT 1`),
-    });
-  }
-
-  console.log(
-    `${people} people (${Math.min(people, users.length)} accounts) for ${seconds} s on ${BASE}`,
-  );
+  let elapsed = 0;
   const times = new Map(PAGES.map(([name]) => [name, []]));
   const failed = new Map();
-  const end = Date.now() + seconds * 1000;
-  const started = performance.now();
-  await Promise.all(
-    sessions.map(async (s, n) => {
-      for (let i = n; Date.now() < end; i++) {
-        const [name, path] = PAGES[i % PAGES.length];
-        const href = path.replace('{item}', s.item).replace('{lot}', s.lot);
-        const t = performance.now();
-        let status;
-        try {
-          const response = await fetch(BASE + href, {
-            headers: { cookie: s.cookie },
-            redirect: 'manual',
-          });
-          await response.text();
-          // A page sending people elsewhere (Stores to pick an area first) is fine; to sign in is not.
-          const login = response.headers.get('location')?.includes('/login');
-          status = response.status < 400 && !login ? 200 : response.status;
-        } catch (e) {
-          status = e.cause?.code ?? e.message;
-        }
-        if (status === 200) times.get(name).push(performance.now() - t);
-        else failed.set(`${name} ${status}`, (failed.get(`${name} ${status}`) ?? 0) + 1);
-      }
-    }),
-  );
-  const elapsed = (performance.now() - started) / 1000;
+  try {
+    for (let i = 0; i < people; i++) {
+      const user = users[i % users.length];
+      const device = `load${randomBytes(10).toString('hex')}`;
+      await db.execute({
+        sql: `INSERT INTO user_devices (id, user_id, label, last_seen_at, created_at, updated_at) VALUES (?, ?, 'load test', ?, ?, ?)`,
+        args: [device, user.id, at, at, at],
+      });
+      const fingerprint = createHash('sha256')
+        .update(`${user.password_hash ?? ''}|${user.totp_secret_enc ?? ''}`)
+        .digest('base64url')
+        .slice(0, 16);
+      const pick = async (sql) => (await db.execute({ sql, args: [user.id] })).rows[0]?.id ?? null;
+      sessions.push({
+        device,
+        cookie: `tora_session=${sessionToken(secret, user.id, device, fingerprint)}`,
+        item: await pick(
+          `SELECT product_id AS id FROM holdings WHERE user_id = ? AND status = 'owned' LIMIT 1`,
+        ),
+        lot: await pick(`SELECT id FROM holdings WHERE user_id = ? AND status = 'owned' LIMIT 1`),
+      });
+    }
 
-  for (const s of sessions)
-    await db.execute({ sql: 'DELETE FROM user_devices WHERE id = ?', args: [s.device] });
-  db.close();
+    console.log(
+      `${people} people (${Math.min(people, users.length)} accounts) for ${seconds} s on ${BASE}`,
+    );
+    const end = Date.now() + seconds * 1000;
+    const started = performance.now();
+    await Promise.all(
+      sessions.map(async (s, n) => {
+        for (let i = n; Date.now() < end; i++) {
+          const [name, path] = PAGES[i % PAGES.length];
+          const href = path.replace('{item}', s.item).replace('{lot}', s.lot);
+          const t = performance.now();
+          let status;
+          try {
+            const response = await fetch(BASE + href, {
+              headers: { cookie: s.cookie },
+              redirect: 'manual',
+            });
+            await response.text();
+            // A page sending people elsewhere (Stores to pick an area first) is fine; to sign in is not.
+            const login = response.headers.get('location')?.includes('/login');
+            status = response.status < 400 && !login ? 200 : response.status;
+          } catch (e) {
+            status = e.cause?.code ?? e.message;
+          }
+          if (status === 200) times.get(name).push(performance.now() - t);
+          else failed.set(`${name} ${status}`, (failed.get(`${name} ${status}`) ?? 0) + 1);
+        }
+      }),
+    );
+    elapsed = (performance.now() - started) / 1000;
+  } finally {
+    for (const s of sessions)
+      await db.execute({ sql: 'DELETE FROM user_devices WHERE id = ?', args: [s.device] });
+    db.close();
+  }
 
   const all = [...times.values()].flat();
   console.log(

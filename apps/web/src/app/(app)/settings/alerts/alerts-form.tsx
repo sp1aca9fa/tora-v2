@@ -1,11 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useActionState, useState, useTransition } from 'react';
+import { useActionState, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
+import { submitWith } from '@/lib/submit-form';
 import {
   type AlertState,
   addDiscordAction,
@@ -166,9 +167,17 @@ export function TelegramConnect({ bot, link }: { bot: string; link: string }) {
 
 export function DiscordForm() {
   const t = useTranslations('alerts');
-  const [state, formAction, pending] = useActionState<AlertState, FormData>(addDiscordAction, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction, pending] = useActionState<AlertState, FormData>(
+    async (prev, formData) => {
+      const next = await addDiscordAction(prev, formData);
+      if (next.ok) formRef.current?.reset();
+      return next;
+    },
+    {},
+  );
   return (
-    <form action={formAction} className="space-y-2 text-sm">
+    <form ref={formRef} onSubmit={submitWith(formAction)} className="space-y-2 text-sm">
       <p className="text-muted-foreground">{t('discordHelp')}</p>
       <div className="flex flex-wrap gap-2">
         <Input
@@ -214,7 +223,7 @@ export function AlertPrefsForm({
     'failures' | 'imports' | 'actions' | 'buy' | 'drops'
   )[];
   return (
-    <form action={formAction} className="space-y-4 text-sm">
+    <form onSubmit={submitWith(formAction)} className="space-y-4 text-sm">
       <fieldset className="space-y-1.5">
         {kinds.map((k) => (
           <label key={k} className="flex items-start gap-2">
@@ -255,14 +264,19 @@ export function AlertPrefsForm({
 /** The app's Telegram bot (admins). */
 export function BotForm({ bot }: { bot: string | null }) {
   const t = useTranslations('alerts');
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<AlertState, FormData>(
-    setTelegramBotAction,
+    async (prev, formData) => {
+      const next = await setTelegramBotAction(prev, formData);
+      if (next.ok) formRef.current?.reset();
+      return next;
+    },
     {},
   );
   return (
     <div className="space-y-3 text-sm">
       {bot && <p>{t('botSet', { bot })}</p>}
-      <form action={formAction} className="flex flex-wrap gap-2">
+      <form ref={formRef} onSubmit={submitWith(formAction)} className="flex flex-wrap gap-2">
         <Input
           name="token"
           type="password"
@@ -278,9 +292,9 @@ export function BotForm({ bot }: { bot: string | null }) {
       </form>
       {bot && (
         <form
-          action={formAction}
           onSubmit={(e) => {
             if (!window.confirm(t('botRemoveConfirm'))) e.preventDefault();
+            else submitWith(formAction)(e);
           }}
         >
           <input type="hidden" name="remove" value="1" />

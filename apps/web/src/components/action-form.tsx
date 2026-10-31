@@ -6,6 +6,7 @@ import { useActionState } from 'react';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import type { FormState } from '@/lib/form';
+import { submitWith } from '@/lib/submit-form';
 
 /**
  * Form shell for a server action: fields come in as (server-rendered) children; shows the
@@ -27,7 +28,7 @@ export function ActionForm({
   const t = useTranslations('common');
   const [state, formAction, pending] = useActionState(action, {});
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={submitWith(formAction)} className="space-y-4">
       {children}
       <FormError state={state} />
       <div className="flex gap-2 pt-2">

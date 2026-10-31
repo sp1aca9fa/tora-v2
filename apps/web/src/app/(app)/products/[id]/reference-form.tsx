@@ -1,21 +1,27 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { submitWith } from '@/lib/submit-form';
 import { type QueryFormState, addReferenceAction } from './source-actions';
 
 /** Paste a listing link of this exact item (a sale counts as a price). */
 export function ReferenceForm({ sourceId }: { sourceId: string }) {
   const t = useTranslations('sources.search');
+  const formRef = useRef<HTMLFormElement>(null);
   const [state, formAction, pending] = useActionState<QueryFormState, FormData>(
-    addReferenceAction.bind(null, sourceId),
+    async (prev, formData) => {
+      const next = await addReferenceAction(sourceId, prev, formData);
+      if (!next.error) formRef.current?.reset();
+      return next;
+    },
     {},
   );
   return (
-    <form action={formAction} className="space-y-1.5">
+    <form ref={formRef} onSubmit={submitWith(formAction)} className="space-y-1.5">
       <div className="flex gap-2">
         <Input
           name="url"

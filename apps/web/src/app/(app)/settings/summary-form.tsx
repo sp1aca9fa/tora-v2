@@ -6,6 +6,7 @@ import { useActionState, useState } from 'react';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
+import { submitWith } from '@/lib/submit-form';
 import { type SummaryPrefsState, saveSummaryPrefsAction } from './actions';
 
 /** Rotate the Summary's insights or show them side by side, how fast, and which ones. */
@@ -25,7 +26,7 @@ export function SummaryForm({
     {},
   );
   return (
-    <form action={formAction} className="space-y-4 text-sm">
+    <form onSubmit={submitWith(formAction)} className="space-y-4 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="inline-flex items-center gap-2">
           <input

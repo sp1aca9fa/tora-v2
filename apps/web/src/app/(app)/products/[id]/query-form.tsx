@@ -7,6 +7,7 @@ import { Field } from '@/components/field';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { submitWith } from '@/lib/submit-form';
 import { type QueryFormState, updateQueryAction } from './source-actions';
 
 /** Edits a search-based source's query (the words, excluded words and price range). */
@@ -17,7 +18,7 @@ export function QueryForm({ sourceId, query }: { sourceId: string; query: Source
     {},
   );
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={submitWith(formAction)} className="space-y-3">
       <Field label={t('keywords')} htmlFor={`q-${sourceId}`} hint={t('keywordsHint')}>
         <Input
           id={`q-${sourceId}`}

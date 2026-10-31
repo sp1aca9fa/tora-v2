@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { submitWith } from '@/lib/submit-form';
 import { type TrackingState, setTrackingAction } from './tracking-actions';
 
 /** How the lot counts in the portfolio: cost, value, both or neither (requirements S8). */
@@ -34,7 +35,7 @@ export function TrackingForm({
         <CardDescription>{t('info')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="space-y-3 text-sm">
+        <form onSubmit={submitWith(formAction)} className="space-y-3 text-sm">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"

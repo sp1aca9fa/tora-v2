@@ -1,12 +1,13 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { FormState } from '@/lib/form';
 import { useMoney } from '@/components/money-context';
+import { submitWith } from '@/lib/submit-form';
 
 export function ManualPriceForm({
   action,
@@ -15,9 +16,17 @@ export function ManualPriceForm({
 }) {
   const t = useTranslations('valuation');
   const money = useMoney();
-  const [state, formAction, pending] = useActionState(action, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction, pending] = useActionState(
+    async (prev: FormState, formData: FormData) => {
+      const next = await action(prev, formData);
+      if (!next.error) formRef.current?.reset();
+      return next;
+    },
+    {},
+  );
   return (
-    <form action={formAction} className="space-y-2">
+    <form ref={formRef} onSubmit={submitWith(formAction)} className="space-y-2">
       <div className="flex gap-2">
         <Input
           name="priceBase"

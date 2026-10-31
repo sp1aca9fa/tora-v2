@@ -20,6 +20,24 @@ export interface CurrencyRow {
   latest: { date: string; rate: number } | null;
 }
 
+/**
+ * A typed rate as a positive number, or null. "1,234.5" and "1.234,5" read the last separator as
+ * the decimal point; a lone comma is a decimal comma ("1,5").
+ */
+function typedRate(text: string): number | null {
+  const s = text.trim().replace(/\s/g, '');
+  const dot = s.lastIndexOf('.');
+  const comma = s.lastIndexOf(',');
+  const normal =
+    dot >= 0 && comma >= 0
+      ? comma > dot
+        ? s.replace(/\./g, '').replace(',', '.')
+        : s.replace(/,/g, '')
+      : s.replace(',', '.');
+  const n = /^\d*\.?\d+$|^\d+\.$/.test(normal) ? Number(normal) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 /** Each other currency's exchange rate to the base (S16; admins): a plug-in or a typed rate. */
 export function CurrencyForm({
   base,
@@ -119,6 +137,7 @@ function RateRow({
   const t = useTranslations('currency');
   const manual = row.setting && 'manual' in row.setting;
   const [typing, setTyping] = useState(!!manual);
+  const [badRate, setBadRate] = useState(false);
   const [typed, setTyped] = useState(
     manual ? String(row.setting && 'manual' in row.setting ? row.setting.manual : '') : '',
   );
@@ -177,8 +196,9 @@ function RateRow({
           className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            const n = Number(typed.replace(',', '.'));
-            if (Number.isFinite(n) && n > 0) save({ manual: n });
+            const n = typedRate(typed);
+            setBadRate(n === null);
+            if (n !== null) save({ manual: n });
           }}
         >
           <label htmlFor={`rate-${row.code}`} className="text-xs text-muted-foreground">
@@ -188,12 +208,26 @@ function RateRow({
             id={`rate-${row.code}`}
             inputMode="decimal"
             value={typed}
-            onChange={(e) => setTyped(e.target.value)}
+            onChange={(e) => {
+              setTyped(e.target.value);
+              setBadRate(false);
+            }}
+            aria-invalid={badRate || undefined}
+            aria-describedby={badRate ? `rate-error-${row.code}` : undefined}
             className="h-9 w-32"
           />
           <Button type="submit" variant="outline" size="sm" disabled={pending}>
             {t('save')}
           </Button>
+          {badRate && (
+            <span
+              id={`rate-error-${row.code}`}
+              role="alert"
+              className="w-full text-xs text-destructive"
+            >
+              {t('rateInvalid')}
+            </span>
+          )}
           <span className="w-full text-xs text-muted-foreground">{t('manualInfo')}</span>
         </form>
       )}

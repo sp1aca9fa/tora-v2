@@ -24,8 +24,10 @@ export function PopularList({
   const t = useTranslations('opportunities');
   const [rows, setRows] = useState(initial);
   const [loading, setLoading] = useState(false);
+  // Set when the server had nothing new (or failed), so the list does not ask again forever.
+  const [done, setDone] = useState(false);
   const end = useRef<HTMLDivElement>(null);
-  const more = rows.length < total;
+  const more = !done && rows.length < total;
 
   useEffect(() => {
     const el = end.current;
@@ -36,7 +38,11 @@ export function PopularList({
         setLoading(true);
         try {
           const next = await morePopularAction(type, by, rows.length, q);
-          setRows((had) => [...had, ...next.filter((r) => !had.some((h) => h.key === r.key))]);
+          const fresh = next.filter((r) => !rows.some((h) => h.key === r.key));
+          if (!fresh.length) setDone(true);
+          setRows((had) => [...had, ...fresh.filter((r) => !had.some((h) => h.key === r.key))]);
+        } catch {
+          setDone(true);
         } finally {
           setLoading(false);
         }
@@ -45,7 +51,7 @@ export function PopularList({
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [rows.length, more, loading, type, by, q]);
+  }, [rows, more, loading, type, by, q]);
 
   const labels = { tora: t('toraView'), worth: t('toraWorth') };
   return (

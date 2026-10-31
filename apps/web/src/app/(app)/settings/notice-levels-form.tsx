@@ -13,6 +13,7 @@ import { LEVEL_STYLE } from '@/components/notice-level';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
+import { submitWith } from '@/lib/submit-form';
 import { type NoticeLevelsState, resetNoticeLevelsAction, saveNoticeLevelsAction } from './actions';
 
 /** One level per notice type; the colour beside each follows the pick before saving. */
@@ -35,7 +36,7 @@ export function NoticeLevelsForm({ levels }: { levels: Record<NoticeType, Notice
           </li>
         ))}
       </ul>
-      <form action={formAction} className="space-y-3">
+      <form onSubmit={submitWith(formAction)} className="space-y-3">
         <ul className="divide-y text-sm">
           {NOTICE_TYPES.map((type) => (
             <li key={type} className="flex items-center gap-3 py-2">

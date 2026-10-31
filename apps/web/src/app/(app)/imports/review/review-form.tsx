@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 import { FormError } from '@/components/form-error';
 import { Button } from '@/components/ui/button';
+import { submitWith } from '@/lib/submit-form';
 import { type ReviewRow, type ReviewState, confirmReviewAction } from '../actions';
 import type { ReviewItem } from './review-item';
 import { ReviewRowFields, initialRow } from './review-row';
@@ -43,7 +44,7 @@ export function ReviewForm({ items }: { items: ReviewItem[] }) {
   ).length;
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={submitWith(formAction)} className="space-y-4">
       <input type="hidden" name="payload" value={payload} />
       <ul className="divide-y rounded-xl border bg-card">
         {items.map((item) => {

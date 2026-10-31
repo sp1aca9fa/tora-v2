@@ -10,6 +10,7 @@ import { useMoney } from '@/components/money-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { submitWith } from '@/lib/submit-form';
 import { WatchTargetFields } from '../../add/add-flow';
 import { removeWatchAction, saveWatchAction } from '../../watchlist/actions';
 
@@ -44,7 +45,7 @@ function WatchForm({
     if (state.ok) onDone();
   }, [state, onDone]);
   return (
-    <form action={formAction} className="space-y-4 rounded-md border p-3">
+    <form onSubmit={submitWith(formAction)} className="space-y-4 rounded-md border p-3">
       <input type="hidden" name="productId" value={productId} />
       {watch && <input type="hidden" name="watchId" value={watch.id} />}
       <ConditionFields cls={cls} defaults={watch?.defaults} />

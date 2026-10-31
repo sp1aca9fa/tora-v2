@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { cn } from '@/lib/utils';
+import { submitWith } from '@/lib/submit-form';
 import { type GradesState, setGradesAction } from './actions';
 
 export interface GradeRow {
@@ -45,7 +46,7 @@ export function GradesForm({ cards }: { cards: GradeRow[] }) {
   const allShown = shown.length > 0 && shown.every((c) => selected.has(c.id));
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={submitWith(formAction)} className="space-y-4">
       <div className="space-y-4 rounded-xl border bg-card px-4 py-3">
         <div role="radiogroup" className="inline-flex rounded-md border p-0.5">
           {(['graded', 'raw'] as const).map((g) => (
