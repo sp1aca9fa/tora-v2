@@ -200,6 +200,7 @@
 - 2026-10-30: Stores > Lotteries (user): a tab listing every post using a lottery word, a new kind of code on Codes (an admin adds the word posters use; a store plug-in may bring it), newest first, kept 30 days like every post; each person marks a post Interested, Applied or Hidden for themselves (table lottery_marks, migration 0069). Reason: lottery sales are announced on the boards among everything else and are easy to miss. Later, maybe: the application period read from the post.
 - 2026-10-30: Agents (user): the main session plans, specs, routes, triages and commits; routine building and light reviews go to a cheaper model, trust territory (prices, signals, alerts, auth, migrations, backups, server scripts) to the strongest; changes are tiered by their diff (docs and tests: checks only; product code: a light review; trust territory: a full review), each visible change gets a screenshot-only UX review, and each review's findings are counted to tune the models later.
 - 2026-10-31: A locked-out sign-in does no password check (user): it waits as long as the last checked sign-in took and fails like any other, so a flood of guesses costs the server only timers; its alert cannot say whether the password was right. Reason: each check is a deliberately slow hash.
+- 2026-10-31: Whole-code review (user: much was built without a reviewer): six areas reviewed in parallel and their fixes re-reviewed; 54 findings, all fixed with tests or listed in Open issues. Behavior changes worth knowing: a source whose role is Off for every item type (and that identifies no type) is not collected; a site refusing rankings or box cards is left alone for the day; a run stopped at its request cap asks the schedule to continue it (exit 2, no alert); alerts count as sent only once a channel took them; undated Out of print / Reprint coming marks are not tested on past days (look-ahead), so they show as unproven; the data tool hides every source kept from AI in every table it can read; backup codes are stored as keyed hashes; a backup leaves out rows written mid-copy without their parent and fails (retried) when an older row lost its parent.
 ---
 
 # CORE
@@ -1071,6 +1072,14 @@ Logged at the user's request (2026-10-13): known gaps to come back to with a pla
 - Japanese documentation (from S18, user 2026-10-26): see the first item; S18 leaves it here until the form is chosen.
 
 - Git history rewrite (user, 2026-10-23): moving personal files out does not remove them from the public history (nor the board codes leaked earlier); rewrite it once, close to the finish line (needs a force-push and a fresh clone on the server).
+
+- Left open by the whole-code review (2026-10-31):
+  - The client address used by the sign-in lockout and alerts prefers `X-Real-IP`; whether the reverse proxy in front (Tailscale Serve) sets or passes it through decides whether a client can rotate it. To check on the server.
+  - The picture step does not know which sites refused earlier in the run; pictures that keep failing are fetched again on every retry run (at most 40 requests a run).
+  - Backup codes made before 2026-10-31 stay unsalted hashes until replaced (new ones are keyed).
+  - A store plug-in that reads "item gone" from a 404 on its search cannot tell it from a moved search page; needs the site's own no-results page as a fixture.
+  - A sold listing found by two items' searches is stored once, for the first item (decision pending).
+  - On a remote database, two tabs loading the same account file at once may get a busy error instead of "not empty" (nothing is loaded twice).
 
 ### Need further analysis
 
