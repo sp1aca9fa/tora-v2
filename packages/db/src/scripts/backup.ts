@@ -41,12 +41,20 @@ if (existsSync(file) && !process.argv.includes('--force')) {
     await setLastBackup(db, { at: toLocalIso(), file: r.file, bytes: r.bytes, rows: r.rows });
     await recordActivity(db, {
       kind: 'backup',
-      detail: { file: r.file, bytes: r.bytes, tables: r.tables, rows: r.rows, seconds },
+      detail: {
+        file: r.file,
+        bytes: r.bytes,
+        tables: r.tables,
+        rows: r.rows,
+        orphans: r.orphans,
+        seconds,
+      },
       href: '/settings/collectors',
     });
     console.log(
       `backup: ${r.file} (${(r.bytes / 1024 / 1024).toFixed(1)} MB, ${r.tables} tables, ` +
-        `${r.rows} rows, ${seconds} s)`,
+        `${r.rows} rows, ${seconds} s)` +
+        (r.orphans > 0 ? `; ${r.orphans} rows written mid-copy without their parent left out` : ''),
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

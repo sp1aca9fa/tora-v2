@@ -15,6 +15,7 @@ import {
   lotSheet,
   planSheet,
   readSheet,
+  sheetAmount,
 } from './lot-sheet';
 import { migrateDb } from './migrate';
 import { createHolding, sellHolding } from './mutations';
@@ -325,6 +326,52 @@ it('reads a hand-made sheet in Japanese and reports each problem', async () => {
   expect(log[2]!.holdingId).toBeTruthy();
   const detail = await importRunDetail(db, a, runId);
   expect(detail!.rows[0]!.product?.name).toBe('ポケモンBOX');
+});
+
+it('keeps the log and counts when an import stops on an unexpected error', async () => {
+  const rows = [
+    ['item', 'category', 'kind', 'quantity', 'cost'],
+    ['ミュウ', 'トレカ', 'シングル', '1', '3000'],
+    ['ミュウツー', 'トレカ', 'シングル', '1', '4000'],
+    ['ピカチュウ', 'トレカ', 'シングル', '1', '5000'],
+  ];
+  const plan = await planSheet(db, a, readSheet(rows, column)!, keyOf);
+  expect(plan.map((e) => e.type)).toEqual(['new', 'new', 'new']);
+  // The second row breaks a database rule (not a refusal Tora knows).
+  const broken = plan[1]!;
+  if (broken.type === 'new') broken.input.acquiredAt = null as never;
+  await expect(applySheet(db, a, plan, 'mine.csv')).rejects.toThrow();
+  const [run] = await db.select().from(importRuns).where(eq(importRuns.userId, a));
+  expect(run!.finishedAt).not.toBeNull();
+  expect(run!.counts).toEqual({ imported: 1, failed: 2 });
+  const log = await db
+    .select()
+    .from(importRows)
+    .where(eq(importRows.importRunId, run!.id))
+    .orderBy(importRows.position);
+  expect(log.map((r) => [r.detail, r.outcome, r.reason])).toEqual([
+    ['line:2', 'imported', null],
+    ['line:3', 'problem', 'interrupted'],
+    ['line:4', 'problem', 'interrupted'],
+  ]);
+});
+
+it("reads a cost only with the base currency's own sign", () => {
+  expect(sheetAmount('¥12,000', 'JPY')).toBe(12_000);
+  expect(sheetAmount('￥１２，０００', 'JPY')).toBe(12_000);
+  expect(sheetAmount('12000円', 'JPY')).toBe(12_000);
+  expect(sheetAmount('12000', 'JPY')).toBe(12_000);
+  expect(sheetAmount(undefined, 'JPY')).toBeNull();
+  // Another currency is never read as yen.
+  expect(sheetAmount('$30', 'JPY')).toBeNaN();
+  expect(sheetAmount('€30', 'JPY')).toBeNaN();
+  expect(sheetAmount('USD 30', 'JPY')).toBeNaN();
+  expect(sheetAmount('¥', 'JPY')).toBeNaN();
+  // In cents on a euro install.
+  expect(sheetAmount('€1250', 'EUR')).toBe(1250);
+  expect(sheetAmount('¥1250', 'EUR')).toBeNaN();
+  expect(sheetAmount('1250円', 'EUR')).toBeNaN();
+  expect(sheetAmount('$1250', 'USD')).toBe(1250);
 });
 
 it('downloads the account data without collected prices or secrets', async () => {

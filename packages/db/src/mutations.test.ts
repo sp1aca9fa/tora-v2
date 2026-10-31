@@ -1,7 +1,7 @@
 import { deriveBucket, pendingGrading, productClass } from '@tora/core';
 import { saveSourceInfos } from './registry';
 import { TEST_SOURCES } from './testing';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -23,6 +23,8 @@ import {
   sellHolding,
   canceledOrderIds,
   confirmImportReview,
+  createProduct,
+  mergeProducts,
   flagForReview,
   markOrderCanceled,
   setCardGrade,
@@ -37,7 +39,10 @@ import {
   searchProducts,
   searchSets,
 } from './queries';
-import { holdings, tcgSets } from './schema';
+import { mergeImportedLots } from './imports';
+import { holdings, suggestions, tcgSets } from './schema';
+import { linkSource } from './sources';
+import { type SuggestionInput, fileSuggestion } from './suggestions';
 import { createUser } from './users';
 
 let db: Db;
@@ -732,4 +737,67 @@ describe('order IDs', () => {
     const edited = await editHolding(db, uid, other.holding.id, { orderId: '333' });
     expect(edited).toMatchObject({ orderId: '333', orderSource: 'snkrdunk' });
   });
+
+  it('merges two imported lots in one go: a failed edit keeps both', async () => {
+    const pending = async (orderId: string | null, cost: number) => {
+      const { holding } = await createHolding(db, uid, card, {
+        ...h(orderId),
+        costTotalBase: cost,
+      });
+      await db
+        .update(holdings)
+        .set({ reviewPending: true, reviewReason: 'maybe_same' })
+        .where(eq(holdings.id, holding.id));
+      return holding.id;
+    };
+    // The kept lot takes the other's order ID (one item per order at this shop).
+    const keep = await pending(null, 0);
+    const drop = await pending('444', 1500);
+    await mergeImportedLots(db, uid, keep, drop);
+    const [kept] = await db.select().from(holdings).where(eq(holdings.id, keep));
+    expect(kept).toMatchObject({ orderId: '444', costTotalBase: 1500, reviewReason: null });
+    expect(await db.select().from(holdings).where(eq(holdings.id, drop))).toEqual([]);
+
+    // Another lot holds the order ID (written before the check existed): nothing changes.
+    const keep2 = await pending(null, 0);
+    const drop2 = await pending('555', 1500);
+    const third = await pending('666', 1000);
+    await db.update(holdings).set({ orderId: '555' }).where(eq(holdings.id, third));
+    await expectDomainError(mergeImportedLots(db, uid, keep2, drop2), 'duplicate_order');
+    const left = await db
+      .select()
+      .from(holdings)
+      .where(inArray(holdings.id, [keep2, drop2]));
+    expect(left).toHaveLength(2);
+    expect(left.find((l) => l.id === keep2)).toMatchObject({
+      orderId: null,
+      reviewReason: 'maybe_same',
+    });
+  });
+});
+
+it("keeps a merged duplicate's judgments about sales and moved listings", async () => {
+  const box = (name: string) =>
+    createProduct(db, uid, { category: 'tcg', kind: 'single', name, franchise: 'pokemon' });
+  const dup = await box('Dup');
+  const into = await box('Into');
+  const moved = await linkSource(db, dup.id, { source: 'mercari', externalId: 'm1' });
+  const dropped = await linkSource(db, dup.id, { source: 'mercari', externalId: 'm2' });
+  await linkSource(db, into.id, { source: 'mercari', externalId: 'm2' });
+  const file = (kind: SuggestionInput['kind'], targetKey: string, payload = {}) =>
+    fileSuggestion(db, { userId: uid, kind, targetKey, productId: dup.id, payload, reason: 'r' });
+  await file('sale_ok', 'obs1');
+  await file('exclude_sale', 'obs2', { observationId: 'obs2' });
+  await file('search_ok', moved.id);
+  await file('search_ok', dropped.id);
+  await file('exclude_word', `${moved.id}|jp`, { sourceId: moved.id, word: 'jp' });
+  await file('fix_product', `${dup.id}|{}`, { changes: { name: 'Dup 2' } });
+  await mergeProducts(db, { id: uid, role: 'admin' }, dup.id, into.id);
+  const left = await db.select().from(suggestions).orderBy(suggestions.kind, suggestions.targetKey);
+  expect(left.map((s) => [s.kind, s.targetKey, s.productId, s.status])).toEqual([
+    ['exclude_sale', 'obs2', into.id, 'open'],
+    ['exclude_word', `${moved.id}|jp`, into.id, 'open'],
+    ['sale_ok', 'obs1', into.id, 'closed'],
+    ['search_ok', moved.id, into.id, 'closed'],
+  ]);
 });

@@ -1,12 +1,25 @@
 // Purchase files uploaded in the app for the import through Claude (requirements S8 step 5).
 import { toLocalIso } from '@tora/core';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, lt, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { importUploads } from './schema';
 
 /** Most files and size per file (a request to the app carries one file of up to ~4 MB). */
 export const UPLOAD_MAX_FILES = 30;
 export const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
+
+/** A batch read for longer than this is taken as failed (its reader died or was stopped). */
+export const UPLOAD_READING_STALE_MS = 30 * 60_000;
+
+/** Batches stuck in `reading` past {@link UPLOAD_READING_STALE_MS}: failed in effect. */
+const stuck = (now: Date) =>
+  and(
+    eq(importUploads.status, 'reading'),
+    lt(importUploads.updatedAt, toLocalIso(new Date(now.getTime() - UPLOAD_READING_STALE_MS))),
+  );
+
+/** Batches ready to read: waiting, or stuck. */
+const readable = (now: Date) => or(eq(importUploads.status, 'waiting'), stuck(now));
 
 export async function addUpload(
   db: Db,
@@ -42,32 +55,28 @@ export async function finishUploadBatch(db: Db, userId: string, batchId: string)
 }
 
 /**
- * Claims a waiting batch for reading (so the app and the home PC never read one twice): its
- * files, or null when someone else took it.
+ * Claims a waiting (or stuck) batch for reading (so the app and the home PC never read one
+ * twice): its files, or null when someone else took it.
  */
-export async function claimUploadBatch(db: Db, batchId: string) {
+export async function claimUploadBatch(db: Db, batchId: string, now = new Date()) {
   const claimed = await db
     .update(importUploads)
-    .set({ status: 'reading', updatedAt: toLocalIso() })
-    .where(and(eq(importUploads.batchId, batchId), eq(importUploads.status, 'waiting')))
+    .set({ status: 'reading', updatedAt: toLocalIso(now) })
+    .where(and(eq(importUploads.batchId, batchId), readable(now)))
     .returning();
   return claimed.length ? claimed : null;
 }
 
-/** Batches waiting to be read, oldest first (all users, or one). */
+/** Batches waiting to be read (or stuck in reading), oldest first (all users, or one). */
 export async function waitingUploadBatches(
   db: Db,
   userId?: string,
+  now = new Date(),
 ): Promise<{ batchId: string; userId: string }[]> {
   const rows = await db
     .selectDistinct({ batchId: importUploads.batchId, userId: importUploads.userId })
     .from(importUploads)
-    .where(
-      and(
-        eq(importUploads.status, 'waiting'),
-        userId ? eq(importUploads.userId, userId) : undefined,
-      ),
-    );
+    .where(and(readable(now), userId ? eq(importUploads.userId, userId) : undefined));
   return rows;
 }
 
@@ -89,16 +98,21 @@ export async function finishUploadRead(
     .where(eq(importUploads.batchId, batchId));
 }
 
-/** A failed batch goes back to waiting (tried again on the next run). */
-export async function retryUploadBatch(db: Db, userId: string, batchId: string): Promise<void> {
+/** A failed (or stuck) batch goes back to waiting (tried again on the next run). */
+export async function retryUploadBatch(
+  db: Db,
+  userId: string,
+  batchId: string,
+  now = new Date(),
+): Promise<void> {
   await db
     .update(importUploads)
-    .set({ status: 'waiting', message: null, updatedAt: toLocalIso() })
+    .set({ status: 'waiting', message: null, updatedAt: toLocalIso(now) })
     .where(
       and(
         eq(importUploads.userId, userId),
         eq(importUploads.batchId, batchId),
-        inArray(importUploads.status, ['failed']),
+        or(eq(importUploads.status, 'failed'), stuck(now)),
       ),
     );
 }

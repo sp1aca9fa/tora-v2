@@ -6,14 +6,17 @@ import { type Table, asc, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { Db } from './client';
 import { loadSourceRegistry } from './registry';
 import {
+  LOTTERY_MARKS,
   canceledOrders,
   holdingEvents,
   holdings,
   importRuns,
+  lotteryMarks,
   manualPrices,
   productSources,
   products,
   purchaseLinks,
+  storePosts,
   tcgSets,
   users,
   watches,
@@ -104,11 +107,20 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
     importRuns: await db.select().from(importRuns).where(eq(importRuns.userId, userId)),
     purchaseLinks: await db.select().from(purchaseLinks).where(eq(purchaseLinks.userId, userId)),
     canceledOrders: await db.select().from(canceledOrders).where(eq(canceledOrders.userId, userId)),
+    // Marks on lottery posts (posts are the install's and kept 30 days: a load skips those gone).
+    lotteryMarks: await db
+      .select({
+        postId: lotteryMarks.postId,
+        mark: lotteryMarks.mark,
+        updatedAt: lotteryMarks.updatedAt,
+      })
+      .from(lotteryMarks)
+      .where(eq(lotteryMarks.userId, userId)),
   };
 }
 
 /** No lots, watches or manual prices: a download can be loaded into it. */
-export async function accountIsEmpty(db: Db, userId: string): Promise<boolean> {
+export async function accountIsEmpty(db: Pick<Db, 'select'>, userId: string): Promise<boolean> {
   for (const table of [holdings, watches, manualPrices]) {
     const [any] = await db
       .select({ id: table.id })
@@ -169,18 +181,21 @@ export async function loadAccountData(
   const registry = await loadSourceRegistry(db);
   const app = data.app as { baseCurrency?: unknown } | undefined;
   if (app?.baseCurrency !== baseCurrency(registry)) return { error: 'currency' };
-  for (const table of [holdings, watches, manualPrices]) {
-    const [any] = await db
-      .select({ id: table.id })
-      .from(table)
-      .where(eq(table.userId, userId))
-      .limit(1);
-    if (any) return { error: 'notEmpty' };
-  }
+  if (!(await accountIsEmpty(db, userId))) return { error: 'notEmpty' };
 
   const items = rowsOf(data, 'items');
-  const lots = rowsOf(data, 'lots');
-  const history = rowsOf(data, 'history');
+  // References stay inside the file: a lot, its history and its links point only at the file's own
+  // lots and imports (an id of someone else's lot on this install would reach into their data).
+  const fileLots = new Set(rowsOf(data, 'lots').map((l) => l.id as string));
+  const fileRuns = new Set(rowsOf(data, 'importRuns').map((r) => r.id as string));
+  const inFile = (set: Set<string>, value: unknown) =>
+    typeof value === 'string' && set.has(value) ? value : null;
+  const lots = rowsOf(data, 'lots').map((l): Row => ({
+    ...l,
+    parentHoldingId: inFile(fileLots, l.parentHoldingId),
+    importRunId: inFile(fileRuns, l.importRunId),
+  }));
+  const history = rowsOf(data, 'history').filter((e) => inFile(fileLots, e.holdingId));
   const manual = rowsOf(data, 'manualPrices');
   const watched = rowsOf(data, 'watches');
   // Files saved before 2026-10-26 spell `cancelled` (the orders, an import's count).
@@ -190,7 +205,11 @@ export async function loadAccountData(
     const { cancelled, ...rest } = counts;
     return { ...r, counts: { ...rest, canceled: cancelled } };
   });
-  const links = rowsOf(data, 'purchaseLinks');
+  const links = rowsOf(data, 'purchaseLinks').map((l): Row => ({
+    ...l,
+    holdingId: inFile(fileLots, l.holdingId),
+    importRunId: inFile(fileRuns, l.importRunId),
+  }));
   const canceled = [...rowsOf(data, 'canceledOrders'), ...rowsOf(data, 'cancelledOrders')];
 
   // New ids for the person's rows; any string equal to an old one (a lot's box, a split's other
@@ -224,6 +243,25 @@ export async function loadAccountData(
   const added = items.filter((i) => !present.has(i.id as string));
   const addedIds = new Set(added.map((i) => i.id as string));
   const listings = rowsOf(data, 'listings').filter((l) => addedIds.has(l.productId as string));
+  // Lottery marks (no id of their own), on posts this install still has.
+  const marks = (Array.isArray(data.lotteryMarks) ? (data.lotteryMarks as unknown[]) : []).filter(
+    (m): m is Row =>
+      !!m &&
+      typeof m === 'object' &&
+      typeof (m as Row).postId === 'string' &&
+      typeof (m as Row).updatedAt === 'string' &&
+      (LOTTERY_MARKS as readonly unknown[]).includes((m as Row).mark),
+  );
+  const posts = new Set<string>();
+  const postIds = [...new Set(marks.map((m) => m.postId as string))];
+  for (let i = 0; i < postIds.length; i += 500) {
+    for (const p of await db
+      .select({ id: storePosts.id })
+      .from(storePosts)
+      .where(inArray(storePosts.id, postIds.slice(i, i + 500)))) {
+      posts.add(p.id);
+    }
+  }
 
   // Boxes before the pulls taken from them.
   const order = (rows: Row[]) => {
@@ -245,74 +283,100 @@ export async function loadAccountData(
     return [...out, ...left];
   };
 
-  const insert = async (tx: Pick<Db, 'insert'>, table: Table, rows: Row[]) => {
+  // Rows a unique index may already hold (canceled orders, purchase links and lottery marks are
+  // not part of "empty") are kept as they are.
+  const insert = async (
+    tx: Pick<Db, 'insert'>,
+    table: Table,
+    rows: Row[],
+    keepExisting = false,
+  ) => {
     for (let i = 0; i < rows.length; i += 50) {
-      await tx.insert(table).values(rows.slice(i, i + 50) as never);
+      const values = tx.insert(table).values(rows.slice(i, i + 50) as never);
+      await (keepExisting ? values.onConflictDoNothing() : values);
     }
   };
-  await db.transaction(async (tx) => {
-    await insert(
-      tx,
-      products,
-      added.map((p) => ({
-        ...columnsOf(products, p),
-        createdBy: userId,
-        setId: p.setId && setIds.has(p.setId as string) ? p.setId : null,
-      })),
-    );
-    await insert(
-      tx,
-      productSources,
-      listings.map((l) => ({ ...columnsOf(productSources, l), id: newId() })),
-    );
-    await insert(
-      tx,
-      importRuns,
-      runs.map((r) => own(importRuns, r)),
-    );
-    await insert(
-      tx,
-      holdings,
-      order(lots).map((l) => own(holdings, l)),
-    );
-    await insert(
-      tx,
-      holdingEvents,
-      history.map((e) => columnsOf(holdingEvents, rename(e) as Row)),
-    );
-    await insert(
-      tx,
-      manualPrices,
-      manual.map((m) => own(manualPrices, m)),
-    );
-    await insert(
-      tx,
-      watches,
-      watched.map((w) => own(watches, w)),
-    );
-    await insert(
-      tx,
-      purchaseLinks,
-      links.map((l) => own(purchaseLinks, l)),
-    );
-    await insert(
-      tx,
-      canceledOrders,
-      canceled.map((c) => own(canceledOrders, c)),
-    );
-    const account = data.account as { preferences?: unknown; noticeLevels?: unknown } | null;
-    if (account) {
-      await tx
-        .update(users)
-        .set(
-          columnsOf(users, {
-            preferences: rename(account.preferences ?? null),
-            noticeLevels: account.noticeLevels ?? null,
-          }),
-        )
-        .where(eq(users.id, userId));
-    }
-  });
+  // Checked again inside the write transaction: two tabs loading the same file load it once.
+  const notEmpty = new Error('notEmpty');
+  try {
+    await db.transaction(async (tx) => {
+      if (!(await accountIsEmpty(tx, userId))) throw notEmpty;
+      await insert(
+        tx,
+        products,
+        added.map((p) => ({
+          ...columnsOf(products, p),
+          createdBy: userId,
+          setId: p.setId && setIds.has(p.setId as string) ? p.setId : null,
+        })),
+      );
+      await insert(
+        tx,
+        productSources,
+        listings.map((l) => ({ ...columnsOf(productSources, l), id: newId() })),
+      );
+      await insert(
+        tx,
+        importRuns,
+        runs.map((r) => own(importRuns, r)),
+      );
+      await insert(
+        tx,
+        holdings,
+        order(lots).map((l) => own(holdings, l)),
+      );
+      await insert(
+        tx,
+        holdingEvents,
+        history.map((e) => columnsOf(holdingEvents, rename(e) as Row)),
+      );
+      await insert(
+        tx,
+        manualPrices,
+        manual.map((m) => own(manualPrices, m)),
+      );
+      await insert(
+        tx,
+        watches,
+        watched.map((w) => own(watches, w)),
+      );
+      await insert(
+        tx,
+        purchaseLinks,
+        links.map((l) => own(purchaseLinks, l)),
+        true,
+      );
+      await insert(
+        tx,
+        canceledOrders,
+        canceled.map((c) => own(canceledOrders, c)),
+        true,
+      );
+      await insert(
+        tx,
+        lotteryMarks,
+        marks
+          .filter((m) => posts.has(m.postId as string))
+          .map((m) => ({ ...columnsOf(lotteryMarks, m), userId })),
+        true,
+      );
+      const account = data.account as { preferences?: unknown; noticeLevels?: unknown } | null;
+      if (account) {
+        await tx
+          .update(users)
+          .set(
+            columnsOf(users, {
+              preferences: rename(account.preferences ?? null),
+              noticeLevels: account.noticeLevels ?? null,
+            }),
+          )
+          .where(eq(users.id, userId));
+      }
+    });
+  } catch (error) {
+    if (error === notEmpty) return { error: 'notEmpty' };
+    throw error;
+  }
   return {
     items: items.length,
     itemsAdded: added.length,

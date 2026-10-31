@@ -51,6 +51,7 @@ import {
   products,
   sourceCandidates,
   sourceWarningDismissals,
+  suggestions,
   tcgSets,
   holdingValues,
   signals,
@@ -87,7 +88,7 @@ export class DomainError extends Error {
   }
 }
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 export type ProductInput = Omit<NewProduct, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
 
@@ -509,7 +510,7 @@ async function moveAcquiredEvent(tx: Pick<Db, 'update'>, holdingId: string, acqu
 
 /** Corrects recorded facts. Logged as a `note` event with `kind: 'edit'` and before/after. */
 export async function editHolding(
-  db: Db,
+  db: Db | Tx,
   userId: string,
   id: string,
   edit: HoldingEdit,
@@ -948,7 +949,7 @@ export async function addNote(
  * Removes a holding registered by mistake. Refused once other records depend on it
  * (pulls logged from it, or a split to/from it), so history stays consistent.
  */
-export async function deleteHolding(db: Db, userId: string, id: string): Promise<void> {
+export async function deleteHolding(db: Db | Tx, userId: string, id: string): Promise<void> {
   await db.transaction(async (tx) => {
     await loadHolding(tx, userId, id);
     const [children] = await tx
@@ -1048,8 +1049,10 @@ export async function flagForReview(
 /**
  * Merges a duplicate product into another (same category and kind): its lots, sales data, manual
  * prices, watches, listings and what was for sale move over, then the duplicate is deleted. Listings the target already has,
- * the duplicate's pending suggestions and its picture are dropped. Products are shared, so other
- * users' lots of the duplicate move too (they are the same item).
+ * the duplicate's suggestions about its own details and its picture are dropped; those about a sale
+ * or a listing that moved go along (verdicts too, so the next data review does not judge them
+ * again). Products are shared, so other users' lots of the duplicate move too (they are the same
+ * item).
  */
 export async function mergeProducts(
   db: Db,
@@ -1093,6 +1096,7 @@ export async function mergeProducts(
       .from(productSources)
       .where(eq(productSources.productId, intoId));
     const has = new Set(intoListings.map((l) => `${l.source}|${l.externalId}`));
+    const movedListings = new Set<string>();
     for (const l of await tx
       .select()
       .from(productSources)
@@ -1104,7 +1108,36 @@ export async function mergeProducts(
           .update(productSources)
           .set({ productId: intoId })
           .where(eq(productSources.id, l.id));
+        movedListings.add(l.id);
       }
+    }
+    // Suggestions keyed by a sale (all moved) or a listing that moved still hold; the unique key
+    // (person, kind, target) has no product in it, so nothing collides. The rest (fixes of the
+    // duplicate's details, a dropped listing's) go with it.
+    const keptSuggestions = (
+      await tx
+        .select({
+          id: suggestions.id,
+          kind: suggestions.kind,
+          targetKey: suggestions.targetKey,
+          payload: suggestions.payload,
+        })
+        .from(suggestions)
+        .where(eq(suggestions.productId, fromId))
+    )
+      .filter(
+        (s) =>
+          s.kind === 'sale_ok' ||
+          s.kind === 'exclude_sale' ||
+          (s.kind === 'search_ok' && movedListings.has(s.targetKey)) ||
+          (s.kind === 'exclude_word' && movedListings.has(String(s.payload.sourceId ?? ''))),
+      )
+      .map((s) => s.id);
+    for (let i = 0; i < keptSuggestions.length; i += 500) {
+      await tx
+        .update(suggestions)
+        .set({ productId: intoId })
+        .where(inArray(suggestions.id, keptSuggestions.slice(i, i + 500)));
     }
     await tx.delete(sourceCandidates).where(eq(sourceCandidates.productId, fromId));
     await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));

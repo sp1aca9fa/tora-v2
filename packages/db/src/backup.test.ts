@@ -105,6 +105,44 @@ it('restores a backup into an empty database exactly (scenario 8)', async () => 
   await expect(restoreDatabase(file, target)).rejects.toThrow(/not empty/);
 });
 
+it('leaves out rows whose parent was not copied, so a restore with references on works', async () => {
+  await seedCollection(db, userId);
+  // As if written mid-copy: a lot whose owner and product are not in the copy, its event, and a
+  // picture of a post that is not there either (references off on this connection).
+  const live = createClient({ url: `file:${join(dir, 'live.db')}` });
+  const at = '2026-10-01T12:00:00.000+09:00';
+  await live.execute('PRAGMA foreign_keys = OFF');
+  await live.batch(
+    [
+      `INSERT INTO holdings (id, user_id, product_id, acquired_at, created_at, updated_at)
+        VALUES ('orphan', 'gone', 'gone', '${at}', '${at}', '${at}')`,
+      `INSERT INTO holding_events (id, holding_id, type, occurred_at, created_at, updated_at)
+        VALUES ('orphan-e', 'orphan', 'acquired', '${at}', '${at}', '${at}')`,
+      `INSERT INTO store_post_images (id, post_id, position, bytes, content_type, created_at)
+        VALUES ('orphan-i', 'gone', 0, x'ff', 'image/jpeg', '${at}')`,
+    ],
+    'write',
+  );
+  const file = join(dir, backupName('2026-10-18'));
+  const backup = await backupDatabase(live, file);
+  expect(backup.orphans).toBe(3);
+
+  const target = createClient({ url: `file:${join(dir, 'restored.db')}` });
+  await target.execute('PRAGMA foreign_keys = ON');
+  const restored = await restoreDatabase(file, target);
+  expect(restored.rows).toBe(backup.rows);
+  const copy = createDb({ url: `file:${join(dir, 'restored.db')}` });
+  const ids = (t: string) => sql.raw(`SELECT id FROM ${t} WHERE id LIKE 'orphan%'`);
+  expect(await copy.all(ids('holdings'))).toEqual([]);
+  expect(await copy.all(ids('holding_events'))).toEqual([]);
+  expect(await copy.all(ids('store_post_images'))).toEqual([]);
+  // The rest came along.
+  const lots = sql`SELECT count(*) AS n FROM holdings`;
+  expect((await copy.all<{ n: number }>(lots))[0]!.n).toBe(
+    (await db.all<{ n: number }>(lots))[0]!.n - 1,
+  );
+});
+
 it('unpacks the latest backup as the analysis copy, only when newer', async () => {
   const backups = join(dir, 'backups');
   const target = join(dir, 'analysis', 'tora.db');

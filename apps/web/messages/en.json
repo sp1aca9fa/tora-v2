@@ -899,7 +899,7 @@
         "bad_region": "Region not known for this category",
         "bad_status": "Status not known (Owned, Sold, Consumed or Lost)",
         "bad_quantity": "Quantity must be a whole number, 1 or more",
-        "bad_cost": "Cost must be a whole amount, 0 or more",
+        "bad_cost": "Cost must be a whole amount, 0 or more, in the app's currency (no other currency's sign)",
         "bad_date": "Date not readable or in the future (use 2026-10-16 or 2026/10/16)",
         "bad_condition": "Condition not known for this kind",
         "bad_packaging": "Packaging not known",
@@ -953,6 +953,7 @@
         "canceled_registered": "canceled per the emails, but registered: check it",
         "not_purchase": "not a purchase",
         "not_collectible": "not a collectible",
+        "interrupted": "the import stopped before this row: import the file again",
         "corrected": "corrected: {fields}"
       },
       "notImported": "{count, plural, one {# row not imported} other {# rows not imported}}",

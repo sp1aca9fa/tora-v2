@@ -3,6 +3,7 @@
 // the person's language (the caller's `name`); an import takes names in any of the app's languages
 // or the keys (the caller's `keyOf`).
 import {
+  baseCurrency,
   GRADERS,
   type Grader,
   RAW_GRADES,
@@ -315,10 +316,36 @@ function fieldValue(f: FieldDef, cell: string, keyOf: KeyOf): string | number | 
   }
 }
 
-/** A whole number from a spreadsheet cell ("¥12,000", "１２０００", "12000.0"). */
-function amount(cell: string | undefined): number | null {
+/** Signs a cost cell in `base` may carry: the base's own ("¥" and "円" for yen, "€" for euros). */
+function baseSigns(base: string): string[] {
+  const signs = new Set<string>(base === 'JPY' ? ['円'] : []);
+  for (const currencyDisplay of ['symbol', 'narrowSymbol'] as const) {
+    try {
+      const part = new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency: base,
+        currencyDisplay,
+      })
+        .formatToParts(0)
+        .find((p) => p.type === 'currency');
+      if (part) signs.add(part.value.normalize('NFKC'));
+    } catch {
+      // Not a currency Intl knows: no sign accepted.
+    }
+  }
+  return [...signs];
+}
+
+/**
+ * A whole number in the base's smallest unit from a spreadsheet cell ("¥12,000", "１２０００",
+ * "12000.0"). Amounts are stored in the base (requirements S16): another currency's sign ("$30" on
+ * a yen install) is not converted nor read as yen, it gives NaN (the row is a bad_cost problem).
+ */
+export function sheetAmount(cell: string | undefined, base: string): number | null {
   if (!cell) return null;
-  const n = Number(cell.normalize('NFKC').replace(/[,\s¥$€£円]/g, ''));
+  let text = cell.normalize('NFKC').replace(/[,\s]/g, '');
+  for (const sign of baseSigns(base)) text = text.split(sign).join('');
+  const n = text ? Number(text) : NaN;
   return Number.isFinite(n) && n >= 0 && Number.isInteger(n) ? n : NaN;
 }
 
@@ -506,7 +533,7 @@ export async function planSheet(
       fail('bad_quantity');
       continue;
     }
-    const cost = amount(cells.cost);
+    const cost = sheetAmount(cells.cost, baseCurrency(registry));
     if (Number.isNaN(cost)) {
       fail('bad_cost');
       continue;
@@ -614,62 +641,78 @@ export async function applySheet(
   const add = (k: string) => (counts[k] = (counts[k] ?? 0) + 1);
   const log: ImportRowLog[] = [];
   const sameProduct = sameProductFinder(db);
-  for (const e of entries) {
-    const row = { title: e.item, detail: `line:${e.line}` };
-    const lot =
-      e.type === 'new'
-        ? e
-        : e.type === 'existing' && e.asNew && addAnyway.includes(e.line)
-          ? e.asNew
-          : null;
-    if (!lot) {
-      if (e.type === 'existing') {
-        add('duplicate');
-        log.push({ ...row, outcome: 'existing', reason: e.match, holdingId: e.lotId });
-      } else if (e.type === 'skipped') {
-        add('skipped');
-        log.push({ ...row, outcome: 'skipped', reason: e.why });
-      } else if (e.type === 'error') {
-        add('failed');
-        log.push({ ...row, outcome: 'problem', reason: e.error });
+  // Rows handled so far: an unexpected error still leaves the import's log and counts, the rows
+  // it did not reach marked as not imported (the lots already added stay, in Review).
+  let done = 0;
+  try {
+    for (; done < entries.length; done++) {
+      const e = entries[done]!;
+      const row = { title: e.item, detail: `line:${e.line}` };
+      const lot =
+        e.type === 'new'
+          ? e
+          : e.type === 'existing' && e.asNew && addAnyway.includes(e.line)
+            ? e.asNew
+            : null;
+      if (!lot) {
+        if (e.type === 'existing') {
+          add('duplicate');
+          log.push({ ...row, outcome: 'existing', reason: e.match, holdingId: e.lotId });
+        } else if (e.type === 'skipped') {
+          add('skipped');
+          log.push({ ...row, outcome: 'skipped', reason: e.why });
+        } else if (e.type === 'error') {
+          add('failed');
+          log.push({ ...row, outcome: 'problem', reason: e.error });
+        }
+        continue;
       }
-      continue;
+      const details = { quantity: lot.quantity, costBase: lot.costBase, day: lot.acquired };
+      // A new item made by an earlier row is used again.
+      let ref = lot.ref;
+      if ('product' in ref) {
+        const same = await sameProduct.find(ref.product);
+        if (same) ref = { productId: same.id };
+      }
+      try {
+        const { holding, product } = await createHolding(db, userId, ref, {
+          ...lot.input,
+          importRunId: runId,
+        });
+        if ('product' in ref) await sameProduct.add(product);
+        add('imported');
+        log.push({
+          ...row,
+          ...details,
+          outcome: 'imported',
+          reason: e.type === 'existing' ? 'added_anyway' : null,
+          holdingId: holding.id,
+        });
+      } catch (error) {
+        if (!(error instanceof DomainError)) throw error;
+        const duplicate = error.code === 'duplicate_order';
+        add(duplicate ? 'duplicate' : 'failed');
+        log.push({
+          ...row,
+          ...details,
+          outcome: duplicate ? 'existing' : 'problem',
+          reason: duplicate ? 'same_order' : error.code,
+          holdingId: duplicate ? (error.message === error.code ? null : error.message) : null,
+        });
+      }
     }
-    const details = { quantity: lot.quantity, costBase: lot.costBase, day: lot.acquired };
-    // A new item made by an earlier row is used again.
-    let ref = lot.ref;
-    if ('product' in ref) {
-      const same = await sameProduct.find(ref.product);
-      if (same) ref = { productId: same.id };
-    }
-    try {
-      const { holding, product } = await createHolding(db, userId, ref, {
-        ...lot.input,
-        importRunId: runId,
-      });
-      if ('product' in ref) await sameProduct.add(product);
-      add('imported');
+  } finally {
+    for (const e of entries.slice(done)) {
+      add('failed');
       log.push({
-        ...row,
-        ...details,
-        outcome: 'imported',
-        reason: e.type === 'existing' ? 'added_anyway' : null,
-        holdingId: holding.id,
-      });
-    } catch (error) {
-      if (!(error instanceof DomainError)) throw error;
-      const duplicate = error.code === 'duplicate_order';
-      add(duplicate ? 'duplicate' : 'failed');
-      log.push({
-        ...row,
-        ...details,
-        outcome: duplicate ? 'existing' : 'problem',
-        reason: duplicate ? 'same_order' : error.code,
-        holdingId: duplicate ? (error.message === error.code ? null : error.message) : null,
+        title: e.item,
+        detail: `line:${e.line}`,
+        outcome: 'problem',
+        reason: 'interrupted',
       });
     }
+    await saveImportRows(db, runId, log);
+    await finishImportRun(db, runId, counts, { note: fileName.slice(0, 200) });
   }
-  await saveImportRows(db, runId, log);
-  await finishImportRun(db, runId, counts, { note: fileName.slice(0, 200) });
   return { runId, counts };
 }

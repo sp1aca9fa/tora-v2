@@ -145,7 +145,11 @@ export async function setMarketSettings(db: Db, value: MarketSettings): Promise<
 }
 
 /** Saves a setting (app_settings) and clears the registry cache. */
-export async function saveSetting(db: Db, key: string, value: unknown): Promise<void> {
+export async function saveSetting(
+  db: Pick<Db, 'insert'>,
+  key: string,
+  value: unknown,
+): Promise<void> {
   const at = toLocalIso();
   await db
     .insert(appSettings)
@@ -171,7 +175,7 @@ export async function setCurrencySettings(db: Db, value: CurrencySettings): Prom
 }
 
 /** The admin's categories and condition lists (S16). */
-export async function setTaxonomy(db: Db, value: Taxonomy): Promise<void> {
+export async function setTaxonomy(db: Pick<Db, 'insert'>, value: Taxonomy): Promise<void> {
   await saveSetting(db, 'categories', {
     categories: value.categories,
     lists: value.lists.filter((l) => !l.builtIn),

@@ -149,26 +149,31 @@ export async function mergeImportedLots(
   if (!keep.reviewPending || !drop.reviewPending) throw new DomainError('invalid_input');
   const reasons = (h: typeof keep) => (h.reviewReason ?? '').split(',').filter(Boolean);
   const dateTaken = reasons(keep).includes('date_approx') && !reasons(drop).includes('date_approx');
-  await db
-    .update(purchaseLinks)
-    .set({ holdingId: keepId, updatedAt: toLocalIso() })
-    .where(eq(purchaseLinks.holdingId, dropId));
-  await deleteHolding(db, userId, dropId);
-  // An item the import made for the other lot (e.g. from a cut-off title) goes too.
-  if (drop.productId !== keep.productId && reasons(drop).includes('new_product')) {
-    await deleteUnusedProduct(db, drop.productId);
-  }
   const edit: { orderId?: string; acquiredAt?: string; costTotalBase?: number } = {};
   if (!keep.orderId && drop.orderId) edit.orderId = drop.orderId;
   if (!keep.costTotalBase && drop.costTotalBase) edit.costTotalBase = drop.costTotalBase;
   if (dateTaken) edit.acquiredAt = drop.acquiredAt;
-  if (Object.keys(edit).length) await editHolding(db, userId, keepId, edit);
   const left = reasons(keep).filter(
     (r) => r !== 'maybe_same' && !(dateTaken && r === 'date_approx'),
   );
-  await db
-    .update(holdings)
-    .set({ reviewReason: left.join(',') || null, updatedAt: toLocalIso() })
-    .where(eq(holdings.id, keepId));
+  // One transaction: a failed edit keeps the other lot. It goes first, as its order ID may be one
+  // a shop allows on one lot only.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(purchaseLinks)
+      .set({ holdingId: keepId, updatedAt: toLocalIso() })
+      .where(eq(purchaseLinks.holdingId, dropId));
+    await deleteHolding(tx, userId, dropId);
+    if (Object.keys(edit).length) await editHolding(tx, userId, keepId, edit);
+    await tx
+      .update(holdings)
+      .set({ reviewReason: left.join(',') || null, updatedAt: toLocalIso() })
+      .where(eq(holdings.id, keepId));
+  });
+  // An item the import made for the other lot (e.g. from a cut-off title) goes too; left over
+  // (unused) when this fails.
+  if (drop.productId !== keep.productId && reasons(drop).includes('new_product')) {
+    await deleteUnusedProduct(db, drop.productId);
+  }
   return { dateTaken };
 }

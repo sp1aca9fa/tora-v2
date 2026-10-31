@@ -146,60 +146,63 @@ export async function saveTaxonomy(
   if (change.blocked.length) throw new DomainError('invalid_input');
   if (change.touched.length && !confirmed) return change;
 
-  // Removed custom fields, choices and regions leave the items.
-  for (const c of next.categories) {
-    const removed = (prev.categories.find((x) => x.key === c.key)?.regions ?? []).filter(
-      (r) => !c.regions?.includes(r),
-    );
-    if (removed.length)
-      await db
-        .update(products)
-        .set({ region: null })
-        .where(and(eq(products.category, c.key), inArray(products.region, removed)));
-    const keep = new Map(
-      c.fields.filter((f) => !f.standard).map((f) => [f.key, f.choices?.map((x) => x.key)]),
-    );
-    const rows = await db
-      .select({ id: products.id, fields: products.fields })
-      .from(products)
-      .where(and(eq(products.category, c.key), isNotNull(products.fields)));
-    for (const r of rows) {
-      const fields = Object.fromEntries(
-        Object.entries(r.fields ?? {}).filter(([k, v]) => {
-          if (!keep.has(k)) return false;
-          const choices = keep.get(k);
-          return !choices || typeof v !== 'string' || choices.includes(v);
-        }),
+  // All or nothing, the setting last: items never follow a taxonomy that was not saved.
+  await db.transaction(async (tx) => {
+    // Removed custom fields, choices and regions leave the items.
+    for (const c of next.categories) {
+      const removed = (prev.categories.find((x) => x.key === c.key)?.regions ?? []).filter(
+        (r) => !c.regions?.includes(r),
       );
-      if (Object.keys(fields).length !== Object.keys(r.fields ?? {}).length) {
-        await db
+      if (removed.length)
+        await tx
           .update(products)
-          .set({ fields: Object.keys(fields).length ? fields : null })
-          .where(eq(products.id, r.id));
+          .set({ region: null })
+          .where(and(eq(products.category, c.key), inArray(products.region, removed)));
+      const keep = new Map(
+        c.fields.filter((f) => !f.standard).map((f) => [f.key, f.choices?.map((x) => x.key)]),
+      );
+      const rows = await tx
+        .select({ id: products.id, fields: products.fields })
+        .from(products)
+        .where(and(eq(products.category, c.key), isNotNull(products.fields)));
+      for (const r of rows) {
+        const fields = Object.fromEntries(
+          Object.entries(r.fields ?? {}).filter(([k, v]) => {
+            if (!keep.has(k)) return false;
+            const choices = keep.get(k);
+            return !choices || typeof v !== 'string' || choices.includes(v);
+          }),
+        );
+        if (Object.keys(fields).length !== Object.keys(r.fields ?? {}).length) {
+          await tx
+            .update(products)
+            .set({ fields: Object.keys(fields).length ? fields : null })
+            .where(eq(products.id, r.id));
+        }
+      }
+      // Each kind's item type (its condition list may have changed).
+      for (const k of c.kinds) {
+        await tx
+          .update(products)
+          .set({ itemType: itemTypeKey(c.key, k.conditions) })
+          .where(and(eq(products.category, c.key), eq(products.kind, k.key)));
       }
     }
-    // Each kind's item type (its condition list may have changed).
-    for (const k of c.kinds) {
-      await db
-        .update(products)
-        .set({ itemType: itemTypeKey(c.key, k.conditions) })
-        .where(and(eq(products.category, c.key), eq(products.kind, k.key)));
+    // Lots keep only values their item's list still has.
+    const values = new Map(
+      next.lists.filter((l) => !l.builtIn).map((l) => [l.key, l.values.map((v) => v.key)]),
+    );
+    const lots = await tx
+      .select({ id: holdings.id, value: holdings.conditionValue, type: products.itemType })
+      .from(holdings)
+      .innerJoin(products, eq(products.id, holdings.productId))
+      .where(isNotNull(holdings.conditionValue));
+    for (const lot of lots) {
+      if (!values.get(conditionListOf(lot.type ?? ''))?.includes(lot.value!)) {
+        await tx.update(holdings).set({ conditionValue: null }).where(eq(holdings.id, lot.id));
+      }
     }
-  }
-  // Lots keep only values their item's list still has.
-  const values = new Map(
-    next.lists.filter((l) => !l.builtIn).map((l) => [l.key, l.values.map((v) => v.key)]),
-  );
-  const lots = await db
-    .select({ id: holdings.id, value: holdings.conditionValue, type: products.itemType })
-    .from(holdings)
-    .innerJoin(products, eq(products.id, holdings.productId))
-    .where(isNotNull(holdings.conditionValue));
-  for (const lot of lots) {
-    if (!values.get(conditionListOf(lot.type ?? ''))?.includes(lot.value!)) {
-      await db.update(holdings).set({ conditionValue: null }).where(eq(holdings.id, lot.id));
-    }
-  }
-  await setTaxonomy(db, next);
+    await setTaxonomy(tx, next);
+  });
   return change;
 }

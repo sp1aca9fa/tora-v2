@@ -134,6 +134,36 @@ export interface BackupResult {
   bytes: number;
   tables: number;
   rows: number;
+  /** Rows dropped from the copy because the row they point at was not copied. */
+  orphans: number;
+}
+
+/**
+ * Deletes the copy's rows whose parent is missing (a child written while the tables were copied
+ * one by one, its parent after that table was done): the copy becomes a consistent, slightly
+ * earlier state, which a database enforcing references accepts on restore. Repeats until none are
+ * left (a dropped lot leaves its events orphaned). The copy has references off: no cascades.
+ */
+async function dropOrphans(c: Client): Promise<number> {
+  let dropped = 0;
+  for (;;) {
+    const rs = await c.execute('PRAGMA foreign_key_check');
+    if (rs.rows.length === 0) return dropped;
+    const byTable = new Map<string, Set<number>>();
+    for (const r of rs.rows) {
+      const ids = byTable.get(String(r[0])) ?? new Set<number>();
+      ids.add(Number(r[1]));
+      byTable.set(String(r[0]), ids);
+    }
+    const statements: InStatement[] = [];
+    for (const [table, ids] of byTable) {
+      for (const id of ids) {
+        statements.push({ sql: `DELETE FROM ${quote(table)} WHERE rowid = ?`, args: [id] });
+      }
+    }
+    await c.batch(statements, 'write');
+    dropped += statements.length;
+  }
 }
 
 /**
@@ -145,9 +175,14 @@ export async function backupDatabase(source: Client, file: string): Promise<Back
   try {
     const copy = join(work, 'tora.db');
     const target = createClient({ url: `file:${copy}` });
-    let result: { tables: number; rows: number };
+    // References off while copying (libsql turns them on): a row written mid-copy without its
+    // parent would otherwise fail the whole backup. dropOrphans then removes such rows.
+    await target.execute('PRAGMA foreign_keys = OFF');
+    let result: { tables: number; rows: number; orphans: number };
     try {
-      result = await copyDatabase(source, target);
+      const copied = await copyDatabase(source, target);
+      const orphans = await dropOrphans(target);
+      result = { tables: copied.tables, rows: copied.rows - orphans, orphans };
       const check = await target.execute('PRAGMA integrity_check');
       if (String(check.rows[0]?.[0]) !== 'ok') throw new Error('the copy failed its check');
     } finally {

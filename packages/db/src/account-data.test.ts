@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GRADERS } from '@tora/core';
+import { sql } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { accountData, loadAccountData } from './account-data';
 import { type Db, createDb } from './client';
@@ -17,8 +18,10 @@ import {
   splitOff,
   submitGrading,
 } from './mutations';
+import { canceledOrders, purchaseLinks } from './schema';
 import { seedCollection } from './seed';
 import { linkSource } from './sources';
+import { lotteryMarksOf, setLotteryMark } from './stores';
 import { setPreferences } from './users';
 import { createUser } from './users';
 import { setManualPrice } from './valuation';
@@ -160,4 +163,84 @@ it('refuses a file it cannot load, and an account with data', async () => {
   ).toEqual({ error: 'currency' });
   expect(await loadAccountData(db, owner, file)).toEqual({ error: 'notEmpty' });
   expect(await loadAccountData(db, fresh, '[]')).toEqual({ error: 'format' });
+});
+
+it('loads into an account that kept its canceled orders and purchase links', async () => {
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  file.purchaseLinks = [
+    { id: 'l1', userId: owner, url: 'https://shop.example/o/1', createdAt: AT },
+  ];
+  file.canceledOrders = [
+    { id: 'c1', userId: owner, orderSource: 'megastore', orderId: 'MID-1', createdAt: AT },
+  ];
+  await db.insert(purchaseLinks).values({ userId: fresh, url: 'https://shop.example/o/1' });
+  await db
+    .insert(canceledOrders)
+    .values({ userId: fresh, orderSource: 'megastore', orderId: 'MID-1' } as never);
+  expect(await loadAccountData(db, fresh, file)).toMatchObject({ lots: file.lots.length });
+  const back = await accountData(db, fresh);
+  expect(back.purchaseLinks).toHaveLength(1);
+  expect(back.canceledOrders).toHaveLength(1);
+});
+
+it('loads a file once when another load got there first', async () => {
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  // The other tab's load lands between the first check and this load's transaction.
+  const raced = new Proxy(db, {
+    get(target, key, receiver) {
+      if (key !== 'transaction') return Reflect.get(target, key, receiver);
+      return async (...args: Parameters<Db['transaction']>) => {
+        await loadAccountData(target, fresh, file);
+        return target.transaction(...args);
+      };
+    },
+  });
+  expect(await loadAccountData(raced, fresh, file)).toEqual({ error: 'notEmpty' });
+  expect((await accountData(db, fresh)).lots).toHaveLength(file.lots.length);
+});
+
+it('carries lottery marks, skipping posts the install no longer has', async () => {
+  await db.run(sql`INSERT INTO store_posts (id, source, external_id, text, posted_at, received_at, store_ids)
+    VALUES ('p1', 'board', '1', 'Lottery', ${AT}, ${AT}, '[]'), ('p2', 'board', '2', 'Lottery', ${AT}, ${AT}, '[]')`);
+  await setLotteryMark(db, owner, 'p1', 'applied');
+  await setLotteryMark(db, owner, 'p2', 'hidden');
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  expect(file.lotteryMarks).toHaveLength(2);
+  await db.run(sql`DELETE FROM store_posts WHERE id = 'p2'`);
+  file.lotteryMarks.push({ postId: 'p1', mark: 'nonsense', updatedAt: AT });
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  await loadAccountData(db, fresh, file);
+  expect([...(await lotteryMarksOf(db, fresh))]).toEqual([['p1', 'applied']]);
+});
+
+it("never reaches into another person's lots or imports", async () => {
+  const other = (await createUser(db, 'other', creds)).user.id;
+  const run = await startImportRun(db, { userId: other, method: 'file', note: 'theirs' });
+  const { holding } = await createHolding(
+    db,
+    other,
+    { product: { category: 'tcg', kind: 'single', name: 'Theirs', franchise: 'pokemon' } },
+    { quantity: 1, costTotalBase: 1_000, acquiredAt: AT, importRunId: run } as never,
+  );
+  const theirs = async () => accountData(db, other, new Date(AT));
+  const before = await theirs();
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  file.history.push({ ...file.history[0], id: 'e-x', holdingId: holding.id, type: 'note' });
+  file.lots[0].parentHoldingId = holding.id;
+  file.lots[0].importRunId = run;
+  file.purchaseLinks = [
+    { id: 'l1', url: 'https://shop.example/o/2', holdingId: holding.id, importRunId: run },
+  ];
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  expect(await loadAccountData(db, fresh, file)).toMatchObject({
+    history: file.history.length - 1,
+  });
+  expect(await theirs()).toEqual(before);
+  const mine = await accountData(db, fresh);
+  expect(mine.lots.some((l) => l.parentHoldingId === holding.id || l.importRunId === run)).toBe(
+    false,
+  );
+  expect(mine.purchaseLinks).toMatchObject([{ holdingId: null, importRunId: null }]);
 });
