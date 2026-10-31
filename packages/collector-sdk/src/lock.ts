@@ -13,6 +13,15 @@ export const stateDir = () =>
 /** Where the home PC keeps one lock per site (next to the collect log). */
 export const defaultLockDir = () => join(stateDir(), 'locks');
 
+/** This boot of the PC (Linux), or null where it cannot be read. */
+export function bootId(): string | null {
+  try {
+    return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
@@ -25,23 +34,26 @@ const alive = (pid: number) => {
 
 /**
  * Never two runs for the same site (S16), whether started by hand or by the schedule: a lock file
- * per source holding the running process's ID. A lock left by a process that is gone (the PC
- * turned off, the run stopped) is taken over. Returns `release`, or the process holding it.
+ * per source holding the running process's ID and the PC's boot. A lock left by a process that is
+ * gone (the PC turned off, the run stopped) is taken over, as is one from an earlier boot: its ID
+ * may now belong to another process. Returns `release`, or the process holding it.
  */
 export function lockSource(
   source: string,
   dir: string = defaultLockDir(),
   pid: number = process.pid,
+  boot: string | null = bootId(),
 ): { release: () => void } | { heldBy: number } {
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${source.replace(/[^\w-]/g, '_')}.lock`);
+  const mine = boot ? `${pid} ${boot}` : String(pid);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      writeFileSync(file, String(pid), { flag: 'wx' });
+      writeFileSync(file, mine, { flag: 'wx' });
       return {
         release: () => {
           try {
-            if (readFileSync(file, 'utf8') === String(pid)) rmSync(file);
+            if (readFileSync(file, 'utf8') === mine) rmSync(file);
           } catch {
             // Already gone.
           }
@@ -49,8 +61,11 @@ export function lockSource(
       };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
-      const holder = Number(readFileSync(file, 'utf8'));
-      if (holder && holder !== pid && alive(holder)) return { heldBy: holder };
+      // "<pid> <boot>"; a lock written before boots were kept holds the ID only (then alive decides).
+      const [held, heldBoot] = readFileSync(file, 'utf8').trim().split(/\s+/);
+      const holder = Number(held);
+      const sameBoot = !heldBoot || !boot || heldBoot === boot;
+      if (holder && holder !== pid && sameBoot && alive(holder)) return { heldBy: holder };
       rmSync(file, { force: true });
     }
   }

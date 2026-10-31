@@ -63,7 +63,12 @@ echo "=== $started $* ===" >>"$LOG"
 ok=1
 collect_rc=0
 pnpm --silent collect "$@" >>"$LOG" 2>&1 || collect_rc=$?
-if [ "$collect_rc" != 0 ]; then
+# Exit 2: a collector stopped at its request cap with listings left (not a failure); the next
+# trigger continues it, as it does after a failure (exit 1). Either way the day is not stamped.
+if [ "$collect_rc" = 2 ]; then
+  echo "collect stopped at a request cap; continues on the next trigger" >>"$LOG"
+  ok=0
+elif [ "$collect_rc" != 0 ]; then
   echo "collect failed (exit $collect_rc); will retry on the next trigger" >>"$LOG"
   ok=0
 fi

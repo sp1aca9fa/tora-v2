@@ -179,6 +179,21 @@ it('keeps going after one product fails (partial)', async () => {
   );
   expect(run.status).toBe('partial');
   expect(run.errors[0]).toContain('parse error');
+  expect(run.capReached).toBe(false);
+});
+
+it('says when a run stopped at its request cap, so the schedule continues it', async () => {
+  await box();
+  const run = await runCollector(
+    db,
+    fakeCollector({
+      findCandidates: async () => {
+        throw new RequestCapError();
+      },
+    }),
+    quiet,
+  );
+  expect(run).toMatchObject({ status: 'partial', capReached: true });
 });
 
 it('offers a linked look-alike instead of searching the site', async () => {

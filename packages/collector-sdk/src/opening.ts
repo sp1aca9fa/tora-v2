@@ -11,7 +11,7 @@ import {
   saveCardSales,
   saveOpeningCards,
 } from '@tora/db';
-import { errorText, type PoliteHttp } from './http';
+import { BlockedError, errorText, type PoliteHttp } from './http';
 import type { SetCardSource } from './types';
 
 /** Cards per set whose sales are read. */
@@ -27,7 +27,7 @@ export async function readOpeningCards(
   sources: SetCardSource[],
   http: PoliteHttp,
   opts: { log: (m: string) => void; now?: Date },
-): Promise<{ sets: number; cards: number; failed: number }> {
+): Promise<{ sets: number; cards: number; failed: number; blocked: string | null }> {
   const now = opts.now ?? new Date();
   const ctx = { http, now, log: opts.log };
   const due = (await openingSetsDue(db, now)).slice(0, SETS_PER_RUN);
@@ -36,8 +36,11 @@ export async function readOpeningCards(
   let done = 0;
   for (const set of due) {
     const rarities = [...new Set(set.rates.tiers.map((t) => t.rarity))];
+    // The source being read, to name the site when it refuses.
+    let current: SetCardSource | null = null;
     try {
       for (const source of sources) {
+        current = source;
         const found: FoundSetCard[] = [];
         for (const rarity of rarities)
           found.push(
@@ -69,7 +72,10 @@ export async function readOpeningCards(
     } catch (error) {
       failed++;
       opts.log(`${set.set.name}: stopped (${errorText(error)})`);
+      // A refusal stops the step (section 7): the set stays due, the site is left alone today.
+      if (error instanceof BlockedError)
+        return { sets: done, cards, failed, blocked: current?.source ?? null };
     }
   }
-  return { sets: done, cards, failed };
+  return { sets: done, cards, failed, blocked: null };
 }

@@ -2,7 +2,9 @@
 // --market / --source: one market's or one source's collectors (S16: spread across the night).
 // Listings already collected today are left out (a retry does only what is left) unless --refresh
 // or --product; a site another collect is running is skipped (never two runs for one site), and
-// one that blocked a run today is left until tomorrow.
+// one that blocked a run today is left until tomorrow. Exit codes: 0 done, 1 a failure (or a
+// site locked by another run), 2 a collector stopped at its request cap with listings left; the
+// schedule tries again after any of them (scripts/collect-cron.sh).
 // Runs collectors from the home PC (never on Vercel/CI). Jitter for cron lives in
 // scripts/collect-cron.sh.
 import {
@@ -17,6 +19,7 @@ import {
   recordActivity,
   refreshBucketValues,
   checkItemSales,
+  finishRun,
   getProduct,
   refreshItemSales,
   refreshOpportunities,
@@ -26,6 +29,7 @@ import {
   refreshTradeCounts,
   runSnapshots,
   readSetting,
+  startRun,
   saveSetting,
   saveUsage,
   loadTimeZone,
@@ -40,7 +44,7 @@ import { parseArgs } from 'node:util';
 import { PoliteHttp, errorText } from '../http';
 import { downloadProductImages } from '../images';
 import { importPurchaseLinks } from '../links';
-import { updateRates } from '../rates';
+import { staleRates, updateRates } from '../rates';
 import { syncCatalogs } from '../catalog';
 import { loadAndRegister } from '../registry';
 import { defaultLockDir, lockSource } from '../lock';
@@ -49,6 +53,7 @@ import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
+import { offEverywhere } from './collect-plan';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
 
@@ -115,7 +120,8 @@ try {
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
 // Only the markets the admin uses, unless a market or source is asked for by name (S10).
-const inUse = marketsInUse(sources, (await loadSourceRegistry(db)).markets);
+const registry = await loadSourceRegistry(db);
+const inUse = marketsInUse(sources, registry.markets);
 const used = (source: string) => {
   const market = marketOf.get(source);
   return !!values.market || !!values.source || !market || inUse.has(market);
@@ -125,14 +131,27 @@ if (unused.length)
   console.log(
     `Not collected (their market is not in use, Settings > Markets): ${unused.join(', ')}`,
   );
-const selected = collectors.filter(
+// A source off for every item type and no type's identity source is used nowhere (S8): its
+// collector, rankings and set cards are left out, unless it is asked for by name.
+const off = (source: string) => source !== values.source && offEverywhere(registry, source);
+const offSources = [
+  ...new Set([...collectors, ...rankings, ...setCards].map((c) => c.source)),
+].filter((source) => used(source) && off(source));
+if (offSources.length)
+  console.log(
+    `Not collected (off for every item type, Settings > Admin > Sources): ${offSources.join(', ')}`,
+  );
+const asked = collectors.filter(
   (c) =>
     used(c.source) &&
     (!values.source || c.source === values.source) &&
     (!values.market || marketOf.get(c.source) === values.market),
 );
-const usedRankings = rankings.filter((r) => used(r.source));
-if (values.market && selected.length === 0) {
+const selected = asked.filter((c) => !off(c.source));
+const usedRankings = rankings.filter((r) => used(r.source) && !off(r.source));
+const usedSetCards = setCards.filter((s) => !off(s.source));
+// A market whose collectors are all off is not an error (the schedule would retry it all day).
+if (values.market && asked.length === 0) {
   const known = [...new Set(sources.map((s) => s.market).filter(Boolean))].join(', ');
   console.error(`No collectors for market "${values.market}" (markets: ${known || 'none'}).`);
   process.exit(1);
@@ -146,7 +165,7 @@ const withLinks = !values.product && importers.some((i) => i.readLink);
 // A run per market keeps the rates, purchase links and uploads (each does only what is waiting).
 const withRates = !values.product && !values.source && rates.length > 0;
 // The box opening value's cards (S20): each set once a week, in any full or per-market run.
-const withOpening = !values.product && !values.source && setCards.length > 0;
+const withOpening = !values.product && !values.source && usedSetCards.length > 0;
 // Rankings (S13): before the collectors, so new candidates are collected the same night.
 const withRankings = !values.product && !values.source && usedRankings.length > 0;
 // Steps: exchange rates, purchase links, each collector, box opening cards, then pictures + lot
@@ -173,6 +192,14 @@ if (withRates) {
     }
   } catch (error) {
     log(`exchange rates: stopped (${errorText(error)})`);
+  }
+  // Old rates keep converting prices (S16): said here, whether or not the fetch above worked.
+  try {
+    for (const r of await staleRates(db, rates)) {
+      log(`exchange rates: ${r.from}/${r.to} last rate ${r.latest}, ${r.days} days old`);
+    }
+  } catch (error) {
+    log(`exchange rates: age check stopped (${errorText(error)})`);
   }
 }
 // Purchase links pasted in the app go first, so new products get searched in this run.
@@ -202,19 +229,46 @@ if (!values.product && !values.source) {
     log(`uploads: stopped (${errorText(error)})`);
   }
 }
+// A site that blocked an earlier run today is left alone until tomorrow (section 7), unless asked
+// for by name or with --refresh; its admins were told after that run. A refusal in this run adds
+// the site for the steps after it.
+const blocked =
+  values.source || values.product || values.refresh
+    ? new Set<string>()
+    : await blockedOn(db, localDate(new Date(), timeZone));
+/**
+ * A refusal outside a collector's run (rankings, box opening cards): the site is left alone for the
+ * rest of this run, and a blocked run is recorded so the day's retries leave it alone too
+ * (`blockedOn`). Requests are not counted: the step's client is shared by its sites.
+ */
+async function refused(source: string, step: string) {
+  blocked.add(source);
+  log(`${source}: refused while reading ${step}, left alone until tomorrow`);
+  const run = await startRun(db, source);
+  await finishRun(db, run, {
+    status: 'blocked',
+    requests: 0,
+    observationsAdded: 0,
+    error: `${step}: the site refused (see the collect log)`,
+  });
+}
 if (withRankings) {
   progress.next('rankings');
-  const locks = usedRankings.map((r) => lockSource(r.source));
+  const readable = usedRankings.filter((r) => !blocked.has(r.source));
+  const locks = readable.map((r) => lockSource(r.source));
   try {
-    if (locks.some((l) => 'heldBy' in l)) {
+    if (readable.length === 0) {
+      log('rankings: skipped, their sites blocked an earlier run today (tried again tomorrow)');
+    } else if (locks.some((l) => 'heldBy' in l)) {
       log('rankings: skipped, another collect is reading the same site');
     } else {
-      const read = await readRankings(db, usedRankings, new PoliteHttp({ maxRequests: 20 }), {
+      const read = await readRankings(db, readable, new PoliteHttp({ maxRequests: 20 }), {
         log: (m) => log(`[rankings] ${m}`),
       });
       log(
         `rankings: ${read.read} read, ${read.candidates} new candidate(s), ${read.failed} failed`,
       );
+      if (read.blocked) await refused(read.blocked, 'rankings');
     }
   } catch (error) {
     log(`rankings: stopped (${errorText(error)})`);
@@ -223,12 +277,6 @@ if (withRankings) {
   }
 }
 if (selected.length === 0) console.log('No collectors registered.');
-// A site that blocked an earlier run today is left alone until tomorrow (section 7), unless asked
-// for by name or with --refresh; its admins were told after that run.
-const blocked =
-  values.source || values.product || values.refresh
-    ? new Set<string>()
-    : await blockedOn(db, localDate(new Date(), timeZone));
 for (const collector of selected) {
   progress.next(collector.source);
   if (blocked.has(collector.source)) {
@@ -260,7 +308,11 @@ for (const collector of selected) {
   log(
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );
+  if (s.status === 'blocked') blocked.add(s.source);
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
+  // Stopped at its request cap with listings left: not done for the day, so the schedule's next
+  // try continues it (listings collected today are left out then).
+  else if (s.capReached && exitCode === 0) exitCode = 2;
   results.push({
     source: s.source,
     status: s.status,
@@ -271,12 +323,15 @@ for (const collector of selected) {
 }
 if (withOpening) {
   progress.next('box opening cards');
-  const locks = setCards.map((s) => lockSource(s.source));
+  const readable = usedSetCards.filter((s) => !blocked.has(s.source));
+  const locks = readable.map((s) => lockSource(s.source));
   try {
-    if (locks.some((l) => 'heldBy' in l)) {
+    if (readable.length === 0) {
+      log('box opening cards: skipped, their sites blocked a run today (tried again tomorrow)');
+    } else if (locks.some((l) => 'heldBy' in l)) {
       log('box opening cards: skipped, another collect is reading the same site');
     } else {
-      const read = await readOpeningCards(db, setCards, new PoliteHttp({ maxRequests: 400 }), {
+      const read = await readOpeningCards(db, readable, new PoliteHttp({ maxRequests: 400 }), {
         log: (m) => log(`[box opening] ${m}`),
       });
       if (read.sets || read.failed) {
@@ -284,6 +339,7 @@ if (withOpening) {
           `box opening cards: ${read.sets} set(s) read, ${read.cards} card(s), ${read.failed} failed`,
         );
       }
+      if (read.blocked) await refused(read.blocked, 'box opening cards');
     }
   } catch (error) {
     log(`box opening cards: stopped (${errorText(error)})`);

@@ -73,6 +73,11 @@ export interface RunSummary {
   errors: string[];
   /** Listings set aside this run, their page gone night after night (S10: admins are told). */
   setAside: { productId: string; name: string; error: string }[];
+  /**
+   * The run stopped at its request cap with listings left (partial): the collect exits non-zero
+   * so the schedule's next try continues it (not the history pass, which waits for tomorrow).
+   */
+  capReached: boolean;
 }
 
 /** The closest two requests to one site may be. */
@@ -157,6 +162,7 @@ export async function runCollector(
     observationsAdded: 0,
     errors: [],
     setAside: [],
+    capReached: false,
   };
   const fail = (what: string, e: unknown) => {
     summary.errors.push(`${what}: ${errorText(e)}`);
@@ -382,6 +388,7 @@ export async function runCollector(
       fail('blocked', e);
     } else if (e instanceof RequestCapError) {
       summary.status = 'partial';
+      summary.capReached = true;
       log('request cap reached; the rest continues next run');
     } else {
       summary.status = 'failed';
