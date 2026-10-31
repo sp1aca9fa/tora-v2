@@ -177,6 +177,12 @@ export async function verifyAction(_prev: LoginState, formData: FormData): Promi
   const code = String(formData.get('code') ?? '').trim();
   let ok = false;
   if (looksLikeBackupCode(code)) {
+    // A device signed in since step 1 may have filled the account: say so before a code is spent.
+    const devices = await listDevices(db, user.id);
+    if (devices.length >= MAX_ACTIVE_DEVICES) {
+      await attempt.drop();
+      return failed('devices', { ...who, devices: devices.map((d) => d.label ?? '-') }, 'code');
+    }
     // Used up before the device is registered: one code signs in once, even in parallel.
     const hash = matchBackupCode(code, user.backupCodeHashes, config.secret);
     ok = hash !== null && (await consumeBackupCode(db, user.id, hash));

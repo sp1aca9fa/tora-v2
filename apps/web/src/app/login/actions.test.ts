@@ -6,7 +6,16 @@ import {
   hashPassword,
   keyedHash,
 } from '@tora/auth';
-import { type Db, type User, createUser, getDb, getUserById, listDevices } from '@tora/db';
+import {
+  type Db,
+  MAX_ACTIVE_DEVICES,
+  type User,
+  createUser,
+  getDb,
+  getUserById,
+  listDevices,
+  registerDevice,
+} from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { MAX_FAILURES_PER_IP, recordAttempt } from '@/lib/auth/lockout';
@@ -150,4 +159,15 @@ it('starts over when the password changed after step 1', async () => {
   env.mfa = await createMfaToken({ secret }, coder.id, 'made-with-the-old-password');
   expect(await verify(backup.codes[1]!)).toEqual({ error: 'expired', step: 'code' });
   expect((await getUserById(db, coder.id))!.backupCodeHashes).toContain(backup.hashes[1]);
+});
+
+it('keeps a backup code when another device filled the account since step 1', async () => {
+  env.ip = '203.0.113.6';
+  env.mfa = await createMfaToken({ secret }, coder.id, credentialFingerprint(coder));
+  while ((await listDevices(db, coder.id)).length < MAX_ACTIVE_DEVICES)
+    await registerDevice(db, coder.id, 'laptop');
+  const before = (await getUserById(db, coder.id))!.backupCodeHashes;
+  // The page says only that the sign-in failed; the reason goes to the alert channel.
+  expect(await verify(backup.codes[2]!)).toMatchObject({ error: 'failed' });
+  expect((await getUserById(db, coder.id))!.backupCodeHashes).toEqual(before);
 });
