@@ -9,23 +9,34 @@ describe('sources kept from AI models (query_sql)', () => {
   };
   it('reads the sales table without them, keeping aliases', () => {
     expect(ok('select count(*) from price_observations where source = ?')).toBe(
-      "select count(*) from (select * from price_observations where source not in ('ebay')) as price_observations where source = ?",
+      "select count(*) from (select * from price_observations where source is null or source not in ('ebay')) as price_observations where source = ?",
     );
     expect(
       ok('select o.source from price_observations o join products p on p.id = o.product_id'),
-    ).toContain("from (select * from price_observations where source not in ('ebay')) as o join");
+    ).toContain(
+      "from (select * from price_observations where source is null or source not in ('ebay')) as o join",
+    );
     expect(ok('select 1 from products')).toBe('select 1 from products');
   });
   it('guards the change marks, and refuses the packed item sales', () => {
     expect(ok('select x.day from price_days_dirty x')).toBe(
-      "select x.day from (select * from price_days_dirty where source not in ('ebay')) as x",
+      "select x.day from (select * from price_days_dirty where source is null or source not in ('ebay')) as x",
     );
     expect(withoutSources('select * from item_sales', ['ebay'])).toHaveProperty('error');
+    // Asks and timing signals carry a source too (signals' may be empty: kept).
+    expect(ok('select s.day from supply s')).toContain('from (select * from supply where');
+    expect(ok('select * from signals')).toContain(
+      "(select * from signals where source is null or source not in ('ebay')) as signals",
+    );
   });
   it('refuses other ways to reach the table', () => {
     expect(withoutSources('select * from main.price_observations', ['ebay'])).toHaveProperty(
       'error',
     );
     expect(withoutSources('select * from "price_observations"', ['ebay'])).toHaveProperty('error');
+    // A comma join would read the second copy unguarded.
+    expect(
+      withoutSources('select * from price_observations a, price_observations b', ['ebay']),
+    ).toHaveProperty('error');
   });
 });

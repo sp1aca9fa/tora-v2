@@ -52,11 +52,15 @@ import { and, desc, eq, inArray, ne, notInArray } from 'drizzle-orm';
 const { holdings, products, priceObservations, productImages, productSources, watches } = schema;
 
 const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : null);
+/** In place of numbers from a source whose terms keep its data from AI models. */
+const HIDDEN = 'from a source Claude may not read';
+
 const pct = (part: number, whole: number) =>
   whole > 0 ? Math.round((part / whole) * 1000) / 10 : null;
 
-/** What a valuation says, in a few fields. */
-function valuationFacts(v: ReturnType<typeof valueHolding>) {
+/** What a valuation says, in a few fields; none of it when its source is kept from AI. */
+function valuationFacts(v: ReturnType<typeof valueHolding>, noAi: string[]) {
+  if (v.source && noAi.includes(v.source)) return { hidden: HIDDEN };
   return {
     valueBase: v.valueBase,
     unitBase: v.unitBase,
@@ -68,9 +72,10 @@ function valuationFacts(v: ReturnType<typeof valueHolding>) {
     pooled: v.pooled,
     confidence: v.confidence,
     estimatedLotSales: v.estimatedSamples,
-    lastSale: v.last
-      ? { priceBase: v.last.priceBase, source: v.last.source, at: day(v.last.observedAt) }
-      : null,
+    lastSale:
+      v.last && !noAi.includes(v.last.source)
+        ? { priceBase: v.last.priceBase, source: v.last.source, at: day(v.last.observedAt) }
+        : null,
   };
 }
 
@@ -143,9 +148,11 @@ export async function listProducts(
   const valuations = new Map(
     picked.map((r) => [r.holding.id, valueHolding(r.holding, r.product, market)]),
   );
+  const noAi = noAiSources(await loadSourceRegistry(db));
   return summarizeByProduct(picked, valuations)
     .map((s) => {
       const first = valuations.get(s.lots[0]!.holding.id)!;
+      const hidden = !!first.source && noAi.includes(first.source);
       return {
         productId: s.product.id,
         name: s.product.name,
@@ -154,17 +161,19 @@ export async function listProducts(
         lots: s.lots.length,
         units: s.units,
         spentBase: s.spentBase,
-        valueBase: s.valuedLots ? s.valueBase : null,
-        unrealizedBase: s.unrealizedBase,
+        valueBase: s.valuedLots && !hidden ? s.valueBase : null,
+        unrealizedBase: hidden ? null : s.unrealizedBase,
         valuedLots: s.valuedLots,
-        valuation: {
-          method: first.method,
-          source: first.source,
-          sales: first.sampleSize,
-          windowDays: first.windowDays,
-          pooled: first.pooled,
-          confidence: first.confidence,
-        },
+        valuation: hidden
+          ? { hidden: HIDDEN }
+          : {
+              method: first.method,
+              source: first.source,
+              sales: first.sampleSize,
+              windowDays: first.windowDays,
+              pooled: first.pooled,
+              confidence: first.confidence,
+            },
       };
     })
     .filter((p) => !filter.unvalued || p.valuedLots < p.lots);
@@ -173,6 +182,7 @@ export async function listProducts(
 export async function productDetail(db: Db, userId: string, productId: string) {
   const product = await getProduct(db, productId);
   if (!product) return { error: 'not found' };
+  const noAi = noAiSources(await loadSourceRegistry(db));
   const [lots, sources, candidates, market, released, similar, lines] = await Promise.all([
     productLots(db, userId, productId),
     listProductSources(db, productId),
@@ -204,7 +214,8 @@ export async function productDetail(db: Db, userId: string, productId: string) {
         h.grading === 'graded' ? `${h.grader} ${h.grade}` : h.rawGrade ? `raw ${h.rawGrade}` : null,
       reviewPending: h.reviewPending,
       reviewReason: h.reviewReason,
-      valuation: h.status === 'owned' ? valuationFacts(valueHolding(h, product, market)) : null,
+      valuation:
+        h.status === 'owned' ? valuationFacts(valueHolding(h, product, market), noAi) : null,
     })),
     sources: sources.map((s) => ({
       source: s.source,
@@ -386,6 +397,8 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
   const productIds = [...new Set(rows.map((r) => r.product.id))];
   const market = await rawMarketData(db, userId, productIds, now);
   const valued = owned.map((r) => ({ ...r, v: valueHolding(r.holding, r.product, market, now) }));
+  // Numbers from a source whose terms keep its data from AI models are left out.
+  const noAiKeys = noAiSources(await loadSourceRegistry(db));
   const lot = (h: Holding, p: Product) => ({ holdingId: h.id, productId: p.id, name: p.name });
   const findings: Finding[] = [];
 
@@ -408,7 +421,12 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       'info',
       'Values from few or old sales, or with similar conditions pooled: treat as rough.',
       valued
-        .filter((x) => x.v.method === 'median' && (x.v.confidence === 'low' || x.v.pooled))
+        .filter(
+          (x) =>
+            x.v.method === 'median' &&
+            (x.v.confidence === 'low' || x.v.pooled) &&
+            !noAiKeys.includes(x.v.source ?? ''),
+        )
         .map((x) => ({
           ...lot(x.holding, x.product),
           source: x.v.source,
@@ -478,13 +496,15 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       'odd_sales',
       'info',
       'Sales of the last 30 days at over 3x or under 1/3 of the value (the median ignores them, but they may be mismatches to exclude).',
-      oddSales(valued, market, now).map((o) => ({
-        ...lot(o.holding, o.product),
-        source: o.source,
-        priceBase: o.priceBase,
-        valueBase: o.valueBase,
-        at: day(o.observedAt),
-      })),
+      oddSales(valued, market, now)
+        .filter((o) => !noAiKeys.includes(o.source))
+        .map((o) => ({
+          ...lot(o.holding, o.product),
+          source: o.source,
+          priceBase: o.priceBase,
+          valueBase: o.valueBase,
+          at: day(o.observedAt),
+        })),
     ),
   );
 
@@ -501,7 +521,6 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       ),
     );
   const weak: unknown[] = [];
-  const noAiKeys = noAiSources(await loadSourceRegistry(db));
   for (const { source, product } of searches) {
     if (!source.lastSuccessAt || noAiKeys.includes(source.source)) continue;
     const obs = await db
@@ -681,8 +700,11 @@ const SQL_WORDS = new Set([
   'as',
 ]);
 
-/** Tables with a row per source's sales: read through a version without the sources kept from AI. */
-const SALES_TABLES = ['price_observations', 'price_days_dirty'];
+/**
+ * Tables with a row per source (sales, asks, timing signals): read through a version without the
+ * sources kept from AI.
+ */
+const SALES_TABLES = ['price_observations', 'price_days_dirty', 'supply', 'signals'];
 /** Tables mixing every source's sales in one row: never read through `query_sql`. */
 const PACKED_TABLES = ['item_sales'];
 
@@ -709,19 +731,22 @@ export function withoutSources(
     if (new RegExp(`\\b\\w+\\s*\\.\\s*${table}\\b|["\`[]${table}\\b`, 'i').test(sql)) {
       return { error: `Read ${table} by its plain name.` };
     }
-    const guarded = `(select * from ${table} where source not in (${list}))`;
-    let rewrote = false;
+    const guarded = `(select * from ${table} where source is null or source not in (${list}))`;
     sql = sql.replace(
       new RegExp(`\\b(from|join)\\s+${table}\\b(?:\\s+(?:as\\s+)?(\\w+))?`, 'gi'),
       (_m, kw: string, alias?: string) => {
-        rewrote = true;
         const keep = alias && !SQL_WORDS.has(alias.toLowerCase());
         const name = keep ? alias : table;
         return `${kw} ${guarded} as ${name}${keep ? '' : alias ? ` ${alias}` : ''}`;
       },
     );
-    if (!rewrote && new RegExp(`\\b${table}\\b`, 'i').test(sql.split(guarded).join(''))) {
-      return { error: `Read ${table} in a FROM or JOIN.` };
+    // Any other mention (a comma join, a subquery's bare name) would read it unguarded.
+    const rest = sql
+      .split(guarded)
+      .join('')
+      .replace(new RegExp(`\\bas\\s+${table}\\b`, 'gi'), '');
+    if (new RegExp(`\\b${table}\\b`, 'i').test(rest)) {
+      return { error: `Read ${table} only right after FROM or JOIN (no comma joins).` };
     }
   }
   return { sql };
@@ -740,7 +765,8 @@ export async function querySql(db: Db, sql: string, limit = 200) {
   const tx = await db.$client.transaction('read');
   try {
     const rs = await tx.execute(
-      `select * from (${guarded.sql}) limit ${Math.min(Math.max(1, limit), 1000)}`,
+      // The line break keeps a trailing -- comment from swallowing the closing parenthesis.
+      `select * from (${guarded.sql}\n) limit ${Math.min(Math.max(1, limit), 1000)}`,
     );
     return {
       columns: rs.columns,
