@@ -55,6 +55,8 @@ never run it).
 
 ## Standing rules
 
+Confirmed by the owner 2026-11-04.
+
 - 2026-10-29: reviewer findings: fix what is right, take the recommended option on "ask"
   findings, skip what is wrong; ideas for the reviewed pages are built, others go to the notes'
   to-do list.
