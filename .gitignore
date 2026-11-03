@@ -23,5 +23,7 @@ next-env.d.ts
 # Agent run logs (specs, logs; kept locally)
 .agent-runs/
 
-# Claude Code sandbox scratch
+# Claude Code: personal files (the rules and settings.json are committed)
+CLAUDE.local.md
+.claude/settings.local.json
 .claude/.cc-writes/

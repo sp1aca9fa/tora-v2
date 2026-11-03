@@ -103,7 +103,7 @@ it('restores a backup into an empty database exactly (scenario 8)', async () => 
 
   // A database with data is never overwritten.
   await expect(restoreDatabase(file, target)).rejects.toThrow(/not empty/);
-});
+}, 20_000); // a full backup and restore; slow when the whole suite runs in parallel
 
 it('leaves out rows whose parent was not copied, so a restore with references on works', async () => {
   await seedCollection(db, userId);

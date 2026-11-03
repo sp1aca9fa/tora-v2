@@ -26,9 +26,18 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
-# Other apps on this box published through the Funnel, "<https port> <local port>": a reset clears
-# every mapping, so theirs are set up again too.
-OTHER_FUNNELS=("8443 3001") # Saku
+# Other apps on this box published through the Funnel: a reset clears every mapping, so theirs are
+# set up again too. TORA_OTHER_FUNNELS in the repo's .env (or the environment), a space-separated
+# list of <https port>:<local port> (e.g. "8443:3001"); empty by default.
+OTHER_FUNNELS_RAW="${TORA_OTHER_FUNNELS:-$(sed -n 's/^TORA_OTHER_FUNNELS="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' .env 2>/dev/null | tail -n 1)}"
+OTHER_FUNNELS=()
+for m in $OTHER_FUNNELS_RAW; do
+  if [[ "$m" =~ ^[0-9]+:[0-9]+$ ]]; then
+    OTHER_FUNNELS+=("${m%%:*} ${m#*:}")
+  else
+    echo "$(date -Iseconds) TORA_OTHER_FUNNELS: '$m' is not <https port>:<local port>, skipped"
+  fi
+done
 
 status="$(tailscale funnel status 2>/dev/null)"
 url="$(printf '%s\n' "$status" | grep -o 'https://[^ ]*\.ts\.net' | head -1)"
@@ -72,7 +81,7 @@ if [ "$fails" = 2 ] || [ "$fails" = 4 ]; then
   fi
   tailscale funnel reset && tailscale funnel --bg "$port" >/dev/null &&
     echo "$(date -Iseconds) Funnel set up again$restarted"
-  for m in "${OTHER_FUNNELS[@]}"; do
+  for m in ${OTHER_FUNNELS[@]+"${OTHER_FUNNELS[@]}"}; do
     read -r https local <<<"$m"
     tailscale funnel --bg --https="$https" "$local" >/dev/null ||
       echo "$(date -Iseconds) could not set up the Funnel on $https again"

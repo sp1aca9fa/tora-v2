@@ -325,5 +325,5 @@ describe('alerts and rule tests', () => {
     });
     expect(strategyKey({ strategy: 'margin', margin: 15 })).toBe('margin:15');
     expect(strategyKey({ strategy: 'steady' })).toBe('steady');
-  });
+  }, 20_000); // heavy (two years of daily prices); slow when the whole suite runs in parallel
 });

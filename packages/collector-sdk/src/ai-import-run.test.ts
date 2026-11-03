@@ -125,10 +125,12 @@ it('keeps a batch that could not be read, to try again', async () => {
 });
 
 it('does not import a batch whose claim another reader took during the read', async () => {
-  let second: Awaited<ReturnType<typeof claimUploadBatch>> = null;
+  let second: Awaited<ReturnType<typeof claimUploadBatch>> | undefined;
   const ask: AskClaude = async <T>(o: { files?: string[] }) => {
-    // The read outlives its claim: the home PC takes the batch as stuck.
-    second = await claimUploadBatch(
+    // The read outlives its claim: the home PC takes the batch as stuck, once, during the first
+    // call. The read may call Claude again (a random sample is read again by Sonnet), and a
+    // second claim then finds the batch taken (null): it must not overwrite the first.
+    second ??= await claimUploadBatch(
       db,
       'batch-0003',
       new Date(Date.now() + UPLOAD_READING_STALE_MS + 60_000),
