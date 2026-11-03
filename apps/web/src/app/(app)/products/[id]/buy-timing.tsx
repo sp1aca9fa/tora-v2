@@ -6,6 +6,7 @@ import {
   type SignalStats,
   type StrategyChoice,
   judge,
+  localDate,
 } from '@tora/core';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -42,6 +43,12 @@ function groupLabel(
 }
 
 const pct = (x: number) => `${x > 0 ? '+' : ''}${Math.round(x * 100)}%`;
+
+/** The day a new release's wait ends: today plus the days left (the numbers' day may be earlier). */
+const waitEnds = (ageDays: number, waitDays: number) =>
+  new Date(Date.parse(`${localDate()}T00:00:00Z`) + (waitDays - ageDays) * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 
 /**
  * Buy timing's verdict (S9 part 4, S22): the person's strategy on today's numbers, the buy zone,
@@ -162,8 +169,37 @@ export async function BuyVerdict({
                     items: stats.lowAge.items,
                     group: group(stats.lowAge),
                     wait: j.waitDays,
+                    date: waitEnds(stats.ageDays, j.waitDays),
                   })
-                : t('buy.newReleaseDefault', { days: stats.ageDays, wait: j.waitDays })}
+                : t('buy.newReleaseDefault', {
+                    days: stats.ageDays,
+                    wait: j.waitDays,
+                    date: waitEnds(stats.ageDays, j.waitDays),
+                  })}
+          </p>
+        )}
+        {j.newRelease && stats.lowDrop && (
+          <p className="text-muted-foreground">
+            {t('buy.lowDrop', {
+              items: stats.lowDrop.items,
+              group: group(stats.lowDrop),
+              pct: pct(stats.lowDrop.change),
+              price:
+                stats.lowDrop.from !== null
+                  ? money(Math.round(stats.lowDrop.from * (1 + stats.lowDrop.change)))
+                  : '-',
+              priced: String(stats.lowDrop.from !== null),
+            })}
+            {stats.lowDrop.deep !== null &&
+              ` ${t('buy.lowDropDeep', {
+                pct: pct(stats.lowDrop.deep),
+                price:
+                  stats.lowDrop.from !== null
+                    ? money(Math.round(stats.lowDrop.from * (1 + stats.lowDrop.deep)))
+                    : '-',
+                priced: String(stats.lowDrop.from !== null),
+              })}`}{' '}
+            {t('buy.lowDropNote')}
           </p>
         )}
         {j.askInZone && (

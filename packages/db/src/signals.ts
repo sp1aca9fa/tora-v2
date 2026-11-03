@@ -17,11 +17,13 @@ import {
   median,
   newSetPattern,
   productClass,
+  recentPrice,
   ruleTests,
   seriesStats,
   strategyKey,
   toLocalIso,
   typicalLowAge,
+  typicalLowDrop,
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -300,6 +302,9 @@ export async function refreshSignals(
       }
       lowAge = lowAges.get(lowKey) ?? null;
     }
+    // How far similar items fell from this age to their low, with the item's own price now.
+    const drop = firstYear ? byLine(line, others, (o) => typicalLowDrop(ageDays!, o, today)) : null;
+    const lowDrop = drop && { ...drop, from: recentPrice(picked?.series ?? [], today) };
     if (pattern) withPattern++;
     // Like for like (as Opportunities): the price source's own ask; another site's cheapest
     // listing is too often something else (Mercari asks at a third of the sales price).
@@ -320,6 +325,7 @@ export async function refreshSignals(
         market: markets.get(`${similarKey(product)}|${line ?? ''}`) ?? null,
         pattern,
         lowAge,
+        lowDrop,
       },
     });
   }

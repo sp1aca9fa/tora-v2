@@ -16,6 +16,8 @@ import {
   strategyKey,
   suggestedStrategy,
   typicalLowAge,
+  typicalLowDrop,
+  recentPrice,
 } from './signals';
 import { byLine, lineFromTitle } from './lines';
 import { STRATEGY_EXAMPLES, replayExample, strategyExamples } from './strategy-examples';
@@ -235,6 +237,39 @@ describe('new-release wait and lines', () => {
     expect(low.age).toBeLessThanOrEqual(120);
     // A year not over yet does not count.
     expect(typicalLowAge(others, '2025-01-15')).toBeNull();
+  });
+
+  it('learns how far similar items fell from this age to their first-year low', () => {
+    const v = (low: number) => (i: number) => 1000 + Math.abs(i - low) * 3;
+    const others = [100, 120, 200].map((low) => ({
+      release: '2024-01-01',
+      series: days('2024-01-01', 365, v(low)),
+    }));
+    // From day 50: 1150 to 1000, 1210 to 1000, 1450 to 1000.
+    const drop = typicalLowDrop(50, others, '2026-01-01')!;
+    expect(drop.items).toBe(3);
+    expect(drop.change).toBeCloseTo(1000 / 1210 - 1, 1);
+    // Too few items for a quarter.
+    expect(drop.deep).toBeNull();
+    // Past the low already: no further fall (a rise is not a fall).
+    expect(typicalLowDrop(300, others.slice(0, 2), '2026-01-01')).toBeNull();
+    expect(typicalLowDrop(300, others, '2026-01-01')!.change).toBeCloseTo(0, 1);
+    // A year not over yet does not count; 8 items give the deeper quarter.
+    expect(typicalLowDrop(50, others, '2024-12-01')).toBeNull();
+    const eight = [60, 80, 100, 120, 140, 160, 200, 250].map((low) => ({
+      release: '2024-01-01',
+      series: days('2024-01-01', 365, v(low)),
+    }));
+    const deep = typicalLowDrop(50, eight, '2026-01-01')!;
+    expect(deep.deep).not.toBeNull();
+    expect(deep.deep!).toBeLessThan(deep.change);
+  });
+
+  it("reads an item's price now from the week before only", () => {
+    const series = days('2026-01-01', 20, (i) => (i < 10 ? 1000 : 2000));
+    expect(recentPrice(series, '2026-01-10')).toBe(1000);
+    expect(recentPrice(series, '2026-01-20')).toBe(2000);
+    expect(recentPrice(series, '2026-03-01')).toBeNull();
   });
 
   it('reads Pokemon lines from titles, and studies the line when it has enough items', () => {

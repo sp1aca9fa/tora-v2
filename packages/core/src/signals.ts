@@ -109,6 +109,17 @@ export interface SignalStats {
   pattern: { items: number; change: number; horizonDays: number; line?: string | null } | null;
   /** The age at which similar items usually hit their first-year low (3+ with a full year). */
   lowAge?: { age: number; items: number; line: string | null } | null;
+  /**
+   * How far similar items fell from this age to their first-year low (`typicalLowDrop`), and the
+   * item's own typical price now (`from`, null with too few recent sales); missing on older rows.
+   */
+  lowDrop?: {
+    items: number;
+    change: number;
+    deep: number | null;
+    line: string | null;
+    from: number | null;
+  } | null;
 }
 
 const DAY = 86_400_000;
@@ -225,6 +236,13 @@ function priceAround(series: DayPrice[], day: number): number | null {
   return near.length >= 2 ? median(near.map((p) => p.price)) : null;
 }
 
+/** The typical price on a day from the prices up to it (the week before; 2+ days of sales). */
+export const recentPrice = (series: DayPrice[], asOf: string): number | null =>
+  priceAround(
+    series.filter((p) => p.day.slice(0, 10) <= asOf),
+    dayNumber(asOf),
+  );
+
 /**
  * The new-set pattern: how similar items' prices moved from this age (days since their release)
  * to 90 days later. Only items with prices around both ages count, whenever their history starts.
@@ -277,6 +295,58 @@ export function typicalLowAge(
   }
   if (ages.length < PATTERN_MIN_ITEMS) return null;
   return { age: Math.round(median(ages)!), items: ages.length };
+}
+
+/** Similar items needed for the deeper quarter of the fall to their low (a quantile of fewer says little). */
+export const LOW_DROP_QUARTER_MIN = 8;
+
+// An item's typical price at each age of its first year with sales, worked out once per item.
+const firstYearPrices = new WeakMap<object, { age: number; price: number }[]>();
+
+/**
+ * How far similar items fell from this age (days since release) to their first-year low: per item
+ * with a full first year (as `typicalLowAge`), its lowest typical price from this age to day 365
+ * against its price at this age; the median of 3 or more items, and the deeper quarter of 8 or
+ * more. For reference only: on 10 past boxes, buying at the median's price before the low's age
+ * did no better than waiting for that age (2026-11-03), so it never ends the wait.
+ */
+export function typicalLowDrop(
+  ageDays: number,
+  others: { release: string; series: DayPrice[] }[],
+  asOf: string,
+): { items: number; change: number; deep: number | null } | null {
+  if (ageDays < 0 || ageDays > PATTERN_MAX_AGE) return null;
+  const today = dayNumber(asOf);
+  const drops: number[] = [];
+  for (const o of others) {
+    const release = dayNumber(o.release);
+    if (release + PATTERN_MAX_AGE + 7 > today) continue;
+    let prices = firstYearPrices.get(o);
+    if (!prices) {
+      const year = o.series
+        .map((p) => dayNumber(p.day) - release)
+        .filter((age) => age >= 0 && age <= PATTERN_MAX_AGE);
+      prices =
+        year.length && year[0]! <= FULL_YEAR.from && year.at(-1)! >= FULL_YEAR.to
+          ? year.flatMap((age) => {
+              const price = priceAround(o.series, release + age);
+              return price === null ? [] : [{ age, price }];
+            })
+          : [];
+      firstYearPrices.set(o, prices);
+    }
+    if (!prices.length) continue;
+    const start = priceAround(o.series, release + ageDays);
+    if (start === null) continue;
+    const low = Math.min(start, ...prices.filter((p) => p.age >= ageDays).map((p) => p.price));
+    drops.push(low / start - 1);
+  }
+  if (drops.length < PATTERN_MIN_ITEMS) return null;
+  return {
+    items: drops.length,
+    change: median(drops)!,
+    deep: drops.length >= LOW_DROP_QUARTER_MIN ? quantile(drops, 0.25) : null,
+  };
 }
 
 /** How an item's price moved in its first months: from day 7 to day 97 after release. */
