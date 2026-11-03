@@ -98,6 +98,8 @@ export interface SignalStats {
   /** Days since release (S9 part 3's release date), and where that date came from. */
   ageDays: number | null;
   releaseFrom: 'set' | 'item' | 'first_sale' | null;
+  /** The release date itself (the new-release wait's end is counted from it); missing on older rows. */
+  release?: string | null;
   /** The item's set line (main expansion, high class pack, ...); missing on older rows. */
   line?: string | null;
   /**

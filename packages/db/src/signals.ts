@@ -321,6 +321,7 @@ export async function refreshSignals(
         ask: ask?.lowestAskBase ?? null,
         ageDays,
         releaseFrom: r?.from ?? null,
+        release: r?.date ?? null,
         line,
         market: markets.get(`${similarKey(product)}|${line ?? ''}`) ?? null,
         pattern,

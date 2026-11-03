@@ -245,10 +245,11 @@ describe('new-release wait and lines', () => {
       release: '2024-01-01',
       series: days('2024-01-01', 365, v(low)),
     }));
-    // From day 50: 1150 to 1000, 1210 to 1000, 1450 to 1000.
+    // From day 50: 1150, 1210 and 1450 to a low typical price of 1012 (the median of the 15 days
+    // around it); the median fall is the middle one's, not the mean.
     const drop = typicalLowDrop(50, others, '2026-01-01')!;
     expect(drop.items).toBe(3);
-    expect(drop.change).toBeCloseTo(1000 / 1210 - 1, 1);
+    expect(drop.change).toBeCloseTo(1012 / 1210 - 1, 3);
     // Too few items for a quarter.
     expect(drop.deep).toBeNull();
     // Past the low already: no further fall (a rise is not a fall).
@@ -260,14 +261,16 @@ describe('new-release wait and lines', () => {
       release: '2024-01-01',
       series: days('2024-01-01', 365, v(low)),
     }));
+    expect(typicalLowDrop(50, eight.slice(0, 7), '2026-01-01')!.deep).toBeNull();
     const deep = typicalLowDrop(50, eight, '2026-01-01')!;
     expect(deep.deep).not.toBeNull();
     expect(deep.deep!).toBeLessThan(deep.change);
   });
 
   it("reads an item's price now from the week before only", () => {
-    const series = days('2026-01-01', 20, (i) => (i < 10 ? 1000 : 2000));
-    expect(recentPrice(series, '2026-01-10')).toBe(1000);
+    // On day 3, the 7 days after it (at 2000) would outweigh the 3 up to it.
+    const series = days('2026-01-01', 20, (i) => (i < 3 ? 1000 : 2000));
+    expect(recentPrice(series, '2026-01-03')).toBe(1000);
     expect(recentPrice(series, '2026-01-20')).toBe(2000);
     expect(recentPrice(series, '2026-03-01')).toBeNull();
   });
