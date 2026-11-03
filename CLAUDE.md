@@ -42,53 +42,25 @@ If a request conflicts with the requirements, point out the conflict and ask bef
 ## Agents
 
 The main session (Opus, high effort) orchestrates: it plans, writes the spec, routes, triages,
-commits and keeps the owner's actions file current. The agents are shared across projects (the
-`selfhost-blueprint` repo's `claude/agents`, linked into `~/.claude`); this project's profile is
-`docs/agents.md` (the app, trust territory, domain checklist, and the model and effort per role:
-pass those as `model` and `effort` every time an agent is started). `/ship <task>` runs the whole
-loop. Subagents cannot start subagents.
+commits and keeps the owner's actions file current. The loop is the shared `/ship`
+(`~/.claude/commands/ship.md`, from the `selfhost-blueprint` repo linked into `~/.claude`): tiers
+0-3 decided by the changed files, Tier 3 handling, which questions may stop the work, how to write
+for the owner, the setup review. Read it before any Tier 1-3 work, with or without `/ship`. This
+project's profile is `docs/agents.md`: risk class, trust-territory paths, domain checklist, the
+model and effort per role (pass them as `model` and `effort` every time an agent is started), the
+owner's list, standing rules. Small changes (a few files, one area) the main session does itself,
+since an agent re-reads everything cold. Subagents cannot start subagents.
 
-**Tiers** (judge by the diff; trust territory, listed in `docs/agents.md`, decides the whole
-change):
+| Tier | When                                                                                         | Review                                                    |
+| ---- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0    | docs, notes, comments, wording in `en.json` only, tests only, config with no behavior change | none; CHECKS only                                         |
+| 1    | product code outside trust territory                                                         | `code-reviewer-light`; `ux-reviewer` if visible           |
+| 2    | a file on the trust-territory paths (`docs/agents.md`)                                       | `code-reviewer`; `ux-reviewer` if visible                 |
+| 3    | Tier 2 the normal loop cannot verify (`/ship` section 1 triggers)                            | plan review, then normal and adversarial review, `triage` |
 
-| Tier | When                                                                                         | Review                                          |
-| ---- | -------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| 0    | docs, notes, comments, wording in `en.json` only, tests only, config with no behavior change | none; CHECKS only                               |
-| 1    | product code outside trust territory                                                         | `code-reviewer-light`; `ux-reviewer` if visible |
-| 2    | trust territory                                                                              | `code-reviewer`; `ux-reviewer` if visible       |
-
-A Tier 0 or 1 change that fails CHECKS twice moves up a tier. Never review Tier 0 "to be safe".
-
-**Loop:**
-
-1. Tier 1 and 2: a spec in `.agent-runs/<date>-<slug>/spec.md` (`docs/spec-template.md`): goal,
-   acceptance criteria, the requirement sections it rests on (point, don't copy), pages touched,
-   tier. Unclear details: the conservative reading under "Assumed".
-2. Build: small changes (a few files, one area) the main session does itself, since an agent
-   re-reads everything cold. Bigger chunks: `builder`, or `builder-heavy` in trust territory.
-   Give the spec path, the chunk and CHECKS; never paste code.
-3. CHECKS; on failure back to the builder, at most 2 tries. Visible changes: sync the test copy
-   and crawl the changed pages (`--views phone,wide,dark`).
-4. Review: the tier's reviewers in one message (parallel). Code reviewers get the commit range,
-   spec path and CHECKS output; the UX reviewer only screenshot paths and one line per page on
-   its purpose, nothing else.
-5. Triage: the main session checks every finding against the code. Act without asking: fix what
-   is right, take the recommended option on "ask" findings, skip what is wrong. Ideas for the
-   reviewed pages are built; ideas about other pages go to the notes' to-do list. Fixes in one
-   batch. Re-review only Tier 2 logic fixes, by the reviewer that found them. At most 2 fix
-   rounds; what is still open goes in the report.
-6. Commit (files by name). Log in `.agent-runs/<date>-<slug>/log.md` (tier and why, chunks,
-   check results, finding counts, decisions); one row per reviewer run in the ledger
-   (`date,slug,tier,reviewer,findings,accepted,rejected,duplicate`); update the actions file
-   (paths in `docs/agents.md`).
-7. Every 10 reviewer runs of a kind, read the ledger and propose model or effort changes as the
-   shared agents' README says.
-
-**Stop and ask** only for: a destructive or irreversible action; pushing or deploying; a new
-dependency, external service or cost; anything public; production data changes; a request that
-conflicts with the requirements; a choice that changes what a price, signal or alert means; two
-failed fix rounds on a bug. When the owner asked for continuous work, prepare the decision in the
-actions file (section C) with a recommendation and continue with other work.
+Project specifics: visible changes sync the test copy and crawl the changed pages
+(`--views phone,wide,dark`); reviewer ideas for the reviewed pages are built, ideas about other
+pages go to the notes' to-do list; anything public or a production data change is an owner stop.
 
 ## Report
 

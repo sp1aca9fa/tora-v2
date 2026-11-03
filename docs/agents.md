@@ -17,12 +17,25 @@ bugs cost a few wrong days; a leak between accounts cannot be recomputed away.
 - Public: `CLAUDE.md`, and `requirements.md` Core (rules 5-7 for data, valuation and collectors).
 - Private: `collectors/ops/claude-rules.md` (read it if it exists; its hard rules never break).
 
+## Risk class
+
+B (recomputable): derived values are rebuilt nightly from kept raw data; user accounts make auth
+and access the exception (`high`).
+
 ## Trust territory (Tier 2)
 
-Collectors and price parsing or matching, sources, valuation, FX and portfolio values, buy
+Areas: collectors and price parsing or matching, sources, valuation, FX and portfolio values, buy
 timing, opportunities and popularity math, alerts (who gets what, how often), auth and access
 checks in server actions, migrations, backups and restore, imports, merges and deletes, the
 self-update and server scripts.
+
+Paths (a changed file here makes the change Tier 2):
+
+- `packages/core/`, `packages/db/`, `packages/auth/`, `packages/collector-sdk/`, `packages/mcp/`
+- `collectors-public/src/`, `collectors/` code (not `collectors/ops/`)
+- `apps/web/src/lib/` and every `actions.ts` or route under `apps/web/src/app/`
+- `ops/update-server.sh`, `ops/ci-status.sh`, `ops/env-value.sh`, `ops/systemd/`,
+  `scripts/collect-cron.sh`
 
 ## Domain checklist
 
@@ -36,9 +49,15 @@ self-update and server scripts.
 
 ## Owner decides
 
-What a price, signal or alert means; direction (what a phase covers, new features); anything
-costing money or public (pushes, publishing, external services); production data changes (give
-the command, never run it).
+A closed list; anything else the orchestrator decides and reports. What a price, signal or alert
+means; direction (what a phase covers, new features); production data changes (give the command,
+never run it).
+
+## Standing rules
+
+- 2026-10-29: reviewer findings: fix what is right, take the recommended option on "ask"
+  findings, skip what is wrong; ideas for the reviewed pages are built, others go to the notes'
+  to-do list.
 
 ## Texts and time
 
@@ -54,16 +73,17 @@ typecheck and `next build` need workarounds there).
 
 The orchestrator passes these values as `model` and `effort` when it starts each agent.
 
-| Role                | Model  | Effort | Note                                                         |
-| ------------------- | ------ | ------ | ------------------------------------------------------------ |
-| builder             | sonnet | medium | pages, texts, glue, docs, tests                              |
-| builder-heavy       | opus   | medium | `high` for auth, sessions, 2FA, devices and access checks    |
-| code-reviewer-light | sonnet | medium |                                                              |
-| code-reviewer       | opus   | medium | `high` for auth and access                                   |
-| ux-reviewer         | sonnet | medium | every visible change; also asks the trust question           |
-| trust-reviewer      | -      | -      | not used: the UX reviewer asks it (one run fewer per change) |
-| triage              | -      | -      | not used: at most two reviewers, whose areas do not overlap  |
-| summarizer          | haiku  | low    |                                                              |
+| Role                                 | Model  | Effort | Note                                                         |
+| ------------------------------------ | ------ | ------ | ------------------------------------------------------------ |
+| builder                              | sonnet | medium | pages, texts, glue, docs, tests                              |
+| builder-heavy                        | opus   | medium | `high` for auth, sessions, 2FA, devices and access checks    |
+| code-reviewer-light                  | sonnet | medium |                                                              |
+| code-reviewer                        | opus   | medium | `high` for auth and access                                   |
+| ux-reviewer                          | sonnet | medium | every visible change; also asks the trust question           |
+| trust-reviewer                       | -      | -      | not used: the UX reviewer asks it (one run fewer per change) |
+| triage                               | opus   | medium | Tier 3 only: elsewhere at most two reviewers, no overlap     |
+| Tier 3: builder-heavy, code-reviewer | opus   | xhigh  | plan, build, normal and adversarial review                   |
+| summarizer                           | haiku  | low    |                                                              |
 
 Why medium, not Saku's high: Tora's math is medians, quantiles and joins over kept raw data, not
 chained records, so a bug is recomputed away the next night.
@@ -71,7 +91,8 @@ chained records, so a bug is recomputed away the next night.
 ## Reviews used
 
 - Tier 0: none. Tier 1: code-reviewer-light (+ ux-reviewer if visible). Tier 2: code-reviewer
-  (+ ux-reviewer if visible).
+  (+ ux-reviewer if visible). Tier 3: code-reviewer on the plan, then code-reviewer normal and
+  adversarial, triage.
 - Page crawler for screenshots: `pnpm crawl --views phone,wide,dark --shots <dir>` on the test
   copy (sync it first).
 
@@ -79,5 +100,11 @@ chained records, so a bug is recomputed away the next night.
 
 - Spec template: `docs/spec-template.md`.
 - Run logs: `.agent-runs/<date>-<slug>/` (git-ignored).
-- Ledger: `collectors/ops/agent-ledger.csv`.
+- Ledgers: `collectors/ops/agent-ledger.csv` (per reviewer run), `collectors/ops/run-ledger.csv`
+  (per task, from 2026-11-03).
 - Owner's actions: `collectors/ops/actions.md` (done items in `actions-done.md`).
+
+## Setup changes
+
+- 2026-11-03: risk class B recorded; Tier 3 row added (`xhigh`); triage used in Tier 3; run
+  ledger started.
