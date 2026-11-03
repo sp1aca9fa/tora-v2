@@ -53,20 +53,22 @@ The seed prints the demo login: `demo` / `local-dev-password`, authenticator key
 
 ## Documentation
 
-| Guide                                      | What it covers                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| [Setup](docs/setup.md)                     | Accounts and tools, the database, deploying, the first user, first settings   |
-| [Markets and currency](docs/markets.md)    | Primary and secondary markets, the base currency, exchange rates              |
-| [Categories](docs/categories.md)           | Kinds of items, fields, condition lists, item types and price buckets         |
-| [Sources and roles](docs/sources.md)       | Reference, supporting, comparison; identity pages; the quality gate           |
-| [Building a collector](docs/collectors.md) | The plug-in contract, the template, testing, rate plug-ins, importers         |
-| [Running collectors](docs/running.md)      | `pnpm collect`, the daily schedule, many collectors, imports, the data review |
-| [Languages](docs/languages.md)             | The app's two languages and adding one                                        |
-| [Backups](docs/backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring          |
-| [Alerts](docs/alerts.md)                   | Telegram and Discord messages, the morning check, the activity log            |
-| [Buy timing](docs/buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies         |
-| [Opportunities](docs/opportunities.md)     | Items worth a look within their group, the signals and their tests            |
-| [Store notices](docs/store-feeds.md)       | Posts about cards on sale in stores near you: store lists and feeds           |
+| Guide                                      | What it covers                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [Setup](docs/setup.md)                     | Accounts and tools, the database, deploying, the first user, first settings          |
+| [Markets and currency](docs/markets.md)    | Primary and secondary markets, the base currency, exchange rates                     |
+| [Categories](docs/categories.md)           | Kinds of items, fields, condition lists, item types and price buckets                |
+| [Sources and roles](docs/sources.md)       | Reference, supporting, comparison; identity pages; the quality gate                  |
+| [Building a collector](docs/collectors.md) | The plug-in contract, the template, testing, rate plug-ins, importers                |
+| [Running collectors](docs/running.md)      | `pnpm collect`, the daily schedule, many collectors, imports, the data review        |
+| [Languages](docs/languages.md)             | The app's two languages and adding one                                               |
+| [Backups](docs/backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
+| [A home server](docs/home-server.md)       | Running everything on one small machine at home: services, updates, off-box copies   |
+| [Agents](docs/agents.md)                   | How Claude Code agents build and review changes here (profile for the shared agents) |
+| [Alerts](docs/alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
+| [Buy timing](docs/buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
+| [Opportunities](docs/opportunities.md)     | Items worth a look within their group, the signals and their tests                   |
+| [Store notices](docs/store-feeds.md)       | Posts about cards on sale in stores near you: store lists and feeds                  |
 
 In the app, Settings > Admin preferences > Commands lists the home-PC commands.
 

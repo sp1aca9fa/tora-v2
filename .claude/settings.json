@@ -1,0 +1,55 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env.turso)",
+      "Edit(./.claude/**)",
+      "Write(./.claude/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/no-turso.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "excludedCommands": [
+      "pnpm --filter @tora/web dev *",
+      "pnpm crawl *",
+      "pnpm --filter @tora/web build",
+      "pnpm --filter @tora/web start *",
+      "pnpm perf *"
+    ],
+    "network": {
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "github.com",
+        "*.github.com",
+        "*.githubusercontent.com"
+      ],
+      "deniedDomains": [
+        "turso.io",
+        "*.turso.io",
+        "turso.tech",
+        "*.turso.tech"
+      ]
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.cache",
+        "~/.local/share/pnpm",
+        "~/.npm"
+      ]
+    }
+  }
+}

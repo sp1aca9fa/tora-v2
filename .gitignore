@@ -22,3 +22,6 @@ next-env.d.ts
 
 # Agent run logs (specs, logs; kept locally)
 .agent-runs/
+
+# Claude Code sandbox scratch
+.claude/.cc-writes/

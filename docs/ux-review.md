@@ -5,6 +5,11 @@ new user would, before the owner does. The reviewer gets screenshots and one lin
 it is for, nothing else: no code, no spec, no history. Knowing how a page was built makes it
 easier to forgive.
 
+Who the reviewer is: a collector who has never seen this app. Tora has no separate trust review,
+so the reviewer also asks, for every price, target or buy hint shown: could it make someone pay
+too much, or skip a good buy, by reading it wrong? Two numbers that contradict each other are a
+bug.
+
 ## What the reviewer is given
 
 - Screenshots of each changed page: phone, wide and dark (`pnpm crawl --only /x --views
