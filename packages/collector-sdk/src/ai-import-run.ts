@@ -22,12 +22,15 @@ const safeName = (name: string, i: number) =>
  * Reads one batch of uploaded files and imports what it finds into the review. Returns null when
  * the batch was not waiting (someone else is reading it), or when this read outlived its claim and
  * someone else took the batch (then nothing is imported: the other read imports it once).
+ * `sampling` sets the share of purchases Sonnet reads again as a random check (default 10%) and
+ * the draw, so tests can force or rule out that second read.
  */
 export async function readUploadBatch(
   db: Db,
   batchId: string,
   ask: AskClaude,
   log: (m: string) => void = () => {},
+  sampling: { sample?: number; random?: () => number } = {},
 ): Promise<{ status: 'done' | 'failed'; message: string } | null> {
   const files = await claimUploadBatch(db, batchId);
   if (!files) return null;
@@ -43,7 +46,7 @@ export async function readUploadBatch(
       names.push({ name, hash: fileHash(data) });
     }
     const ctx = await checkContext(db, userId);
-    const read = await readPurchases(ctx, dir, names, ask, { log });
+    const read = await readPurchases(ctx, dir, names, ask, { log, ...sampling });
     // No date at all: the day it was uploaded, checked in review.
     const plan = await planAiImport(db, userId, read, ctx.products, () => files[0]!.createdAt);
     const renewed = await renewUploadClaim(db, batchId, claim);
@@ -87,11 +90,17 @@ export async function readUploadBatch(
 export async function readWaitingUploads(
   db: Db,
   ask: AskClaude,
-  options: { userId?: string; log?: (m: string) => void } = {},
+  options: {
+    userId?: string;
+    log?: (m: string) => void;
+    sample?: number;
+    random?: () => number;
+  } = {},
 ): Promise<number> {
   let read = 0;
   for (const { batchId } of await waitingUploadBatches(db, options.userId)) {
-    if (await readUploadBatch(db, batchId, ask, options.log)) read++;
+    const sampling = { sample: options.sample, random: options.random };
+    if (await readUploadBatch(db, batchId, ask, options.log, sampling)) read++;
   }
   return read;
 }

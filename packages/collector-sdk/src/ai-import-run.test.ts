@@ -84,10 +84,13 @@ it('reads an uploaded batch once into the review, by whoever claims it first', a
   };
   await addUpload(db, userId, 'batch-0001', { name: 'IMG 1.png', data: Buffer.from('png') });
   // Still uploading: not read yet.
-  expect(await readWaitingUploads(db, ask)).toBe(0);
+  const once = { random: () => 0.99 };
+  expect(await readWaitingUploads(db, ask, once)).toBe(0);
   expect(await finishUploadBatch(db, userId, 'batch-0001')).toBe(1);
 
-  expect(await readWaitingUploads(db, ask)).toBe(1);
+  // Not drawn for the random check: one read only.
+  expect(await readWaitingUploads(db, ask, once)).toBe(1);
+  expect(seen).toHaveLength(1);
   // The file reached the reader under a safe, unique name.
   expect(seen[0]).toEqual(['01-IMG_1.png']);
   const review = await pendingImportReview(db, userId);
@@ -128,8 +131,8 @@ it('does not import a batch whose claim another reader took during the read', as
   let second: Awaited<ReturnType<typeof claimUploadBatch>> | undefined;
   const ask: AskClaude = async <T>(o: { files?: string[] }) => {
     // The read outlives its claim: the home PC takes the batch as stuck, once, during the first
-    // call. The read may call Claude again (a random sample is read again by Sonnet), and a
-    // second claim then finds the batch taken (null): it must not overwrite the first.
+    // call. The random check is drawn, so the read calls Claude again (Sonnet), and a second
+    // claim then would find the batch taken (null): it must not overwrite the first.
     second ??= await claimUploadBatch(
       db,
       'batch-0003',
@@ -145,7 +148,10 @@ it('does not import a batch whose claim another reader took during the read', as
   await addUpload(db, userId, 'batch-0003', { name: 'a.png', data: Buffer.from('png') });
   await finishUploadBatch(db, userId, 'batch-0003');
   const logged: string[] = [];
-  expect(await readUploadBatch(db, 'batch-0003', ask, (m) => logged.push(m))).toBeNull();
+  expect(
+    await readUploadBatch(db, 'batch-0003', ask, (m) => logged.push(m), { random: () => 0 }),
+  ).toBeNull();
+  expect(logged.join()).toMatch(/Sonnet reading again/);
   expect(second).toHaveLength(1);
   expect(logged.join()).toMatch(/claim was taken/);
   // Nothing imported, no import run; the batch stays with the second reader.
@@ -153,4 +159,36 @@ it('does not import a batch whose claim another reader took during the read', as
   expect(await db.select().from(schema.importRuns)).toEqual([]);
   const [batch] = await uploadBatchesOf(db, userId);
   expect(batch).toMatchObject({ status: 'reading', importRunId: null });
+});
+
+it('reads a purchase again with Sonnet when the random check draws it, and only then', async () => {
+  const models = (draw: number) => {
+    const asked: string[] = [];
+    const ask: AskClaude = async <T>(o: { model: string; files?: string[] }) => {
+      asked.push(o.model);
+      return {
+        output: { rows: (o.files ?? []).map(row) } as T,
+        costUsd: 0.001,
+        tokens: 100,
+        modelName: 'claude-haiku-5-5',
+      };
+    };
+    return { asked, ask, random: () => draw };
+  };
+  // Drawn (0 is below the 10% share): read once, then again by Sonnet.
+  const drawn = models(0);
+  await addUpload(db, userId, 'batch-0004', { name: 'a.png', data: Buffer.from('png') });
+  await finishUploadBatch(db, userId, 'batch-0004');
+  expect(
+    await readUploadBatch(db, 'batch-0004', drawn.ask, undefined, { random: drawn.random }),
+  ).toMatchObject({ status: 'done' });
+  expect(drawn.asked).toEqual(['haiku', 'sonnet']);
+  // Not drawn (0.99): read once only.
+  const kept = models(0.99);
+  await addUpload(db, userId, 'batch-0005', { name: 'b.png', data: Buffer.from('png') });
+  await finishUploadBatch(db, userId, 'batch-0005');
+  expect(
+    await readUploadBatch(db, 'batch-0005', kept.ask, undefined, { random: kept.random }),
+  ).toMatchObject({ status: 'done' });
+  expect(kept.asked).toEqual(['haiku']);
 });
