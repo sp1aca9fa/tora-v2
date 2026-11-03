@@ -1,5 +1,6 @@
 import { decryptSecret } from '@tora/auth';
 import { linesNotice, storeNotice, toLocalIso } from '@tora/core';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,9 +9,11 @@ import { beforeEach, expect, it } from 'vitest';
 import { listActivity, recordActivity } from './activity';
 import {
   type AlertContext,
+  type AlertTexts,
   addDiscordChannel,
   alertLoginFailure,
   alertServerEvent,
+  alertServerUpdate,
   alertFailures,
   channelsOf,
   checkMissedRuns,
@@ -104,6 +107,7 @@ const TEXTS: Record<string, Record<string, string>> = {
     backupFailed: 'backup failed: {error}',
     noCollect: 'no collect for {hours} h',
     noBackup: 'no backup for {hours} h',
+    updateCiFailed: 'ci failed on {to}, still {from}',
     sourceQuiet: 'quiet: {sources}',
     summaryTitle: 'summary',
     summaryImport:
@@ -542,6 +546,103 @@ it('tells why a sign-in failed: the account, else admins; one message per 15 min
   expect(await alertLoginFailure(db, ctx, { reason: 'unknownUser', ...unknown }, at(0))).toBe(1);
   expect(sent.at(-1)!.text).toContain('a name of 10 characters');
   expect(sent.at(-1)!.text).not.toContain('secret');
+});
+
+it('a server update that never left its version says so: CI failed, refused, waiting for CI', async () => {
+  // The app's own wording (apps/web/messages), in every language it ships.
+  const messages = (l: string): AlertTexts =>
+    JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../apps/web/messages', `${l}.json`), 'utf8'),
+    ).alertText;
+  for (const l of ['en', 'ja', 'es']) {
+    for (const k of [
+      'updateCiFailed',
+      'updateRefused',
+      'updateWaiting',
+      'ciPending',
+      'ciUnknown',
+    ]) {
+      expect(messages(l)[k], `${l}: ${k}`).toBeTruthy();
+    }
+    expect(messages(l).updateCiFailed).not.toBe(messages(l).updateFailed);
+  }
+  const real: AlertContext = { ...ctx, texts: messages };
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const before = sent.length;
+  const update = { from: 'abc1234', to: 'def5678' };
+  expect(await alertServerUpdate(db, real, { ...update, failed: 'ci' })).toEqual({
+    sent: 1,
+    failed: 0,
+  });
+  expect(sent.at(-1)!.text).toContain(
+    'Tora: GitHub CI failed on def5678, so the server did not update and keeps running abc1234. It tries again when a newer version is pushed, or when ops/update-server.sh is run by hand.',
+  );
+  expect(sent.at(-1)!.text).not.toContain('went back');
+  expect(await alertServerUpdate(db, real, { ...update, failed: 'uncommitted' })).toEqual({
+    sent: 1,
+    failed: 0,
+  });
+  expect(sent.at(-1)!.text).toContain(
+    'Tora: the server did not update to def5678: its code folder has uncommitted changes, and going back would lose them. It keeps running abc1234.',
+  );
+  expect(
+    await alertServerUpdate(db, real, { ...update, failed: null, waiting: 'pending' }),
+  ).toEqual({ sent: 1, failed: 0 });
+  expect(sent.at(-1)!.text).toContain(
+    "Tora: the server has not updated for 24 h and keeps running abc1234; the newest version, def5678, is waiting for GitHub CI (not finished or not started). Check the repo's Actions tab",
+  );
+  expect(
+    await alertServerUpdate(db, real, { ...update, failed: null, waiting: 'unknown' }),
+  ).toEqual({ sent: 1, failed: 0 });
+  expect(sent.at(-1)!.text).toContain('(no usable answer from GitHub)');
+  // A step that failed after the update began still says it went back.
+  expect(await alertServerUpdate(db, real, { ...update, failed: 'build' })).toEqual({
+    sent: 1,
+    failed: 0,
+  });
+  expect(sent.at(-1)!.text).toContain('It went back to abc1234');
+  expect(sent.length).toBe(before + 5);
+  const log = await listActivity(db, { id: admin, admin: true });
+  expect(
+    log
+      .filter((e) => e.action?.startsWith('serverUpdate'))
+      .map((e) => [e.action, e.level])
+      .reverse(),
+  ).toEqual([
+    ['serverUpdateCiFailed', 'failed'],
+    ['serverUpdateRefused', 'failed'],
+    ['serverUpdateWaiting', 'problem'],
+    ['serverUpdateWaiting', 'problem'],
+    ['serverUpdateFailed', 'failed'],
+  ]);
+});
+
+it('a server update alert no channel took: counted as failed, retried without a second entry', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const update = { from: 'abc1234', to: 'def5678', failed: 'ci' };
+  const entries = async () =>
+    (await listActivity(db, { id: admin, admin: true })).filter(
+      (e) => e.action === 'serverUpdateCiFailed',
+    ).length;
+  failDiscord = true;
+  expect(await alertServerUpdate(db, ctx, update)).toEqual({ sent: 0, failed: 1 });
+  expect(await entries()).toBe(1);
+  expect(await alertServerUpdate(db, ctx, { ...update, retry: true })).toEqual({
+    sent: 0,
+    failed: 1,
+  });
+  failDiscord = false;
+  expect(await alertServerUpdate(db, ctx, { ...update, retry: true })).toEqual({
+    sent: 1,
+    failed: 0,
+  });
+  expect(await entries()).toBe(1);
+  // A retry whose first try never wrote its entry (another update since) writes it.
+  expect(await alertServerUpdate(db, ctx, { ...update, to: 'fed9876', retry: true })).toEqual({
+    sent: 1,
+    failed: 0,
+  });
+  expect(await entries()).toBe(2);
 });
 
 it("logs a server's own events, and tells admins only when asked", async () => {

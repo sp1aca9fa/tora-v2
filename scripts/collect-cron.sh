@@ -16,7 +16,10 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # TORA_STATE_DIR (environment or the repo's .env): a second Tora on this PC keeps its own folder.
-TORA_STATE_DIR="${TORA_STATE_DIR:-$(sed -n 's/^TORA_STATE_DIR=//p' "$REPO_DIR/.env" 2>/dev/null | tail -n 1)}"
+# Read as ops/update-server.sh reads it, so both use the same locks.
+# shellcheck source=ops/env-value.sh
+. "$REPO_DIR/ops/env-value.sh"
+TORA_STATE_DIR="${TORA_STATE_DIR:-$(env_value TORA_STATE_DIR "$REPO_DIR/.env")}"
 STATE_DIR="${TORA_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/tora}"
 LOG="$STATE_DIR/collect.log"
 # One stamp and lock per set of arguments ("--market us" -> "market-us").

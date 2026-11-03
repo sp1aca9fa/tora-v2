@@ -971,36 +971,77 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
 }
 
 /**
- * A server's automatic update (its update script, `pnpm alerts update`): in the
- * activity log; a failure (the server went back to the version before) goes to admins at once.
+ * Failed steps where the server never left `from`: their own activity action and text (the
+ * generic ones say it went back). `ci`: GitHub CI failed on the new version; `uncommitted`: the
+ * repo had uncommitted changes, so the update was refused.
+ */
+const STAYED: Record<string, { action: string; text: string }> = {
+  ci: { action: 'serverUpdateCiFailed', text: 'updateCiFailed' },
+  uncommitted: { action: 'serverUpdateRefused', text: 'updateRefused' },
+};
+
+/** What GitHub said while a new version waited for its CI run. */
+export type UpdateWaitStatus = 'pending' | 'unknown';
+
+/**
+ * A server's automatic update (its update script, `pnpm alerts update`): in the activity log; a
+ * failure goes to admins at once (the server went back to the version before, or never left it:
+ * STAYED). `waiting`: the server has gone 24 h without updating while GitHub CI was not green
+ * (the script asks once per wait); it keeps running `from`. `retry`: the script trying again an
+ * alert no channel took: the activity entry is written only if the last one of its kind is not
+ * this same update. Returns the messages sent and the channels that failed (the script tries
+ * again when every one failed).
  */
 export async function alertServerUpdate(
   db: Db,
   ctx: AlertContext,
-  update: { from: string; to: string; failed: string | null },
-): Promise<number> {
-  const { from, to, failed } = update;
-  await recordActivity(db, {
-    kind: 'admin',
-    action: failed ? 'serverUpdateFailed' : 'serverUpdate',
-    level: failed ? 'failed' : 'ok',
-    detail: { ...(failed ? { step: failed } : {}), from, to },
-    href: '/settings/activity',
-  });
-  if (!failed) return 0;
-  let sent = 0;
-  for (const admin of await adminsToAlert(db)) {
-    const t = await textsFor(db, admin, ctx);
-    sent += await sendToUser(
-      db,
-      admin.id,
-      lines('admin', null, [
-        { text: fillText(t.updateFailed!, { step: failed, from, to }), role: 'bad' },
-      ]),
-      ctx,
-    );
+  update: {
+    from: string;
+    to: string;
+    failed: string | null;
+    waiting?: UpdateWaitStatus | null;
+    retry?: boolean;
+  },
+): Promise<{ sent: number; failed: number }> {
+  const { from, to, failed, waiting } = update;
+  const stayed = failed ? STAYED[failed] : undefined;
+  const action = waiting
+    ? 'serverUpdateWaiting'
+    : failed
+      ? (stayed?.action ?? 'serverUpdateFailed')
+      : 'serverUpdate';
+  const last = update.retry ? await lastActivity(db, 'admin', { action }) : null;
+  if (!last || last.detail.from !== from || last.detail.to !== to) {
+    await recordActivity(db, {
+      kind: 'admin',
+      action,
+      level: waiting ? 'problem' : failed ? 'failed' : 'ok',
+      detail: { ...(failed ? { step: failed } : {}), from, to },
+      href: '/settings/activity',
+    });
   }
-  return sent;
+  if (!failed && !waiting) return { sent: 0, failed: 0 };
+  let sent = 0;
+  let tried = 0;
+  for (const admin of await adminsToAlert(db)) {
+    tried += (await channelsOf(db, admin.id)).length;
+    const t = await textsFor(db, admin, ctx);
+    const line = waiting
+      ? {
+          text: fillText(t.updateWaiting!, {
+            to,
+            from,
+            status: (waiting === 'pending' ? t.ciPending : t.ciUnknown) ?? waiting,
+          }),
+          role: 'warning' as const,
+        }
+      : {
+          text: fillText(t[stayed?.text ?? 'updateFailed']!, { step: failed!, from, to }),
+          role: 'bad' as const,
+        };
+    sent += await sendToUser(db, admin.id, lines('admin', null, [line]), ctx);
+  }
+  return { sent, failed: tried - sent };
 }
 
 /**

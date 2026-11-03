@@ -3,8 +3,11 @@
 //       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
 //       stopped before it could record itself and sends failures to admins at once, then the
 //       watched items' buy zone and target alerts (S9 part 5; from today's numbers only).
-//   update --from <rev> --to <rev> [--failed <step>]
-//       Run by a server's update script: logs the update, a failure to admins.
+//   update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry]
+//       Run by a server's update script: logs the update, a failure to admins (step ci: GitHub
+//       CI failed, uncommitted: refused; the server stayed on <from>); --waiting: the server has
+//       gone 24 h without updating while CI was not green, to admins. Exits 1 when every admin
+//       channel failed; the script then tries again with --retry (no second activity entry).
 //   server <title> [--text <details>] [--level ok|problem|failed] [--tell]
 //       Run by a server's own scripts: logs what they noticed (default level problem); --tell
 //       also sends it to admins at once.
@@ -46,6 +49,8 @@ const { values, positionals } = parseArgs({
     from: { type: 'string' },
     to: { type: 'string' },
     failed: { type: 'string' },
+    waiting: { type: 'string' },
+    retry: { type: 'boolean' },
     text: { type: 'string' },
     level: { type: 'string' },
     tell: { type: 'boolean' },
@@ -100,15 +105,24 @@ if (command === 'after-run') {
   const buy = await sendWatchAlerts(db, ctx);
   console.log(`alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`);
 } else if (command === 'update') {
-  // Run by a server's update script after an update (or a failed one, rolled back).
+  // Run by a server's update script after an update (or a failed one), or while one waits for CI.
+  const waiting = values.waiting ?? null;
+  if (waiting !== null && waiting !== 'pending' && waiting !== 'unknown') {
+    console.error('alerts update: --waiting pending|unknown');
+    process.exit(1);
+  }
   const sent = await alertServerUpdate(db, ctx, {
     from: values.from ?? '?',
     to: values.to ?? '?',
     failed: values.failed ?? null,
+    waiting,
+    retry: values.retry ?? false,
   });
   console.log(
-    `alerts: server update ${values.failed ? 'failed' : 'done'}, ${sent} message(s) sent`,
+    `alerts: server update ${waiting ? 'waiting for CI' : values.failed ? 'failed' : 'done'}, ${sent.sent} message(s) sent${sent.failed ? `, ${sent.failed} channel(s) failed` : ''}`,
   );
+  // Every channel failed: exit 1, so the update script tries again at its next check.
+  if (sent.sent === 0 && sent.failed > 0) process.exitCode = 1;
 } else if (command === 'server') {
   const title = positionals.slice(1).join(' ').trim();
   const level = values.level ?? 'problem';
@@ -131,7 +145,7 @@ if (command === 'after-run') {
   );
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step>] | server <title> [--text <details>] [--level ok|problem|failed] [--tell]',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry] | server <title> [--text <details>] [--level ok|problem|failed] [--tell]',
   );
   process.exit(1);
 }
