@@ -85,6 +85,7 @@ The orchestrator passes these values as `model` and `effort` when it starts each
 | trust-reviewer                       | -      | -      | not used: the UX reviewer asks it (one run fewer per change) |
 | triage                               | opus   | medium | Tier 3 only: elsewhere at most two reviewers, no overlap     |
 | Tier 3: builder-heavy, code-reviewer | opus   | xhigh  | plan, build, normal and adversarial review                   |
+| challenger                           | opus   | high   | direction only, on request or at a phase's start             |
 | summarizer                           | haiku  | low    |                                                              |
 
 Why medium, not Saku's high: Tora's math is medians, quantiles and joins over kept raw data, not
@@ -110,3 +111,4 @@ chained records, so a bug is recomputed away the next night.
 
 - 2026-11-03: risk class B recorded; Tier 3 row added (`xhigh`); triage used in Tier 3; run
   ledger started.
+- 2026-11-04: challenger added (opus high); evaluated per `/ship` section 8, not by the noisy or redundant triggers.
