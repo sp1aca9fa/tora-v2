@@ -69,7 +69,7 @@ After each task, short, no step recap, only the lines that have something:
 ```
 Done: <what changed; tier and why>
 Tested: <checks and tests; what was not tested>
-Needs you: <decisions and blockers, each with a recommendation>
+Actions: <"New actions from this round are in <the actions file>." or "No new actions raised.">
 Open issues: <unresolved after 2 rounds, known limits>
 Assumed: <assumptions about data, prices or users, with the rule they rest on>
 Ideas: <for the to-do list>
