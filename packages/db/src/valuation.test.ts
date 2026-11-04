@@ -4,7 +4,7 @@ import { TEST_SOURCES } from './testing';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import {
@@ -402,7 +402,9 @@ describe('trade counts (Summary insights)', () => {
   it("counts sales per period for items anyone holds, marking the user's own", async () => {
     const { pika, mew } = await scenario();
     // The opened box is held by nobody any more; ピカチュウ also sold 40 days before.
-    const counts = await tradeCounts(db, uid, [30, 90]);
+    // The periods count back from the clock: on the scenario's day, whatever today is.
+    vi.useFakeTimers({ toFake: ['Date'], now });
+    const counts = await tradeCounts(db, uid, [30, 90]).finally(() => vi.useRealTimers());
     const of = (id: string) => counts.find((c) => c.product.id === id)!;
     expect(counts).toHaveLength(2);
     expect([...of(mew.product.id).sales]).toEqual([
