@@ -20,6 +20,12 @@ export default defineConfig([
   js.configs.recommended,
   tseslint.configs.recommended,
   {
+    // The process check's script and tests are shared with other projects, byte for byte, so they
+    // cannot carry the `/* global */` line this repo's other scripts use.
+    files: ['ops/process-check*.mjs'],
+    languageOptions: { globals: { process: 'readonly', console: 'readonly' } },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',

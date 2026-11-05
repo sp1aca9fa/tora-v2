@@ -1,0 +1,70 @@
+{
+  "tier2": [
+    "packages/core/",
+    "packages/db/",
+    "packages/auth/",
+    "packages/collector-sdk/",
+    "packages/mcp/",
+    "collectors-public/src/",
+    "apps/web/src/lib/",
+    "apps/web/src/app/**/actions.ts",
+    "apps/web/src/app/**/*-actions.ts",
+    "apps/web/src/app/**/route.ts",
+    "apps/web/src/app/**/route.tsx",
+    "ops/update-server.sh",
+    "ops/ci-status.sh",
+    "ops/env-value.sh",
+    "ops/systemd/",
+    "scripts/collect-cron.sh",
+    ".github/workflows/",
+    "ops/process-check.mjs",
+    "ops/process-check.json"
+  ],
+  "tier2New": ["apps/web/src/app/**/page.tsx"],
+  "tier0": ["docs/", "**/*.md", "**/*.test.*"],
+  "reviews": {
+    "0": [],
+    "1": ["code-reviewer-light"],
+    "2": ["code-reviewer"],
+    "3": ["code-reviewer", "triage"]
+  },
+  "profileBullets": {
+    "`packages/core/`, `packages/db/`, `packages/auth/`, `packages/collector-sdk/`, `packages/mcp/`": {
+      "patterns": [
+        "packages/core/",
+        "packages/db/",
+        "packages/auth/",
+        "packages/collector-sdk/",
+        "packages/mcp/"
+      ]
+    },
+    "`collectors-public/src/`, `collectors/` code (not `collectors/ops/`)": {
+      "patterns": ["collectors-public/src/"],
+      "reason": "collectors/ is a submodule CI does not check out: a bump shows only as a gitlink."
+    },
+    "`apps/web/src/lib/` and every `actions.ts`, `*-actions.ts` or route under `apps/web/src/app/`": {
+      "patterns": [
+        "apps/web/src/lib/",
+        "apps/web/src/app/**/actions.ts",
+        "apps/web/src/app/**/*-actions.ts",
+        "apps/web/src/app/**/route.ts",
+        "apps/web/src/app/**/route.tsx"
+      ]
+    },
+    "a new `page.tsx` under `apps/web/src/app/` (a change to an existing page is not Tier 2 by path)": {
+      "patterns": ["apps/web/src/app/**/page.tsx"]
+    },
+    "`ops/update-server.sh`, `ops/ci-status.sh`, `ops/env-value.sh`, `ops/systemd/`, `scripts/collect-cron.sh`": {
+      "patterns": [
+        "ops/update-server.sh",
+        "ops/ci-status.sh",
+        "ops/env-value.sh",
+        "ops/systemd/",
+        "scripts/collect-cron.sh"
+      ]
+    },
+    "`.github/workflows/`, `ops/process-check.mjs`, `ops/process-check.json`": {
+      "patterns": [".github/workflows/", "ops/process-check.mjs", "ops/process-check.json"]
+    }
+  }
+}

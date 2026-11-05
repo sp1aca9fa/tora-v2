@@ -33,9 +33,11 @@ Paths (a changed file here makes the change Tier 2):
 
 - `packages/core/`, `packages/db/`, `packages/auth/`, `packages/collector-sdk/`, `packages/mcp/`
 - `collectors-public/src/`, `collectors/` code (not `collectors/ops/`)
-- `apps/web/src/lib/` and every `actions.ts` or route under `apps/web/src/app/`
+- `apps/web/src/lib/` and every `actions.ts`, `*-actions.ts` or route under `apps/web/src/app/`
+- a new `page.tsx` under `apps/web/src/app/` (a change to an existing page is not Tier 2 by path)
 - `ops/update-server.sh`, `ops/ci-status.sh`, `ops/env-value.sh`, `ops/systemd/`,
   `scripts/collect-cron.sh`
+- `.github/workflows/`, `ops/process-check.mjs`, `ops/process-check.json`
 
 ## Domain checklist
 
@@ -96,6 +98,8 @@ chained records, so a bug is recomputed away the next night.
 - Tier 0: none. Tier 1: code-reviewer-light (+ ux-reviewer if visible). Tier 2: code-reviewer
   (+ ux-reviewer if visible). Tier 3: code-reviewer on the plan, then code-reviewer normal and
   adversarial, triage.
+- Owner's actions file: code-reviewer-light with `Mode: actions`, once per task, when items with
+  commands changed.
 - Page crawler for screenshots: `pnpm crawl --views phone,wide,dark --shots <dir>` on the test
   copy (sync it first).
 
@@ -112,3 +116,4 @@ chained records, so a bug is recomputed away the next night.
 - 2026-11-03: risk class B recorded; Tier 3 row added (`xhigh`); triage used in Tier 3; run
   ledger started.
 - 2026-11-04: challenger added (opus high); evaluated per `/ship` section 8, not by the noisy or redundant triggers.
+- 2026-11-05: process check added (`docs/ci.md`, `ops/process-check.json`, which must agree with the Paths list above): commit trailers state tier and reviews, CI compares them with the changed files. The workflows and the check's own files joined the Paths, and so did `*-actions.ts` files and new pages, which the list did not name.
