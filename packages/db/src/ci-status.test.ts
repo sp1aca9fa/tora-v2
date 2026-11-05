@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -12,7 +13,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const SCRIPT = join(import.meta.dirname, '../../../ops/ci-status.sh');
+const ROOT = join(import.meta.dirname, '../../..');
+const SCRIPT = join(ROOT, 'ops/ci-status.sh');
 const SHA = 'a'.repeat(40);
 
 // Fake git: answers `remote get-url origin` with the file "remote" (fails when it is missing).
@@ -61,12 +63,16 @@ function run(args: string[] = [SHA]) {
 }
 
 const curlArgs = () => readFileSync(join(dir, 'curl-args'), 'utf8').trim().split('\n');
-const runOf = (status: string, conclusion: string | null = null) => ({
+const runOf = (status: string, conclusion: string | null = null, name = 'check') => ({
   id: 1,
-  name: 'check',
+  name,
   status,
   conclusion,
 });
+const processRun = (status: string, conclusion: string | null = null) =>
+  runOf(status, conclusion, 'process-check');
+const otherRun = (status: string, conclusion: string | null = null) =>
+  runOf(status, conclusion, 'other-job');
 function answer(runs: object[], total = runs.length) {
   writeFileSync(join(dir, 'body'), JSON.stringify({ total_count: total, check_runs: runs }));
 }
@@ -234,5 +240,220 @@ describe('ops/ci-status.sh', () => {
     expectWord('unknown');
     writeFileSync(join(dir, 'bin', 'node'), '#!/usr/bin/env bash\nexit 1\n');
     expectWord('unknown');
+  });
+});
+
+describe('ops/ci-status.sh and the process job', () => {
+  const CHECK_GREEN = runOf('completed', 'success');
+  const NAMELESS_FAILED = { id: 2, status: 'completed', conclusion: 'failure' };
+  const rows: [string, object[], string][] = [
+    ['check green, process red', [CHECK_GREEN, processRun('completed', 'failure')], 'success'],
+    ['no check yet, process green', [processRun('completed', 'success')], 'pending'],
+    ['no check yet, process red', [processRun('completed', 'failure')], 'pending'],
+    ['no check yet, another job green', [otherRun('completed', 'success')], 'pending'],
+    [
+      'no check yet, process red, another job green',
+      [processRun('completed', 'failure'), otherRun('completed', 'success')],
+      'pending',
+    ],
+    [
+      'check running, process green',
+      [runOf('in_progress'), processRun('completed', 'success')],
+      'pending',
+    ],
+    [
+      'check running, process red',
+      [runOf('in_progress'), processRun('completed', 'failure')],
+      'pending',
+    ],
+    [
+      'check red, process green',
+      [runOf('completed', 'failure'), processRun('completed', 'success')],
+      'failure',
+    ],
+    ['check green, process running', [CHECK_GREEN, processRun('in_progress')], 'success'],
+    [
+      'check green, process green, a nameless run failed',
+      [CHECK_GREEN, processRun('completed', 'success'), NAMELESS_FAILED],
+      'failure',
+    ],
+    // `check` skipped or neutral: CI did not test the commit, whatever else is green.
+    ['check skipped', [runOf('completed', 'skipped')], 'pending'],
+    ['check neutral', [runOf('completed', 'neutral')], 'pending'],
+    [
+      'check skipped, process green',
+      [runOf('completed', 'skipped'), processRun('completed', 'success')],
+      'pending',
+    ],
+    [
+      'check skipped, process red',
+      [runOf('completed', 'skipped'), processRun('completed', 'failure')],
+      'pending',
+    ],
+    [
+      'check neutral, process red',
+      [runOf('completed', 'neutral'), processRun('completed', 'failure')],
+      'pending',
+    ],
+    [
+      'check skipped, another job green',
+      [runOf('completed', 'skipped'), otherRun('completed', 'success')],
+      'pending',
+    ],
+    // Other runs keep their rule: skipped and neutral count as passed.
+    [
+      'check green, another job skipped',
+      [CHECK_GREEN, otherRun('completed', 'skipped')],
+      'success',
+    ],
+    [
+      'check green, another job neutral',
+      [CHECK_GREEN, otherRun('completed', 'neutral')],
+      'success',
+    ],
+    ['check green, process skipped', [CHECK_GREEN, processRun('completed', 'skipped')], 'success'],
+    ['check cancelled', [runOf('completed', 'cancelled')], 'failure'],
+    // Two runs named check (two workflows): one that really ran is enough, none is not.
+    ['one check green, one check skipped', [CHECK_GREEN, runOf('completed', 'skipped')], 'success'],
+    [
+      'one check skipped, one check neutral',
+      [runOf('completed', 'skipped'), runOf('completed', 'neutral')],
+      'pending',
+    ],
+  ];
+  for (const [title, runs, word] of rows) {
+    it(`${title}: ${word}`, () => {
+      answer(runs);
+      expectWord(word);
+    });
+  }
+
+  it('100 of 101 shown, all green: unknown', () => {
+    answer(
+      Array.from({ length: 100 }, () => CHECK_GREEN),
+      101,
+    );
+    expectWord('unknown');
+  });
+
+  it('the page guard uses the unfiltered counts: process runs do not hide the missing run', () => {
+    answer([CHECK_GREEN, processRun('completed', 'failure')], 3);
+    expectWord('unknown');
+  });
+
+  it('only the exact name is dropped: any other name that failed is a failure', () => {
+    for (const name of [
+      'Process-Check',
+      'process-check ',
+      ' process-check',
+      'process-check-2',
+      'process',
+      '',
+      null,
+      7,
+      ['process-check'],
+    ]) {
+      answer([CHECK_GREEN, { id: 2, name, status: 'completed', conclusion: 'failure' }]);
+      expectWord('failure');
+    }
+  });
+
+  it('a run with a non-string name that is still running keeps the verdict pending', () => {
+    answer([CHECK_GREEN, { id: 2, name: 7, status: 'in_progress', conclusion: null }]);
+    expectWord('pending');
+  });
+
+  it('only a run named exactly check stands for CI', () => {
+    for (const name of ['Check', 'check ', 'checks', 'check-all', '']) {
+      answer([runOf('completed', 'success', name)]);
+      expectWord('pending');
+    }
+    answer([{ id: 1, status: 'completed', conclusion: 'success' }]);
+    expectWord('pending');
+  });
+
+  it('skipped next to a green run of another name does not stand for CI', () => {
+    for (const name of ['Check', 'check ', 'checks']) {
+      answer([runOf('completed', 'skipped'), runOf('completed', 'success', name)]);
+      expectWord('pending');
+    }
+  });
+
+  it('more runs than the page shows beat a skipped check: unknown, never pending or success', () => {
+    answer([runOf('completed', 'skipped')], 2);
+    expectWord('unknown');
+  });
+
+  it('a process run it cannot read leaves the verdict unknown', () => {
+    answer([CHECK_GREEN, { id: 2, name: 'process-check', conclusion: 'failure' }]);
+    expectWord('unknown');
+  });
+
+  it('the name of the process job is on exactly one line: the server check before it lands', () => {
+    const lines = readFileSync(SCRIPT, 'utf8').split('\n');
+    expect(lines.filter((line) => line.includes('process-check'))).toHaveLength(1);
+  });
+
+  // Job ids and job-level keys of a workflow, read by indent: no YAML parser here. A form this cannot
+  // read gives no jobs, which the test below refuses.
+  function readJobs(yaml: string) {
+    const lines = yaml.split('\n');
+    const jobs = new Map<string, { key: string; value: string }[]>();
+    const start = lines.indexOf('jobs:');
+    if (start === -1) return jobs;
+    let id: string | null = null;
+    for (const line of lines.slice(start + 1)) {
+      if (/^[^\s#]/.test(line)) break;
+      const job = /^ {2}['"]?([^\s'":#]+)['"]?\s*:/.exec(line);
+      if (job) {
+        id = String(job[1]);
+        jobs.set(id, []);
+        continue;
+      }
+      const key = /^ {4}([A-Za-z0-9_-]+)\s*:\s*(.*)$/.exec(line);
+      if (key && id !== null) {
+        jobs.get(id)?.push({ key: String(key[1]), value: String(key[2]).trim() });
+      }
+    }
+    return jobs;
+  }
+  const WORKFLOWS = join(ROOT, '.github/workflows');
+  const workflowFiles = () => readdirSync(WORKFLOWS).filter((file) => /\.ya?ml$/.test(file));
+
+  it('the CI workflow has a job check, and nothing named like the process job', () => {
+    const ci = readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toMatch(/^jobs:\n {2}check:$/m);
+    expect(ci).not.toMatch(/^ {2}process-check:/m);
+    expect(ci).not.toMatch(/^\s+name:\s*process-check\s*$/m);
+    // A job-level `if:` could conclude skipped, which the gate reads as CI not testing the commit.
+    expect(ci).not.toMatch(/^ {4}if:/m);
+  });
+
+  it('nothing renames the check run: no job-level name or strategy in that job', () => {
+    const jobs = readJobs(readFileSync(join(WORKFLOWS, 'ci.yml'), 'utf8'));
+    const keys = (jobs.get('check') ?? []).map(({ key }) => key);
+    // Either would rename the run, so every commit would wait. A step's `name:` is deeper, and fine.
+    expect(keys).not.toContain('name');
+    expect(keys).not.toContain('strategy');
+    expect(keys).toContain('steps');
+  });
+
+  it('only ci.yml has a job check, and no other job takes either name', () => {
+    const files = workflowFiles();
+    expect(files).toContain('ci.yml');
+    for (const file of files) {
+      const jobs = readJobs(readFileSync(join(WORKFLOWS, file), 'utf8'));
+      expect(jobs.size, `${file}: no jobs read`).toBeGreaterThan(0);
+      // Any other job the gate would read as CI: a new workflow must not stand for a tested commit.
+      expect(jobs.has('check'), `${file}: job id check`).toBe(file === 'ci.yml');
+      if (file !== 'process.yml')
+        expect(jobs.has('process-check'), `${file}: process job`).toBe(false);
+      for (const [id, keys] of jobs) {
+        for (const { key, value } of keys) {
+          const named = key === 'name' ? value.replace(/^['"]|['"]$/g, '') : null;
+          expect(['check', 'process-check'], `${file}: job ${id} is named`).not.toContain(named);
+        }
+      }
+    }
   });
 });

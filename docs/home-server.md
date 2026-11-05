@@ -206,6 +206,13 @@ commit's CI status as a warning and updates anyway. A fork without CI sets
 - A commit CI never runs on (`[skip ci]` in its message, a push that changes only ignored paths, a
   disabled workflow) is never installed by the automatic update: it waits, and the 24-hour alert
   says so. Push a commit CI runs on, or update by hand.
+- "CI passed" means the run named exactly `check` (the job in `.github/workflows/ci.yml`) concluded
+  `success` and no other counted run failed. No `check` run yet, or one that concluded `skipped` or
+  `neutral`, means CI did not test the commit, so the server waits. Renaming that job holds every
+  update back until `ops/ci-status.sh` follows.
+- The process job (`process-check`) never holds back an update: `ops/ci-status.sh` drops it by that
+  exact name before the verdict, and it can never stand in for `check`. A run with any other name
+  still counts.
 
 The restart needs root: a sudoers rule allows that one command without a password, and the timer
 runs the script:
