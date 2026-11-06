@@ -40,6 +40,15 @@ export interface CollectorContext {
   /** The product's active listings on other sources (e.g. TCGplayer's English title). */
   linkedListings?: (productId: string) => Promise<{ source: string; title: string | null }[]>;
   /**
+   * The item's kept sales in the source's own market since `since` (ms), in the source's currency,
+   * for judging far prices against its own history (S30). One packed row read per item. Empty when
+   * they cannot be compared: the source declares no market, or its currency is not the base.
+   */
+  keptSales?: (
+    productId: string,
+    since: number,
+  ) => Promise<{ bucket: string | null; price: number; at: number }[]>;
+  /**
    * For collectors with `historyPhase`: `fresh` asks for the new sales, what is for sale and the
    * last sale only (older history left for later: `complete: false`); `history` asks only to
    * catch up older history, with the requests left once every listing had its fresh pass.

@@ -1,4 +1,10 @@
-import { type CollectorRunStatus, inAppZone, localDate, sourceInfo } from '@tora/core';
+import {
+  type CollectorRunStatus,
+  baseCurrency,
+  inAppZone,
+  localDate,
+  sourceInfo,
+} from '@tora/core';
 import {
   type Db,
   createQuerySource,
@@ -10,7 +16,9 @@ import {
   reactivateListing,
   recordListingFailure,
   recordListingRetry,
+  keptSalesSince,
   listProductSources,
+  loadItemSales,
   setSourceQuery,
   insertObservations,
   loadSourceRegistry,
@@ -114,7 +122,9 @@ export async function runCollector(
   const now = options.now ?? new Date();
   // Plug-ins report amounts in their own currency; they are stored in the base (S16).
   const toBase = await baseConverter(db);
-  const own = sourceInfo(await loadSourceRegistry(db), collector.source)?.currency;
+  const registry = await loadSourceRegistry(db);
+  const info = sourceInfo(registry, collector.source);
+  const own = info?.currency;
   const ctx: CollectorContext = {
     http,
     now,
@@ -138,6 +148,20 @@ export async function runCollector(
       return n;
     },
     setOf: (product) => productSetInfo(db, product),
+    keptSales: async (productId, since) => {
+      // Never across markets, and history is in the base currency: unknown stays unchecked (S30).
+      if (!info?.market || info.currency !== baseCurrency(registry)) return [];
+      const sameMarket = (key: string) => sourceInfo(registry, key)?.market === info.market;
+      try {
+        return keptSalesSince(await loadItemSales(db, [productId]), productId, since, sameMarket);
+      } catch (error) {
+        // The searches are spent by now: the listing goes on, its sales simply unchecked.
+        log(
+          `history of ${productId} could not be read, far prices not checked: ${errorText(error)}`,
+        );
+        return [];
+      }
+    },
     linkedListings: async (productId) =>
       (await listProductSources(db, productId))
         .filter((s) => s.active)

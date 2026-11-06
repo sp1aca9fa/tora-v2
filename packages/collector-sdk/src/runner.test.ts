@@ -1,6 +1,8 @@
 import {
   type Db,
   bucketStats,
+  insertObservations,
+  saveSourceInfos,
   collectorHealth,
   confirmCandidate,
   createDb,
@@ -847,4 +849,69 @@ it('leaves a gone page unlinked: no card until a new match, a pasted link still 
 
   await linkSource(db, product.id, { source: 'fake', externalId: 'X2' });
   expect((await listProductSources(db, product.id)).filter((s) => s.active)).toHaveLength(1);
+});
+
+it('gives a plug-in its item kept sales in its own market only', async () => {
+  const { product } = await box();
+  await saveSourceInfos(db, [
+    { key: 'jp-a', label: 'A', market: 'jp', currency: 'JPY' },
+    { key: 'jp-b', label: 'B', market: 'jp', currency: 'JPY' },
+    { key: 'us', label: 'US', market: 'us', currency: 'USD' },
+    { key: 'none', label: 'No market', currency: 'JPY' },
+  ]);
+  const sale = (source: string, price: number, currency = 'JPY') => ({
+    productId: product.id,
+    source,
+    observationType: 'sold' as const,
+    bucket: 'sealed:shrink',
+    priceBase: price,
+    currency,
+    observedAt: '2026-10-05T12:00:00.000+09:00',
+    fetchedAt: '2026-10-05T12:00:00.000+09:00',
+    externalRef: `${source}|${price}`,
+  });
+  await insertObservations(db, [sale('jp-a', 100), sale('jp-b', 200), sale('us', 300, 'USD')]);
+  const read = async (source: string) => {
+    let got: { price: number }[] | undefined;
+    const collector = fakeCollector({
+      source,
+      collect: async (_link, p, ctx) => {
+        got = await ctx.keptSales?.(p.id, Date.parse('2026-10-01T00:00:00Z'));
+        return { state: {}, complete: true };
+      },
+    });
+    await linkSource(db, product.id, { source, externalId: 'X', url: 'https://x' });
+    await runCollector(db, collector, { ...quiet, collectOnly: true });
+    return got?.map((s) => s.price).toSorted((a, b) => a - b);
+  };
+  expect(await read('jp-a')).toEqual([100, 200]);
+  expect(await read('jp-b')).toEqual([100, 200]);
+  // Never across markets; another currency cannot be compared; no market, no read.
+  expect(await read('us')).toEqual([]);
+  expect(await read('none')).toEqual([]);
+});
+
+it('a history read that fails leaves the listing running, its sales unchecked', async () => {
+  const { product } = await box();
+  await saveSourceInfos(db, [{ key: 'jp-a', label: 'A', market: 'jp', currency: 'JPY' }]);
+  await linkSource(db, product.id, { source: 'jp-a', externalId: 'X', url: 'https://x' });
+  const logs: string[] = [];
+  let got: unknown;
+  const collector = fakeCollector({
+    source: 'jp-a',
+    collect: async (_link, p, ctx) => {
+      await db.$client.execute('alter table item_sales rename to item_sales_away');
+      got = await ctx.keptSales?.(p.id, 0);
+      await db.$client.execute('alter table item_sales_away rename to item_sales');
+      return { state: {}, complete: true };
+    },
+  });
+  const summary = await runCollector(db, collector, {
+    ...quiet,
+    collectOnly: true,
+    log: (m) => logs.push(m),
+  });
+  expect(got).toEqual([]);
+  expect(summary).toMatchObject({ status: 'ok', errors: [] });
+  expect(logs.join('\n')).toContain('far prices not checked');
 });

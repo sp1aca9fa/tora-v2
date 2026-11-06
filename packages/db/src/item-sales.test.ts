@@ -7,7 +7,9 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import {
   checkItemSales,
+  keptSalesSince,
   loadItemSales,
+  packSales,
   refreshItemSales,
   soldDays,
   sourceCounts,
@@ -155,4 +157,41 @@ it('the self-check finds a saved row that drifted from the sales, fixes it, and 
   await db.insert(priceObservations).values([sale(b.id, '2026-10-03T02:00:00.000Z', 310)]);
   expect(await checkItemSales(db)).toEqual({ checked: 1, fixed: [a.id] });
   expect((await days(a.id)).map((d) => d.prices)).toEqual([[100], [200]]);
+});
+
+it('reads kept sales since a time, from the sources asked for, without estimated lots', () => {
+  const at = (day: number) => Date.parse(`2026-10-${String(day).padStart(2, '0')}T00:00:00.000Z`);
+  const row = (source: string, day: number, priceBase: number, extra: object = {}) => ({
+    productId: 'P',
+    source,
+    bucket: 'raw:A',
+    currency: 'JPY',
+    observationType: 'sold' as const,
+    excluded: false,
+    quantityInferred: false,
+    observedAt: new Date(at(day)).toISOString(),
+    priceBase,
+    ...extra,
+  });
+  const packed = new Map([
+    [
+      'P',
+      packSales([
+        row('a', 1, 100),
+        row('a', 20, 200),
+        row('a', 21, 999, { quantityInferred: true }),
+        row('a', 22, 50, { observationType: 'listing' }),
+        row('a', 23, 777, { excluded: true }),
+        row('other-market', 20, 300),
+      ]),
+    ],
+  ]);
+  const jp = (s: string) => s === 'a';
+  expect(keptSalesSince(packed, 'P', at(10), jp)).toEqual([
+    { bucket: 'raw:A', price: 200, at: at(20) },
+  ]);
+  // An item without sales, or no source allowed: nothing, not an error.
+  expect(keptSalesSince(packed, 'none', at(10), jp)).toEqual([]);
+  expect(keptSalesSince(new Map(), 'P', at(10), jp)).toEqual([]);
+  expect(keptSalesSince(packed, 'P', at(10), () => false)).toEqual([]);
 });

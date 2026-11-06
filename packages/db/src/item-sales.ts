@@ -386,6 +386,28 @@ export function unpackSales(
   return out;
 }
 
+/**
+ * An item's kept sales since `since` (ms) on the sources `includes` lets through, for the far-price
+ * check against its own history (S30). Trades with an estimated lot size are left out: their price
+ * is a guess. Prices are in the base currency.
+ */
+export function keptSalesSince(
+  packed: Map<string, PackedSales>,
+  productId: string,
+  since: number,
+  includes: (source: string) => boolean,
+): { bucket: string | null; price: number; at: number }[] {
+  const out: { bucket: string | null; price: number; at: number }[] = [];
+  for (const g of packed.get(productId)?.groups ?? []) {
+    if (g.t !== 'sold' || !includes(g.s)) continue;
+    const estimated = new Set(g.e);
+    g.at.forEach((at, i) => {
+      if (at >= since && !estimated.has(i)) out.push({ bucket: g.b, price: g.p[i]!, at });
+    });
+  }
+  return out;
+}
+
 /** Kept sales of one item, source, condition, currency and day. */
 export interface SoldDay {
   productId: string;
