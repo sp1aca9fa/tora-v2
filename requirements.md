@@ -48,7 +48,15 @@
 | S15 | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): server actions called by the wrong person and the rules on random cases tested (nothing found); account download loading built and round-tripped; load runs, collector faults, edge cases (input, imports) and layout at 7 views done (seven bugs fixed, an eighth from the owner's use); `pnpm check:all` added; bug log reviewed with the user (quiet-source warning and two-tab protection built); next the user's check |
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress (2026-10-25): first pass done (every guide read against the app, links and commands checked); both gaps found moved to Open issues (user, 2026-10-26) |
 | S26 | Opportunities as sub pages: Worth a look, Popular now, Signals, Buy plan; cards with tags and a target price; every item ranked, loaded as you scroll; a singles ranking and the top 60 as candidates | built 2026-10-27 (no migration; the singles ranking and the targets fill in with the next collect); crawled on the real-data test copy (10 pages, phone, wide and dark: no errors; the menu's Actions count was too faint, fixed); the user's check in progress (2026-10-28: first fixes built, the next round being planned) |
-| S27 | Opportunities part 2: chains in store posts; singles (market note, steadier prices, the set as the line); tested signal plug-ins (PSA 10 vs raw A, a quick rise); planning: spend a budget well, a monthly plan, a spread check, a look-back test | in progress (2026-10-28): steps 1-4 built |
+| S27 | Opportunities part 2: chains in store posts; singles (market note, steadier prices, the set as the line); tested signal plug-ins (PSA 10 vs raw A, a quick rise); planning: spend a budget well, a monthly plan, a spread check, a look-back test | steps 1-6 built (to 2026-10-31); the owner's check (2026-11-07) moved its follow-ups to S28, S31 and S32, step 7 to S33 |
+| S28 | The owner's notes, small round: Spread on wide screens and its links, refused rankings alert, store codes, franchise fix, old backup codes | planned 2026-11-07 |
+| S29 | Store notices and Lotteries: notices only when a sale starts, lottery posts out of Now | planned 2026-11-07 |
+| S30 | Sales accuracy: fewer wrong sales from search-based sources | planned 2026-11-07 |
+| S31 | Buy timing: target prices with dates and confidence, a simpler card | planned 2026-11-07 |
+| S32 | Opportunities as a deal finder: ways of spotting deals, potential, price | planned 2026-11-07 |
+| S33 | Look-back test (from S27 step 7) | planned 2026-11-07, after the owner is happy with S31 |
+| S34 | Sell timing | planned 2026-11-07, spec later; needs S31 and S32 |
+| S35 | Sources and collection load: identity sources, which stores earn their place, a rhythm per item | planned 2026-11-07 |
 
 ### Decision log
 
@@ -203,6 +211,7 @@
 - 2026-10-31: Whole-code review (user: much was built without a reviewer): six areas reviewed in parallel and their fixes re-reviewed; 54 findings, all fixed with tests or listed in Open issues. Behavior changes worth knowing: a source whose role is Off for every item type (and that identifies no type) is not collected; a site refusing rankings or box cards is left alone for the day; a run stopped at its request cap asks the schedule to continue it (exit 2, no alert); alerts count as sent only once a channel took them; undated Out of print / Reprint coming marks are not tested on past days (look-ahead), so they show as unproven; the data tool hides every source kept from AI in every table it can read; backup codes are stored as keyed hashes; a backup leaves out rows written mid-copy without their parent and fails (retried) when an older row lost its parent.
 - 2026-10-31: Stores > Lotteries lists only a lottery's own posts (user): posters mention the lottery word in chatter and stock reports ("nothing but the lottery", the lottery queue), so the list leaves out replies and posts using a "Not a lottery" phrase (a new kind of code on Codes, set by an admin; never shown as a post's code). Every post still shows in the other lists. On the owner's 12 days of posts: 141 used the word, 89 kept.
 - 2026-11-03: New-release wait shows its end date and how far similar items fell to their low (user: the card gave a day number, no date or price). Buy timing's new-release line gives the wait's end as a date; under it, how far similar items (3+ with a full first year, the item's line when enough) fell from this age to their first-year low, as a median and, with 8+ items, the deeper quarter, with the price that gives from the item's typical price of the last week. Reference only, the wait is unchanged: a leave-one-out check on 10 past Pokemon boxes (SNKRDUNK sales) found the median's price reached early on 8 of 10 but cheaper than the price at the wait's end on only 4-6 of 8, and higher 90 days later on 4-5 of 8, against 7 of 10 for waiting; the quarter's price was reached on only 3-4 of 10, too few to prove. "Falling fast" now says what flat means (under 5 % down in 2 weeks).
+- 2026-11-07: Plan S28-S35 from the owner's check (user). Sales accuracy comes before Buy timing, since targets rest on the year's lows. Buy timing changes rule: it shows target prices with their tested record and confidence instead of showing none it cannot prove (user: a number Tora is partly confident in beats no number). Notices move toward only saying a sale has started, since Now is what gets read.
 ---
 
 # CORE
@@ -1047,11 +1056,117 @@ Decided 2026-10-28 (user, decision log), from the S26 check. Steps, each built a
 4. Spend a budget well: a budget (and a date) gives a varied mix (types, sets, price levels; no item taking most of it), each pick with why and by when, any pick swapped for the next best. Built 2026-10-28 on the Buy plan (user's choice, Balanced): Suggest a mix, Swap, the total against the budget without a date, the date optional, each item's signals shown. On the owner's data the first version filled the budget with cheap items nothing pointed to (a used controller at ¥1,000); now only items worth a look or watched come in, and a thin mix says so. Also from the review's asks (user, all Recommended): owned items stay ranked, "Owned: buy another?"; warning chips keep showing the items with the warning, marked with an icon and "the warning" in the filter line. After the user's look at the cards (2026-10-28; user, all Recommended): the market's "Line falling" (86 of 88 cards) read as "buy nothing" next to green targets. Now a card with a proven warning after which prices fell says "Wait, or under" the target lowered by that fall (main-set boxes: -13 %; singles: -9 %), the price bar is colored (green at target, blue close, red far over, amber waiting), Watch is an icon. Each person picks the conditions suggested per type (Watchlist > Strategy; e.g. no raw B). Reprints: an admin marks an item out of print or a reprint coming (from a day), a plug-in may guess for unmarked items (a shop's own boxes, in the private collectors), both tested as signals ("Out of print", warning "Reprint coming"); migration 0068. Signals: the three best signals on top, links to each type, groups with nothing proven folded, card tags link to their row. The Hiroshima box had no signal at all (special sets: 25 checks, too few to prove anything), not a "don't buy". Then (user, 2026-10-28): a tap on the target or the wait price explains it, the wait price says whether the item sold that low on 1 day in 10 of the past year; Popular shows Tora's view under each SNKRDUNK rank and Tora's price next to the site's; the Buy strategy page uses the whole width, strategies before the example on phones, the margin inside its card, and each strategy says on how many of the person's watches it calls a good price today. No sealed item is worth a look: on booster boxes, Line falling (bought while on: higher 90 days later 22 % of the time against 72 %) outweighs Sales picking up (89 %); it is proven only for boxes, so it is not the sealed type's market warning. Then (user, 2026-10-28): plainer wait texts (the target's strategy named, Tora's suggestion or the person's; "a new low" instead of quantiles); Popular per item type with four measures (site rankings, most traded in 30 days on every site, trending, the year; nightly `popularity` setting), infinite scroll, and a card's rank tag opening its ranking with the item marked. Claude's own read of the prices against Tora's (2026-10-28, 121 cards and sealed items with a year of prices): judged on price level (where today's price sits in its own past year), whether the fall has stopped (the last 14 days against the 30 before), trading (40+ days with sales in 90) and reprint risk, about 14 items look like reasonable buys (older boxes near their year's low and turning up, several PSA 10s 25-70 % under their peak with prices flat or rising again). Tora calls almost none of them worth a look or a good price: its "worth a look" rests on signals of activity (sales picking up), not on price level, and its verdict says wait for nearly everything because similar items fell over 15 % in 12 weeks, a rule that holds as long as the market is down, even after an item stops falling. Suggested changes, waiting for the user's decision: test a "cheap and steadying" signal (bottom 30 % of the year, the fall paused) like the others; let a paused fall end the market's wait; never set a wait price under the year's cheapest tenth. Built (user, 2026-10-28, all three): signal "Cheap, fall paused" (price in the cheapest 30 % of its past year's daily prices, from 300+ days of prices; the last 14 days' median at least -2 % against the 30 days before), tested like the others; on the owner's data to 10-23 proven on booster boxes (15 of 19 higher 90 days later against 73 % any day) and Japanese singles (41 of 60 against 60 %), on for 13 items. The data narrowed the second change: a paused fall alone does not end a falling line (boxes: 8 of 38 higher; singles 49 % against 60 %), cheap and paused does (singles: 25 of 37 higher, median +6 %; boxes: 6 cases, too few). So Line falling is off and the market's fall no longer makes an item wait (buy verdict) when the item is cheap and its fall paused; most of the 13 now rank as worth a look. A wait price stops at the past year's cheapest tenth ("Tora asks no lower"). Also (user): a name search on Worth a look, Popular and Buy plan (`?q=`, kept across the tabs; every word in the name, alias or set name; romaji and hiragana find katakana, long vowels loose: "pikachu" finds ピカチュウ; English names that differ from the Japanese do not). Popular keeps each item's rank in the whole list; on Buy plan the search narrows the list and Suggest a mix, ticked items it hides still count.
 5. Monthly plan (DCA): a monthly amount and the items aimed for; each month what to buy now and what to wait on; bought against the plan. Built 2026-10-31 on the Buy plan: an Every month switch makes the budget a monthly amount; the plan, Suggest a mix and Swap run to the month's last day on what is left once this month's purchases for the collection are counted (cost; not pulls, gifts, trades nor things bought to use; lots without a cost said); ticked items bought this month (same item and condition, or any condition for a plan item without one) say so and are not counted again nor offered to a mix; the list in Buy now / Wait / No price yet. No carry-over of an unspent amount (owner may change it).
 6. Spread check: the holdings by type, franchise, set, era and price level; heavy concentration flagged; groups held little with proven signals pointed to. Built 2026-10-31 as Portfolio > Spread: the lots counted in value, at market value or at cost with no price (said); groups by item type, franchise (a name typed in any of the app's languages read as the same franchise), set (kept apart by franchise), release era (before 2016, 2016-2019, 2020-2022, then each year) and the price of one (powers of ten in the base currency's smallest unit); a group with 50 %+ of the value is heavy (not franchises, nor the only group there is), so is one item with 20 %+; item types and sets held under 5 % with items worth a look linked to Worth a look (a set by name search, which now also finds set codes). Thresholds are first guesses for the owner to tune.
-7. Look-back test: what a mix would have done bought 6 or 12 months ago.
+7. Look-back test: what a mix would have done bought 6 or 12 months ago. Moved to S33 (the owner, 2026-11-07).
 
 Acceptance: the user's check after each step that shows in the app; a UX review (`docs/ux-review.md`) before each.
 
 First UX review (2026-10-28, steps 1-3, on the real-data test copy): fixed what it marked "fix": an item whose proven warning outweighs its proven signal was listed as worth a look (now with the rest; the type chips count the same way, "1 of 64"); a shorter intro on every tab; the four tabs fit a phone ("Popular"); the signal chips without a bare percent that read as a price change; "Prices as of"; the market note in plain words; a filter line with the count and Clear; "No signal today" on cards with no tag; the Signals tables with a "Vs any day" column in points; a plain empty Popular page. Left to the owner: owned items among the suggestions, warning chips as a filter, grading warnings by strength, folding groups with few checks. The Buy plan findings go to steps 4-5.
+
+## S28 to S35: from the owner's check of 2026-11-07
+
+The owner's comments after S27, in the order to build them. Small and independent work first, then
+sales accuracy, because target prices rest on the year's lows, which wrong sales distort. Numbers
+are from the owner's data to 2026-11-06. Each visible step gets a UX review and the owner's check;
+what a price, signal or alert means stays the owner's call, with the proposal in the actions file.
+
+### S28: The owner's notes, small round
+
+- Portfolio > Spread: uses wide screens like other pages; a group (item type, franchise, set, era,
+  price of one) links to the Items page filtered by it, so Items gains the filters it lacks. The
+  "worth a look" suggestions stay.
+- A site refusing Tora while reading rankings or box opening cards alerts like a refused collector.
+- Store codes: the owner's new codes and a pass over posts without a store (private lists).
+- A franchise typed in Japanese: the importer that writes it fixed, one data command for the owner.
+- After the owner replaces both accounts' login codes: the old backup code form is no longer
+  accepted.
+
+### S29: Store notices and Lotteries
+
+The Now page is what the owner actually reads, so notices should only say a sale has started.
+
+- Sent at once: a post or reply in the person's stores with a start word, or a burst (3 or more
+  different people on one store within 15 minutes, whatever the words). The burst is the safety net
+  for wording the list misses and for people replying instead of posting. All other posts stay on
+  Now. A shorter message with a link to the thread. Each person picks All, Sales starting, or Off.
+  Size: 204 of 3,995 posts and replies in 30 days carry a start word, across all stores.
+- Before any change: replay a busy past week, list what would and would not have been sent, and the
+  owner marks what they would have missed.
+- Lottery posts leave Now: only a first post with a lottery word, an application cue and no "not a
+  lottery" phrase, its replies following; unsure stays on Now; Now says how many moved. Tested on a
+  sample the owner marks. Expected effect is small: about 6 % of posts (11 % of first posts at most).
+
+### S30: Sales accuracy
+
+Of the sales kept in the last 60 days, the share over twice or under half the item's median for its
+condition: Mercari 5.7 %, Yahoo! Auctions 5.5 %, a marketplace with its own pages 0.7 %, SNKRDUNK
+0.2 %. Search-based sources are the problem. A random sample shows the causes:
+
+- Goods matched to a game of the same name; near names (a sequel, a newer console's accessory).
+- Sets and lots sold as one, read as one unit.
+- A single card, or a part, sold under a sealed product's name.
+- Other regions' versions; a graded card in a raw condition; a different card number in the title.
+
+Not every far price is wrong, so rules go first and a price check last. Reserved listings are not
+the cause (6.3 % against 5.1 %). Steps:
+
+1. Measure per cause on a labeled sample, as the baseline.
+2. Filter rules per cause; item kinds must match (software is not goods).
+3. Far prices judged against the item's own recent sales, not only that night's batch: nights with
+   few sales have little to compare with.
+4. A sold listing found by two items' searches stored for each (the owner's decision pending).
+5. Re-check stored sales from their kept titles: exclusions only, raw rows stay, a command for the
+   owner. Measure again, and show what moved in values and year's lows.
+
+### S31: Buy timing, target prices
+
+The owner wants a quick judgment and real numbers: "Id rather have a number Tora is partially
+confident than having nothing." So the rule changes from showing no target it cannot prove to
+showing the target with its record.
+
+- The top card: the verdict, the tags, and fair, good and ideal prices, each with a likely date and
+  a confidence. Detail moves to tooltips and the Why card.
+- Good and ideal come from how far similar items fell from this age to their first-year low.
+  Confidence is how often similar items reached that price by that date, with how many items it
+  rests on; too few similar items reads "rough". Tested first on past days with no look-ahead, for
+  every type; the results go to the owner before the card changes. A weak row shows its weak record.
+- Tools for timing, as far as anyone can: how much to buy at each price, an alert when a price is
+  reached, a live listing already at a target, the risk of waiting (how often the price never came
+  back), signs a fall is ending (listings, sales speed, the fall paused), dated events.
+- Layout: on wide screens the card and Why on one side, the chart on the other; on phones card, Why,
+  chart. Targets drawn on the chart.
+
+### S32: Opportunities as a deal finder
+
+Today's list rests on price analysis. The owner wants deals spotted in different ways, and the best
+picked by potential and price.
+
+- Lists by way of spotting: falling hard, cheap with the fall paused, sales picking up, listings
+  drying up, a listing well under the market, rising fast.
+- Potential: criteria a person sets (subjects, rarity, out of print, rank), each tested on the
+  history and showing its record; one that does not prove out can stay as a stated preference.
+- Every row shows potential, the Buy timing verdict and its target (S31).
+- Buy plan is reconsidered here, keeping the monthly amount only if it still fits.
+
+### S33: Look-back test
+
+S27 step 7, wanted once the owner is happy with Buy timing. Two readings to pick from then: replay
+Tora's picks from past days against an even spread, or today's mix priced in the past.
+
+### S34: Sell timing
+
+A spec comes later. The owner's starting rule: a good time to sell means the price went up, is not
+expected to go up further, and there are clear ways to reinvest (so it depends on S31 and S32 having
+good options to buy).
+
+### S35: Sources and collection load
+
+- Identity sources: search-by-number on a shop loses items (one shop: 15 of 56 linked items set aside
+  in two weeks, none back). An identity source need not be a shop; official product pages and shops'
+  official search APIs to weigh.
+- Which stores earn their place: what each adds to prices and how much noise, per item type.
+- A rhythm per item instead of the same effort for all: of 326 items on one marketplace, 195 gained
+  15+ kept sales in 14 days and 64 none. Busy items nightly, quiet ones every 3 to 7 nights, for-sale
+  searches nightly only for items owned or watched. About a third fewer requests (estimate).
 
 ## S18: Documentation pass
 
