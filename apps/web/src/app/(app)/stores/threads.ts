@@ -32,3 +32,19 @@ export function threads(posts: PostView[]): { post: PostView; replies: PostView[
   }
   return firsts.map((post) => ({ post, replies: (replies.get(post.ref) ?? []).toReversed() }));
 }
+
+/**
+ * Threads split by the posts that left Now (S29: a confirmed lottery's, whose replies all go with
+ * it), and how many posts moved: each thread's post and replies, once each.
+ */
+export function splitMoved<T extends { post: { id: string }; replies: { id: string }[] }>(
+  list: T[],
+  moved: Set<string>,
+): { kept: T[]; gone: T[]; count: number } {
+  const gone = list.filter((th) => moved.has(th.post.id));
+  return {
+    kept: list.filter((th) => !moved.has(th.post.id)),
+    gone,
+    count: new Set(gone.flatMap((th) => [th.post.id, ...th.replies.map((r) => r.id)])).size,
+  };
+}

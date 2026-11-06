@@ -5,6 +5,7 @@ import {
   type StoreArea,
   chainsInPost,
   codesInPost,
+  isWordOnly,
   localDate,
   productsInPost,
   storeLabelIn,
@@ -149,11 +150,11 @@ export async function toViews(
   ]);
   const others = [
     ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
-    ...glossary.filter((g) => !g.product && !g.notLottery).map((g) => g.code),
+    ...glossary.filter((g) => !g.product && !isWordOnly(g)).map((g) => g.code),
   ];
   const inArea = storesInArea(area, all, localDate());
   const byId = new Map(all.map((s) => [s.id, s]));
-  const otherCodes = glossary.filter((g) => !g.product && !g.notLottery);
+  const otherCodes = glossary.filter((g) => !g.product && !isWordOnly(g));
   // A post's stores' codes (not the ones that are just their name), with the store they name.
   const storeCodesOf = (ids: string[]): CodeMeaning[] =>
     ids.flatMap((id) => {

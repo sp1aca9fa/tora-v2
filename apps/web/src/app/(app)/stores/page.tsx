@@ -1,17 +1,19 @@
 import { PLACE } from '@tora/core';
-import { postsPage } from '@tora/db';
+import { confirmedLotteryPosts, postsPage, storeGlossary, trackerState } from '@tora/db';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
+import { setNowHidesLotteriesAction } from './actions';
+import { clock, nothingSince } from './feed-state';
 import { areaLocations, postDays } from './locations';
 import { type PostView, storeLabel, toViews } from './post-views';
 import { PostItem } from './posts-list';
 import { NowList, NowRow, NowTools, StoreSection } from './now-row';
 import { Since } from './since';
 import { AutoRefresh } from './stores-nav';
-import { threads } from './threads';
+import { splitMoved, threads } from './threads';
 
 /** The row of the posts naming no store or place Tora knows, from boards mixing chains. */
 const UNKNOWN = 'unknown';
@@ -33,7 +35,8 @@ type Thread = ReturnType<typeof threads>[number];
  * Posts naming no store sit in rows of their own: no store or area known, a chain known but not
  * where, or areas only (a section per area). Today's (from 5:00); yesterday's folded. The area's
  * stores, or every store. A notice's link opens its row (`?open=` its id). Before an area is set,
- * the Area page comes first.
+ * the Area page comes first. A person's choice takes confirmed lotteries out (S29): their posts
+ * stay on Lotteries and the other pages; unsure ones stay here.
  */
 export default async function NowPage({
   searchParams,
@@ -69,11 +72,14 @@ export default async function NowPage({
     }),
     postsPage(db, { offset: 0, limit: MAX_POSTS, since, named: false }),
   ]);
-  const views = await toViews(
-    db,
-    area,
-    [...named.posts, ...unknown.posts].sort((a, b) => b.postedAt.localeCompare(a.postedAt)),
+  const posts = [...named.posts, ...unknown.posts].sort((a, b) =>
+    b.postedAt.localeCompare(a.postedAt),
   );
+  const hideLotteries = user.preferences?.nowHidesLotteries === true;
+  const moved = hideLotteries
+    ? await confirmedLotteryPosts(db, posts, await storeGlossary(db))
+    : new Set<string>();
+  const views = await toViews(db, area, posts);
   const unknownRows = new Map([
     [UNKNOWN, { id: UNKNOWN, label: t('unknownStoreTitle'), storeIds: [], km: null }],
     [UNKNOWN_AREA, { id: UNKNOWN_AREA, label: t('unknownAreaTitle'), storeIds: [], km: null }],
@@ -126,7 +132,12 @@ export default async function NowPage({
       })
       .sort((a, b) => b.latest.postedAt.localeCompare(a.latest.postedAt));
   };
-  const all = threads(views);
+  // Only what this view would show counts as moved (the rows' own rules, in `group`).
+  const { kept: all, gone } = splitMoved(threads(views), moved);
+  const movedCount = splitMoved(
+    group(gone).flatMap((r) => r.stores.flatMap(([, list]) => list)),
+    moved,
+  ).count;
   // A thread is today's when its post or a reply is.
   const todays = group(all.filter((th) => newest([th]) >= today));
   const earlier = group(all.filter((th) => newest([th]) < today));
@@ -203,6 +214,9 @@ export default async function NowPage({
     </NowRow>
   );
 
+  // Nothing to show: is that because nothing happened, or because the tracker is down?
+  const state = todays.length === 0 ? await trackerState(db) : null;
+  const silentSince = state && nothingSince(state.feed, state.tracking);
   const everyRow = [...todays, ...earlier];
   const unread = everyRow.some((r) => r.latest.postedAt > (seen[r.location.id] ?? ''));
 
@@ -220,13 +234,44 @@ export default async function NowPage({
           </Link>
         </div>
       </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <form action={setNowHidesLotteriesAction.bind(null, !hideLotteries)}>
+          <button
+            type="submit"
+            role="switch"
+            aria-checked={hideLotteries}
+            className="flex items-center gap-2"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'relative h-4 w-7 rounded-full transition-colors',
+                hideLotteries ? 'bg-primary' : 'bg-muted-foreground/40',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-3 rounded-full bg-background transition-all',
+                  hideLotteries ? 'left-3.5' : 'left-0.5',
+                )}
+              />
+            </span>
+            {t('hideLotteries')}
+          </button>
+        </form>
+        {hideLotteries && (
+          <Link href="/stores/lotteries" className="underline">
+            {t('lotteriesMoved', { n: movedCount })}
+          </Link>
+        )}
+      </div>
       <NowTools
         rows={everyRow.map((r) => ({ id: r.location.id, at: r.latest.postedAt }))}
         unread={unread}
       >
         {todays.length === 0 ? (
           <p className="rounded-xl border bg-card px-4 py-6 text-sm text-muted-foreground">
-            {t('noToday')}
+            {silentSince ? t('noTodayDown', { time: clock(silentSince) }) : t('noToday')}
           </p>
         ) : (
           <NowList rows={todays.map((r) => ({ id: r.location.id, node: row(r) }))} />

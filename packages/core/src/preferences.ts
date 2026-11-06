@@ -1,7 +1,7 @@
 // Per-user display preferences (requirements S8).
 import type { NoticePrefs } from './alert-notices';
 import type { StrategyChoice } from './signals';
-import type { StoreArea, StoreFeedPrefs } from './stores';
+import type { StoreArea, StoreFeedPrefs, StoreNoticeMode } from './stores';
 
 /** Panels of the Portfolio Summary's rotating card, in their default order. */
 export const SUMMARY_PANELS = [
@@ -47,6 +47,10 @@ export interface UserPreferences {
   suggestConditions?: Record<string, string[]>;
   /** The stores watched for store notices (S25). */
   storeArea?: StoreArea;
+  /** What the person is sent about their stores (S29); unset: everything, as before S29. */
+  storeNoticeMode?: StoreNoticeMode;
+  /** Confirmed lotteries and their replies leave Now for Lotteries (S29); unset: they stay. */
+  nowHidesLotteries?: boolean;
   /** When each Now row (a location) was last opened, for its unread count (S25). */
   storesSeen?: Record<string, string>;
   /** Alerts about the store feed itself (S25). */

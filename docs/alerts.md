@@ -16,7 +16,54 @@ happened (Settings > Activity).
 | How many things wait on Actions                                           | Each person | The morning summary                                                          | The app's morning check         |
 | A watched item turned Good price, or its lowest ask went under the target | Each person | Right after the nightly collect (again only after 14 days out)               | The home PC (`collect-cron.sh`) |
 | Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app's morning check         |
-| Store posts and comments for your area, a store feed gone silent          | Each person | At once ([Store notices](store-feeds.md))                                    | The app                         |
+| Store posts and comments for your area (your choice below), a feed silent | Each person | At once ([Store notices](store-feeds.md))                                    | The app                         |
+
+### Store notices: how you are told
+
+Each person picks one on **Stores > Area**. The default is every post, so nothing changes until you
+choose otherwise:
+
+- **Every post:** new posts (one per store per 30 minutes) and every reply, with their pictures and
+  the post as written.
+- **Sales starting:** a short message when someone in your area says a sale has started, in a post
+  or a reply, or when 3 or more different people post about one store within 15 minutes, whatever
+  the words (the safety net for wording Tora does not know and for people replying instead of
+  posting). A burst's message says the store is busy, not that a sale started; an area holding many
+  stores makes no burst, only words. The same person twice counts once; posts with no author count
+  as one person. A message holds the time, the store, the products, the line holding the start word
+  (a burst: the newest post's first line) and, for a burst, how many people; its title opens the
+  store's row on Now. One per store per 30 minutes, with one exception: a start word right after a
+  burst's message still goes through once. After a message, a burst needs three people anew. A start
+  word the feed brought in up to 2 hours late still sends, at its real time. A failed send goes
+  again with the next post about that store. "Send a test notice" on Stores > Area sends an example.
+- **Off:** no store messages. Other alerts stay, and so do the store feed's own messages (posts
+  naming an unknown store, silence), which have their own switches on Stores > Feed.
+
+The words come from a store list plug-in and from admins (Stores > Codes): a **sale start word**
+("started"), and a phrase that **is not a start** ("not started yet"), which rules out the post's
+words. A plug-in's new words count after the next collect saves them; until then only bursts fire.
+Admins can turn any of them off. These words are never shown as a post's code.
+
+**Lotteries.** A confirmed lottery is a first post with a lottery word, an **application word**
+("apply", "deadline"), no "not a lottery" phrase ("raffle queue") and no sale start; its replies go
+with it. Its thread never sends
+a Sales starting message and never counts toward a burst. A person can also move these threads off
+the Now page ("Hide lottery posts on Now", on Now or Stores > Area); Now then says how many moved, with a link to
+Lotteries. Anything unsure stays on Now. By store, By location, All posts and Lotteries keep showing
+every post.
+
+**Try a choice on past posts** (reads only, sends nothing, writes nothing to the database):
+
+```bash
+pnpm --silent --filter @tora/db stores-replay --user <name> --from <day> --to <day> --out <file>
+# or --busiest 7: the 7 days with the most posts about that person's area
+# --words <file.json>: a JSON list of glossary entries to try besides the saved ones
+```
+
+It writes the messages per day for each choice, each Sales starting message and why, what would not
+be sent (per store, threads with replies or products first), and the threads that would leave Now.
+It replays the same rules from when each post reached Tora: a post that arrived over 30 minutes
+late makes no message unless it is a start word under 2 hours old, as in real use.
 
 A site refusing Tora counts as a failed collect, also when it refuses while reading rankings or box
 opening cards. A listing set aside is tried again every 7 days by its source's normal collect: a

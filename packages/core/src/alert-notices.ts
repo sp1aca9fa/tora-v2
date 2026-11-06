@@ -3,6 +3,9 @@
 // kind (cards or plain text, colors, which parts show) and words them (texts with {placeholders}).
 // The same builders and renderers make the previews on Settings > Alerts > Customize notices.
 
+import { BURST_MINUTES, firstLineOf } from './stores';
+import { toLocalIso } from './time';
+
 export const NOTICE_KINDS = [
   'store',
   'storeUnknown',
@@ -49,7 +52,16 @@ export const NOTICE_KIND_ROLES: Record<NoticeKind, NoticeRole[]> = {
 
 /** The texts each kind uses (keys of the `alertText` messages), for the wording editor. */
 export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
-  store: ['storePosts', 'storeReply', 'storeArea', 'storeLink', 'storeOpen'],
+  store: [
+    'storePosts',
+    'storeReply',
+    'storeArea',
+    'storeLink',
+    'storeOpen',
+    'storeStarts',
+    'storeBusy',
+    'storeBurst',
+  ],
   storeUnknown: ['storeUnknown', 'storeLink', 'storeOpen'],
   feed: [
     'feedConnected',
@@ -528,6 +540,8 @@ export interface StorePostData {
   comment: boolean;
   /** A reply: its first post's text. */
   threadText?: string | null;
+  /** A note next to the products ("3 people in 15 minutes"). */
+  note?: string | null;
 }
 
 /** A reply's first post, as its start ("KTA 雪(1)…"). */
@@ -557,7 +571,10 @@ export function storeNotice(t: NoticeTexts, posts: StorePostData[], link: string
   const cards = [...byLocation.values()].map(({ data, stores }) => {
     const sections = [...stores].map(([store, list]) => {
       const entry = (p: StorePostData): NoticeEntry => ({
-        sub: p.products.length ? p.products.join(', ') : null,
+        sub:
+          [...(p.products.length ? [p.products.join(', ')] : []), ...(p.note ? [p.note] : [])].join(
+            ' · ',
+          ) || null,
         quote: p.text,
         when: p.when,
         at: p.at ?? null,
@@ -614,6 +631,64 @@ export function storeNotice(t: NoticeTexts, posts: StorePostData[], link: string
     replyText: t.storeReply ?? 'reply',
     split: true,
     cards: cards.map((c) => c.card),
+  };
+}
+
+/**
+ * A sale has started (S29, the 'starts' choice): short. For each store the time, its products, the
+ * post's first line and, for a burst, how many people; the card's title opens the store's row on Now.
+ * No pictures, no thread, no link to the board. `people` null: a start word, not a burst. A message
+ * holding only bursts does not say a sale has started: people are busy at the store, nothing more.
+ */
+export function storeStartsNotice(
+  t: NoticeTexts,
+  posts: (Omit<StorePostData, 'comment' | 'thread' | 'threadText' | 'url' | 'note'> & {
+    people: number | null;
+  })[],
+): Notice {
+  return {
+    ...storeNotice(
+      t,
+      posts.map(({ people, ...p }) => ({
+        ...p,
+        text: firstLineOf(p.text),
+        url: null,
+        comment: false,
+        thread: null,
+        threadText: null,
+        note:
+          people === null
+            ? null
+            : fillText(t.storeBurst ?? '{n} people in {minutes} minutes', {
+                n: people,
+                minutes: BURST_MINUTES,
+              }),
+      })),
+      null,
+    ),
+    head: posts.every((p) => p.people !== null)
+      ? (t.storeBusy ?? 'Tora: busy at your stores')
+      : (t.storeStarts ?? 'Tora: a sale has started'),
+  };
+}
+
+/** What a Sales starting message looks like, marked as an example (the button on Stores > Area). */
+export function storeStartsExample(t: NoticeTexts, link: string | null, now = new Date()): Notice {
+  const at = toLocalIso(now);
+  return {
+    ...storeStartsNotice(t, [
+      {
+        key: 'example:1',
+        location: { id: 'example', title: 'Megastore Minato', url: link },
+        store: 'Megastore Minato',
+        products: ['Snow set'],
+        text: 'X1 started',
+        when: at.slice(11, 16),
+        at,
+        people: null,
+      },
+    ]),
+    head: t.storeExample ?? 'Tora: a test, this is how a sale started message looks',
   };
 }
 

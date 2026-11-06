@@ -7,8 +7,11 @@ import {
   noticeExamples,
   plainText,
   storeNotice,
+  storeStartsExample,
+  storeStartsNotice,
   telegramHtml,
 } from './alert-notices';
+import { toLocalIso } from './time';
 
 const m: Notice = {
   kind: 'store',
@@ -223,4 +226,69 @@ it('fills placeholders and plural counts as the messages write them', () => {
       ['{n, plural, other {# x}}', 'many'],
     ].map(([text, n]) => fillText(String(text), { n: n! }) === text),
   ).toEqual([true, true, true]);
+});
+
+describe('a sale started notice (S29)', () => {
+  const data = (over = {}) => ({
+    key: 'b:1',
+    location: { id: 'l1', title: 'Minato', url: 'https://tora.example/stores?open=l1' },
+    store: 'Megastore Minato',
+    products: ['Snow set'],
+    text: `started <b>*x*</b> ${'y'.repeat(100)}\nsecond line`,
+    when: '18:00',
+    at: '2026-11-01T18:00:00.000+09:00',
+    people: null,
+    ...over,
+  });
+  it('is short: time, store, products, first line, the row link; escaped on both apps', () => {
+    const n = storeStartsNotice({}, [data()]);
+    expect(n.kind).toBe('store');
+    expect(n.head).toBe('Tora: a sale has started');
+    expect(n.images).toBeUndefined();
+    const [payload] = discordPayloads(n) as { embeds: { url: string; description: string }[] }[];
+    expect(payload!.embeds[0]!.url).toBe('https://tora.example/stores?open=l1');
+    expect(payload!.embeds[0]!.description).toContain('Snow set');
+    expect(payload!.embeds[0]!.description).toContain('\\*x\\*');
+    expect(payload!.embeds[0]!.description).not.toContain('second line');
+    expect(payload!.embeds[0]!.description).not.toContain('y'.repeat(90));
+    const telegram = telegramHtml(n);
+    expect(telegram).toContain('&lt;b&gt;*x*&lt;/b&gt;');
+    expect(telegram).toContain('href="https://tora.example/stores?open=l1"');
+    expect(telegram).toContain('<code>18:00</code>');
+    expect(telegram).not.toContain('second line');
+  });
+  it('does not say a sale started when the message holds only bursts', () => {
+    const busy = storeStartsNotice({}, [data({ people: 3 })]);
+    expect(busy.head).toBe('Tora: busy at your stores');
+    const mixed = storeStartsNotice({}, [data({ people: 3 }), data({ key: 'b:2' })]);
+    expect(mixed.head).toBe('Tora: a sale has started');
+    expect(storeStartsNotice({ storeBusy: 'Busy' }, [data({ people: 3 })]).head).toBe('Busy');
+  });
+  it('says how many people for a burst, with or without products', () => {
+    const burst = (products: string[]) =>
+      telegramHtml(storeStartsNotice({}, [data({ people: 4, products })]));
+    expect(burst([])).toContain('<i>4 people in 15 minutes</i>');
+    expect(burst(['Snow set'])).toContain('<i>Snow set · 4 people in 15 minutes</i>');
+    const own = telegramHtml(
+      storeStartsNotice({ storeBurst: '{n} in {minutes} min' }, [data({ people: 3 })]),
+    );
+    expect(own).toContain('3 in 15 min');
+  });
+  it('marks the example as a test', () => {
+    const n = storeStartsExample({}, 'https://tora.example/stores');
+    expect(n.head).toContain('a test');
+    expect(telegramHtml(n)).toContain('X1 started');
+    // The app's time zone (Tokyo by default), not UTC.
+    const at = new Date('2026-11-01T03:05:00.000Z');
+    const entry = storeStartsExample({}, null, at).cards[0]!.sections![0]!.entries[0]!;
+    expect(entry.when).toBe('12:05');
+    expect(entry.at).toBe(toLocalIso(at));
+  });
+  it('keeps the every post notice as it was: no note, the same line', () => {
+    const { people: _, ...post } = data();
+    const n = storeNotice({}, [{ ...post, url: null, comment: false }], null);
+    expect(n.cards[0]!.sections![0]!.entries[0]!.sub).toBe('Snow set');
+    const none = storeNotice({}, [{ ...post, products: [], url: null, comment: false }], null);
+    expect(none.cards[0]!.sections![0]!.entries[0]!.sub).toBeNull();
+  });
 });

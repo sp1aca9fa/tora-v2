@@ -29,26 +29,33 @@ export function StoresNav() {
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [pathname]);
   return (
-    <nav
-      ref={nav}
-      className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {TABS.map(([name, href]) => (
-        <Link
-          key={name}
-          href={href}
-          aria-current={pathname === href ? 'page' : undefined}
-          className={cn(
-            '-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
-            pathname === href
-              ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {t(name)}
-        </Link>
-      ))}
-    </nav>
+    <div className="relative">
+      <nav
+        ref={nav}
+        className="flex gap-1 overflow-x-auto overflow-y-hidden border-b [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {TABS.map(([name, href]) => (
+          <Link
+            key={name}
+            href={href}
+            aria-current={pathname === href ? 'page' : undefined}
+            className={cn(
+              '-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+              pathname === href
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {t(name)}
+          </Link>
+        ))}
+      </nav>
+      {/* On a phone the row scrolls: a fade says there is more. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background md:hidden"
+      />
+    </div>
   );
 }
 

@@ -8,6 +8,8 @@ import {
   type StoreAreaChoice,
   type StoreFeedPrefs,
   STORE_NOTICE_KM,
+  STORE_NOTICE_MODES,
+  type StoreNoticeMode,
   activeArea,
   distanceKm,
   roundPoint,
@@ -32,6 +34,9 @@ import {
   saveFeedBoardsAction,
   saveStoreAreaAction,
   saveStoreFeedAction,
+  saveStoreNoticeModeAction,
+  sendStartsExampleAction,
+  setNowHidesLotteriesAction,
   setStoreCodesAction,
 } from './actions';
 
@@ -185,6 +190,7 @@ export function StoreAreaForm({
       <CardHeader>
         <CardTitle>{t('area')}</CardTitle>
         <CardDescription>
+          {t('areaInfo')}{' '}
           {area.travel && travelling ? t('travelOn', { until: area.travel.until }) : t('homeOn')}
           {active.mode === 'distance' ? ` ${t('withinKm', { km: active.km })}` : ''}
         </CardDescription>
@@ -247,7 +253,7 @@ export function StoreAreaForm({
                 ? setChoice({ mode: 'stores', storeIds: stores.filter(on).map((s) => s.id) })
                 : locate()
             }
-            className="h-9 w-56"
+            className="h-9 w-44"
             aria-label={t('mode')}
           >
             <option value="stores">{t('modeStores')}</option>
@@ -366,14 +372,20 @@ export function StoreAreaForm({
                           <span className="text-xs text-primary">{t('addedByHand')} </span>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          {[s.chain, s.region, km !== null ? t('km', { km: km.toFixed(1) }) : null]
+                          {[
+                            s.chainKey === PLACE ? null : s.chain,
+                            s.region,
+                            km !== null ? t('km', { km: km.toFixed(1) }) : null,
+                          ]
                             .filter(Boolean)
                             .join(' · ')}
                         </span>
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {t('codes')}: {s.codes.join(', ') || '-'}
-                      </p>
+                      {s.codes.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {t('codes')}: {s.codes.join(', ')}
+                        </p>
+                      )}
                     </div>
                   </li>
                 );
@@ -537,6 +549,96 @@ export function FeedAlerts({ prefs: saved }: { prefs: StoreFeedPrefs | null }) {
       </label>
       <p className="text-xs text-muted-foreground">{t('feedAlertsInfo')}</p>
     </div>
+  );
+}
+
+/** How the person is told about their stores, and whether lotteries stay on Now (S29). */
+export function StoreNoticeChoice({
+  mode: savedMode,
+  hideLotteries: savedHide,
+  paused,
+}: {
+  mode: StoreNoticeMode;
+  hideLotteries: boolean;
+  /** The tracker is down: no messages whatever the choice. */
+  paused: boolean;
+}) {
+  const t = useTranslations('stores');
+  const [mode, setMode] = useState(savedMode);
+  const [hide, setHide] = useState(savedHide);
+  const [pending, startTransition] = useTransition();
+  const [tested, setTested] = useState<number | null>(null);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('noticeChoice.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className={cn('space-y-3 text-sm', pending && 'opacity-70')}>
+        {paused && mode !== 'off' && <p className="text-destructive">{t('noticeChoice.paused')}</p>}
+        <div className="grid gap-3 md:grid-cols-3">
+          {STORE_NOTICE_MODES.map((m) => (
+            <label key={m} className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="storeNoticeMode"
+                className="mt-0.5 size-4"
+                checked={mode === m}
+                onChange={() => {
+                  setMode(m);
+                  startTransition(() => saveStoreNoticeModeAction(m));
+                }}
+              />
+              <span>
+                {t(`noticeChoice.${m}`)}
+                <span className="block text-xs text-muted-foreground">
+                  {t(`noticeChoice.${m}Info`)}
+                </span>
+                {m === 'starts' && (
+                  <span className="block text-xs text-muted-foreground">
+                    {t('noticeChoice.startsInfo2')}
+                  </span>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => setTested((await sendStartsExampleAction()).sent))
+            }
+          >
+            {t('noticeChoice.test')}
+          </Button>
+          {tested !== null && (
+            <span role="status" className="text-xs text-muted-foreground">
+              {t('noticeChoice.tested', { n: tested })}
+            </span>
+          )}
+        </div>
+        <label className="flex items-start gap-2 border-t pt-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4"
+            checked={hide}
+            onChange={(e) => {
+              setHide(e.target.checked);
+              startTransition(() => setNowHidesLotteriesAction(e.target.checked));
+            }}
+          />
+          <span>
+            {t('hideLotteries')}
+            <span className="block text-xs text-muted-foreground">
+              {t('noticeChoice.hideLotteriesInfo')}
+            </span>
+          </span>
+        </label>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -704,9 +806,7 @@ export function AddGlossary() {
   const t = useTranslations('stores');
   const [code, setCode] = useState('');
   const [meaning, setMeaning] = useState('');
-  const [kind, setKind] = useState<'other' | 'product' | 'chain' | 'lottery' | 'notLottery'>(
-    'other',
-  );
+  const [kind, setKind] = useState<Parameters<typeof addGlossaryAction>[2]>('other');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   return (
@@ -736,18 +836,23 @@ export function AddGlossary() {
         placeholder={t('meaning')}
         className="h-8 min-w-48 flex-1"
       />
-      <NativeSelect
-        value={kind}
-        onChange={(e) => setKind(e.target.value as typeof kind)}
-        className="h-8 w-32"
-        aria-label={t('codeKind')}
-      >
-        <option value="other">{t('codeKindOther')}</option>
-        <option value="product">{t('isProduct')}</option>
-        <option value="chain">{t('codeKindChain')}</option>
-        <option value="lottery">{t('codeKindLottery')}</option>
-        <option value="notLottery">{t('codeKindNotLottery')}</option>
-      </NativeSelect>
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        {t('codeKind')}
+        <NativeSelect
+          value={kind}
+          onChange={(e) => setKind(e.target.value as typeof kind)}
+          className="h-8 w-40"
+        >
+          <option value="other">{t('codeKindOther')}</option>
+          <option value="product">{t('isProduct')}</option>
+          <option value="chain">{t('codeKindChain')}</option>
+          <option value="lottery">{t('codeKindLottery')}</option>
+          <option value="notLottery">{t('codeKindNotLottery')}</option>
+          <option value="lotteryCue">{t('codeKindLotteryCue')}</option>
+          <option value="saleStart">{t('codeKindSaleStart')}</option>
+          <option value="notSaleStart">{t('codeKindNotSaleStart')}</option>
+        </NativeSelect>
+      </label>
       <Button type="submit" size="sm" disabled={pending}>
         {t('add')}
       </Button>

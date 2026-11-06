@@ -7,6 +7,7 @@ import {
   type StoreAreaChoice,
   type StoreFeedPrefs,
   STORE_NOTICE_KM,
+  STORE_NOTICE_MODES,
   type TrackingHours,
   roundPoint,
   toLocalIso,
@@ -22,6 +23,7 @@ import {
   removeGlossary,
   removeStore,
   saveTrackingHours,
+  sendStartsExample,
   setPreferences,
   setStoreCodes,
   trackNow,
@@ -29,6 +31,7 @@ import {
   setLotteryMark,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { alertContext } from '@/lib/alerts';
 import { authed } from '@/lib/auth/guard';
 import { LOTTERY_SHOWN, type PostsFilter, postViews } from './post-views';
 
@@ -67,6 +70,30 @@ export async function saveStoreAreaAction(area: StoreArea): Promise<{ error?: st
   });
   revalidatePath('/stores');
   return {};
+}
+
+/** What the person is sent about their stores (S29): their own preference, nothing else's. */
+export async function saveStoreNoticeModeAction(mode: string) {
+  const { db, user } = await authed();
+  const chosen = STORE_NOTICE_MODES.find((m) => m === mode);
+  if (!chosen) return;
+  await setPreferences(db, user.id, { storeNoticeMode: chosen });
+  revalidatePath('/stores');
+}
+
+/** Confirmed lotteries leave the person's Now page, or stay there (S29). */
+export async function setNowHidesLotteriesAction(on: boolean) {
+  const { db, user } = await authed();
+  await setPreferences(db, user.id, { nowHidesLotteries: on === true });
+  revalidatePath('/stores');
+}
+
+/** An example Sales starting message to the person's own channels; how many took it. */
+export async function sendStartsExampleAction(): Promise<{ sent: number }> {
+  const { db, user } = await authed();
+  const ctx = alertContext();
+  if (!ctx) return { sent: 0 };
+  return { sent: await sendStartsExample(db, user, ctx) };
 }
 
 /** Days a Now row's last opening is kept (the page shows today and yesterday). */
@@ -200,11 +227,21 @@ export async function forgetBoardAction(key: string) {
   revalidatePath('/stores');
 }
 
+type GlossaryKind =
+  | 'other'
+  | 'product'
+  | 'chain'
+  | 'lottery'
+  | 'notLottery'
+  | 'lotteryCue'
+  | 'saleStart'
+  | 'notSaleStart';
+
 /** A code that is no store or place, with its meaning (admins). */
 export async function addGlossaryAction(
   code: string,
   meaning: string,
-  kind: 'other' | 'product' | 'chain' | 'lottery' | 'notLottery' = 'other',
+  kind: GlossaryKind = 'other',
 ): Promise<{ error?: string }> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return { error: 'admin' };
@@ -222,7 +259,13 @@ export async function addGlossaryAction(
           ? { lottery: true }
           : kind === 'notLottery'
             ? { notLottery: true }
-            : {}),
+            : kind === 'lotteryCue'
+              ? { lotteryCue: true }
+              : kind === 'saleStart'
+                ? { saleStart: true }
+                : kind === 'notSaleStart'
+                  ? { notSaleStart: true }
+                  : {}),
   });
   await recordAdminChange(db, user.id, 'glossaryAdded', { code: c, meaning: m }, '/stores/area');
   revalidatePath('/stores');

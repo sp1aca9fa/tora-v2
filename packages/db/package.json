@@ -27,6 +27,7 @@
     "backup": "tsx src/scripts/backup.ts",
     "collect-request": "tsx src/scripts/collect-request.ts",
     "restore": "tsx src/scripts/restore.ts",
+    "stores-replay": "tsx src/scripts/stores-replay.ts",
     "stress-data": "tsx src/scripts/stress-data.ts"
   },
   "dependencies": {

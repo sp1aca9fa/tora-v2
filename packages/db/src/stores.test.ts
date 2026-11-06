@@ -1,8 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { toLocalIso } from '@tora/core';
-import { beforeEach, expect, it } from 'vitest';
+import { localDate, toLocalIso } from '@tora/core';
+import { eq } from 'drizzle-orm';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
@@ -33,14 +34,18 @@ import {
   saveTrackingHours,
   sendFeedMessages,
   sendStoreNotices,
+  confirmedLotteryPosts,
+  sendStartsExample,
   setLotteryMark,
   setStoreCodes,
   rematchPosts,
   storeCodes,
   storeGlossary,
   trackNow,
+  trackerState,
 } from './stores';
-import { storePosts } from './schema';
+import { storeNotices, storePosts, users } from './schema';
+import { replayMarkdown, replayNotices, replayTotals } from './stores-replay';
 import { createUser, setPreferences } from './users';
 
 const SECRET = 'x'.repeat(32);
@@ -717,4 +722,273 @@ it('pages the posts, newest first, all or those of some stores', async () => {
   const board = await postsPage(db, { offset: 0, limit: 10, chain: 'megastore' });
   expect(board.posts).toHaveLength(5);
   expect((await postsPage(db, { offset: 0, limit: 10, chain: null })).posts).toEqual([]);
+});
+
+describe('store notice choices (S29)', () => {
+  const area = { home: { mode: 'distance' as const, point: { lat: 35.69, lon: 139.7 }, km: 10 } };
+  const words = [
+    { code: 'started', meaning: 'x', saleStart: true },
+    { code: 'not started yet', meaning: 'x', notSaleStart: true },
+    { code: 'raffle', meaning: 'x', lottery: true },
+    { code: 'apply', meaning: 'x', lotteryCue: true },
+  ];
+  const by = (id: string, text: string, author: string, minutesAgo = 1, replyTo?: string) => ({
+    ...post(id, text, minutesAgo),
+    author,
+    ...(replyTo ? { replyTo } : {}),
+  });
+  const push = (posts: ReturnType<typeof by>[], at = now) =>
+    receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts }, at);
+  const start = async (mode?: 'all' | 'starts' | 'off') => {
+    await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+    await setPreferences(db, uid, { storeArea: area, ...(mode ? { storeNoticeMode: mode } : {}) });
+    await saveGlossary(db, 'test', words);
+    await newFeedToken(db, uid);
+    await push([by('0', 'first page', 'x', 300)], new Date(now.getTime() - 1000));
+  };
+  const send = async (posts: ReturnType<typeof by>[], at = now, c = ctx) =>
+    sendStoreNotices(db, await push(posts, at), c, at);
+
+  it("'all' explicitly is the same as no choice, message for message", async () => {
+    const run = async (mode?: 'all') => {
+      const dir = await mkdtemp(join(tmpdir(), 'tora-all-'));
+      db = createDb({ url: `file:${join(dir, 'test.db')}` });
+      await migrateDb(db);
+      const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
+      uid = (await createUser(db, 'a', creds)).user.id;
+      await saveStores(db, 'test', [
+        {
+          key: 'kita',
+          chain: 'megastore',
+          name: 'メガストアKita',
+          codes: ['KTA'],
+          region: '東京都',
+          lat: 35.699,
+          lon: 139.774,
+        },
+      ]);
+      await start(mode);
+      sent = [];
+      await send([by('1', 'KTA started', 'a'), by('2', 'KTA more', 'b')]);
+      await send([by('3', 'still a line', 'c', 1, '1')]);
+      await send([by('4', 'KTA later', 'd')]);
+      await rm(dir, { recursive: true, force: true });
+      return sent;
+    };
+    const unset = await run();
+    expect(unset.length).toBe(2);
+    expect(await run('all')).toEqual(unset);
+  });
+
+  it("'all' does not read the new word kinds as codes around products", async () => {
+    await start();
+    await saveGlossary(db, 'test', [{ code: '開けた', meaning: 'x', saleStart: true }]);
+    await saveGlossary(db, 'feed:myboard', [{ code: '雪', meaning: 'Snow set', product: true }]);
+    await send([by('1', 'KTA 雪開けた', 'a')]);
+    // The word stays an ordinary word: a short code in that run is not taken for a product.
+    expect(sent.at(-1)).not.toContain('Snow set');
+  });
+
+  it("'off' sends no store notices", async () => {
+    await start('off');
+    expect(await send([by('1', 'KTA started', 'a')])).toBe(0);
+    expect(sent).toEqual([]);
+  });
+
+  it("'starts' sends for a start word, also in a reply, and not for other posts", async () => {
+    await start('starts');
+    expect(await send([by('1', 'KTA line forming', 'a')])).toBe(0);
+    expect(await send([by('2', 'KTA not started yet', 'b')])).toBe(0);
+    expect(await send([by('3', 'MID started', 'b')])).toBe(0); // out of the area
+    expect(await send([by('4', 'it started', 'c', 1, '1')])).toBe(1);
+    expect(sent.at(-1)).toContain('it started');
+  });
+
+  it("'starts' sends one short notice for ten people saying so, no thread, no pictures", async () => {
+    await start('starts');
+    const bodies: unknown[] = [];
+    const counted = (async (u: string, init?: RequestInit) => {
+      bodies.push(init?.body);
+      return fakeFetch(u, init);
+    }) as typeof fetch;
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...by(`t${i}`, `KTA started ${i}\nsecond line`, `p${i}`),
+      pictures: [{ bytes: Buffer.from('x'), contentType: 'image/png', url: 'https://x.test/1' }],
+    }));
+    expect(await send(ten, now, { ...ctx, fetch: counted })).toBe(1);
+    expect(bodies).toHaveLength(1);
+    expect(typeof bodies[0]).toBe('string'); // no files
+    expect(sent.at(-1)).toContain('KTA started');
+    expect(sent.at(-1)).not.toContain('second line');
+    expect(sent.at(-1)).not.toContain('example.com');
+    // Still quiet for that store.
+    expect(await send([by('after', 'KTA started again', 'q')])).toBe(0);
+  });
+
+  it("'starts' sends a burst: 3 different people within 15 minutes, from stored posts", async () => {
+    await start('starts');
+    expect(await send([by('1', 'KTA hm', 'a', 14)])).toBe(0);
+    expect(await send([by('2', 'KTA hm', 'a', 5)])).toBe(0);
+    expect(await send([by('3', 'KTA hm', 'b', 4)])).toBe(0);
+    expect(await send([by('4', 'KTA hm', 'c', 1)])).toBe(1);
+    expect(sent.at(-1)).toContain('3 people in 15 minutes');
+  });
+
+  it("'starts' sends again after a failed send, with the next post about the store", async () => {
+    await start('starts');
+    const refused = (async () => new Response('no', { status: 500 })) as unknown as typeof fetch;
+    expect(await send([by('1', 'KTA started', 'a')], now, { ...ctx, fetch: refused })).toBe(0);
+    expect(await send([by('2', 'KTA hm', 'b')])).toBe(1);
+    expect(sent.at(-1)).toContain('KTA started');
+  });
+
+  it("'starts' never fires on a confirmed lottery's thread, nor counts it in a burst", async () => {
+    await start('starts');
+    expect(await send([by('l', 'KTA raffle, apply', 'a')])).toBe(0);
+    expect(await send([by('l2', 'it started', 'b', 1, 'l')])).toBe(0);
+    expect(await send([by('l3', 'yes', 'c', 1, 'l2')])).toBe(0);
+    // Three lottery people and two others are not three others.
+    expect(await send([by('n1', 'KTA hm', 'd')])).toBe(0);
+    expect(await send([by('n2', 'KTA hm', 'e')])).toBe(0);
+    expect(await send([by('n3', 'KTA hm', 'f')])).toBe(1);
+  });
+
+  it("is per person: another person's choice and area stay theirs", async () => {
+    await start('starts');
+    const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
+    const other = (await createUser(db, 'b', creds)).user.id;
+    await addDiscordChannel(db, other, 'https://discord.com/api/webhooks/2/def', SECRET, fakeFetch);
+    await setPreferences(db, other, { storeArea: area });
+    // A post with no start word: only the person with no choice, on everything.
+    expect(await send([by('1', 'KTA hm', 'a')])).toBe(1);
+    await setPreferences(db, other, { storeArea: { home: { mode: 'stores', storeIds: [] } } });
+    // Out of the other's area now: only the person on 'starts'.
+    expect(await send([by('2', 'KTA started', 'b')])).toBe(1);
+  });
+
+  it("'starts' keeps a reply's products from a first post of an earlier push", async () => {
+    await start('starts');
+    await saveGlossary(db, 'feed:myboard', [
+      { code: 'X1', meaning: 'Snow set', product: true, byHand: true } as never,
+    ]);
+    await push([by('f', 'KTA X1', 'a')]);
+    const refused = (async () => new Response('no', { status: 500 })) as unknown as typeof fetch;
+    // The reply's notice fails, so it goes with a later push whose own threads do not name it.
+    expect(await send([by('r', 'it started', 'b', 1, 'f')], now, { ...ctx, fetch: refused })).toBe(
+      0,
+    );
+    expect(await send([by('n', 'KTA hm', 'c')])).toBe(1);
+    expect(sent.at(-1)).toContain('it started');
+    expect(sent.at(-1)).toContain('Snow set');
+  });
+
+  it("'starts' sends a start word that came in late, at its real time, on a later push", async () => {
+    await start('starts');
+    const r = await push([by('late', 'KTA started', 'a', 90)]);
+    expect(r.fresh).toHaveLength(1);
+    expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
+    const moment = Math.floor(
+      Date.parse(new Date(now.getTime() - 90 * 60_000).toISOString()) / 1000,
+    );
+    expect(sent.at(-1)).toContain(`<t:${moment}:t>`);
+  });
+
+  it("'all' and a first push still ignore a late post", async () => {
+    await start('all');
+    expect(await send([by('late', 'KTA started', 'a', 90)])).toBe(0);
+    await saveGlossary(db, 'x', []);
+    const first = await receivePush(
+      db,
+      uid,
+      { source: 'other', chain: 'megastore', posts: [by('z', 'KTA started', 'a', 90)] },
+      now,
+    );
+    expect(first.first).toBe(true);
+    await setPreferences(db, uid, { storeNoticeMode: 'starts' });
+    expect(await sendStoreNotices(db, first, ctx, now)).toBe(0);
+  });
+
+  it('sends the example to the person only, and says how many channels took it', async () => {
+    await start('off');
+    const [me] = await db.select().from(users).where(eq(users.id, uid));
+    expect(await sendStartsExample(db, me!, ctx)).toBe(1);
+    expect(sent.at(-1)).toContain('a test');
+  });
+
+  it('reads the newest feed across accounts, its time only, for an account with none', async () => {
+    expect((await trackerState(db)).feed).toBeNull();
+    await newFeedToken(db, uid);
+    expect((await trackerState(db)).feed).toBeNull(); // a token that never sent
+    await receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts: [] }, now);
+    const creds = { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] };
+    const other = (await createUser(db, 'b', creds)).user.id;
+    await newFeedToken(db, other);
+    const older = new Date(now.getTime() - 3600_000);
+    await receivePush(db, other, { source: 'myboard', chain: 'megastore', posts: [] }, older);
+    expect((await trackerState(db)).feed).toEqual({ at: toLocalIso(now) });
+  });
+
+  it('finds a confirmed lottery from a reply whose first post is older than the list', async () => {
+    await start();
+    await push([by('l', 'KTA raffle, apply', 'a', 3000)]);
+    const reply = await push([by('l2', 'I applied', 'b', 1, 'l')]);
+    const plain = await push([by('n', 'KTA hm', 'c')]);
+    const gone = await push([by('g', 'hello', 'd', 1, 'nobody')]);
+    const posts = [...reply.fresh, ...plain.fresh, ...gone.fresh];
+    const ids = await confirmedLotteryPosts(db, posts, await storeGlossary(db));
+    expect(ids).toEqual(new Set([reply.fresh[0]!.id]));
+    await saveGlossary(db, 'test', []);
+    expect((await confirmedLotteryPosts(db, posts, await storeGlossary(db))).size).toBe(0);
+  });
+
+  it('replays what would be sent, the same as sending, and changes nothing', async () => {
+    await start('starts');
+    const later = (m: number) => new Date(now.getTime() + m * 60_000);
+    const at = (m: number) => later(m).toISOString();
+    const steps: [ReturnType<typeof by>[], Date][] = [
+      [[by('1', 'KTA hm', 'a')], now],
+      [[by('2', 'KTA started', 'b')], now],
+      [[by('3', 'KTA started', 'c')], now],
+      [[{ ...by('r', 'KTA raffle, apply', 'd'), postedAt: at(40) }], later(40)],
+      [[{ ...by('4', 'KTA started', 'e'), postedAt: at(70) }], later(71)],
+      [[{ ...by('5', 'it went', 'f', 1, '4'), postedAt: at(72) }], later(72)],
+    ];
+    let live = 0;
+    for (const [posts, when] of steps) live += await send(posts, when);
+    const before = {
+      posts: await db.select().from(storePosts),
+      user: await db.select().from(users),
+      notices: await db.select().from(storeNotices),
+    };
+    sent = [];
+    const day = localDate(now);
+    const r = await replayNotices(db, { username: 'a', from: day, to: day });
+    const totals = replayTotals(r);
+    expect(live).toBe(2);
+    expect(totals.starts).toBe(live);
+    expect(totals.off).toBe(0);
+    expect(totals.all).toBeGreaterThan(totals.starts);
+    expect(r.starts.map((s) => s.why)).toEqual(['word', 'word']);
+    expect(r.leavingNow).toMatchObject([{ replies: 0, line: 'KTA raffle, apply' }]);
+    expect(r.notSent[0]!.threads.map((t) => t.line)).toContain('KTA hm');
+    expect(replayMarkdown(r, 'T')).toContain('## Messages per day');
+    // Sent nothing, wrote nothing.
+    expect(sent).toEqual([]);
+    expect(await db.select().from(storePosts)).toEqual(before.posts);
+    expect(await db.select().from(users)).toEqual(before.user);
+    expect(await db.select().from(storeNotices)).toEqual(before.notices);
+    await expect(replayNotices(db, { username: 'nobody' })).rejects.toThrow('no user');
+  });
+
+  it('replays without looking ahead: a post received later makes no earlier burst', async () => {
+    await start('starts');
+    const later = new Date(now.getTime() + 60 * 60_000);
+    await push([by('a', 'KTA hm', 'a', 2)]);
+    await push([by('b', 'KTA hm', 'b', 1)]);
+    await push([by('c', 'KTA hm', 'c', 3)], later);
+    const day = localDate(now);
+    const r = await replayNotices(db, { username: 'a', from: day, to: day });
+    // The third came in an hour late: too old to make a notice, as in sendStoreNotices.
+    expect(replayTotals(r).starts).toBe(0);
+  });
 });

@@ -31,7 +31,12 @@ export default async function StoreCodesPage() {
   const products = listed
     .filter((g) => g.product)
     .sort((a, b) => Number(!!a.hidden) - Number(!!b.hidden) || Number(b.byHand) - Number(a.byHand));
-  const glossary = listed.filter((g) => !g.product);
+  const isWord = (g: (typeof listed)[number]) =>
+    g.lottery || g.notLottery || g.lotteryCue || g.saleStart || g.notSaleStart;
+  const glossary = listed.filter((g) => !g.product && !isWord(g));
+  const wordKinds = (['saleStart', 'notSaleStart', 'lottery', 'lotteryCue', 'notLottery'] as const)
+    .map((kind) => ({ kind, words: listed.filter((g) => g[kind]) }))
+    .filter((k) => k.words.length);
   /** Remove (an admin's code) or turn off / on (a store list's or feed's). */
   const change = (g: (typeof codesList)[number]) =>
     admin &&
@@ -54,7 +59,8 @@ export default async function StoreCodesPage() {
           <CardDescription>{t('codesInfo')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="max-h-[32rem] overflow-y-auto">
+          {/* On a phone the page itself scrolls: a box inside it cut rows in two. */}
+          <div className="sm:max-h-[32rem] sm:overflow-y-auto">
             <table className="w-full text-sm">
               <tbody>
                 {codes.map((c) => (
@@ -101,29 +107,46 @@ export default async function StoreCodesPage() {
             {glossary.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t('noOtherCodes')}</p>
             ) : (
-              <table className="w-full text-sm">
-                <tbody>
-                  {glossary.map((g) => (
-                    <tr
-                      key={`${g.code}|${g.byHand}`}
-                      className={cn('border-t align-top', g.hidden && 'opacity-60')}
-                    >
-                      <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
-                      <td className="py-1.5 text-xs text-muted-foreground">
-                        {g.meaning}
-                        {g.chain && ` · ${t('chainCode')}`}
-                        {g.lottery && ` · ${t('codeKindLottery')}`}
-                        {g.notLottery && ` · ${t('codeKindNotLottery')}`}
-                        {g.hidden && ` · ${t('codeIsOff')}`}
-                      </td>
-                      <td className="py-1.5 text-right">{change(g)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="max-h-[32rem] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {glossary.map((g, i) => (
+                      <tr
+                        key={`${g.code}|${g.byHand}|${i}`}
+                        className={cn('border-t align-top', g.hidden && 'opacity-60')}
+                      >
+                        <td className="w-px py-1.5 pr-3 whitespace-nowrap">{g.code}</td>
+                        <td className="py-1.5 text-xs text-muted-foreground">
+                          {g.meaning}
+                          {g.chain && ` · ${t('chainCode')}`}
+                          {g.hidden && ` · ${t('codeIsOff')}`}
+                        </td>
+                        <td className="py-1.5 text-right">{change(g)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-            {admin && <AddGlossary />}
           </div>
+          {wordKinds.map(({ kind, words }) => (
+            <div key={kind} className="space-y-1.5">
+              <h3 className="text-sm font-medium">{t(`wordKind.${kind}`)}</h3>
+              <p className="text-xs text-muted-foreground">{t(`wordKind.${kind}Info`)}</p>
+              <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                {words.map((g, i) => (
+                  <li
+                    key={`${g.code}|${g.byHand}|${i}`}
+                    className={cn('flex items-baseline gap-1.5', g.hidden && 'opacity-60')}
+                  >
+                    {g.code}
+                    {change(g)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {admin && <AddGlossary />}
         </CardContent>
       </Card>
       {views && (
@@ -137,19 +160,21 @@ export default async function StoreCodesPage() {
               <StoreCodesList stores={views} />
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('addTitle')}</CardTitle>
-              <CardDescription>{t('addInfo')}</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <details className="group rounded-xl border bg-card">
+            <summary className="cursor-pointer list-none px-6 py-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex h-8 items-center rounded-md border px-3 group-open:border-transparent group-open:px-0">
+                {t('addTitle')}
+              </span>
+            </summary>
+            <div className="space-y-3 px-6 pb-6">
+              <p className="text-sm text-muted-foreground">{t('addInfo')}</p>
               <AddStoreForm
                 chains={[
                   ...new Map(all.map((s) => [s.chain, s.chainLabel ?? s.chain])).entries(),
                 ].map(([chain, label]) => ({ chain, label }))}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </details>
         </div>
       )}
     </div>

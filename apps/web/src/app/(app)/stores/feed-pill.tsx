@@ -6,33 +6,10 @@ import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { trackNowAction } from './actions';
+import { type FeedState, SILENT_MS, type Tracking, clock, feedDown } from './feed-state';
 
-/** The feed as /api/stores/state reports it (null: it never sent anything). */
-interface FeedState {
-  at: string;
-  source: string | null;
-  board: string | null;
-  posts: number;
-  next: { board: string | null; at: string } | null;
-  watched: { key: string; readAt: string | null }[];
-}
-
-/** Whether the board tracker reads now (its working hours), as /api/stores/state reports it. */
-interface Tracking {
-  on: boolean;
-  why: 'always' | 'hours' | 'hour' | 'untilStart' | 'outside';
-  until: string | null;
-  resumeAt: string | null;
-  since: string | null;
-  hours: { from: string; to: string } | null;
-}
-
-/** A feed or a watched board silent this long is stopped (as on the Feed page). */
-const SILENT_MS = 10 * 60_000;
 /** After its next read was due, how long the feed may take to load, read and send. */
 const DUE_MS = 90_000;
-
-const clock = (at: string) => at.slice(11, 16);
 
 /**
  * The store feed at a glance on every Stores page (S25): a pill in a corner saying whether it
@@ -76,11 +53,7 @@ export function FeedPill({ admin }: { admin: boolean }) {
   }, [asked]);
   if (feed === undefined || !now) return null;
 
-  const stopped = tracking && !tracking.on;
-  // Silence counts from the start of the tracking hours: the feed rested before.
-  const since = tracking?.on && tracking.since ? Date.parse(tracking.since) : 0;
-  const heard = feed ? Math.max(Date.parse(feed.at), since) : 0;
-  const silent = !stopped && !!feed && now - heard > SILENT_MS;
+  const { stopped, silent, since, down } = feedDown(feed, tracking, now);
   const starting = !stopped && !!feed && Date.parse(feed.at) < since;
 
   let tone: 'ok' | 'reading' | 'late' | 'silent' | 'none' | 'stopped';
@@ -148,14 +121,14 @@ export function FeedPill({ admin }: { admin: boolean }) {
           <p className="text-base font-bold sm:text-lg">
             {stopped
               ? t('stoppedTitle', {
-                  hours: tracking.hours ? `${tracking.hours.from}-${tracking.hours.to}` : '-',
+                  hours: tracking!.hours ? `${tracking!.hours.from}-${tracking!.hours.to}` : '-',
                 })
               : t('silentTitle', { time: clock(feed!.at) })}
           </p>
           <p className="text-sm">
             {stopped
-              ? tracking.resumeAt
-                ? t('resumes', { time: clock(tracking.resumeAt) })
+              ? tracking!.resumeAt
+                ? t('resumes', { time: clock(tracking!.resumeAt) })
                 : null
               : t('silentInfo')}
           </p>
@@ -169,14 +142,14 @@ export function FeedPill({ admin }: { admin: boolean }) {
               >
                 {t('trackHour')}
               </Button>
-              {tracking.resumeAt && (
+              {tracking!.resumeAt && (
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={pending}
                   onClick={() => track('untilStart')}
                 >
-                  {t('trackUntilStart', { time: clock(tracking.resumeAt) })}
+                  {t('trackUntilStart', { time: clock(tracking!.resumeAt!) })}
                 </Button>
               )}
             </div>
@@ -188,32 +161,35 @@ export function FeedPill({ admin }: { admin: boolean }) {
           {t('extra', { time: clock(tracking.until) })}
         </p>
       )}
-      <Link
-        href="/stores/feed"
-        aria-live="polite"
-        className={cn(
-          'fixed right-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-20 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-2xl border sm:rounded-full bg-card/95 px-3 py-1.5 text-xs tabular-nums shadow-md backdrop-blur md:right-4 md:bottom-4',
-          tone === 'late' && 'border-amber-500/60',
-          (tone === 'silent' || tone === 'stopped') && 'border-destructive/60 text-destructive',
-        )}
-      >
-        <span
-          aria-hidden
+      {/* The alert above says it all when the tracker is down: one alert, no pill beside it. */}
+      {!down && (
+        <Link
+          href="/stores/feed"
+          aria-live="polite"
           className={cn(
-            'size-2 shrink-0 rounded-full',
-            tone === 'ok' && 'bg-green-600',
-            tone === 'reading' && 'animate-pulse bg-green-600',
-            tone === 'late' && 'bg-amber-500',
-            (tone === 'silent' || tone === 'stopped') && 'bg-destructive',
-            tone === 'none' && 'bg-muted-foreground/40',
+            'fixed right-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-20 flex max-w-[70vw] sm:max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-2xl border sm:rounded-full bg-card/95 px-3 py-1.5 text-xs tabular-nums shadow-md backdrop-blur md:right-4 md:bottom-4',
+            tone === 'late' && 'border-amber-500/60',
+            (tone === 'silent' || tone === 'stopped') && 'border-destructive/60 text-destructive',
           )}
-        />
-        <span className="line-clamp-2 sm:truncate">
-          {lead && <span className="max-sm:hidden">{lead} · </span>}
-          {text}
-          {tone === 'reading' && <span className="feed-dots" aria-hidden />}
-        </span>
-      </Link>
+        >
+          <span
+            aria-hidden
+            className={cn(
+              'size-2 shrink-0 rounded-full',
+              tone === 'ok' && 'bg-green-600',
+              tone === 'reading' && 'animate-pulse bg-green-600',
+              tone === 'late' && 'bg-amber-500',
+              (tone === 'silent' || tone === 'stopped') && 'bg-destructive',
+              tone === 'none' && 'bg-muted-foreground/40',
+            )}
+          />
+          <span className="line-clamp-2 sm:truncate">
+            {lead && <span className="max-sm:hidden">{lead} · </span>}
+            {text}
+            {tone === 'reading' && <span className="feed-dots" aria-hidden />}
+          </span>
+        </Link>
+      )}
     </>
   );
 }

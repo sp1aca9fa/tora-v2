@@ -4,15 +4,29 @@ import {
   type CodeMeaning,
   DEFAULT_FEED_PREFS,
   PLACE,
+  STORE_FRESH_MINUTES,
+  canConfirmLottery,
   chainsInPost,
   type StoreEntry,
   fillText,
+  isWordOnly,
   linesNotice,
   localDate,
   locationsOf,
+  lotteryPostIds,
+  noticeablePosts,
+  postRef,
+  postedStores,
+  postsToTell,
   productsInPost,
+  salesStarting,
+  startsReadSince,
+  startsPosts,
   storeNotice,
+  storeNoticeModeOf,
   storeLabelIn,
+  storeStartsExample,
+  storeStartsNotice,
   storeUnknownNotice,
   storesInArea,
   storesInPost,
@@ -24,7 +38,19 @@ import {
   trackingState,
   withinHours,
 } from '@tora/core';
-import { and, desc, eq, gte, inArray, isNull, lt, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   type AlertContext,
@@ -53,10 +79,6 @@ import {
 
 /** The Now page's row of posts naming only areas (apps/web stores/page.tsx). */
 const UNKNOWN_SHOP_ROW = 'unknown-shop';
-/** Posts this old or older make no notice (a feed's first push brings a page of old ones). */
-const FRESH_MINUTES = 30;
-/** Posts about one store within this time after a notice make no new one. */
-const QUIET_MINUTES = 30;
 const POSTS_PER_PUSH = 200;
 /** A push this long all new (one pinned post aside) counts as a page turned over. */
 const GAP_MIN_POSTS = 10;
@@ -66,6 +88,8 @@ const IMAGE_MAX_BYTES = 8_000_000;
 const IMAGE_DAYS = 7;
 /** Pictures attached to one notice at most (Discord's and Telegram's limit). */
 const IMAGES_PER_NOTICE = 10;
+/** How far up a thread its first post is looked for. */
+const THREAD_STEPS = 5;
 
 /** A store as a directory plug-in lists it: its key there and what it is. */
 export interface ListedStore extends StoreEntry {
@@ -621,7 +645,7 @@ export async function sendFeedMessages(
   ctx: AlertContext,
   now = new Date(),
 ): Promise<number> {
-  const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
+  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
   const unknownPosts = received.first
     ? []
     : received.fresh.filter((p) => !p.storeIds.length && !p.replyTo && p.postedAt >= since);
@@ -900,7 +924,9 @@ function storeLabel(store: Store, t: AlertTexts, locale: string): string {
  * Notices of new posts and replies naming a store of a person's area (posts of the last 30 minutes,
  * none for a feed's first push). A post: one per store every 30 minutes. A reply (a comment on a
  * post, e.g. "still a line", "sold out"): every one at once, marked as a comment to its post. Each
- * names the time, the store and the products its codes stand for, then the post as written.
+ * names the time, the store and the products its codes stand for, then the post as written. That
+ * is the 'all' choice (the default). 'starts' (S29): only sales starting, one short notice per store
+ * per quiet time, read from stored posts. 'off': none.
  */
 export async function sendStoreNotices(
   db: Db,
@@ -909,9 +935,10 @@ export async function sendStoreNotices(
   now = new Date(),
 ): Promise<number> {
   if (received.first) return 0;
-  const since = toLocalIso(new Date(now.getTime() - FRESH_MINUTES * 60_000));
-  const posts = received.fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
-  if (!posts.length) return 0;
+  const posts = noticeablePosts(received.fresh, now);
+  // 'starts' takes a start word up to 2 hours late; everything else stays on `posts`.
+  const newer = startsPosts(received.fresh, now);
+  if (!newer.length) return 0;
   const all = await cachedStores(db);
   const byId = new Map(all.map((s) => [s.id, s]));
   const locationOf = locationsOf(all);
@@ -919,13 +946,12 @@ export async function sendStoreNotices(
     (u) => u.preferences?.storeArea,
   );
   const today = localDate(now);
-  const quiet = toLocalIso(new Date(now.getTime() - QUIET_MINUTES * 60_000));
   const base = await appUrl(db);
   // Products by their codes; other codes (stores, states) only help read the runs around them.
   const glossary = await storeGlossary(db);
   const others = [
     ...all.flatMap((s) => [s.name, ...storeCodes(s)]),
-    ...glossary.filter((g) => !g.product && !g.notLottery).map((g) => g.code),
+    ...glossary.filter((g) => !g.product && !isWordOnly(g)).map((g) => g.code),
   ];
   const named = (text: string) => productsInPost(text, glossary, others).map((g) => g.meaning);
   // A reply naming no product takes its thread's (the first post's).
@@ -941,81 +967,158 @@ export async function sendStoreNotices(
       : []
     ).map((r) => [r.id, r.text]),
   );
+  /** A starts notice can show a post of an earlier push: its thread's first post too. */
+  const readFirsts = async (list: StorePost[]) => {
+    for (const source of new Set(list.map((p) => p.source))) {
+      const ids = [
+        ...new Set(
+          list.flatMap((p) =>
+            p.source === source && p.thread && !firsts.has(p.thread) ? [p.thread] : [],
+          ),
+        ),
+      ];
+      if (!ids.length) continue;
+      const rows = await db
+        .select({ id: storePosts.externalId, text: storePosts.text })
+        .from(storePosts)
+        .where(and(eq(storePosts.source, source), inArray(storePosts.externalId, ids)));
+      for (const r of rows) firsts.set(r.id, r.text);
+    }
+  };
+  const places = new Set(all.filter((s) => s.chain === PLACE).map((s) => s.id));
   // The posts' pictures, attached to the notices that carry them.
   const pictures = await imagesOf(
     db,
     posts.map((p) => p.id),
   );
-  let sent = 0;
-  for (const user of people) {
-    const area = storesInArea(user.preferences!.storeArea, all, today);
-    const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
-    if (!mine.length) continue;
-    const storeIds = [...new Set(mine.filter((p) => !p.replyTo).flatMap((p) => p.storeIds))].filter(
-      (id) => area.has(id),
-    );
-    const last = new Map(
+  // A card per location (the Now page's rows), a section per store; posts naming only areas open
+  // the page's "area known" row.
+  const postData = (p: StorePost, ids: string[], t: AlertTexts, locale: string) => {
+    const title = (s: Store) =>
+      s.chain === PLACE ? (storeLabelIn(s, locale) ?? s.name) : storeLabel(s, t, locale);
+    const areasOnly = ids.every((id) => byId.get(id)?.chain === PLACE);
+    // A chain named with only areas: its branch there.
+    const chains = areasOnly ? chainsInPost(p.text, glossary) : [];
+    let products = named(p.text);
+    if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
+    return ids.map((id) => {
+      const at = byId.get(locationOf.get(id) ?? id) ?? byId.get(id)!;
+      const row = areasOnly ? UNKNOWN_SHOP_ROW : at.id;
+      return {
+        key: `${p.source}:${p.externalId}`,
+        thread: p.thread ? `${p.source}:${p.thread}` : null,
+        location: {
+          id: at.id,
+          title: title(at),
+          url: base ? `${base}/stores?open=${encodeURIComponent(row)}` : null,
+        },
+        store: chains.length
+          ? chains
+              .map((c) => `${c} · ${storeLabelIn(byId.get(id)!, locale) ?? byId.get(id)!.name}`)
+              .join(', ')
+          : storeLabel(byId.get(id)!, t, locale),
+        products,
+        text: p.text,
+        // "18:00", as the Now page shows it.
+        when: p.postedAt.slice(11, 16),
+        at: p.postedAt,
+        url: p.url,
+        comment: !!p.replyTo,
+        threadText: p.thread ? (firsts.get(p.thread) ?? null) : null,
+      };
+    });
+  };
+  const lastNotices = async (userId: string, storeIds: string[]) =>
+    new Map(
       (storeIds.length
         ? await db
             .select()
             .from(storeNotices)
-            .where(and(eq(storeNotices.userId, user.id), inArray(storeNotices.storeId, storeIds)))
+            .where(and(eq(storeNotices.userId, userId), inArray(storeNotices.storeId, storeIds)))
         : []
       ).map((n) => [n.storeId, n.sentAt]),
     );
+  // The quiet time starts only when a channel took the notice (a failed send goes again).
+  const startQuiet = async (userId: string, told: Iterable<string>) => {
+    for (const id of told) {
+      await db
+        .insert(storeNotices)
+        .values({ userId, storeId: id, sentAt: toLocalIso(now) })
+        .onConflictDoUpdate({
+          target: [storeNotices.userId, storeNotices.storeId],
+          set: { sentAt: toLocalIso(now) },
+        });
+    }
+  };
+  // Read once, only when someone chose 'starts'.
+  let startsData: Promise<{ recent: StorePost[]; lottery: Set<string> }> | null = null;
+  const readStartsData = async () => {
+    const recent = await db
+      .select()
+      .from(storePosts)
+      .where(
+        and(gte(storePosts.postedAt, startsReadSince(now)), sql`${storePosts.storeIds} <> '[]'`),
+      );
+    return {
+      recent,
+      lottery: await confirmedLotteryPosts(db, [...recent, ...newer], glossary),
+    };
+  };
+  let sent = 0;
+  for (const user of people) {
+    const mode = storeNoticeModeOf(user.preferences);
+    if (mode === 'off') continue;
+    const area = storesInArea(user.preferences!.storeArea, all, today);
+    if (mode === 'starts') {
+      const fromPush = newer.filter((p) => p.storeIds.some((id) => area.has(id)));
+      if (!fromPush.length) continue;
+      startsData ??= readStartsData();
+      const { recent, lottery } = await startsData;
+      const stores = [...new Set(fromPush.flatMap((p) => p.storeIds))].filter((id) => area.has(id));
+      const starts = salesStarting({
+        fresh: fromPush,
+        recent,
+        area,
+        places,
+        lottery,
+        last: await lastNotices(user.id, stores),
+        glossary,
+        now,
+      });
+      if (!starts.length) continue;
+      await readFirsts(starts.map((s) => s.post));
+      const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
+      const message = storeStartsNotice(
+        t,
+        starts.flatMap(({ storeId, post, people: n, line }) =>
+          postData(post, [storeId], t, locale).map((d) => ({ ...d, text: line, people: n })),
+        ),
+      );
+      if (!(await sendToUser(db, user.id, message, ctx))) continue;
+      sent++;
+      await startQuiet(
+        user.id,
+        starts.map((s) => s.storeId),
+      );
+      continue;
+    }
+    const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
+    if (!mine.length) continue;
+    const last = await lastNotices(user.id, postedStores(mine, area));
     const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
     // New posts: the latest per store not told within the quiet time; replies: all of them.
-    const told = new Set<string>();
-    const chosen: StorePost[] = [];
-    for (const id of storeIds) {
-      if ((last.get(id) ?? '') > quiet) continue;
-      const post = mine.filter((p) => !p.replyTo && p.storeIds.includes(id)).at(-1)!;
-      told.add(id);
-      if (!chosen.includes(post)) chosen.push(post);
-    }
-    chosen.push(...mine.filter((p) => p.replyTo));
+    const { chosen, told } = postsToTell(mine, area, last, now);
     if (!chosen.length) continue;
-    chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
-    // A card per location (the Now page's rows), a section per store; posts naming only areas
-    // open the page's "area known" row.
-    const title = (s: Store) =>
-      s.chain === PLACE ? (storeLabelIn(s, locale) ?? s.name) : storeLabel(s, t, locale);
     const message = storeNotice(
       t,
-      chosen.flatMap((p) => {
-        const ids = p.storeIds.filter((id) => area.has(id));
-        const areasOnly = ids.every((id) => byId.get(id)?.chain === PLACE);
-        // A chain named with only areas: its branch there.
-        const chains = areasOnly ? chainsInPost(p.text, glossary) : [];
-        let products = named(p.text);
-        if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
-        return ids.map((id) => {
-          const at = byId.get(locationOf.get(id) ?? id) ?? byId.get(id)!;
-          const row = areasOnly ? UNKNOWN_SHOP_ROW : at.id;
-          return {
-            key: `${p.source}:${p.externalId}`,
-            thread: p.thread ? `${p.source}:${p.thread}` : null,
-            location: {
-              id: at.id,
-              title: title(at),
-              url: base ? `${base}/stores?open=${encodeURIComponent(row)}` : null,
-            },
-            store: chains.length
-              ? chains
-                  .map((c) => `${c} · ${storeLabelIn(byId.get(id)!, locale) ?? byId.get(id)!.name}`)
-                  .join(', ')
-              : storeLabel(byId.get(id)!, t, locale),
-            products,
-            text: p.text,
-            // "18:00", as the Now page shows it.
-            when: p.postedAt.slice(11, 16),
-            at: p.postedAt,
-            url: p.url,
-            comment: !!p.replyTo,
-            threadText: p.thread ? (firsts.get(p.thread) ?? null) : null,
-          };
-        });
-      }),
+      chosen.flatMap((p) =>
+        postData(
+          p,
+          p.storeIds.filter((id) => area.has(id)),
+          t,
+          locale,
+        ),
+      ),
       base ? `${base}/stores` : null,
     );
     const images = chosen
@@ -1029,20 +1132,60 @@ export async function sendStoreNotices(
       )
       .slice(0, IMAGES_PER_NOTICE);
     if (images.length) message.images = images;
-    // The quiet time starts only when a channel took the notice (a failed send goes again).
     if (!(await sendToUser(db, user.id, message, ctx))) continue;
     sent++;
-    for (const id of told) {
-      await db
-        .insert(storeNotices)
-        .values({ userId: user.id, storeId: id, sentAt: toLocalIso(now) })
-        .onConflictDoUpdate({
-          target: [storeNotices.userId, storeNotices.storeId],
-          set: { sentAt: toLocalIso(now) },
-        });
-    }
+    await startQuiet(user.id, told);
   }
   return sent;
+}
+
+/** The example of a Sales starting message, to the person's own channels; how many took it. */
+export async function sendStartsExample(
+  db: Db,
+  user: typeof users.$inferSelect,
+  ctx: AlertContext,
+): Promise<number> {
+  const base = await appUrl(db);
+  const notice = storeStartsExample(await textsFor(db, user, ctx), base ? `${base}/stores` : null);
+  return sendToUser(db, user.id, notice, ctx);
+}
+
+/**
+ * The ids of those posts that are a confirmed lottery or in one's thread (S29); the first posts of
+ * threads not among them are read, by their board's unique key. Nothing is read when the glossary
+ * cannot confirm a lottery; a thread whose first post is gone stays unsure.
+ */
+export async function confirmedLotteryPosts(
+  db: Pick<Db, 'select'>,
+  posts: StorePost[],
+  glossary: CodeMeaning[],
+): Promise<Set<string>> {
+  if (!canConfirmLottery(glossary)) return new Set();
+  const known = new Map<string, StorePost>(posts.map((p) => [postRef(p), p]));
+  // A reply's `thread` is its first post, or (the post answered unknown when it came) the post it
+  // answers: at most a few steps up.
+  for (let step = 0; step < THREAD_STEPS; step++) {
+    const wanted = new Map<string, Set<string>>();
+    for (const p of known.values()) {
+      if (!p.replyTo) continue;
+      for (const id of [p.thread ?? p.replyTo, p.replyTo]) {
+        if (known.has(`${p.source}|${id}`)) continue;
+        wanted.set(p.source, (wanted.get(p.source) ?? new Set()).add(id));
+      }
+    }
+    if (!wanted.size) break;
+    let found = 0;
+    for (const [source, ids] of wanted) {
+      const rows = await db
+        .select()
+        .from(storePosts)
+        .where(and(eq(storePosts.source, source), inArray(storePosts.externalId, [...ids])));
+      for (const r of rows) known.set(postRef(r), r);
+      found += rows.length;
+    }
+    if (!found) break;
+  }
+  return lotteryPostIds(posts, known, glossary);
 }
 
 /** The pictures of these posts (by post id), in their order. */
@@ -1300,6 +1443,30 @@ export async function storesState(db: Db, userId: string) {
           })),
         }
       : null,
+  };
+}
+
+/**
+ * Whether Tora can hear the boards at all, for lines any account sees: the tracking hours and the
+ * time of the newest push from any account's feed (store notices go to everyone from those). Only
+ * that time crosses accounts: no board, no source.
+ */
+export async function trackerState(db: Pick<Db, 'select'>) {
+  const [[newest], tracking] = await Promise.all([
+    db
+      .select({ at: feedTokens.lastSeenAt })
+      .from(feedTokens)
+      .where(isNotNull(feedTokens.lastSeenAt))
+      .orderBy(desc(feedTokens.lastSeenAt))
+      .limit(1),
+    readTracking(db),
+  ]);
+  return {
+    feed: newest?.at ? { at: newest.at } : null,
+    tracking: {
+      ...trackingState(tracking),
+      hours: tracking.hours ? { from: tracking.hours.from, to: tracking.hours.to } : null,
+    },
   };
 }
 

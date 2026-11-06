@@ -1,5 +1,6 @@
 // Store notices (requirements S25): physical stores, the area a person watches, and which stores a
 // post (a sighting of cards on sale) is about.
+import { toLocalIso } from './time';
 
 /** A physical store, as a store directory plug-in or the admin describes it. */
 export interface StoreEntry {
@@ -201,7 +202,23 @@ export interface CodeMeaning {
    * it are left off Stores > Lotteries (2026-10-31). Never shown as a post's code.
    */
   notLottery?: boolean;
+  /**
+   * A word saying a sale has begun ("started"): such a post sends a notice at once to people who
+   * chose only sales starting (S29). Never shown as a post's code.
+   */
+  saleStart?: boolean;
+  /** A phrase saying it has not ("not started yet"): the post sends no notice for its words. */
+  notSaleStart?: boolean;
+  /**
+   * An application word ("apply", "deadline"): with a lottery word, the post is a lottery's own
+   * announcement and can leave Now (S29). Never shown as a post's code.
+   */
+  lotteryCue?: boolean;
 }
+
+/** Glossary entries that only steer notices and lists: never a post's code, never a product's run. */
+export const isWordOnly = (g: CodeMeaning): boolean =>
+  !!(g.notLottery || g.saleStart || g.notSaleStart || g.lotteryCue);
 
 /**
  * The codes of the stores and places, each with what it stands for: the ones that are not just
@@ -386,4 +403,301 @@ export function productsInPost(
     }
   }
   return found;
+}
+
+// ---- Sales starting and confirmed lotteries (requirements S29) ----
+
+/** Posts this old or older make no notice (a feed's first push brings a page of old ones). */
+export const STORE_FRESH_MINUTES = 30;
+/** Posts about one store within this time after a notice make no new one. */
+export const STORE_QUIET_MINUTES = 30;
+/** S29: how late a start word may reach Tora and still be told, at its real time. */
+export const STORE_LATE_WORD_MINUTES = 120;
+/** S29: this many different authors on one store, within this time, is a burst, whatever the words. */
+export const BURST_AUTHORS = 3;
+export const BURST_MINUTES = 15;
+/** The cut of a post's first line in a short notice (S29: about 80 characters). */
+const FIRST_LINE_CHARS = 80;
+
+/** What a person is sent about their stores: everything (the default), only starts, or nothing. */
+export const STORE_NOTICE_MODES = ['all', 'starts', 'off'] as const;
+export type StoreNoticeMode = (typeof STORE_NOTICE_MODES)[number];
+
+/** A person's choice; none or anything unknown (an old account file) is today's: everything. */
+export function storeNoticeModeOf(prefs: { storeNoticeMode?: unknown } | null | undefined) {
+  return STORE_NOTICE_MODES.find((m) => m === prefs?.storeNoticeMode) ?? 'all';
+}
+
+type WordKind = 'lottery' | 'notLottery' | 'saleStart' | 'notSaleStart' | 'lotteryCue';
+
+/** Whether a text uses a word of this kind, as codes are found: Latin ones as whole words. */
+const usesWord = (text: string, glossary: CodeMeaning[], kind: WordKind) => {
+  const t = norm(text);
+  return glossary.some((g) => g[kind] && mentions(t, g.code));
+};
+
+/** S29 (a): a sale start word and no not-start phrase. */
+export const hasSaleStart = (text: string, glossary: CodeMeaning[]): boolean =>
+  usesWord(text, glossary, 'saleStart') && !usesWord(text, glossary, 'notSaleStart');
+
+/**
+ * S29: a lottery's own announcement: a first post (not a reply) with a lottery word, an application
+ * cue, no "not a lottery" phrase and no sale starting. A post only mentioning a lottery, or also
+ * saying something is on sale, is not one: unsure stays.
+ */
+export const confirmedLottery = (
+  post: { text: string; replyTo?: string | null },
+  glossary: CodeMeaning[],
+): boolean =>
+  !post.replyTo &&
+  usesWord(post.text, glossary, 'lottery') &&
+  usesWord(post.text, glossary, 'lotteryCue') &&
+  !usesWord(post.text, glossary, 'notLottery') &&
+  !hasSaleStart(post.text, glossary);
+
+/** Without both kinds of word nothing can be confirmed: callers spare their reads. */
+export const canConfirmLottery = (glossary: CodeMeaning[]): boolean =>
+  glossary.some((g) => g.lottery) && glossary.some((g) => g.lotteryCue);
+
+/** A post with what places it in a thread. */
+export interface ThreadedPost {
+  id: string;
+  source: string;
+  externalId: string;
+  text: string;
+  replyTo: string | null;
+  thread: string | null;
+}
+
+export const postRef = (p: { source: string; externalId: string }) => `${p.source}|${p.externalId}`;
+
+/**
+ * The ids of those `posts` that are a confirmed lottery or in one's thread (replies to replies too).
+ * `known` holds the posts answered (by `postRef`); a thread whose first post is not known is
+ * unsure, so it stays.
+ */
+export function lotteryPostIds<T extends ThreadedPost>(
+  posts: T[],
+  known: Map<string, ThreadedPost>,
+  glossary: CodeMeaning[],
+): Set<string> {
+  const out = new Set<string>();
+  if (!canConfirmLottery(glossary)) return out;
+  for (const post of posts) {
+    let at: ThreadedPost | undefined = post;
+    const seen = new Set<string>();
+    while (at?.replyTo && !seen.has(at.id)) {
+      seen.add(at.id);
+      at =
+        known.get(`${at.source}|${at.thread ?? at.replyTo}`) ??
+        known.get(`${at.source}|${at.replyTo}`);
+    }
+    if (at && !at.replyTo && confirmedLottery(at, glossary)) out.add(post.id);
+  }
+  return out;
+}
+
+/**
+ * The most different authors in any window of BURST_MINUTES (both ends counted) holding the moment
+ * `at`. The same author twice counts once; every post with no author together counts as one
+ * author, never many. Moments are compared as instants, so the time zone's offset plays no part.
+ */
+export function burstAuthors(
+  posts: { author: string | null; postedAt: string }[],
+  at: string,
+): number {
+  const moment = Date.parse(at);
+  if (!Number.isFinite(moment)) return 0;
+  const span = BURST_MINUTES * 60_000;
+  const timed = posts
+    .map((p) => ({ when: Date.parse(p.postedAt), who: norm(p.author ?? '').trim() }))
+    .filter((p) => Number.isFinite(p.when));
+  let most = 0;
+  for (const start of timed) {
+    if (start.when > moment || start.when + span < moment) continue;
+    const inside = timed.filter((p) => p.when >= start.when && p.when <= start.when + span);
+    most = Math.max(most, new Set(inside.map((p) => p.who)).size);
+  }
+  return most;
+}
+
+/** A post as the notice rules read it. */
+export interface NoticePost extends ThreadedPost {
+  author: string | null;
+  postedAt: string;
+  receivedAt: string;
+  storeIds: string[];
+}
+
+/** A store to tell about under 'starts': the post to show, and why. */
+export interface SaleStart<T extends NoticePost = NoticePost> {
+  storeId: string;
+  post: T;
+  why: 'word' | 'burst';
+  /** A burst: how many people. */
+  people: number | null;
+  /** The line to show: the one holding the start word; a burst: the newest post's first. */
+  line: string;
+}
+
+/** New posts recent enough to make a notice, naming a store. */
+export const noticeablePosts = <T extends Pick<NoticePost, 'storeIds' | 'postedAt'>>(
+  fresh: T[],
+  now: Date,
+): T[] => {
+  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
+  return fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
+};
+
+/** How far back a start word can still be told, at most 2 hours late. */
+const lateWordSince = (now: Date): string =>
+  toLocalIso(new Date(now.getTime() - STORE_LATE_WORD_MINUTES * 60_000));
+
+/**
+ * From when stored posts matter to the rules below: as far back as a late start word counts, and a
+ * quiet time further, so the word that opened a quiet time is still seen.
+ */
+export const startsReadSince = (now: Date): string =>
+  toLocalIso(new Date(now.getTime() - (STORE_LATE_WORD_MINUTES + STORE_QUIET_MINUTES) * 60_000));
+
+/** New posts that may make a 'starts' notice, naming a store: a start word may come in late. */
+export const startsPosts = <T extends Pick<NoticePost, 'storeIds' | 'postedAt'>>(
+  fresh: T[],
+  now: Date,
+): T[] => {
+  const since = lateWordSince(now);
+  return fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
+};
+
+/** The moment a notice sent at this time or earlier no longer keeps the store quiet. */
+const quietFrom = (at: Date) => toLocalIso(new Date(at.getTime() - STORE_QUIET_MINUTES * 60_000));
+
+/** 'all' (S25, unchanged): the stores of the area named by new first posts. */
+export const postedStores = (
+  mine: Pick<NoticePost, 'storeIds' | 'replyTo'>[],
+  area: Set<string>,
+): string[] =>
+  [...new Set(mine.filter((p) => !p.replyTo).flatMap((p) => p.storeIds))].filter((id) =>
+    area.has(id),
+  );
+
+/**
+ * 'all' (S25, unchanged): the latest new post per store not told within the quiet time, and every
+ * reply; `told` holds the stores whose quiet time starts with this notice.
+ */
+export function postsToTell<T extends Pick<NoticePost, 'storeIds' | 'replyTo' | 'postedAt'>>(
+  mine: T[],
+  area: Set<string>,
+  last: Map<string, string>,
+  now: Date,
+): { chosen: T[]; told: Set<string> } {
+  const quiet = quietFrom(now);
+  const told = new Set<string>();
+  const chosen: T[] = [];
+  for (const id of postedStores(mine, area)) {
+    if ((last.get(id) ?? '') > quiet) continue;
+    const post = mine.filter((p) => !p.replyTo && p.storeIds.includes(id)).at(-1)!;
+    told.add(id);
+    if (!chosen.includes(post)) chosen.push(post);
+  }
+  chosen.push(...mine.filter((p) => p.replyTo));
+  chosen.sort((a, b) => a.postedAt.localeCompare(b.postedAt));
+  return { chosen, told };
+}
+
+/**
+ * 'starts' (S29): which stores of the area to tell about now, one notice per store per quiet time.
+ * `fresh` is this push's posts (`startsPosts`), `recent` what is stored since `startsReadSince`,
+ * never a post received later than now. Posts in `lottery` (a confirmed lottery's thread) neither
+ * fire nor count. A store is looked at when a new post names it.
+ *
+ * A start word (no not-start phrase) tells the store when its post is fresh, or the feed brought it
+ * late, up to 2 hours (the notice shows its real time) and posted after the last notice, which
+ * already covered anything older. Its post must have come in after the last
+ * notice's quiet time; one that came in then and is still untold had its send fail, so it goes
+ * again. Exception: a notice with no start word in by its time was a burst's, and its quiet time
+ * must not swallow a real start: the first word after it goes through, then that word's own quiet
+ * time holds.
+ *
+ * A burst: 3 different authors within 15 minutes among posts fresh and in after the last notice's
+ * quiet time, so sustained chatter needs three people anew. Places (`places`, areas holding many
+ * stores) make no burst, only words do.
+ */
+export function salesStarting<T extends NoticePost>(opts: {
+  fresh: T[];
+  recent: T[];
+  area: Set<string>;
+  places: Set<string>;
+  lottery: Set<string>;
+  last: Map<string, string>;
+  glossary: CodeMeaning[];
+  now: Date;
+}): SaleStart<T>[] {
+  const { fresh, recent, area, places, lottery, last, glossary, now } = opts;
+  const quiet = quietFrom(now);
+  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
+  const lateSince = lateWordSince(now);
+  const stored = [...new Map([...recent, ...fresh].map((p) => [p.id, p])).values()]
+    .filter((p) => !lottery.has(p.id))
+    .sort((a, b) => a.postedAt.localeCompare(b.postedAt) || a.id.localeCompare(b.id));
+  const woken = new Set(
+    fresh.flatMap((p) => (lottery.has(p.id) ? [] : p.storeIds)).filter((id) => area.has(id)),
+  );
+  const cameLate = (p: T) =>
+    Date.parse(p.receivedAt) - Date.parse(p.postedAt) > STORE_FRESH_MINUTES * 60_000;
+  const out: SaleStart<T>[] = [];
+  for (const storeId of woken) {
+    const told = last.get(storeId) ?? '';
+    const toldAt = told ? Date.parse(told) : Number.NEGATIVE_INFINITY;
+    const onStore = stored.filter((p) => p.storeIds.includes(storeId));
+    const afterQuiet = (p: T) => {
+      const came = Date.parse(p.receivedAt);
+      return !(Number.isFinite(came) && told > quietFrom(new Date(came)));
+    };
+    const words = onStore.filter((p) => hasSaleStart(p.text, glossary));
+    const burstsOnly = !!told && !words.some((p) => Date.parse(p.receivedAt) <= toldAt);
+    const word = words
+      .filter(
+        (p) =>
+          p.postedAt >= lateSince &&
+          (p.postedAt >= since || (cameLate(p) && Date.parse(p.postedAt) > toldAt)) &&
+          (afterQuiet(p) || (burstsOnly && Date.parse(p.receivedAt) > toldAt)),
+      )
+      .at(-1);
+    if (word && (told <= quiet || burstsOnly)) {
+      out.push({
+        storeId,
+        post: word,
+        why: 'word',
+        people: null,
+        line: startLineOf(word.text, glossary),
+      });
+      continue;
+    }
+    if (told > quiet || places.has(storeId)) continue;
+    const open = onStore.filter((p) => p.postedAt >= since && afterQuiet(p));
+    const people = Math.max(0, ...open.map((p) => burstAuthors(open, p.postedAt)));
+    if (people >= BURST_AUTHORS) {
+      const newest = open.at(-1)!;
+      out.push({ storeId, post: newest, why: 'burst', people, line: firstLineOf(newest.text) });
+    }
+  }
+  return out.sort((a, b) => a.post.postedAt.localeCompare(b.post.postedAt));
+}
+
+/** A post's first line that says something, cut to about 80 characters (emoji kept whole). */
+export function firstLineOf(text: string): string {
+  const line =
+    text
+      .split('\n')
+      .map((l) => l.trim())
+      .find(Boolean) ?? '';
+  const chars = [...line];
+  return chars.length > FIRST_LINE_CHARS ? `${chars.slice(0, FIRST_LINE_CHARS).join('')}…` : line;
+}
+
+/** The line of a post holding a start word (the first such), cut as `firstLineOf` cuts. */
+export function startLineOf(text: string, glossary: CodeMeaning[]): string {
+  const line = text.split('\n').find((l) => usesWord(l, glossary, 'saleStart'));
+  return firstLineOf(line ?? text);
 }
