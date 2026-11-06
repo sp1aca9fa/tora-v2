@@ -15,34 +15,20 @@ import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { LOCALES } from '@/i18n/locale';
-import { loadMessages } from '@/i18n/messages';
 import { userActions } from '@/lib/actions';
 import { authed } from '@/lib/auth/guard';
 import { getMoney } from '@/lib/money-server';
+import { SPREAD_PARAM, franchiseAliases, spreadLabel } from '@/lib/spread-group';
 import { cn } from '@/lib/utils';
 import { PortfolioHeader } from '../_portfolio/header';
-import { typeLabel } from '../opportunities/cards';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
 }
 
 /** Groups shown per dimension before "N more". */
-const SHOWN = 6;
+const SHOWN = 5;
 const pct = (share: number) => `${(share * 100).toFixed(1)}%`;
-const norm = (s: string) => s.normalize('NFKC').trim().toLowerCase();
-
-/** A franchise typed by its name in any language ("ポケモン") read as its key (`pokemon`). */
-async function franchiseAliases() {
-  const aliases = new Map<string, string>();
-  for (const locale of LOCALES) {
-    const names = ((await loadMessages(locale)) as { franchise?: Record<string, string> })
-      .franchise;
-    for (const [key, name] of Object.entries(names ?? {})) aliases.set(norm(name), key);
-  }
-  return (f: string | null) => (f ? (aliases.get(norm(f)) ?? f) : null);
-}
 
 /**
  * Portfolio, Spread tab (requirements S27 step 6): how the collection's value is spread over item
@@ -70,14 +56,10 @@ export default async function SpreadPage() {
     ),
   );
   const names = new Map(portfolio.rows.map((r) => [r.product.id, r.product.name]));
-  const label = (d: SpreadDimension, key: string) => {
-    if (key === '') return t(d === 'set' ? 'spread.noSet' : `spread.unknown.${d}`);
-    if (d === 'type') return typeLabel(t, key);
-    if (d === 'franchise') return t.has(`franchise.${key}`) ? t(`franchise.${key}`) : key;
-    if (d === 'set') return spreadSetName(key);
-    if (d === 'era') return key === 'before2016' ? t('spread.before2016') : key;
-    return t(`spread.price.${key}`, { a: money(1_000), b: money(10_000), c: money(100_000) });
-  };
+  const label = (d: SpreadDimension, key: string) => spreadLabel(t, money, d, key);
+  // A row opens Items filtered to the lots it counted.
+  const rowHref = (d: SpreadDimension, key: string) =>
+    `/items?${SPREAD_PARAM[d]}=${encodeURIComponent(key)}`;
   const little = {
     type: heldLittle(spread.dimensions.type, worth.types),
     set: heldLittle(spread.dimensions.set, new Map([...worth.sets].map(([k, s]) => [k, s.count]))),
@@ -102,15 +84,17 @@ export default async function SpreadPage() {
       ) : (
         <>
           <div className="max-w-3xl space-y-1 text-sm">
-            <p>
-              {t('spread.intro', { total: money(spread.total) })}
-              {spread.atCostLots > 0 && (
-                <span className="text-muted-foreground">
-                  {' '}
-                  {t('spread.atCost', { amount: money(spread.atCost), count: spread.atCostLots })}
-                </span>
-              )}
-            </p>
+            <p>{t('spread.intro', { total: money(spread.total) })}</p>
+            {spread.atCostLots > 0 && (
+              <p className="text-muted-foreground">
+                {t('spread.atCost', {
+                  market: money(spread.total - spread.atCost),
+                  cost: money(spread.atCost),
+                  count: spread.atCostLots,
+                  total: money(spread.total),
+                })}
+              </p>
+            )}
             <details className="text-xs text-muted-foreground">
               <summary className="cursor-pointer">{t('spread.howTitle')}</summary>
               <p className="mt-1">
@@ -142,60 +126,77 @@ export default async function SpreadPage() {
               </ul>
             </section>
           )}
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+          {/* Columns, so a short card leaves no hole under it. */}
+          <div className="columns-1 gap-4 lg:columns-2 xl:columns-3 min-[2400px]:columns-4 min-[3200px]:columns-5">
             {SPREAD_DIMENSIONS.map((d) => {
               const groups = spread.dimensions[d];
               const pointed = d === 'type' || d === 'set' ? little[d] : [];
+              const row = (g: (typeof groups)[number]) => (
+                <li key={g.key}>
+                  <Link
+                    href={rowHref(d, g.key)}
+                    className="group -mx-2 block rounded-lg px-2 py-1 hover:bg-accent"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={cn(
+                          'line-clamp-2 min-w-0 group-hover:underline',
+                          g.heavy && 'font-medium',
+                          g.key === '' && 'text-muted-foreground',
+                        )}
+                      >
+                        {label(d, g.key)}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 tabular-nums">
+                        <span>
+                          {pct(g.share)}{' '}
+                          <span className="text-xs text-muted-foreground">{money(g.value)}</span>
+                        </span>
+                        <ChevronRight className="size-3.5 text-muted-foreground" />
+                      </span>
+                    </div>
+                    <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn('h-full', g.heavy ? 'bg-amber-500' : 'bg-primary/70')}
+                        style={{ width: `${Math.max(1, g.share * 100)}%` }}
+                      />
+                    </div>
+                  </Link>
+                  {g.heavy && (
+                    <p className="px-2 text-xs text-amber-700 dark:text-amber-300">
+                      {t('spread.heavy', { share: pct(g.share) })}
+                    </p>
+                  )}
+                </li>
+              );
               return (
-                <section key={d} className="space-y-2 rounded-xl border bg-card px-4 py-3">
+                <section
+                  key={d}
+                  className="mb-4 space-y-2 break-inside-avoid rounded-xl border bg-card px-4 py-3"
+                >
                   <h2 className="font-medium">{t(`spread.dimension.${d}`)}</h2>
                   {d === 'franchise' && (
                     <p className="text-xs text-muted-foreground">{t('spread.franchiseNote')}</p>
                   )}
-                  <ul className="space-y-1.5 text-sm">
-                    {groups.slice(0, SHOWN).map((g) => (
-                      <li key={g.key}>
-                        <div className="flex justify-between gap-3">
-                          <span
-                            className={cn(
-                              'line-clamp-2 min-w-0',
-                              g.heavy && 'font-medium',
-                              g.key === '' && 'text-muted-foreground',
-                            )}
-                          >
-                            {label(d, g.key)}
-                          </span>
-                          <span className="shrink-0 tabular-nums">
-                            {pct(g.share)}{' '}
-                            <span className="text-xs text-muted-foreground">{money(g.value)}</span>
-                          </span>
-                        </div>
-                        <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={cn('h-full', g.heavy ? 'bg-amber-500' : 'bg-primary/70')}
-                            style={{ width: `${Math.max(1, g.share * 100)}%` }}
-                          />
-                        </div>
-                        {g.heavy && (
-                          <p className="text-xs text-amber-700 dark:text-amber-300">
-                            {t('spread.heavy', { share: pct(g.share) })}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <ul className="space-y-1.5 text-sm">{groups.slice(0, SHOWN).map(row)}</ul>
                   {groups.length > SHOWN && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('spread.more', {
-                        count: groups.length - SHOWN,
-                        share: pct(groups.slice(SHOWN).reduce((s, g) => s + g.share, 0)),
-                      })}
-                    </p>
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-xs text-muted-foreground">
+                        {t('spread.more', {
+                          count: groups.length - SHOWN,
+                          share: pct(groups.slice(SHOWN).reduce((s, g) => s + g.share, 0)),
+                        })}
+                      </summary>
+                      <ul className="mt-1.5 space-y-1.5">{groups.slice(SHOWN).map(row)}</ul>
+                    </details>
                   )}
                   {pointed.length > 0 && (
                     <div className="space-y-1.5 border-t pt-2">
+                      <h3 className="text-xs font-medium">
+                        {t(`spread.littleTitle.${d as 'type' | 'set'}`)}
+                      </h3>
                       <p className="text-xs text-muted-foreground">
-                        {t('spread.little', { day: worth.day ?? '-' })}
+                        {t('spread.littleDay', { day: worth.day ?? '-' })}
                       </p>
                       <ul className="space-y-1 text-xs">
                         {pointed.slice(0, SHOWN).map((g) => (
@@ -204,7 +205,7 @@ export default async function SpreadPage() {
                               href={link(d as 'type' | 'set', g.key)}
                               className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5 hover:bg-accent"
                             >
-                              <span className="min-w-0 flex-1 truncate">
+                              <span className="min-w-0 flex-1">
                                 {t('spread.littleItem', {
                                   name: label(d, g.key),
                                   share: pct(g.share),

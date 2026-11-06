@@ -30,12 +30,12 @@ export function ItemCard({ card }: { card: ItemCardData }) {
     <li className="md:flex">
       <Link
         href={`/products/${product.id}`}
-        className="flex w-full items-center gap-3 px-3 py-3 transition-colors hover:bg-accent/50 md:flex-col md:items-stretch md:gap-2 md:rounded-xl md:border md:bg-card md:p-3"
+        className="flex w-full items-center gap-2.5 px-3 py-3 transition-colors hover:bg-accent/50 md:flex-col md:items-stretch md:gap-2 md:rounded-xl md:border md:bg-card md:p-3"
       >
         <ProductImage
           product={product}
           version={card.version}
-          className="size-[4.5rem] md:aspect-square md:size-auto md:w-full"
+          className="size-14 md:aspect-square md:size-auto md:w-full"
         />
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="line-clamp-2 text-[0.9375rem] leading-snug font-medium md:line-clamp-3">

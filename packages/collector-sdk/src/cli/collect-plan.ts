@@ -29,3 +29,29 @@ export function offEverywhere(registry: SourceRegistry, key: string): boolean {
   }
   return true;
 }
+
+/** What a collect did with one source, for the activity log and the alert after the run. */
+export interface SourceResult {
+  source: string;
+  status: string;
+  requests: number;
+  observations: number;
+}
+
+/**
+ * A site refusing Tora outside a collector's run (the owner, 2026-11-07: alerts like a refused
+ * collector). In the run's results, so it goes the way a refused collector does: a failed entry in
+ * the activity log, sent to admins after the run. Its status has its own text (`status_blocked_*`
+ * in the alert texts). The site is left alone for the rest of the day (`blockedOn`), so it comes
+ * once a day per site. Requests are not counted: the step's client is shared by its sites.
+ */
+export const refusedResult = (source: string, step: 'rankings' | 'opening'): SourceResult => ({
+  source,
+  status: `blocked_${step}`,
+  requests: 0,
+  observations: 0,
+});
+
+/** Whether a collect's activity entry is a failure, which admins are sent. */
+export const runFailed = (results: SourceResult[]) =>
+  results.some((r) => r.status === 'failed' || r.status.startsWith('blocked'));

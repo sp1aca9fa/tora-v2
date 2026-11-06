@@ -432,46 +432,76 @@ export async function saveCandidates(
   return inserted.length;
 }
 
-export async function activeSources(
+/** A listing set aside as broken and not left gone by a person. */
+const setAsideListing = sql`${productSources.active} = 0 AND ${productSources.failure} IS NOT NULL
+  AND json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL
+  AND json_extract(${productSources.failure}, '$.leftAt') IS NULL`;
+
+/**
+ * What a source's collect goes through: its active listings, and those set aside whose week is up
+ * (see `LISTING_RETRY_DAYS`), in one order so the request budget treats them alike. A listing set
+ * aside is not tried when its item has an active listing of the source (someone linked a new page;
+ * bringing the old one back could mix another item's prices in), and of several only the newest
+ * set aside is (older ones may be pages it replaced); set aside together, the first in this order.
+ * Known limit: an item with two good listings of a source, one of them set aside, keeps that one
+ * aside until someone links it again.
+ */
+export async function listingsToCollect(
   db: Db,
   source: string,
   filter: { productId?: string } = {},
+  now = new Date(),
 ): Promise<{ source: ProductSource; product: Product }[]> {
-  return (
-    db
-      .select({ source: productSources, product: products })
-      .from(productSources)
-      .innerJoin(products, eq(products.id, productSources.productId))
-      .where(
-        and(
-          eq(productSources.source, source),
-          eq(productSources.active, true),
-          filter.productId ? eq(productSources.productId, filter.productId) : undefined,
-        ),
-      )
-      // Items someone holds or watches first (candidates nobody tracks after), then sources never
-      // collected (or least recently) first, so a capped run still makes progress.
-      .orderBy(
-        sql`NOT (${exists(
-          db
-            .select({ one: sql`1` })
-            .from(holdings)
-            .where(
-              and(
-                eq(holdings.productId, products.id),
-                inArray(holdings.status, ['owned', 'consumed']),
-              ),
+  const rows = await db
+    .select({ source: productSources, product: products })
+    .from(productSources)
+    .innerJoin(products, eq(products.id, productSources.productId))
+    .where(
+      and(
+        eq(productSources.source, source),
+        or(eq(productSources.active, true), setAsideListing),
+        filter.productId ? eq(productSources.productId, filter.productId) : undefined,
+      ),
+    )
+    // Items someone holds or watches first (candidates nobody tracks after), then sources never
+    // collected (or least recently) first, so a capped run still makes progress.
+    .orderBy(
+      sql`NOT (${exists(
+        db
+          .select({ one: sql`1` })
+          .from(holdings)
+          .where(
+            and(
+              eq(holdings.productId, products.id),
+              inArray(holdings.status, ['owned', 'consumed']),
             ),
-        )} OR ${exists(
-          db
-            .select({ one: sql`1` })
-            .from(watches)
-            .where(eq(watches.productId, products.id)),
-        )})`,
-        sql`${productSources.lastSuccessAt} IS NOT NULL`,
-        asc(productSources.lastSuccessAt),
-      )
-  );
+          ),
+      )} OR ${exists(
+        db
+          .select({ one: sql`1` })
+          .from(watches)
+          .where(eq(watches.productId, products.id)),
+      )})`,
+      sql`${productSources.lastSuccessAt} IS NOT NULL`,
+      asc(productSources.lastSuccessAt),
+    );
+  const linked = new Set(rows.filter((r) => r.source.active).map((r) => r.source.productId));
+  const newest = new Map<string, { id: string; at: string }>();
+  for (const { source: l } of rows) {
+    const at = l.active ? undefined : l.failure?.brokenAt;
+    // On a tie the last one in this order wins: the one that last worked, likely the live one.
+    if (at && at >= (newest.get(l.productId)?.at ?? '')) newest.set(l.productId, { id: l.id, at });
+  }
+  const today = toLocalIso(now).slice(0, 10);
+  return rows.filter(({ source: l }) => {
+    if (l.active) return true;
+    const f = l.failure!;
+    return (
+      !linked.has(l.productId) &&
+      newest.get(l.productId)?.id === l.id &&
+      daysBetween((f.triedAt ?? f.brokenAt!).slice(0, 10), today) >= LISTING_RETRY_DAYS
+    );
+  });
 }
 
 /**
@@ -578,9 +608,20 @@ export async function updateSourceProgress(
 export const LISTING_BROKEN_NIGHTS = 3;
 
 /**
+ * Days between tries of a listing set aside (the owner, 2026-11-07: one set aside wrongly comes
+ * back with no data command). Counted in days of the install's time zone, from the day it was set
+ * aside or last tried.
+ */
+export const LISTING_RETRY_DAYS = 7;
+
+const daysBetween = (from: string, to: string) =>
+  (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+
+/**
  * Counts a failed collect of a listing (once a night; a retry the same night does not count
- * again). On the `LISTING_BROKEN_NIGHTS`th night the listing is set aside: no longer collected,
- * and its item asks for a new link on Actions. Returns whether it is broken now.
+ * again). On the `LISTING_BROKEN_NIGHTS`th night the listing is set aside: only tried once every
+ * `LISTING_RETRY_DAYS`, and its item asks for a new link on Actions. Returns whether it is broken
+ * now.
  */
 export async function recordListingFailure(
   db: Db,
@@ -607,6 +648,48 @@ export async function recordListingFailure(
   return broken;
 }
 
+/**
+ * A try of a listing set aside failed: it waits for the next one, with nothing else changed (it was
+ * already told about). A person may have linked it or left it gone since the run read it: then
+ * this writes nothing.
+ */
+export async function recordListingRetry(
+  db: Db,
+  link: Pick<ProductSource, 'id' | 'failure'>,
+  error: string,
+  now = new Date(),
+): Promise<void> {
+  await db
+    .update(productSources)
+    .set({ failure: { ...link.failure!, triedAt: toLocalIso(now), error: error.slice(0, 300) } })
+    .where(and(eq(productSources.id, link.id), setAsideListing));
+}
+
+/**
+ * A try of a listing set aside worked: it is collected again, its failure cleared. A person may have
+ * left it gone or linked a page since the run read it, and they win (two active listings would mix
+ * prices): written only if it is still set aside and its item has no active listing of the source.
+ * Returns whether it came back.
+ */
+export async function reactivateListing(db: Db, linkId: string): Promise<boolean> {
+  const [link] = await db
+    .update(productSources)
+    .set({ active: true, failure: null })
+    .where(
+      and(
+        eq(productSources.id, linkId),
+        setAsideListing,
+        sql`NOT EXISTS (SELECT 1 FROM product_sources AS sibling
+          WHERE sibling.product_id = ${productSources.productId}
+            AND sibling.source = ${productSources.source}
+            AND sibling.active = 1)`,
+      ),
+    )
+    .returning({ productId: productSources.productId });
+  if (link) await clearBucketValues(db, [link.productId]);
+  return !!link;
+}
+
 /** Items with a listing set aside as broken (S10: admins relink them even when not held). */
 export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
   const rows = await db
@@ -615,9 +698,7 @@ export async function productsWithBrokenListings(db: Db): Promise<Product[]> {
     .innerJoin(products, eq(products.id, productSources.productId))
     .where(
       // Written as the failed-listings index is (a bound false would not use it).
-      sql`${productSources.active} = 0 AND ${productSources.failure} IS NOT NULL
-        AND json_extract(${productSources.failure}, '$.brokenAt') IS NOT NULL
-        AND json_extract(${productSources.failure}, '$.leftAt') IS NULL`,
+      setAsideListing,
     );
   return rows.map((r) => r.product);
 }

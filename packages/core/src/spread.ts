@@ -96,6 +96,16 @@ export function spreadLots(
     });
 }
 
+/** The price levels `priceLevelOf` gives. */
+export const SPREAD_PRICE_LEVELS = ['lt1k', 'lt10k', 'lt100k', 'gte100k'] as const;
+
+/**
+ * Whether a group key (from a URL) can name a text: a plain word, not a path into the texts
+ * ("a.b") nor an inherited name ("constructor", "__proto__").
+ */
+export const isPlainKey = (key: string) =>
+  key !== '' && !key.includes('.') && !(key in Object.prototype);
+
 /** A release year's era: before 2016, 2016-2019, 2020-2022, then each year; '' unknown. */
 export function eraOf(released: string | null): string {
   const year = Number(released?.slice(0, 4));
@@ -117,7 +127,8 @@ export function priceLevelOf(unitValue: number): string {
   return 'gte100k';
 }
 
-function keyOf(lot: SpreadLot, dimension: SpreadDimension): string {
+/** The group a lot falls in, per dimension ('' unknown). */
+export function spreadKeyOf(lot: SpreadLot, dimension: SpreadDimension): string {
   switch (dimension) {
     case 'type':
       return lot.type;
@@ -132,6 +143,24 @@ function keyOf(lot: SpreadLot, dimension: SpreadDimension): string {
   }
 }
 
+/**
+ * The ids of the holdings the spread counts in one group, by the same lots and keys `spreadOf`
+ * uses (so Items can list exactly what a Spread row counted). Lots with no value are not counted.
+ */
+export function spreadGroupHoldings<R extends SpreadRow & { holding: { id: string } }>(
+  rows: readonly R[],
+  dimension: SpreadDimension,
+  key: string,
+  franchiseOf?: (franchise: string | null) => string | null,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const [lot] = spreadLots([row], franchiseOf);
+    if (lot && lot.value > 0 && spreadKeyOf(lot, dimension) === key) ids.add(row.holding.id);
+  }
+  return ids;
+}
+
 /** The collection's spread: each dimension's groups, biggest first; heavy groups and items. */
 export function spreadOf(lots: readonly SpreadLot[]): Spread {
   const counted = lots.filter((l) => l.value > 0);
@@ -144,7 +173,7 @@ export function spreadOf(lots: readonly SpreadLot[]): Spread {
   };
   const dimensions = Object.fromEntries(
     SPREAD_DIMENSIONS.map((d) => {
-      const groups = sum((l) => keyOf(l, d));
+      const groups = sum((l) => spreadKeyOf(l, d));
       // An unknown group is not a concentration of anything, nor is the only group there is.
       const known = groups.filter(([key]) => key !== '').length;
       return [

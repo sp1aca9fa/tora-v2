@@ -1,6 +1,6 @@
 import type { SourceRegistry } from '@tora/core';
 import { describe, expect, it } from 'vitest';
-import { offEverywhere } from './collect-plan';
+import { offEverywhere, refusedResult, runFailed } from './collect-plan';
 
 const registry = (r: Partial<SourceRegistry>): SourceRegistry => ({
   sources: [
@@ -51,5 +51,27 @@ describe('sources left out of the collect', () => {
 
   it('keeps a source the registry does not describe (unknown is not off)', () => {
     expect(offEverywhere(registry({}), 'myboard')).toBe(false);
+  });
+});
+
+describe('a site refusing outside a collector', () => {
+  const fine = { source: 'arcade', status: 'ok', requests: 3, observations: 1 };
+
+  it('makes the run a failure, as a refused collector does', () => {
+    expect(runFailed([fine])).toBe(false);
+    expect(runFailed([])).toBe(false);
+    expect(runFailed([{ ...fine, status: 'partial' }])).toBe(false);
+    expect(runFailed([{ ...fine, status: 'blocked' }])).toBe(true);
+    expect(runFailed([fine, refusedResult('megastore', 'rankings')])).toBe(true);
+    expect(runFailed([fine, refusedResult('megastore', 'opening')])).toBe(true);
+  });
+
+  it('counts no requests and has a status with its own text', () => {
+    expect(refusedResult('megastore', 'opening')).toEqual({
+      source: 'megastore',
+      status: 'blocked_opening',
+      requests: 0,
+      observations: 0,
+    });
   });
 });

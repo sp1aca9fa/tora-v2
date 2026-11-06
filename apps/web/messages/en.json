@@ -112,8 +112,8 @@
     }
   },
   "spread": {
-    "intro": "Where your collection's value of {total} sits.",
-    "atCost": "{amount} of it is at cost: {count, plural, one {# lot has} other {# lots have}} no market price yet.",
+    "intro": "Where your {total} of value sits, by group.",
+    "atCost": "{market} market value + {cost} valued at what you paid ({count, plural, one {# lot has} other {# lots have}} no market price) = {total}; the percentages use this total.",
     "howTitle": "How this works",
     "how": "Each lot counts at its market value, or at its cost with no price yet. A group holding {heavy} or more of the value is marked heavy (not a franchise: collecting one is normal, nor the only group there is), so is one item with {item} or more. Under item types and sets: those you hold under {little} of where Tora has items worth a look.",
     "empty": "Nothing to spread yet: add items you own with a cost or a price.",
@@ -121,14 +121,18 @@
     "heavy": "Heavy: {share} of the value in one group.",
     "franchiseNote": "Collecting mostly one franchise is normal: no group here is marked heavy.",
     "more": "{count, plural, one {# more group} other {# more groups}}: {share}.",
-    "little": "You hold little of these, Tora has items worth a look (as of {day}):",
+    "littleTitle": {
+      "type": "Item types you barely hold with items worth a look",
+      "set": "Sets you barely hold with items worth a look"
+    },
+    "littleDay": "As of {day}.",
     "littleItem": "{name}: you hold {share}, {count} worth a look",
-    "noSet": "No set recorded",
+    "noSet": "Not recorded",
     "unknown": {
-      "type": "Unknown",
-      "franchise": "No franchise recorded",
-      "era": "Release date missing",
-      "price": "Unknown"
+      "type": "Not recorded",
+      "franchise": "Not recorded",
+      "era": "Not recorded",
+      "price": "Not recorded"
     },
     "before2016": "Before 2016",
     "dimension": {
@@ -136,7 +140,7 @@
       "franchise": "Franchise",
       "set": "Set",
       "era": "Released",
-      "price": "Price of one"
+      "price": "Price per item"
     },
     "price": {
       "lt1k": "Under {a}",
@@ -151,6 +155,9 @@
     "allTypes": "All types",
     "allStatuses": "All statuses",
     "emptyFiltered": "No entries match these filters.",
+    "groupTotals": "Spread counts {total} for this group: {market} market value + {cost} valued at what you paid ({count, plural, one {# lot has} other {# lots have}} no market price).",
+    "groupChip": "{dimension}: {name}",
+    "removeFilter": "Remove this filter",
     "addFirst": "Add your first item",
     "allOf": "All {category}"
   },
@@ -245,7 +252,7 @@
     "notOwned": "Not owned",
     "suggestedItem": "Suggested item (Opportunities), not owned",
     "moreSuggestions": "{count, plural, one {# more suggestion} other {# more suggestions}}",
-    "broken": "Its {source} page stopped working on {day} ({error}) and is no longer collected: link the new one.",
+    "broken": "Its {source} page stopped working on {day} ({error}) and is only tried once a week now: link the new one.",
     "leaveGone": "Page gone, leave it unlinked",
     "paste": "Or paste the {source} page of this item:",
     "openItem": "Open item",
@@ -598,6 +605,7 @@
   },
   "franchise": {
     "pokemon": "Pokémon",
+    "zelda": "The Legend of Zelda",
     "one_piece": "One Piece",
     "yugioh": "Yu-Gi-Oh!",
     "mtg": "Magic",
@@ -1533,6 +1541,8 @@
     "sourceLine": "{source}: {status}",
     "status_failed": "failed",
     "status_blocked": "blocked by the site",
+    "status_blocked_rankings": "refused Tora while reading rankings, left alone until tomorrow",
+    "status_blocked_opening": "refused Tora while reading box opening cards, left alone until tomorrow",
     "status_partial": "partly done",
     "status_locked": "skipped, another collect was running it",
     "backupFailed": "Tora: the backup failed: {error}",
@@ -1576,7 +1586,7 @@
     "updateWaiting": "Tora: the server has not updated for 24 h and keeps running {from}; the newest version, {to}, is waiting for GitHub CI ({status}). Check the repo's Actions tab (a commit CI never runs on is never installed automatically), or run ops/update-server.sh on the server by hand.",
     "ciPending": "not finished or not started",
     "ciUnknown": "no usable answer from GitHub",
-    "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone 3 nights in a row. Those items get no new prices from it until someone links their new page (Actions).",
+    "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone 3 nights in a row. Those items get no new prices from it until someone links their new page (Actions), or the page answers again: Tora tries once a week.",
     "listingGoneLine": "{source}: {name} ({error})",
     "summaryGone": "{count, plural, one {# item waits} other {# items wait}} for a new page link (its old one is gone)",
     "loginFailed": "Tora: a sign-in to {user} failed: {why}",

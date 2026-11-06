@@ -104,6 +104,7 @@ const TEXTS: Record<string, Record<string, string>> = {
     collectStopped: 'collect stopped {code}',
     sourceLine: '{source}: {status}',
     status_failed: 'failed',
+    status_blocked_rankings: 'refused reading rankings',
     backupFailed: 'backup failed: {error}',
     noCollect: 'no collect for {hours} h',
     noBackup: 'no backup for {hours} h',
@@ -233,6 +234,30 @@ it('marks failures alerted when no admin has a channel (nothing to try again)', 
   await recordActivity(db, { kind: 'backup', level: 'failed', detail: { error: 'disk full' } });
   expect(await alertFailures(db, ctx, toLocalIso(new Date(Date.now() - 60_000)))).toBe(0);
   expect((await db.select().from(activity)).every((e) => e.alertedAt)).toBe(true);
+});
+
+it('tells admins of a site refusing while reading rankings or box opening cards, once a day', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const since = toLocalIso(new Date(Date.now() - 60_000));
+  const refused = (source: string, status: string) => ({
+    kind: 'collect' as const,
+    level: 'failed' as const,
+    detail: { sources: [{ source, status, requests: 0, observations: 0 }] },
+  });
+  await recordActivity(db, refused('megastore', 'blocked_rankings'));
+  expect(await alertFailures(db, ctx, since)).toBe(1);
+  expect(sent.at(-1)!.text).toBe('collect failed\nmegastore: refused reading rankings');
+  // The day's retry (the site is left alone by then, but say another run reports it): not again.
+  await recordActivity(db, refused('megastore', 'blocked_opening'));
+  expect(await alertFailures(db, ctx, since)).toBe(0);
+  expect(sent).toHaveLength(1);
+  // The real texts exist for both, under the same section as the collector's.
+  const { alertText } = JSON.parse(
+    readFileSync(join(__dirname, '../../../apps/web/messages/en.json'), 'utf8'),
+  ) as { alertText: Record<string, string> };
+  expect(alertText.status_blocked).toBeTruthy();
+  expect(alertText.status_blocked_rankings).toContain('rankings');
+  expect(alertText.status_blocked_opening).toContain('box opening cards');
 });
 
 it('tells admins about listings set aside, though the run did not fail', async () => {

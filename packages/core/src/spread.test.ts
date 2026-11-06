@@ -2,8 +2,10 @@ import { expect, it } from 'vitest';
 import {
   type SpreadLot,
   eraOf,
+  isPlainKey,
   heldLittle,
   priceLevelOf,
+  spreadGroupHoldings,
   spreadLots,
   spreadOf,
   spreadSetName,
@@ -121,4 +123,45 @@ it('counts lots counted in value, at cost with no market price, sets apart by fr
   ]);
   // The only item type there is: not heavy.
   expect(s.dimensions.type).toMatchObject([{ key: 'sealed', share: 1, heavy: false }]);
+});
+
+it('lists the holdings of one group with the same lots and keys the spread counts', () => {
+  const product = (id: string, franchise: string | null) => ({
+    id,
+    franchise,
+    setName: null,
+    setCode: null,
+    releaseDate: '2024-01-01',
+  });
+  const row = (id: string, franchise: string | null, valueBase: number | null, counted = true) => ({
+    holding: { id: `h-${id}`, quantity: 1, costTotalBase: 0, countInValue: counted },
+    product: product(id, franchise),
+    valueBase,
+    type: 'sealed',
+  });
+  const rows = [
+    row('a', 'pokemon', 6000),
+    row('b', 'ポケモン', 500),
+    row('c', 'one_piece', 5000),
+    row('d', null, 3000),
+    row('e', 'pokemon', 9000, false),
+    row('f', 'pokemon', null),
+  ];
+  const alias = (f: string | null) => (f === 'ポケモン' ? 'pokemon' : f);
+  expect([...spreadGroupHoldings(rows, 'franchise', 'pokemon', alias)]).toEqual(['h-a', 'h-b']);
+  expect([...spreadGroupHoldings(rows, 'franchise', '', alias)]).toEqual(['h-d']);
+  expect([...spreadGroupHoldings(rows, 'price', 'lt1k', alias)]).toEqual(['h-b']);
+  expect([...spreadGroupHoldings(rows, 'era', '2024', alias)]).toHaveLength(4);
+  expect(spreadGroupHoldings(rows, 'franchise', 'nothing', alias).size).toBe(0);
+});
+
+it('tells a plain group key from a path or an inherited name', () => {
+  expect(['pokemon', 'lt1k', 'before2016'].map(isPlainKey)).toEqual([true, true, true]);
+  expect(['', 'a.b', 'constructor', '__proto__', 'toString'].map(isPlainKey)).toEqual([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
 });

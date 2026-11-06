@@ -24,11 +24,11 @@ import {
 } from '@tora/db';
 import { resolveTaxonomy } from '@tora/core';
 import { migrateDb } from '@tora/db/migrate';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { BlockedError, ListingGoneError, RequestCapError } from './http';
 import { pace, runCollector } from './runner';
 import type { Collector } from './types';
@@ -552,6 +552,250 @@ it('sets a listing aside after 3 nights gone, then asks for a new link; other er
   expect(await link()).toMatchObject({ active: true, failure: null });
 });
 
+describe('a listing set aside is tried again every 7 days', () => {
+  const SET_ASIDE_AT = '2026-10-12T03:00:00.000+09:00';
+  const failure = {
+    nights: 3,
+    since: '2026-10-10',
+    day: '2026-10-12',
+    error: 'gone',
+    brokenAt: SET_ASIDE_AT,
+  };
+  // 03:00 in the install's zone, N days after it was set aside.
+  const after = (days: number) => ({
+    ...quiet,
+    collectOnly: true,
+    now: new Date(Date.parse(SET_ASIDE_AT) + days * 86_400_000),
+  });
+  const setAside = async (externalId: string, extra: object = {}) => {
+    const { product } = await box();
+    return setAsideOn(product.id, externalId, extra);
+  };
+  const setAsideOn = async (productId: string, externalId: string, extra: object = {}) => {
+    const link = await linkSource(db, productId, { source: 'fake', externalId });
+    await db
+      .update(schema.productSources)
+      .set({ active: false, failure: { ...failure, ...extra } })
+      .where(eq(schema.productSources.id, link.id));
+    return productId;
+  };
+  const unheld = (name: string) =>
+    createProduct(db, null, { category: 'tcg', kind: 'booster_box', name });
+  const linkOf = async (productId: string, externalId = 'X1') =>
+    (await listProductSources(db, productId)).find((s) => s.externalId === externalId)!;
+  const failing = (error: Error, calls: string[] = []) =>
+    fakeCollector({
+      collect: async (link) => {
+        calls.push(link.externalId!);
+        throw error;
+      },
+    });
+
+  it('a failure waits another 7 days, with no alert and no repeated set aside', async () => {
+    const id = await setAside('X1');
+    const calls: string[] = [];
+    const collector = failing(new ListingGoneError('still gone'), calls);
+    expect((await runCollector(db, collector, after(6))).status).toBe('ok');
+    expect(calls).toEqual([]);
+    const tried = await runCollector(db, collector, after(7));
+    expect(calls).toEqual(['X1']);
+    expect(tried).toMatchObject({ status: 'ok', errors: [], setAside: [] });
+    expect(await linkOf(id)).toMatchObject({
+      active: false,
+      failure: {
+        nights: 3,
+        day: '2026-10-12',
+        brokenAt: SET_ASIDE_AT,
+        error: expect.stringContaining('still gone'),
+      },
+    });
+    // Asked once: again that day (any kind of run) and until its 7 days are up, nothing.
+    await runCollector(db, collector, after(7));
+    await runCollector(db, collector, after(13));
+    expect(calls).toHaveLength(1);
+    expect((await runCollector(db, collector, after(14))).setAside).toEqual([]);
+    expect(calls).toHaveLength(2);
+    // Still on Actions meanwhile.
+    expect(await productsWithBrokenListings(db)).toHaveLength(1);
+  });
+
+  it('any other failure waits too, without making the run partial', async () => {
+    const id = await setAside('X1');
+    const run = await runCollector(db, failing(new Error('a changed page?')), after(7));
+    expect(run).toMatchObject({ status: 'ok', errors: [], setAside: [] });
+    expect((await linkOf(id)).failure).toMatchObject({ error: 'a changed page?' });
+    expect((await linkOf(id)).active).toBe(false);
+  });
+
+  it('a success brings it back by itself: active, failure cleared, the Actions card gone', async () => {
+    const id = await setAside('X1');
+    expect(await pendingActions(db, userId)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'source', source: 'fake' })]),
+    );
+    const run = await runCollector(db, fakeCollector(), after(7));
+    expect(run).toMatchObject({ status: 'ok', observationsAdded: 3, setAside: [] });
+    const link = await linkOf(id);
+    expect(link).toMatchObject({ active: true, failure: null });
+    expect(link.lastSuccessAt).toBeTruthy();
+    expect(await productsWithBrokenListings(db)).toEqual([]);
+    expect(
+      (await pendingActions(db, userId)).filter(
+        (c) => c.kind === 'source' && c.source === 'fake' && c.broken,
+      ),
+    ).toEqual([]);
+    // From then on an ordinary listing: three more nights gone set it aside again, with an alert.
+    const collector = failing(new ListingGoneError('gone again'));
+    await runCollector(db, collector, after(8));
+    await runCollector(db, collector, after(9));
+    const third = await runCollector(db, collector, after(10));
+    expect(third.setAside).toHaveLength(1);
+  });
+
+  it('a person leaving it gone during the run wins over the try', async () => {
+    const id = await setAside('X1');
+    const collector = fakeCollector({
+      collect: async () => {
+        await leaveListingGone(db, id, 'fake');
+        return { state: null, complete: true };
+      },
+    });
+    expect((await runCollector(db, collector, after(7))).status).toBe('ok');
+    const link = await linkOf(id);
+    expect(link).toMatchObject({ active: false, lastSuccessAt: null });
+    expect(link.failure?.leftAt).toBeTruthy();
+  });
+
+  it('a person linking a new page during the run wins: never two active listings', async () => {
+    const id = await setAside('X1');
+    let history = 0;
+    const collector = fakeCollector({
+      historyPhase: true,
+      collect: async (_link, _product, ctx) => {
+        if (ctx.phase === 'history') history++;
+        else await linkSource(db, id, { source: 'fake', externalId: 'X2' });
+        return { state: null, complete: false };
+      },
+    });
+    await runCollector(db, collector, after(7));
+    expect((await linkOf(id)).active).toBe(false);
+    expect((await listProductSources(db, id)).filter((s) => s.active)).toHaveLength(1);
+    expect((await linkOf(id, 'X2')).active).toBe(true);
+    expect(history).toBe(0);
+  });
+
+  it('an active listing of another item or source does not stop it coming back', async () => {
+    const id = await setAside('X1');
+    await linkSource(db, id, { source: 'other', externalId: 'O1' });
+    await linkSource(db, (await unheld('Another')).id, { source: 'fake', externalId: 'X1' });
+    await runCollector(db, fakeCollector(), after(7));
+    expect((await linkOf(id)).active).toBe(true);
+  });
+
+  it('a refusal or the request cap is no try: it stays due', async () => {
+    const id = await setAside('X1');
+    const blocked = await runCollector(db, failing(new BlockedError('403')), after(7));
+    expect(blocked.status).toBe('blocked');
+    expect((await linkOf(id)).failure).toEqual(failure);
+    const capped = await runCollector(db, failing(new RequestCapError()), after(7));
+    expect(capped).toMatchObject({ status: 'partial', capReached: true });
+    expect((await linkOf(id)).failure).toEqual(failure);
+    await runCollector(db, fakeCollector(), after(8));
+    expect(await linkOf(id)).toMatchObject({ active: true, failure: null });
+  });
+
+  it('leaves alone one a person left gone, and one whose item has a new link', async () => {
+    const calls: string[] = [];
+    const collector = failing(new ListingGoneError('gone'), calls);
+    const left = await setAside('X1');
+    expect(await leaveListingGone(db, left, 'fake')).toBe(true);
+    await runCollector(db, collector, after(30));
+    expect(calls).toEqual([]);
+
+    const relinked = (await unheld('Other')).id;
+    await setAsideOn(relinked, 'R1');
+    await linkSource(db, relinked, { source: 'fake', externalId: 'R2' });
+    await runCollector(db, collector, after(30));
+    expect(calls).toEqual(['R2']);
+    expect((await linkOf(relinked, 'R1')).active).toBe(false);
+  });
+
+  it("of an item's listings set aside, tries only the newest", async () => {
+    const calls: string[] = [];
+    const id = await setAside('X1');
+    await setAsideOn(id, 'X2', { brokenAt: '2026-10-13T03:00:00.000+09:00' });
+    await runCollector(db, failing(new ListingGoneError('gone'), calls), after(10));
+    expect(calls).toEqual(['X2']);
+  });
+
+  it('of two set aside together, tries one, and never brings both back', async () => {
+    const id = await setAside('X1');
+    await setAsideOn(id, 'X2');
+    const calls: string[] = [];
+    const works = fakeCollector();
+    const collect = works.collect;
+    works.collect = (link, ...rest) => {
+      calls.push(link.externalId!);
+      return collect(link, ...rest);
+    };
+    await runCollector(db, works, after(7));
+    expect(calls).toHaveLength(1);
+    expect((await listProductSources(db, id)).filter((s) => s.active)).toHaveLength(1);
+    await runCollector(db, works, after(14));
+    expect((await listProductSources(db, id)).filter((s) => s.active)).toHaveLength(1);
+  });
+
+  it('goes in the same order as other listings: held first, then the oldest', async () => {
+    const calls: string[] = [];
+    const held = await setAside('OLD');
+    const collected = async (productId: string, externalId: string, at: string) => {
+      await db
+        .update(schema.productSources)
+        .set({ lastSuccessAt: at })
+        .where(
+          and(
+            eq(schema.productSources.productId, productId),
+            eq(schema.productSources.externalId, externalId),
+          ),
+        );
+    };
+    await collected(held, 'OLD', '2026-10-01T03:00:00.000+09:00');
+    const { product: active } = await createHolding(
+      db,
+      userId,
+      { product: { category: 'tcg', kind: 'booster_box', name: 'Active', setName: 'A' } },
+      {
+        quantity: 1,
+        costTotalBase: 5000,
+        acquiredAt: '2026-09-01T00:00:00.000+09:00',
+        packagingState: 'sealed_shrink',
+      },
+    );
+    await linkSource(db, active.id, { source: 'fake', externalId: 'NEW' });
+    await collected(active.id, 'NEW', '2026-10-15T03:00:00.000+09:00');
+    await setAsideOn((await unheld('Nobody tracks it')).id, 'NOBODY');
+    await runCollector(db, failing(new ListingGoneError('gone'), calls), after(7));
+    expect(calls).toEqual(['OLD', 'NEW', 'NOBODY']);
+  });
+
+  it('the request cap stops it like any other listing, leaving the next for the next run', async () => {
+    const calls: string[] = [];
+    await setAside('X1');
+    await setAsideOn((await unheld('Nobody tracks it')).id, 'Y1');
+    await runCollector(db, failing(new RequestCapError(), calls), after(7));
+    expect(calls).toEqual(['X1']);
+  });
+
+  it('with a one-product run: only that product', async () => {
+    const calls: string[] = [];
+    const id = await setAside('X1');
+    const collector = failing(new ListingGoneError('gone'), calls);
+    await runCollector(db, collector, { ...after(7), productId: 'another' });
+    expect(calls).toEqual([]);
+    await runCollector(db, collector, { ...after(7), productId: id });
+    expect(calls).toEqual(['X1']);
+  });
+});
+
 it('leaves a gone page unlinked: no card until a new match, a pasted link still links', async () => {
   const { product } = await box();
   await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
@@ -567,6 +811,10 @@ it('leaves a gone page unlinked: no card until a new match, a pasted link still 
     findCandidates: async () => {
       searches++;
       return found;
+    },
+    // Its page stays gone when its weekly try comes.
+    collect: async () => {
+      throw new ListingGoneError('item X1 not found');
     },
   });
   const sourceCards = async () =>

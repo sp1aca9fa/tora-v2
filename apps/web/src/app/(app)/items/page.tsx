@@ -4,8 +4,12 @@ import {
   type HoldingStatus,
   type ProductKind,
   TRACKING_MODES,
+  SPREAD_DIMENSIONS,
   type Taxonomy,
   categoryDef,
+  productClass,
+  spreadGroupHoldings,
+  spreadLots,
   trackingMode,
 } from '@tora/core';
 import {
@@ -16,6 +20,7 @@ import {
   summarizeByProduct,
 } from '@tora/db';
 import type { Metadata } from 'next';
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { Suspense } from 'react';
@@ -28,13 +33,18 @@ import { itemCardData } from './card-data';
 import { ItemList } from './item-list';
 import { ItemFilters } from './item-filters';
 import { getMoney } from '@/lib/money-server';
+import { SPREAD_PARAM, franchiseAliases, spreadLabel } from '@/lib/spread-group';
 import { getTaxonomy } from '@/lib/taxonomy';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('portfolio'))('title') };
 }
 
-type SearchParams = Promise<{ q?: string; type?: string; status?: string }>;
+type SearchParams = Promise<
+  { q?: string; type?: string; status?: string } & Partial<
+    Record<'class' | 'franchise' | 'set' | 'era' | 'price', string>
+  >
+>;
 
 /** `type` is a category (`tcg`) or category:kind (`tcg:booster_box`). */
 function parseType(
@@ -78,14 +88,44 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
     cardGradeCounts(db, user.id),
     getTranslations(),
   ]);
-  const rows =
-    listed ??
-    portfolio.rows.toSorted(
-      (a, b) =>
-        b.holding.acquiredAt.localeCompare(a.holding.acquiredAt) ||
-        b.holding.createdAt.localeCompare(a.holding.createdAt) ||
-        a.holding.id.localeCompare(b.holding.id),
-    );
+  // A Spread group (S28): only the lots that row counted, by Spread's own grouping.
+  const groups = SPREAD_DIMENSIONS.flatMap((d) => {
+    const key = sp[SPREAD_PARAM[d] as keyof typeof sp];
+    return typeof key === 'string' ? [{ d, key: key.slice(0, 200) }] : [];
+  });
+  const franchiseOf = groups.length > 0 ? await franchiseAliases() : undefined;
+  const spreadRows =
+    groups.length > 0
+      ? portfolio.rows.map((r) => ({
+          ...r,
+          type: productClass(r.product),
+          valueBase: r.valuation.valueBase,
+        }))
+      : [];
+  const inGroups = groups.map(({ d, key }) => spreadGroupHoldings(spreadRows, d, key, franchiseOf));
+  // What Spread counts for these groups together, to show next to Items' own total.
+  const groupLots =
+    groups.length > 0
+      ? spreadLots(
+          spreadRows.filter((r) => inGroups.every((ids) => ids.has(r.holding.id))),
+          franchiseOf,
+        ).filter((l) => l.value > 0)
+      : [];
+  const atCostLots = groupLots.filter((l) => l.atCost);
+  const groupTotal = groupLots.reduce((n, l) => n + l.value, 0);
+  const groupAtCost = atCostLots.reduce((n, l) => n + l.value, 0);
+  const inAllGroups = <R extends { holding: { id: string } }>(list: R[]) =>
+    groups.length > 0 ? list.filter((r) => inGroups.every((ids) => ids.has(r.holding.id))) : list;
+  const rows = listed
+    ? inAllGroups(listed)
+    : inAllGroups(
+        portfolio.rows.toSorted(
+          (a, b) =>
+            b.holding.acquiredAt.localeCompare(a.holding.acquiredAt) ||
+            b.holding.createdAt.localeCompare(a.holding.createdAt) ||
+            a.holding.id.localeCompare(b.holding.id),
+        ),
+      );
   const valuations = new Map(portfolio.rows.map((r) => [r.holding.id, r.valuation]));
   // Everything the search and status match: the chips count it; the list shows the type picked.
   // Lots are summed per item within their tracking group (S8): investments, value only, ...
@@ -107,11 +147,14 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
       .filter((s) => s.mode === 'investment' || s.mode === 'value_only')
       .reduce((n, s) => n + s.valueBase, 0),
   });
-  const href = (type: string | null) => {
+  const href = (type: string | null, without?: string) => {
     const next = new URLSearchParams();
     if (sp.q) next.set('q', sp.q);
     if (sp.status) next.set('status', sp.status);
     if (type) next.set('type', type);
+    for (const { d, key } of groups) {
+      if (SPREAD_PARAM[d] !== without) next.set(SPREAD_PARAM[d], key);
+    }
     const query = next.toString();
     return query ? `/items?${query}` : '/items';
   };
@@ -141,7 +184,7 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
   });
   // A heading per tracking group only when there is more than investments.
   const headed = modes.some((m) => m.mode !== 'investment');
-  const filtered = Boolean(category || q || status !== 'owned');
+  const filtered = Boolean(category || q || status !== 'owned' || groups.length > 0);
 
   return (
     <div className="space-y-4">
@@ -166,6 +209,34 @@ export default async function ItemsPage({ searchParams }: { searchParams: Search
             );
           })}
         </div>
+        {groups.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {groups.map(({ d, key }) => (
+              <Link
+                key={d}
+                href={href(sp.type || null, SPREAD_PARAM[d])}
+                aria-label={t('inventory.removeFilter')}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary/10 px-3 py-1 text-sm hover:bg-primary/20"
+              >
+                {t('inventory.groupChip', {
+                  dimension: t(`spread.dimension.${d}`),
+                  name: spreadLabel(t, money, d, key),
+                })}
+                <X className="size-3.5" />
+              </Link>
+            ))}
+            {atCostLots.length > 0 && (
+              <p className="w-full text-xs text-muted-foreground">
+                {t('inventory.groupTotals', {
+                  total: money(groupTotal),
+                  market: money(groupTotal - groupAtCost),
+                  cost: money(groupAtCost),
+                  count: atCostLots.length,
+                })}
+              </p>
+            )}
+          </div>
+        )}
         {category && (
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
             {kindsOf(taxonomy, category).map((k) => {

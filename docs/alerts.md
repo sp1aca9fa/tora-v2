@@ -18,6 +18,13 @@ happened (Settings > Activity).
 | Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app's morning check         |
 | Store posts and comments for your area, a store feed gone silent          | Each person | At once ([Store notices](store-feeds.md))                                    | The app                         |
 
+A site refusing Tora counts as a failed collect, also when it refuses while reading rankings or box
+opening cards. A listing set aside is tried again every 7 days by its source's normal collect: a
+success brings it back and its Actions card goes away, a failure waits for the next try and sends
+nothing. Known limit: it is not tried while its item has another active listing of that source, so
+an item with two good listings there, one of them set aside, keeps that one aside until someone
+links it again.
+
 Each person picks their channels, switches each kind on or off and chooses the language of the
 messages in **Settings > Alerts**. A failure at night arrives at night; Telegram and Discord can
 mute a chat.

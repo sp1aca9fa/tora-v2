@@ -1,12 +1,15 @@
 import { type CollectorRunStatus, inAppZone, localDate, sourceInfo } from '@tora/core';
 import {
   type Db,
-  activeSources,
   createQuerySource,
   heldBuckets,
   finishRun,
   LISTING_BROKEN_NIGHTS,
+  LISTING_RETRY_DAYS,
+  listingsToCollect,
+  reactivateListing,
   recordListingFailure,
+  recordListingRetry,
   listProductSources,
   setSourceQuery,
   insertObservations,
@@ -233,7 +236,12 @@ export async function runCollector(
     }
     if (!options.matchOnly) {
       const today = localDate(now);
-      const all = await activeSources(db, collector.source, { productId: options.productId });
+      const all = await listingsToCollect(
+        db,
+        collector.source,
+        { productId: options.productId },
+        now,
+      );
       // A page that answered "gone" today is asked again tomorrow (counted once a night anyway).
       const goneToday = ({ source: l }: (typeof all)[number]) => l.failure?.day === today;
       const sources = options.skipCollectedToday
@@ -257,6 +265,8 @@ export async function runCollector(
       for (const { source: listing, product } of sources) {
         tick();
         let link = listing;
+        // Set aside earlier and its week is up: a success brings it back, a failure just waits.
+        let onTrial = !listing.active;
         try {
           // An auto-made query from an older version of the collector's defaults is regenerated.
           const extra = link.query?.extra as { edited?: boolean; v?: number } | undefined;
@@ -288,6 +298,14 @@ export async function runCollector(
             fresh,
             await heldBuckets(db, product.id),
           );
+          if (onTrial) {
+            onTrial = false;
+            if (!(await reactivateListing(db, link.id))) {
+              log(`collect "${product.name}": relinked or left gone during the run, left as it is`);
+              continue;
+            }
+            log(`collect "${product.name}": set aside until now, it answers again`);
+          }
           if (collector.historyPhase && !result.complete)
             behind.push({
               link: { ...link, state: result.state ?? null, title: result.title ?? link.title },
@@ -342,10 +360,19 @@ export async function runCollector(
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
           // A listing failing night after night is set aside (its item asks for a new link on
-          // Actions), so a run is not partial forever over a page that is gone.
-          if (listingGone(e) && (await recordListingFailure(db, listing, errorText(e), now))) {
+          // Actions), so a run is not partial forever over a page that is gone. On trial it was
+          // already told about: not a problem of this run, and nobody is told again.
+          if (onTrial) {
+            await recordListingRetry(db, listing, errorText(e), now);
             log(
-              `collect "${product.name}": failed ${LISTING_BROKEN_NIGHTS} nights in a row, set aside until relinked (${errorText(e)})`,
+              `collect "${product.name}": set aside, still failing, tried again in ${LISTING_RETRY_DAYS} days (${errorText(e)})`,
+            );
+          } else if (
+            listingGone(e) &&
+            (await recordListingFailure(db, listing, errorText(e), now))
+          ) {
+            log(
+              `collect "${product.name}": failed ${LISTING_BROKEN_NIGHTS} nights in a row, set aside, tried again every ${LISTING_RETRY_DAYS} days until relinked (${errorText(e)})`,
             );
             summary.setAside.push({
               productId: product.id,

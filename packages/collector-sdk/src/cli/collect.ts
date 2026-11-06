@@ -54,7 +54,7 @@ import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
-import { offEverywhere } from './collect-plan';
+import { type SourceResult, offEverywhere, refusedResult, runFailed } from './collect-plan';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
 
@@ -159,7 +159,7 @@ if (values.market && asked.length === 0) {
 }
 let exitCode = 0;
 // Each collector's result, for the activity log (S17).
-const results: { source: string; status: string; requests: number; observations: number }[] = [];
+const results: SourceResult[] = [];
 // Listings set aside tonight (their page gone night after night): admins are told (S10).
 const setAside: { source: string; productId: string; name: string; error: string }[] = [];
 const withLinks = !values.product && importers.some((i) => i.readLink);
@@ -239,18 +239,20 @@ const blocked =
     : await blockedOn(db, localDate(new Date(), timeZone));
 /**
  * A refusal outside a collector's run (rankings, box opening cards): the site is left alone for the
- * rest of this run, and a blocked run is recorded so the day's retries leave it alone too
- * (`blockedOn`). Requests are not counted: the step's client is shared by its sites.
+ * rest of this run, a blocked run is recorded so the day's retries leave it alone too
+ * (`blockedOn`), and admins are told after the run (`refusedResult`).
  */
-async function refused(source: string, step: string) {
+async function refused(source: string, step: 'rankings' | 'opening') {
   blocked.add(source);
-  log(`${source}: refused while reading ${step}, left alone until tomorrow`);
+  results.push(refusedResult(source, step));
+  const reading = step === 'rankings' ? 'rankings' : 'box opening cards';
+  log(`${source}: refused while reading ${reading}, left alone until tomorrow`);
   const run = await startRun(db, source);
   await finishRun(db, run, {
     status: 'blocked',
     requests: 0,
     observationsAdded: 0,
-    error: `${step}: the site refused (see the collect log)`,
+    error: `${reading}: the site refused (see the collect log)`,
   });
 }
 if (withRankings) {
@@ -354,7 +356,7 @@ if (withOpening) {
           `box opening cards: ${read.sets} set(s) read, ${read.cards} card(s), ${read.failed} failed`,
         );
       }
-      if (read.blocked) await refused(read.blocked, 'box opening cards');
+      if (read.blocked) await refused(read.blocked, 'opening');
     }
   } catch (error) {
     log(`box opening cards: stopped (${errorText(error)})`);
@@ -506,7 +508,7 @@ if (values.review || process.env.TORA_REVIEW === '1') {
   await reviewUsers(db, await listUsers(db), claudeJudge, { log: console.log });
 }
 // The activity log (S17); a failed run is sent to admins by `pnpm alerts after-run`.
-const failed = results.some((r) => r.status === 'failed' || r.status === 'blocked');
+const failed = runFailed(results);
 await recordActivity(db, {
   kind: 'collect',
   level: failed ? 'failed' : exitCode ? 'problem' : 'ok',

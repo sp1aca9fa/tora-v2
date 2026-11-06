@@ -266,8 +266,8 @@ export const productSources = sqliteTable(
     recentSales: text('recent_sales', { mode: 'json' }).$type<RecentSale[]>(),
     /**
      * The listing failing night after night (a page gone, an item removed): cleared by a
-     * success. After `LISTING_BROKEN_NIGHTS` nights it is set aside (`active` false, `brokenAt`)
-     * and the item asks for a new link on Actions.
+     * success. After `LISTING_BROKEN_NIGHTS` nights it is set aside (`active` false, `brokenAt`):
+     * the item asks for a new link on Actions and it is tried again every `LISTING_RETRY_DAYS`.
      */
     failure: text('failure', { mode: 'json' }).$type<ListingFailure>(),
     ...timestamps,
@@ -292,8 +292,10 @@ export interface ListingFailure {
   since: string;
   day: string;
   error: string;
-  /** Set aside as broken (no longer collected). */
+  /** Set aside as broken (no longer collected, only tried again now and then). */
   brokenAt?: string;
+  /** The last try since it was set aside, which failed too. */
+  triedAt?: string;
   /**
    * Left gone by a person (the item has no page there now): no new link is asked for; the site
    * is still searched, and a new match shows as a suggestion.

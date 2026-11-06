@@ -16,6 +16,9 @@ const WIDE = [
   /^\/watchlist\/strategy$/,
 ];
 
+/** Pages that use a 4K screen's whole width (cards in columns). */
+const EXTRA_WIDE = [/^\/spread$/];
+
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */
 const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist(\/opening)?$/];
 
@@ -23,12 +26,13 @@ const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist(\/opening)?$/];
 export function PageWidth({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const wide = WIDE.some((re) => re.test(pathname));
+  const extra = EXTRA_WIDE.some((re) => re.test(pathname));
   const medium = MEDIUM.some((re) => re.test(pathname));
   return (
     <main
       className={cn(
         'mx-auto px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-8 md:pb-10',
-        wide ? 'max-w-[120rem]' : medium ? 'max-w-[68rem]' : 'max-w-3xl',
+        extra ? 'max-w-[240rem]' : wide ? 'max-w-[120rem]' : medium ? 'max-w-[68rem]' : 'max-w-3xl',
       )}
     >
       {children}

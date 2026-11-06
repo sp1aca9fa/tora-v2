@@ -49,7 +49,7 @@
 | S18 | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress (2026-10-25): first pass done (every guide read against the app, links and commands checked); both gaps found moved to Open issues (user, 2026-10-26) |
 | S26 | Opportunities as sub pages: Worth a look, Popular now, Signals, Buy plan; cards with tags and a target price; every item ranked, loaded as you scroll; a singles ranking and the top 60 as candidates | built 2026-10-27 (no migration; the singles ranking and the targets fill in with the next collect); crawled on the real-data test copy (10 pages, phone, wide and dark: no errors; the menu's Actions count was too faint, fixed); the user's check in progress (2026-10-28: first fixes built, the next round being planned) |
 | S27 | Opportunities part 2: chains in store posts; singles (market note, steadier prices, the set as the line); tested signal plug-ins (PSA 10 vs raw A, a quick rise); planning: spend a budget well, a monthly plan, a spread check, a look-back test | steps 1-6 built (to 2026-10-31); the owner's check (2026-11-07) moved its follow-ups to S28, S31 and S32, step 7 to S33 |
-| S28 | The owner's notes, small round: Spread on wide screens and its links, refused rankings alert, store codes, franchise fix, old backup codes | planned 2026-11-07 |
+| S28 | The owner's notes, small round: Spread on wide screens and its links, refused rankings alert, store codes, franchise fix, old backup codes | built 2026-11-07 (a shop's sold-out items read correctly, set-aside listings tried again weekly; old backup code form waits for the owner's new codes), awaiting the owner's check |
 | S29 | Store notices and Lotteries: notices only when a sale starts, lottery posts out of Now | planned 2026-11-07 |
 | S30 | Sales accuracy: fewer wrong sales from search-based sources | planned 2026-11-07 |
 | S31 | Buy timing: target prices with dates and confidence, a simpler card | planned 2026-11-07 |
@@ -1077,6 +1077,8 @@ what a price, signal or alert means stays the owner's call, with the proposal in
 - A site refusing Tora while reading rankings or box opening cards alerts like a refused collector.
 - Store codes: the owner's new codes and a pass over posts without a store (private lists).
 - A franchise typed in Japanese: the importer that writes it fixed, one data command for the owner.
+- A shop's parser that dropped sold-out items (their link has another form), which read as "page
+  gone" and set listings aside: fixed, and the listings set aside for it come back.
 - After the owner replaces both accounts' login codes: the old backup code form is no longer
   accepted.
 
@@ -1116,6 +1118,14 @@ the cause (6.3 % against 5.1 %). Steps:
 4. A sold listing found by two items' searches stored for each (the owner's decision pending).
 5. Re-check stored sales from their kept titles: exclusions only, raw rows stay, a command for the
    owner. Measure again, and show what moved in values and year's lows.
+6. Tora checks its own data each night (the owner, 2026-11-07) and alerts the admins when it looks
+   odd; it fixes nothing, the alert is the cue to look into it. Within a source: the share of kept
+   sales far from the item's median, against that source's usual share; a run keeping far fewer sales
+   than usual. Across sources in one market: an item and condition whose medians differ over 2x with
+   enough sales on both sides, and a source running high or low against the others on many items. Too
+   few sales says nothing. One alert while a finding lasts, with what, how much and the usual level;
+   the same findings on a settings page and in the data tool (sources kept from AI models left out).
+   It comes after steps 1-5, so its usual levels are those of cleaned data.
 
 ### S31: Buy timing, target prices
 
