@@ -59,7 +59,7 @@ since an agent re-reads everything cold. Subagents cannot start subagents.
 | 3    | Tier 2 the normal loop cannot verify (`/ship` section 1 triggers)                            | plan review, then normal and adversarial review, `triage` |
 
 Project specifics: visible changes sync the test copy and crawl the changed pages
-(`--views phone,wide,dark`); reviewer ideas for the reviewed pages are built, ideas about other
+(`--views phone,wide,half,full,dark`); reviewer ideas for the reviewed pages are built, ideas about other
 pages go to the notes' to-do list; anything public or a production data change is an owner stop.
 
 ## Report

@@ -203,8 +203,8 @@ source kept from AI models are left out. With `TORA_STATUS_URL` (the app's addre
 
 ## Checking every page: `pnpm crawl`
 
-Signs in, follows every link from the home page and opens each page at phone (390 px) and wide
-(1280 px) widths, then lists pages with an HTTP error, a console or page error, a raw text key, an
+Signs in, follows every link from the home page and opens each page at phone (390 px), wide
+(1280 px), half-widescreen (1920 px) and full widescreen (3840 px) widths, then lists pages with an HTTP error, a console or page error, a raw text key, an
 unfilled `{placeholder}`, sideways scrolling or text too faint to read on its background (WCAG
 AA); it exits with 1 when any has one. `--views all` adds the smallest phone (320 px), a tablet, a
 2560 px screen, 200 % zoom and dark mode; a comma list picks some (`--views phone,dark`). It only opens

@@ -100,7 +100,7 @@ chained records, so a bug is recomputed away the next night.
   adversarial, triage.
 - Owner's actions file: code-reviewer-light with `Mode: actions`, once per task, when items with
   commands changed.
-- Page crawler for screenshots: `pnpm crawl --views phone,wide,dark --shots <dir>` on the test
+- Page crawler for screenshots: `pnpm crawl --views phone,wide,half,full,dark --shots <dir>` on the test
   copy (sync it first).
 
 ## Paths

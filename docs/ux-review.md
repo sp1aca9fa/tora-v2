@@ -12,8 +12,8 @@ bug.
 
 ## What the reviewer is given
 
-- Screenshots of each changed page: phone, wide and dark (`pnpm crawl --only /x --views
-phone,wide,dark --shots <dir>`).
+- Screenshots of each changed page: phone, wide, half-widescreen (1920 px), full widescreen (3840 px)
+  and dark (`pnpm crawl --only /x --views phone,wide,half,full,dark --shots <dir>`).
 - Per page, one line: what it is for and who opens it ("pick what to buy this month, with a budget;
   a collector, a few times a month").
 - Nothing else. If a page cannot be understood without more, that is a finding.
@@ -24,9 +24,11 @@ Answer as someone who has never seen the app. For each page:
 
 1. **Purpose.** In five seconds, can you tell what this page is for and what to do first? Say what
    you think it is for; if that differs from the line given, that is the top finding.
-2. **Amount.** Is there more on screen than the first task needs? Name what could be folded away,
-   moved to a detail page, or dropped. Count the distinct things competing for attention above the
-   fold on the phone.
+2. **Amount.** Is there more on screen than the first task needs, at any width? Name what could be
+   folded away, moved to a detail page, or dropped; explanations of numbers and secondary details
+   are the usual excess, while a warning or risk the reader must see stays. A wider screen is no
+   reason to show more at once. Count the distinct things competing for attention in the first
+   screen at each width: past what a person can take in, they start skipping.
 3. **Words.** Jargon, internal names, abbreviations, numbers without units or a "compared with
    what". Labels that say the same thing two ways on one page, or one thing two ways across pages.
 4. **Hierarchy.** Does the most important thing look most important? Headings, size and color
@@ -37,7 +39,10 @@ Answer as someone who has never seen the app. For each page:
    lead. Nothing important only reachable by a hidden gesture.
 7. **States.** Empty, loading, one item, very many items, long names, missing pictures or prices:
    what the screenshots show of them, and what they likely look like.
-8. **Phone.** Tap targets, text that wraps badly, sideways scroll, things cut off.
+8. **Phone and wide screens.** Phone: tap targets, text that wraps badly, sideways scroll, things
+   cut off. Half and full widescreen: does the page use the space (more columns, side panels, wider
+   tables and charts), or is it a narrow column between empty margins? Only running text keeps a
+   readable line length, inside its own column.
 9. **Trust.** Where the page states a guess or a forecast, does it say so plainly? Anything that
    could make a person spend money on a wrong reading is a top finding.
 10. **Breaks and bugs.** Anything that looks wrong rather than unclear: numbers that don't add up

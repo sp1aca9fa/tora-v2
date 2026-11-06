@@ -1,12 +1,12 @@
 /* global console, process, document, window, getComputedStyle, NodeFilter, URL */
 // The page crawler (S15, built before S10 part B): signs in, follows every in-app link from the
-// home page and opens each page at phone and wide widths, then reports pages with a server error,
+// home page and opens each page at phone, wide, half-widescreen and full 4K widths, then reports pages with a server error,
 // a console error, a raw text key or {placeholder}, that scroll sideways, or with text too faint
 // to read on its background (WCAG AA). Only opens pages (GET); presses nothing. Run it against a test copy,
 // not the real app. `--views all` adds the smallest phone (320 px), a tablet, a 2560 px screen,
 // 200 % zoom and dark mode; a comma list picks some (`--views phone,dark`).
 //   pnpm crawl [--base http://localhost:3200] [--max 150] [--per-pattern 2] [--only /settings]
-//              [--views phone,wide|all] [--shots <dir>] [--out <report.json>]
+//              [--views phone,wide,half,full|all] [--shots <dir>] [--out <report.json>]
 // Sign-in from the environment or `.env`: CRAWL_USER, CRAWL_PASSWORD, and CRAWL_TOTP_KEY (base32)
 // or CRAWL_TOTP_KEY_FILE.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -25,11 +25,14 @@ const VIEWS = [
   { name: 'tablet', width: 768, height: 1024, phone: true },
   { name: 'wide', width: 1280, height: 900 },
   { name: 'xl', width: 2560, height: 1440 },
+  // A window on half of a 4K monitor, and the whole monitor (at 100 % display scaling).
+  { name: 'half', width: 1920, height: 2160 },
+  { name: 'full', width: 3840, height: 2160 },
   // A 1280 px window at 200 % zoom lays out like a 640 px one.
   { name: 'zoom', width: 640, height: 450, scale: 2 },
   { name: 'dark', width: 1280, height: 900, dark: true },
 ];
-const VIEW_NAMES = arg('views', 'phone,wide');
+const VIEW_NAMES = arg('views', 'phone,wide,half,full');
 const WIDTHS = VIEWS.filter((v) => VIEW_NAMES === 'all' || VIEW_NAMES.split(',').includes(v.name));
 // Links that do something, download a file or leave the app's pages.
 const SKIP = /^\/(api|logout|_next)\b|\/(export|download)\b|\.(csv|json|xlsx|zip|png|jpg|webp)$/;
