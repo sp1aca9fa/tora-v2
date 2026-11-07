@@ -82,7 +82,7 @@ The orchestrator passes these values as `model` and `effort` when it starts each
 | builder                              | sonnet | medium | pages, texts, glue, docs, tests                              |
 | builder-heavy                        | opus   | medium | `high` for auth, sessions, 2FA, devices and access checks    |
 | code-reviewer-light                  | sonnet | medium |                                                              |
-| code-reviewer                        | opus   | medium | `high` for auth and access                                   |
+| code-reviewer                        | opus   | high   | above the class's minimum; see below                         |
 | ux-reviewer                          | sonnet | medium | every visible change; also asks the trust question           |
 | trust-reviewer                       | -      | -      | not used: the UX reviewer asks it (one run fewer per change) |
 | triage                               | opus   | medium | Tier 3 only: elsewhere at most two reviewers, no overlap     |
@@ -90,8 +90,10 @@ The orchestrator passes these values as `model` and `effort` when it starts each
 | challenger                           | opus   | high   | direction only, on request or at a phase's start             |
 | summarizer                           | haiku  | low    |                                                              |
 
-Why medium, not Saku's high: Tora's math is medians, quantiles and joins over kept raw data, not
-chained records, so a bug is recomputed away the next night.
+Why the builder stays at medium, not Saku's high: Tora's math is medians, quantiles and joins over
+kept raw data, not chained records, so a bug is recomputed away the next night. Why `code-reviewer`
+is at high: on 4 past changes with known bugs, high caught 11 of 12 and medium 9 of 12, for about
+22% more cost. All of the gap is one change, so this is a hint; the cost is small enough to take it.
 
 ## Reviews used
 
@@ -118,3 +120,4 @@ chained records, so a bug is recomputed away the next night.
 - 2026-11-04: challenger added (opus high); evaluated per `/ship` section 8, not by the noisy or redundant triggers.
 - 2026-11-05: process check added (`docs/ci.md`, `ops/process-check.json`, which must agree with the Paths list above): commit trailers state tier and reviews, CI compares them with the changed files. The workflows and the check's own files joined the Paths, and so did `*-actions.ts` files and new pages, which the list did not name.
 - 2026-11-07: from a spend measure over one session in each project, about a tenth of it avoidable around builders: builders auto-compact at 200k, a long rehearsal runs in the background with no polling and on a small sample while fixing, a start map goes in the builder's prompt, a stale resume above about 150k gives way to a fresh builder; the agent ledger gains `severe` and `fix_caused`; `spend-view.mjs` joins the setup review. No review step changed.
+- 2026-11-07: `code-reviewer` moved from medium to high, by the owner, on the comparison noted under "Models and efforts"; the class table stays as it is.
