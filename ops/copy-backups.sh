@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Copies the daily database backups of a Tora server (the machine running the app and the nightly
 # collect, e.g. a mini PC at home) to this machine, so a dead server disk does not take them along
-# (requirements S6), and refreshes this machine's analysis copy (the newest backup, unpacked) for
-# read-only queries. Mirrors the server's backup folder: what the server prunes (older than 30
+# (requirements S6), and refreshes this machine's analysis copy (the newest backup, unpacked, without
+# the data of sources kept from AI models; needs sqlite3) for read-only queries. Mirrors the server's backup folder: what the server prunes (older than 30
 # days, first of the month kept) is pruned here too, unless the server suddenly holds fewer than 3
 # backups (a new or wiped disk): then nothing is deleted.
 #
@@ -99,9 +99,29 @@ rsync -a "${delete[@]}" --include='*.db.gz' --exclude='*' -e 'ssh -o BatchMode=y
 newest="$(ls "$LOCAL_DIR"/tora-*.db.gz 2>/dev/null | sort | tail -1)"
 echo "$(ls "$LOCAL_DIR"/*.db.gz 2>/dev/null | wc -l) backup(s) here, newest $(basename "${newest:-none}")"
 
-# The analysis copy follows the newest backup.
+# An interrupted run's file holds everything, so it does not stay, whether or not a refresh is due.
+if [ -d "$(dirname "$ANALYSIS")" ]; then
+  find "$(dirname "$ANALYSIS")" -maxdepth 1 -ignore_readdir_race \
+    -name "$(basename "$ANALYSIS").part*" -mmin +60 -delete ||
+    echo "could not clear old part files"
+fi
+
+# The analysis copy follows the newest backup, without the sources kept from AI models. When that
+# fails nothing replaces the copy there, and the next run tries again.
 if [ -n "$newest" ] && [ "$newest" -nt "$ANALYSIS" ]; then
   mkdir -p "$(dirname "$ANALYSIS")"
-  gunzip -c "$newest" >"$ANALYSIS.part" && mv "$ANALYSIS.part" "$ANALYSIS"
-  echo "analysis copy refreshed"
+  # Its own file, so a run publishes only what it scrubbed itself (`pnpm backup` also refreshes the
+  # copy).
+  part="$ANALYSIS.part.$$"
+  rm -f "$part" "$part-journal"
+  if gunzip -c "$newest" >"$part" &&
+    sqlite3 -bail "$part" <"$(dirname "$SELF")/scrub-analysis.sql" &&
+    [ "$(sqlite3 -readonly "$part" 'pragma integrity_check')" = ok ]; then
+    mv "$part" "$ANALYSIS"
+    echo "analysis copy refreshed"
+  else
+    rm -f "$part" "$part-journal"
+    echo "analysis copy NOT refreshed: could not take the kept-from-AI sources out of it"
+    notify "Tora: the analysis copy could not be refreshed (see copy-backups.log)." || true
+  fi
 fi

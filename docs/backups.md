@@ -16,7 +16,9 @@ It runs even when the collect failed, and only once a day (the day in the app's 
 - **Size and time**: a database with 280,000 collected prices gives an 18 MB file in about 40 s.
   Each backup reads every row once, well within Turso's free monthly reads.
 - **Analysis copy**: each run also unpacks the latest copy to `~/.local/share/tora/analysis/tora.db`
-  (or `TORA_ANALYSIS_DB`). Heavy questions read it instead of Turso: the MCP `query_sql` tool does,
+  (or `TORA_ANALYSIS_DB`) and takes out the data of sources kept from AI models
+  (`ops/scrub-analysis.sql`), keeping the old copy if that fails. `ops/copy-backups.sh` needs
+  `sqlite3` for it. Heavy questions read it instead of Turso: the MCP `query_sql` tool does,
   and so should any analysis script (a single careless query on Turso can use a large part of the
   free monthly reads).
 

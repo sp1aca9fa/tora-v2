@@ -3,9 +3,9 @@
 // index: the web app never needs it.
 import { type Client, type InStatement, type ResultSet, createClient } from '@libsql/client';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, mkdtemp, readdir, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip } from 'node:zlib';
 
@@ -336,19 +336,59 @@ export async function pruneBackups(dir: string, today: string): Promise<number> 
   return removed;
 }
 
+/** Takes the sources kept from AI models out of a fresh analysis copy (scripts read it directly). */
+async function scrubAnalysisCopy(file: string): Promise<void> {
+  const script = await readFile(
+    join(import.meta.dirname, '../../../ops/scrub-analysis.sql'),
+    'utf8',
+  );
+  const client = createClient({ url: `file:${file}` });
+  try {
+    await client.executeMultiple(script);
+    const { rows } = await client.execute('pragma integrity_check');
+    if (rows[0]?.[0] !== 'ok') throw new Error('the scrubbed copy fails its integrity check');
+  } finally {
+    client.close();
+  }
+}
+
+/** An interrupted run's file holds everything, so it does not stay, whether or not a refresh is due. */
+async function removeOldParts(target: string): Promise<void> {
+  const folder = dirname(target);
+  const stem = `${basename(target)}.part`;
+  for (const name of await readdir(folder).catch(() => [])) {
+    if (!name.startsWith(stem)) continue;
+    const old = join(folder, name);
+    const file = await stat(old).catch(() => null);
+    if (file && Date.now() - file.mtimeMs > 3_600_000) await rm(old, { force: true });
+  }
+}
+
 /**
- * Unpacks the latest backup to `target` when it is newer than the copy there (the file is
- * replaced whole). Returns the backup's day, or null when there is no backup.
+ * Unpacks the latest backup to `target` when it is newer than the copy there, without the sources
+ * kept from AI models (the file is replaced whole, or not at all when that fails). Returns the
+ * backup's day, or null when there is no backup.
  */
 export async function refreshAnalysisCopy(dir: string, target: string): Promise<string | null> {
+  await removeOldParts(target);
   const day = (await listBackups(dir)).at(-1);
   if (!day) return null;
   const file = join(dir, backupName(day));
   const [backup, copy] = await Promise.all([stat(file), stat(target).catch(() => null)]);
   if (copy && copy.mtimeMs >= backup.mtimeMs) return day;
   await mkdir(dirname(target), { recursive: true });
-  const part = `${target}.part`;
-  await pipeline(createReadStream(file), createGunzip(), createWriteStream(part));
+  // Its own file, so a run publishes only what it scrubbed itself (ops/copy-backups.sh also refreshes
+  // the copy).
+  const part = `${target}.part.${process.pid}`;
+  const leftovers = () => Promise.all(['', '-journal'].map((e) => rm(part + e, { force: true })));
+  await leftovers();
+  try {
+    await pipeline(createReadStream(file), createGunzip(), createWriteStream(part));
+    await scrubAnalysisCopy(part);
+  } catch (error) {
+    await leftovers();
+    throw error;
+  }
   await rename(part, target);
   return day;
 }

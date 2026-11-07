@@ -85,7 +85,13 @@ export async function portfolioSummary(db: Db, userId: string) {
   const p = await portfolioValuation(db, userId);
   const valuations = new Map(p.rows.map((r) => [r.holding.id, r.valuation]));
   const summaries = summarizeByProduct(p.rows, valuations);
-  const withPl = summaries.filter((s) => s.unrealizedBase !== null);
+  const noAi = noAiSources(await loadSourceRegistry(db));
+  const hidden = (s: (typeof summaries)[number]) =>
+    s.lots.some((l) => {
+      const source = valuations.get(l.holding.id)?.source;
+      return !!source && noAi.includes(source);
+    });
+  const withPl = summaries.filter((s) => s.unrealizedBase !== null && !hidden(s));
   const byPl = withPl.toSorted((a, b) => b.unrealizedBase! - a.unrealizedBase!);
   const row = (s: (typeof summaries)[number]) => ({
     productId: s.product.id,
@@ -93,9 +99,10 @@ export async function portfolioSummary(db: Db, userId: string) {
     kind: s.product.kind,
     units: s.units,
     spentBase: s.spentBase,
-    valueBase: s.valuedLots ? s.valueBase : null,
-    unrealizedBase: s.unrealizedBase,
-    unrealizedPct: s.unrealizedBase === null ? null : pct(s.unrealizedBase, s.valuedCostBase),
+    valueBase: s.valuedLots && !hidden(s) ? s.valueBase : null,
+    unrealizedBase: hidden(s) ? null : s.unrealizedBase,
+    unrealizedPct:
+      s.unrealizedBase === null || hidden(s) ? null : pct(s.unrealizedBase, s.valuedCostBase),
   });
   const series = await portfolioSeries(db, userId);
   // The chart, thinned: the first of each month, plus every day of the last 30.
@@ -152,7 +159,11 @@ export async function listProducts(
   return summarizeByProduct(picked, valuations)
     .map((s) => {
       const first = valuations.get(s.lots[0]!.holding.id)!;
-      const hidden = !!first.source && noAi.includes(first.source);
+      // Any lot: a sum holding one lot's value gives that value away by subtraction.
+      const hidden = s.lots.some((l) => {
+        const source = valuations.get(l.holding.id)!.source;
+        return !!source && noAi.includes(source);
+      });
       return {
         productId: s.product.id,
         name: s.product.name,
@@ -217,27 +228,36 @@ export async function productDetail(db: Db, userId: string, productId: string) {
       valuation:
         h.status === 'owned' ? valuationFacts(valueHolding(h, product, market), noAi) : null,
     })),
-    sources: sources.map((s) => ({
-      source: s.source,
-      active: s.active,
-      listing: s.externalId,
-      title: s.title,
-      url: s.url,
-      query: s.query,
-      lastCollected: day(s.lastSuccessAt),
-      sales: s.observations,
-      latestSale: day(s.latestObservation),
-      learned:
-        s.state && typeof s.state === 'object'
-          ? pickLearned(s.state as Record<string, unknown>)
-          : null,
-    })),
-    pendingSuggestions: candidates.map((c) => ({
-      source: c.source,
-      title: c.title,
-      score: c.score,
-      url: c.url,
-    })),
+    sources: sources.map((s) => {
+      const link = {
+        source: s.source,
+        active: s.active,
+        listing: s.externalId,
+        url: s.url,
+        query: s.query,
+      };
+      // That the link exists stays (as in `query_sql`); what came from the site does not.
+      if (noAi.includes(s.source)) return { ...link, hidden: HIDDEN };
+      return {
+        ...link,
+        title: s.title,
+        lastCollected: day(s.lastSuccessAt),
+        sales: s.observations,
+        latestSale: day(s.latestObservation),
+        learned:
+          s.state && typeof s.state === 'object'
+            ? pickLearned(s.state as Record<string, unknown>)
+            : null,
+      };
+    }),
+    pendingSuggestions: candidates
+      .filter((c) => !noAi.includes(c.source))
+      .map((c) => ({
+        source: c.source,
+        title: c.title,
+        score: c.score,
+        url: c.url,
+      })),
   };
 }
 
@@ -321,11 +341,18 @@ export async function sales(
   });
 }
 
+/** Collector health without the sources kept from AI models: a source's big moves hold its medians. */
+async function collectorHealthForAi(db: Db, noAi: string[], now?: Date) {
+  return (await collectorHealth(db, now)).filter((h) => !noAi.includes(h.source));
+}
+
 export async function collectorStatus(db: Db) {
-  const health = await collectorHealth(db);
+  const noAi = noAiSources(await loadSourceRegistry(db));
+  const health = await collectorHealthForAi(db, noAi);
   const runs = await db
     .select()
     .from(schema.collectorRuns)
+    .where(noAi.length ? notInArray(schema.collectorRuns.source, noAi) : undefined)
     .orderBy(desc(schema.collectorRuns.startedAt))
     .limit(10);
   return {
@@ -472,7 +499,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     .innerJoin(products, eq(products.id, productSources.productId))
     .where(and(eq(productSources.active, true), ne(productSources.externalId, QUERY_SOURCE_ID)));
   const byListing = new Map<string, typeof links>();
-  for (const l of links) {
+  for (const l of links.filter((l) => !noAiKeys.includes(l.source))) {
     const key = `${l.source}|${l.externalId}`;
     byListing.set(key, [...(byListing.get(key) ?? []), l]);
   }
@@ -496,7 +523,12 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
       'odd_sales',
       'info',
       'Sales of the last 30 days at over 3x or under 1/3 of the value (the median ignores them, but they may be mismatches to exclude).',
-      oddSales(valued, market, now)
+      // Its value would be that source's median: left out with its sales.
+      oddSales(
+        valued.filter((x) => !noAiKeys.includes(x.v.source ?? '')),
+        market,
+        now,
+      )
         .filter((o) => !noAiKeys.includes(o.source))
         .map((o) => ({
           ...lot(o.holding, o.product),
@@ -553,7 +585,7 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     ),
   );
 
-  const health = await collectorHealth(db, now);
+  const health = await collectorHealthForAi(db, noAiKeys, now);
   findings.push(
     finding(
       'collectors',
@@ -598,7 +630,11 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     })
     .from(priceObservations)
     .where(
-      and(inArray(priceObservations.productId, productIds), eq(priceObservations.excluded, false)),
+      and(
+        inArray(priceObservations.productId, productIds),
+        eq(priceObservations.excluded, false),
+        noAiKeys.length ? notInArray(priceObservations.source, noAiKeys) : undefined,
+      ),
     );
   const share = new Map<string, { n: number; inferred: number }>();
   for (const e of estimated) {
@@ -675,17 +711,22 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
 // read-only SQL
 
 /**
- * Tables with a row per source (sales, asks, timing signals, link candidates): read through a
+ * Tables with a row per source (sales, asks, timing signals, link candidates, runs): read through a
  * version without the rows of the sources kept from AI.
  */
-const SALES_TABLES = [
+export const SALES_TABLES = [
+  'collector_runs',
   'price_observations',
   'price_days_dirty',
   'supply',
   'signals',
   'source_candidates',
   'rankings',
+  'opening_sets',
   'opening_cards',
+  'stores',
+  'store_posts',
+  'tcg_sets',
 ];
 /** Tables mixing every source's data in one row: never read through `query_sql`. */
 const PACKED_TABLES: Record<string, string> = {
@@ -699,12 +740,19 @@ const PACKED_TABLES: Record<string, string> = {
  * column name to the expression replacing it (`l` is the quoted list of those sources).
  */
 const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
-  // Every row stays (which items have which listings); the trades last seen there and the
-  // collector's opaque progress (which may hold page data) are left out for those sources.
-  product_sources: {
-    recent_sales: (l) => `case when source in (${l}) then null else recent_sales end`,
-    state: (l) => `case when source in (${l}) then null else state end`,
-  },
+  // Every row stays (which items have which listings); what came from the site or tells how the
+  // collecting went (trades last seen, progress, errors, page title, dates) is left out for them.
+  product_sources: Object.fromEntries(
+    [
+      'recent_sales',
+      'state',
+      'failure',
+      'title',
+      'image_url',
+      'last_success_at',
+      'details_synced_at',
+    ].map((c) => [c, (l: string) => `case when source in (${l}) then null else ${c} end`]),
+  ),
   // A saved value (BucketValue in @tora/db valuation.ts) carries the last sale, the buy price and
   // a summary per source besides the valuation: those of the sources are taken out.
   bucket_values: {
@@ -720,10 +768,26 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
   },
   // Each lot's recent values by day (the same values as holding_values): totals in `series` stay.
   portfolio_charts: { recent: () => 'null' },
-  // Sent messages may quote a price or ask of any source: only kinds that never do keep their text.
+  // Sent messages may quote a price or ask of any source, and failure cards (kind admin) name the
+  // sources and quote their errors: only kinds that never do keep their text.
   alert_log: {
-    text: () =>
-      `case when kind in ('store', 'storeUnknown', 'feed', 'admin', 'test') then text end`,
+    text: () => `case when kind in ('store', 'storeUnknown', 'feed', 'test') then text end`,
+  },
+  // A run's or a check's log lists each source with its requests and errors; settings name them.
+  activity: {
+    detail: () => `case when kind in ('collect', 'check', 'admin') then null else detail end`,
+  },
+  // Gap and bias come from a source's prices, and another source's row may be compared against it.
+  sources: {
+    quality: (l) =>
+      `case when key in (${l}) or ${l
+        .split(', ')
+        .map((k) => `instr(quality, '"' || ${k} || '"')`)
+        .join(' or ')} then null else quality end`,
+  },
+  app_settings: {
+    value: () =>
+      `case when key in (${READABLE_SETTINGS.map((k) => `'${k}'`).join(', ')}) then value end`,
   },
 };
 
@@ -732,6 +796,69 @@ const ROW_FILTERS: Record<string, (l: string) => string> = {
   // Valued from those sources' sales: the whole value is theirs.
   bucket_values: (l) => `coalesce(json_extract(value, '$.valuation.source'), '') not in (${l})`,
 };
+
+/** Settings readable through `query_sql`; any other's value is left out (a new one holds nothing). */
+const READABLE_SETTINGS = [
+  'alertsSentToday',
+  'catalogHash',
+  'categories',
+  'closingStepsDay',
+  'collectWindow',
+  'currency',
+  'dbBudget',
+  'itemSalesBuiltAt',
+  'languages',
+  'lastBackup',
+  'lotSizesFullAt',
+  'markets',
+  'morningCheckDay',
+  'rateSources',
+  'salesRecheckRuns',
+  'setLines',
+  'signalPicks',
+  'sourceOrder',
+  'timeZone',
+  'valueSeriesBreak',
+];
+
+/**
+ * Tables holding no data of any one source, read as they are. Every table is in one of the lists
+ * (a test checks): a new one holding a source's data also goes in `ops/scrub-analysis.sql`.
+ */
+export const SOURCE_FREE_TABLES = [
+  'account_setups',
+  'alert_channels',
+  'canceled_orders',
+  'db_usage',
+  'feed_tokens',
+  'fx_rates',
+  'holding_events',
+  'holdings',
+  'import_rows',
+  'import_runs',
+  'import_uploads',
+  'login_attempts',
+  'lottery_marks',
+  'manual_prices',
+  'notice_messages',
+  'product_images',
+  'products',
+  'purchase_links',
+  'source_warning_dismissals',
+  'store_notices',
+  'store_post_images',
+  'suggestions',
+  'user_devices',
+  'users',
+  'watches',
+];
+/** Every table the guards of `query_sql` know, for that test. */
+export const SORTED_TABLES = () => [
+  ...SALES_TABLES,
+  ...Object.keys(PACKED_TABLES),
+  ...Object.keys(HIDDEN_COLUMNS),
+  ...SOURCE_FREE_TABLES,
+];
 
 /** Tables `withoutSources` rebuilds columns of: their column names are needed (`columns`). */
 export const REBUILT_TABLES = Object.keys(HIDDEN_COLUMNS);
@@ -895,13 +1022,14 @@ export async function watchlist(db: Db, userId: string) {
   return rows.map(({ watch, product }) => {
     const signal = timing.get(`${product.id}|${watch.bucket}`);
     const choice = strategyOf(user?.preferences, productClass(product));
-    // Numbers from a source Claude may not read are left out, as is the ask (given above).
-    const stats =
-      signal && !(signal.source && noAi.includes(signal.source))
-        ? { ...signal.stats, ask: null }
-        : null;
     const v = values.get(bucketValueKey(product.id, watch.bucket || null))?.valuation;
     const hidden = !!v?.source && noAi.includes(v.source);
+    // Numbers from a source Claude may not read are left out, as is the ask (given above); a value
+    // from one leaves out the signal too, which may rest on it without naming it.
+    const stats =
+      signal && !hidden && !(signal.source && noAi.includes(signal.source))
+        ? { ...signal.stats, ask: null }
+        : null;
     const asks = (supply.get(product.id) ?? []).filter((s) => !noAi.includes(s.source));
     const ask = lowestAsk(asks, watch.bucket);
     return {

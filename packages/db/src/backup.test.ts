@@ -2,7 +2,7 @@ import { createClient } from '@libsql/client';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
@@ -182,6 +182,50 @@ it('unpacks the latest backup as the analysis copy, only when newer', async () =
   const before = (await stat(target)).mtimeMs;
   expect(await refreshAnalysisCopy(backups, target)).toBe('2026-10-17');
   expect((await stat(target)).mtimeMs).toBe(before);
+});
+
+it('takes the sources kept from AI out of the analysis copy, or leaves the old copy', async () => {
+  const backups = join(dir, 'backups');
+  const target = join(dir, 'analysis', 'tora.db');
+  await mkdir(backups);
+  const live = createClient({ url: `file:${join(dir, 'live.db')}` });
+  const run = (source: string) =>
+    live.execute({
+      sql: `insert into collector_runs (id, source, status, started_at, created_at, updated_at)
+            values (?, ?, 'ok', 'x', 'x', 'x')`,
+      args: [source, source],
+    });
+  await live.execute(`insert into sources (key, info, created_at, updated_at) values
+    ('ebay', '{"noAi":true}', 'x', 'x'), ('mercari', '{}', 'x', 'x')`);
+  await run('ebay');
+  await run('mercari');
+  await backupDatabase(live, join(backups, backupName('2026-10-17')));
+  await refreshAnalysisCopy(backups, target);
+  const read = async () => {
+    const copy = createClient({ url: `file:${target}` });
+    const { rows } = await copy.execute('select source from collector_runs');
+    copy.close();
+    return rows.map((r) => r.source);
+  };
+  expect(await read()).toEqual(['mercari']);
+
+  // A later backup it cannot be taken out of: the old copy stays, with nothing left beside it.
+  await live.execute('drop table supply');
+  await backupDatabase(live, join(backups, backupName('2026-10-18')));
+  // An interrupted run's full file: gone once it is old, and another run's is left alone.
+  const old = new Date(Date.now() - 2 * 3_600_000);
+  await writeFile(`${target}.part.1`, 'full');
+  await utimes(`${target}.part.1`, old, old);
+  await writeFile(`${target}.part.2`, 'another run');
+  await expect(refreshAnalysisCopy(backups, target)).rejects.toThrow();
+  expect(await read()).toEqual(['mercari']);
+  expect((await readdir(join(dir, 'analysis'))).sort()).toEqual(['tora.db', 'tora.db.part.2']);
+  // Also when no refresh is due: drop the failing backup, so the copy is current.
+  await rm(join(backups, backupName('2026-10-18')));
+  await writeFile(`${target}.part.3`, 'full');
+  await utimes(`${target}.part.3`, old, old);
+  await refreshAnalysisCopy(backups, target);
+  expect(existsSync(`${target}.part.3`)).toBe(false);
 });
 
 it('keeps the last 30 days and the first backup of each month for a year', async () => {
