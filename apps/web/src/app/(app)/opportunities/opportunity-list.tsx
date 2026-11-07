@@ -16,6 +16,7 @@ export function OpportunityList({
   total,
   proven,
   picked,
+  flat,
   filter,
   labels,
 }: {
@@ -23,6 +24,8 @@ export function OpportunityList({
   total: number;
   proven: number;
   picked: number;
+  /** Ordered by the person's criteria first, so the proven items are not together. */
+  flat: boolean;
   filter: CardsFilter;
   labels: OpportunityLabels;
 }) {
@@ -73,13 +76,15 @@ export function OpportunityList({
   return (
     <>
       <ul className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {proven > 0 && heading(t('provenTitle', { count: proven }))}
+        {!flat && proven > 0 && heading(t('provenTitle', { count: proven }))}
         {rows.map((o, i) => (
           <Fragment key={o.productId}>
-            {i === proven &&
+            {!flat &&
+              i === proven &&
               picked > 0 &&
               heading(t('pickTitle', { count: picked }), t('pickNote'))}
-            {i === proven + picked &&
+            {!flat &&
+              i === proven + picked &&
               heading(
                 t('restTitle', { count: total - proven - picked }),
                 proven ? t('restNote') : `${t('noneProven')} ${t('restNote')}`,

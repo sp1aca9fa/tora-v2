@@ -1,11 +1,18 @@
 import { STRATEGIES, judge, productClass, strategyOf, suggestedStrategy } from '@tora/core';
-import { heldItemTypes, latestSignals, listWatches, loadOpportunities } from '@tora/db';
+import {
+  heldItemTypes,
+  latestSignals,
+  listWatches,
+  loadOpportunities,
+  rarityOptions,
+} from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { authed } from '@/lib/auth/guard';
 import { bucketLabel } from '@/lib/product-display';
 import { type ConditionTypeView, ConditionPicker } from './condition-picker';
+import { PotentialPicker } from './potential-picker';
 import { type StrategyTypeView, StrategyPicker } from './strategy-picker';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,11 +25,12 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function StrategyPage() {
   const { db, user } = await authed();
-  const [t, watches, owned, saved] = await Promise.all([
+  const [t, watches, owned, saved, rarities] = await Promise.all([
     getTranslations(),
     listWatches(db, user.id),
     heldItemTypes(db, user.id),
     loadOpportunities(db),
+    rarityOptions(db),
   ]);
   const types = [...new Set([...watches.map((w) => productClass(w.product)), ...owned])];
   // Each strategy on the person's own watches today (S27): how many it calls a good price.
@@ -92,6 +100,10 @@ export default async function StrategyPage() {
       </header>
       <StrategyPicker types={views} />
       {conditions.length > 0 && <ConditionPicker types={conditions} />}
+      <PotentialPicker
+        rarities={[...new Set([...rarities, ...(user.preferences?.potential?.rarities ?? [])])]}
+        current={user.preferences?.potential ?? {}}
+      />
     </div>
   );
 }

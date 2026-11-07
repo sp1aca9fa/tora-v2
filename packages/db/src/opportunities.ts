@@ -4,7 +4,11 @@
 // saved in one setting that pages and the MCP read.
 import {
   type DayPrice,
+  type DealWay,
+  type ListingsThen,
   type OpportunityMember,
+  type PotentialCriteria,
+  type PotentialHit,
   type ReprintHint,
   type OpportunityNumbers,
   type OpportunitySignal,
@@ -14,14 +18,21 @@ import {
   type StrategyChoice,
   type Verdict,
   type ZoneBasis,
-  ASK_FLOOR,
-  ASK_UNDER,
   BUYLIST_NEAR,
+  DEAL_WAYS,
+  LISTINGS_BACK_DAYS,
+  LISTINGS_GAP_DAYS,
   MARKET_SHARE,
   OPPORTUNITY_WARNINGS,
   OpportunityGroup,
+  askIsUnder,
+  dealWayStates,
+  hasPotential,
   judge,
+  listingsBackFrom,
+  listingsNear,
   localDate,
+  potentialHits,
   provenEdge,
   suggestsCondition,
   waitPrice,
@@ -31,7 +42,7 @@ import {
   strategyOf,
   toLocalIso,
 } from '@tora/core';
-import { and, eq, gte, inArray } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { imageVersions } from './images';
 import { matchingProducts } from './queries';
@@ -41,7 +52,7 @@ import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, latestSignals, pickSeries } from './signals';
-import { currentSupply, lowestAsk } from './supply';
+import { SUPPLY_FRESH_DAYS, currentSupply, listingHistory, listingsIn, lowestAsk } from './supply';
 
 const DAY = 86_400_000;
 /** Days of sales a reference source's series needs to be preferred over a longer one elsewhere. */
@@ -66,6 +77,11 @@ export interface OpportunityItem {
    */
   ask: { price: number; source: string; url: string | null } | null;
   buylist: { price: number; source: string; day: string } | null;
+  /**
+   * Listings in this condition on the price source only, now and about 14 days ago (S32). Kept
+   * apart from `numbers`, which the MCP passes on whole. Missing in data saved before: unknown.
+   */
+  listings?: ListingsThen;
 }
 
 export interface SavedOpportunities {
@@ -185,9 +201,17 @@ export async function refreshOpportunities(
   }
 
   const ids = [...memberOf.keys()];
-  const [supply, buylist] = await Promise.all([
+  const daysAgo = (days: number) => localDate(new Date(now.getTime() - days * DAY));
+  const [supply, buylist, listed] = await Promise.all([
     currentSupply(db, ids, now),
     latestBuylist(db, now),
+    listingHistory(
+      db,
+      ids,
+      // The latest report can be SUPPLY_FRESH_DAYS old, and "before" is measured from it.
+      daysAgo(LISTINGS_BACK_DAYS + LISTINGS_GAP_DAYS + SUPPLY_FRESH_DAYS),
+      daysAgo(LISTINGS_BACK_DAYS - LISTINGS_GAP_DAYS),
+    ),
   ]);
   const byId = new Map(all.map((p) => [p.id, p]));
   const tests: SavedOpportunities['tests'] = {};
@@ -204,10 +228,8 @@ export async function refreshOpportunities(
       const bucket = m.bucket ?? '';
       // Like for like: another site's cheapest listing is too often something else (no shrink,
       // one pack), so the ask is the price source's own.
-      const ask = lowestAsk(
-        (supply.get(m.id) ?? []).filter((s) => s.source === m.source),
-        bucket,
-      );
+      const own = (supply.get(m.id) ?? []).filter((s) => s.source === m.source);
+      const ask = lowestAsk(own, bucket);
       const shop = buylist.get(m.id)?.find((b) => b.bucket === bucket || b.bucket === null);
       items.push({
         productId: m.id,
@@ -221,6 +243,19 @@ export async function refreshOpportunities(
           ? { price: ask.lowestAskBase, source: ask.source, url: ask.url }
           : null,
         buylist: shop ? { price: shop.price, source: shop.source, day: shop.day } : null,
+        // A condition missing from a report that counts others had nothing for sale (currentSupply);
+        // a source with no report, or none with a count, stays unknown.
+        listings: {
+          now:
+            listingsIn(own, bucket) ??
+            (!own.some((s) => s.bucket === bucket) && own.some((s) => s.listings !== null)
+              ? 0
+              : null),
+          before: listingsNear(
+            listed.get(`${m.id}|${m.source}|${bucket}`) ?? [],
+            listingsBackFrom(own[0]?.day ?? today),
+          ),
+        },
       });
     }
   }
@@ -304,11 +339,7 @@ export async function loadOpportunities(
       ...ranked,
       picked: ranked.unproven.filter((k) => picks.includes(k) && rules.some((r) => r.key === k)),
       tests,
-      askUnder:
-        !!item.ask &&
-        !!price &&
-        item.ask.price <= price * ASK_UNDER &&
-        item.ask.price >= price * ASK_FLOOR,
+      askUnder: askIsUnder(item.ask, price),
       buylistNear: !!item.buylist && !!price && item.buylist.price >= price * BUYLIST_NEAR,
     };
   });
@@ -370,6 +401,8 @@ export interface OpportunityCard extends Opportunity, ItemView {
   owned: boolean;
   imageVersion: string | null;
   ranks: (RankView & { label: string })[];
+  /** The person's criteria it meets (S32), a stated preference: none without criteria. */
+  potential: PotentialHit[];
 }
 
 /** A warning on for nearly every item of a type: how many of how many, and its record. */
@@ -537,6 +570,46 @@ export async function rankedViews(
   };
 }
 
+/** The rarities in use, most items first, for the person to pick from (S32). */
+export async function rarityOptions(db: Pick<Db, 'select'>): Promise<string[]> {
+  const rows = await db
+    .select({ rarity: products.rarity })
+    .from(products)
+    .where(isNotNull(products.rarity))
+    .groupBy(products.rarity)
+    .orderBy(sql`count(*) desc`, products.rarity)
+    .limit(60);
+  return rows.flatMap((r) => (r.rarity?.trim() ? [r.rarity] : []));
+}
+
+/** How many of the person's criteria each item of a list meets (S32). */
+async function potentialCounts(
+  db: Db,
+  criteria: PotentialCriteria,
+  ids: string[],
+  now: Date,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const ranks = criteria.ranked ? await latestRanks(db, ids, now) : null;
+  for (let i = 0; i < ids.length; i += 500) {
+    const rows = await db
+      .select({
+        id: products.id,
+        name: products.name,
+        nameAlias: products.nameAlias,
+        rarity: products.rarity,
+        reprint: products.reprint,
+      })
+      .from(products)
+      .where(inArray(products.id, ids.slice(i, i + 500)));
+    for (const p of rows) {
+      const ranked = !!ranks?.get(p.id)?.length;
+      out.set(p.id, potentialHits(criteria, { ...p, ranked }).length);
+    }
+  }
+  return out;
+}
+
 /** How far over its target an item is (0 at or under it); unknown last. */
 const gap = (c: { now: number | null; target: number | null }) =>
   c.now !== null && c.target ? Math.max(0, c.now / c.target - 1) : Infinity;
@@ -545,12 +618,18 @@ const gap = (c: { now: number | null; target: number | null }) =>
  * The Worth a look list of an item type (S26), `limit` items from `offset`: those with a proven
  * signal first, by score, then the rest by score; equal scores nearest their target first. With
  * signals, only the items every one of them is on and proven for (warnings too). The summary counts
- * every type.
+ * every type. With a way (S32), only the items it is on, those meeting most of the person's criteria
+ * first, then as above; a way ranks nothing and never changes the list without one.
  */
 export async function opportunityCards(
   db: Db,
   user: Pick<User, 'id' | 'preferences'>,
-  filter: { type: string | null; signals?: OpportunitySignal[]; q?: string | null },
+  filter: {
+    type: string | null;
+    signals?: OpportunitySignal[];
+    q?: string | null;
+    way?: DealWay | null;
+  },
   offset: number,
   limit: number,
   now = new Date(),
@@ -562,6 +641,8 @@ export async function opportunityCards(
   /** Of the list, how many have a proven signal (they come first), then an admin's pick. */
   proven: number;
   picked: number;
+  /** A way's list ordered by the person's criteria first. */
+  reordered: boolean;
   /** The signal plug-ins' labels (S27). */
   rules: SignalRuleInfo[];
   /**
@@ -569,6 +650,8 @@ export async function opportunityCards(
    * record on the group with the most of them. Left out of the items' warnings and scores.
    */
   market: MarketWarning[];
+  /** Of the type's items (with the search and signals chosen), the ways with items on (S32). */
+  ways: { key: DealWay; items: number }[];
   items: OpportunityCard[];
   /** An item of each group of the type's signals, to name the group. */
   groupItems: Record<string, Product>;
@@ -612,7 +695,7 @@ export async function opportunityCards(
     ? filter.type
     : (summary.types[0]?.type ?? null);
   // Filtered on the item's signals as saved: a market warning too.
-  const list = adjusted.filter(
+  const shown = adjusted.filter(
     (o, i) =>
       keep[i] &&
       o.itemType === type &&
@@ -620,6 +703,24 @@ export async function opportunityCards(
         (k) => o.proven.includes(k) || saved.items[i]!.warnings.includes(k),
       ),
   );
+  const states = shown.map(dealWayStates);
+  const ways = DEAL_WAYS.flatMap((key) => {
+    const items = states.filter((s) => s[key] === true).length;
+    return items ? [{ key, items }] : [];
+  });
+  const way = filter.way;
+  const list = way ? shown.filter((_, i) => states[i]![way] === true) : shown;
+  const criteria = user.preferences?.potential;
+  const potential =
+    way && hasPotential(criteria)
+      ? await potentialCounts(
+          db,
+          criteria,
+          list.map((o) => o.productId),
+          now,
+        )
+      : null;
+  const count = (id: string) => potential?.get(id) ?? 0;
   const [owned, views] = await Promise.all([
     db
       .selectDistinct({ id: holdings.productId })
@@ -631,6 +732,7 @@ export async function opportunityCards(
   const ordered = list.map((o, i) => ({ o, ...views[i]! }));
   ordered.sort(
     (a, b) =>
+      count(b.o.productId) - count(a.o.productId) ||
       Number(worthALook(b.o)) - Number(worthALook(a.o)) ||
       Number(b.o.picked.length > 0) - Number(a.o.picked.length > 0) ||
       b.o.score - a.o.score ||
@@ -658,10 +760,12 @@ export async function opportunityCards(
       [...samples].flatMap(([group, id]) => (byId.has(id) ? [[group, byId.get(id)!]] : [])),
     ),
     total: ordered.length,
+    reordered: !!potential && [...potential.values()].some((n) => n > 0),
     proven: ordered.filter((c) => worthALook(c.o)).length,
     picked: ordered.filter((c) => !worthALook(c.o) && c.o.picked.length > 0).length,
     rules: saved.rules,
     market: market.get(type ?? '') ?? [],
+    ways,
     items: page.flatMap(({ o, ...c }) => {
       const product = byId.get(o.productId);
       if (!product) return [];
@@ -676,6 +780,10 @@ export async function opportunityCards(
             ...r,
             label: labels.get(r.ranking) ?? r.ranking,
           })),
+          potential: potentialHits(criteria, {
+            ...product,
+            ranked: !!ranks.get(o.productId)?.length,
+          }),
         },
       ];
     }),

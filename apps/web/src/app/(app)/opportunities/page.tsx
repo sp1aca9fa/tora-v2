@@ -1,3 +1,4 @@
+import { type DealWay, DEAL_WAYS_TESTED, dealWayRecord } from '@tora/core';
 import { TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -13,7 +14,7 @@ import { OpportunityList } from './opportunity-list';
 export default async function WorthALookPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; signal?: string; q?: string }>;
+  searchParams: Promise<{ type?: string; signal?: string; q?: string; way?: string }>;
 }) {
   const { db, user } = await authed();
   const filter = cleanFilter(await searchParams);
@@ -27,8 +28,8 @@ export default async function WorthALookPage({
   }
   const type = data.type;
   const signals = data.summary.signals[type] ?? [];
-  const href = (q: { type: string; signals?: string[] }) =>
-    `/opportunities?type=${encodeURIComponent(q.type)}${q.signals?.length ? `&signal=${q.signals.join(',')}` : ''}${filter.q ? `&q=${encodeURIComponent(filter.q)}` : ''}`;
+  const href = (q: { type: string; signals?: string[]; way?: DealWay | null }) =>
+    `/opportunities?type=${encodeURIComponent(q.type)}${q.signals?.length ? `&signal=${q.signals.join(',')}` : ''}${q.way ? `&way=${q.way}` : ''}${filter.q ? `&q=${encodeURIComponent(filter.q)}` : ''}`;
   /** The chosen signals with this one added, or taken out. */
   const toggled = (key: string) =>
     filter.signals.some((k) => k === key)
@@ -67,7 +68,7 @@ export default async function WorthALookPage({
               return (
                 <Link
                   key={s.key}
-                  href={href({ type, signals: toggled(s.key) })}
+                  href={href({ type, signals: toggled(s.key), way: filter.way })}
                   aria-pressed={on}
                   className={cn(
                     chip(on),
@@ -82,6 +83,37 @@ export default async function WorthALookPage({
             })}
           </div>
         )}
+        {data.ways.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-xs text-muted-foreground">{t('opportunities.way.here')}</span>
+            {data.ways.map((w) => {
+              const on = filter.way === w.key;
+              return (
+                <Link
+                  key={w.key}
+                  href={href({ type, signals: filter.signals, way: on ? null : w.key })}
+                  aria-pressed={on}
+                  className={cn(chip(on), 'py-0.5 text-xs')}
+                >
+                  {t(`opportunities.way.name.${w.key}`)}{' '}
+                  <span className="tabular-nums opacity-70">{w.items}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+        {filter.way && (
+          <p className="rounded-xl border bg-card px-3 py-2 text-sm">
+            {t(`opportunities.way.record.${dealWayRecord(filter.way, type)}`, {
+              way: t(`opportunities.way.name.${filter.way}`),
+              type: typeLabel(t, type).toLowerCase(),
+              day: DEAL_WAYS_TESTED,
+            })}{' '}
+            <Link href={href({ type, signals: filter.signals })} className="underline">
+              {t('opportunities.clearFilter')}
+            </Link>
+          </p>
+        )}
         {filter.signals.length > 0 && (
           <p className="text-xs">
             {t('opportunities.filtered', {
@@ -94,7 +126,7 @@ export default async function WorthALookPage({
                 )
                 .join(' + '),
             })}{' '}
-            <Link href={href({ type })} className="underline">
+            <Link href={href({ type, way: filter.way })} className="underline">
               {t('opportunities.clearFilter')}
             </Link>
           </p>
@@ -143,16 +175,18 @@ export default async function WorthALookPage({
         </p>
       </div>
       <OpportunityList
-        key={`${type}|${filter.signals.join()}|${filter.q ?? ''}`}
+        key={`${type}|${filter.signals.join()}|${filter.q ?? ''}|${filter.way ?? ''}`}
         initial={data.rows}
         total={data.total}
         proven={data.proven}
+        flat={data.reordered && !!filter.way}
         picked={data.picked}
-        filter={{ type, signals: filter.signals, q: filter.q }}
+        filter={{ type, signals: filter.signals, q: filter.q, way: filter.way }}
         labels={{
           now: t('opportunities.now'),
           target: t('opportunities.target'),
           good: t('opportunities.goodNow'),
+          preference: t('opportunities.potential.mark'),
           watch: t('opportunities.watch'),
           noSignal: t('opportunities.noSignal'),
           seeRecord: t('opportunities.seeRecord'),

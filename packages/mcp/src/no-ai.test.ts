@@ -214,7 +214,16 @@ describe('query_sql on a database holding a noAi source', () => {
         .set({ quality: { card: { against: 'ebay', pairs: 3 } } })
         .where(eq(schema.sources.key, 'mercari'));
       await db.insert(schema.appSettings).values([
-        { key: 'opportunities', value: { items: [{ source: 'ebay' }] } },
+        {
+          key: 'opportunities',
+          value: {
+            items: [
+              { source: 'ebay', listings: { now: 9, before: 12 } },
+              { source: 'mercari', listings: { now: 3, before: 4 } },
+              { source: 'mercari', buylist: { source: 'ebay', price: 1, day: 'x' } },
+            ],
+          },
+        },
         { key: 'currency', value: 'JPY' },
       ]);
     });
@@ -263,6 +272,15 @@ describe('query_sql on a database holding a noAi source', () => {
       expect(await all('alert_log')).not.toContain('ebay');
       expect(await all('bucket_values')).not.toContain('ebay');
       expect(await all('item_sales')).not.toContain('ebay');
+      // A saved opportunity on that source goes with its counts; the other source's stays.
+      const [saved] = (
+        await db.$client.execute("select value from app_settings where key = 'opportunities'")
+      ).rows;
+      expect(JSON.parse(String(saved!.value)).items).toEqual([
+        { source: 'mercari', listings: { now: 3, before: 4 } },
+        { source: 'mercari', buylist: null },
+      ]);
+      expect(await all('app_settings')).not.toContain('ebay');
       // The packed sales keep the other source's prices, and its daily counts.
       const [packed] = (await db.$client.execute('select sales from item_sales')).rows;
       const sales = JSON.parse(String(packed!.sales));
@@ -296,7 +314,7 @@ describe('query_sql on a database holding a noAi source', () => {
     for (const table of SALES_TABLES) {
       expect(scrub, table).toContain(`delete from ${table} where source in hidden;`);
     }
-    // Hide lots by day and any other setting from Claude's tool, and hold no such source today.
+    // Hide lots by day and any other setting from Claude's tool; the scrub takes out what names such a source.
     const toolOnly = ['portfolio_charts', 'app_settings'];
     for (const table of REBUILT_TABLES.filter((t) => !toolOnly.includes(t))) {
       expect(scrub, table).toContain(`update ${table} set`);

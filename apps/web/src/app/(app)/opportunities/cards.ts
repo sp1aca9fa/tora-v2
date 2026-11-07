@@ -1,9 +1,11 @@
 import 'server-only';
 import {
+  type DealWay,
   type OpportunitySignal,
   type OpportunityTests,
   type SignalRuleInfo,
   DEFAULT_MARGIN,
+  cleanDealWay,
   isBuiltInSignal,
   PROVEN_MIN_CHECKS,
 } from '@tora/core';
@@ -22,6 +24,8 @@ export interface CardsFilter {
   signals: OpportunitySignal[];
   /** A name search (`?q=`). */
   q: string | null;
+  /** A way of spotting a deal (`?way=`, S32). */
+  way: DealWay | null;
 }
 
 /** A filter from the address or a client: unknown values dropped. */
@@ -30,6 +34,7 @@ export function cleanFilter(f: {
   signal?: unknown;
   signals?: unknown;
   q?: unknown;
+  way?: unknown;
 }): CardsFilter {
   const asked = Array.isArray(f.signals)
     ? f.signals
@@ -45,6 +50,7 @@ export function cleanFilter(f: {
       ),
     ].slice(0, 10),
     q: cleanSearch(f.q),
+    way: cleanDealWay(f.way),
   };
 }
 
@@ -124,6 +130,7 @@ function rowOf(
   money: (n: number) => string,
   o: OpportunityCard,
   rules: readonly SignalRuleInfo[],
+  way: DealWay | null,
 ): OpportunityRowData {
   const n = o.numbers;
   // What the item's line is: its set, its line, or (too few of either) similar items.
@@ -148,6 +155,20 @@ function rowOf(
           cheaper: n.year != null ? pct(1 - n.year) : '-',
           hold: n.hold14 != null ? signed(n.hold14) : '-',
         });
+  /** Why the item is on a way's list; a listing under the market already says so itself. */
+  const wayWhy = (w: DealWay) =>
+    w === 'falling_hard' || w === 'rising_fast'
+      ? why('quick_rise')
+      : w === 'cheap_paused'
+        ? why('cheap_steady')
+        : w === 'sales_up'
+          ? why('sales_up')
+          : w === 'listings_drying'
+            ? t('opportunities.way.why', {
+                now: o.listings?.now ?? 0,
+                before: o.listings?.before ?? 0,
+              })
+            : null;
   const signals = [
     ...o.proven.map((key) => ({ key, style: 'proven' as const })),
     ...o.warnings.map((key) => ({ key, style: 'warning' as const })),
@@ -160,6 +181,7 @@ function rowOf(
   const goal = o.wait ? o.wait.under : o.target;
   const over = o.now !== null && goal ? o.now / goal - 1 : null;
   const warning = o.wait && signalLabel(t, o.wait.key, rules);
+  const good = o.verdict === 'good' && (!o.wait || (over !== null && over <= 0));
   return {
     productId: o.productId,
     href: `/products/${o.productId}/buy${o.bucket ? `?condition=${encodeURIComponent(o.bucket)}` : ''}`,
@@ -246,7 +268,22 @@ function rowOf(
           .filter(Boolean)
           .join(' ')
       : null,
-    good: o.verdict === 'good' && (!o.wait || (over !== null && over <= 0)),
+    good,
+    // A list by way ranks on no proven signal, so Buy timing's word shows whatever it is.
+    verdict:
+      way && o.verdict && !good
+        ? t(o.verdict === 'good' ? 'opportunities.way.verdictWait' : 'opportunities.way.verdict', {
+            verdict: t(`buy.verdict.${o.verdict}`),
+          })
+        : null,
+    wayWhy: way ? wayWhy(way) : null,
+    potential: o.potential.map((p) =>
+      p.kind === 'subject'
+        ? p.value
+        : p.kind === 'rarity'
+          ? t('opportunities.potential.rarity', { value: p.value })
+          : t(`opportunities.potential.${p.kind}`),
+    ),
     askUnder:
       o.askUnder && o.ask && n.price
         ? t('opportunities.askUnder', {
@@ -287,5 +324,7 @@ export async function loadCards(
     getTranslations(),
     getMoney(),
   ]);
-  return data && { ...data, rows: data.items.map((o) => rowOf(t, money, o, data.rules)) };
+  return (
+    data && { ...data, rows: data.items.map((o) => rowOf(t, money, o, data.rules, filter.way)) }
+  );
 }

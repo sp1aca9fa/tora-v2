@@ -53,6 +53,15 @@ update sources set quality = null
 delete from app_settings
   where key = 'dataCheck' and exists (select 1 from hidden h where instr(value, '"' || h.key || '"'));
 
+-- Saved opportunities hold each item's numbers, ask and listing counts, on the item's own source;
+-- its shop price can come from any source.
+update app_settings set value = json_set(value, '$.items', (select json_group_array(json(
+      case when json_extract(e.value, '$.buylist.source') in hidden
+        then json_set(e.value, '$.buylist', json('null')) else e.value end))
+    from json_each(app_settings.value, '$.items') e
+    where coalesce(json_extract(e.value, '$.source'), '') not in hidden))
+  where key = 'opportunities' and exists (select 1 from hidden h where instr(value, '"' || h.key || '"'));
+
 -- Messages and logs name sources and quote their errors.
 update activity set detail = '{}'
   where kind in ('collect', 'check', 'admin') and exists (select 1 from hidden);

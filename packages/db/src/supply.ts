@@ -1,5 +1,5 @@
 import { localDate, toLocalIso } from '@tora/core';
-import { and, gte, inArray, sql } from 'drizzle-orm';
+import { and, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { type Supply, supply } from './schema';
 
@@ -90,6 +90,42 @@ export function lowestAsk(rows: Supply[], bucket: string): Supply | null {
 export function listingsIn(rows: Supply[], bucket: string): number | null {
   const known = rows.filter((r) => r.bucket === bucket && r.listings !== null);
   return known.length ? known.reduce((n, r) => n + r.listings!, 0) : null;
+}
+
+/**
+ * Per item, source and condition (`id|source|bucket`), the listing counts reported from `from` to
+ * `to`, days included. Rows without a count are left out.
+ */
+export async function listingHistory(
+  db: Pick<Db, 'select'>,
+  productIds: string[],
+  from: string,
+  to: string,
+): Promise<Map<string, { day: string; listings: number }[]>> {
+  const out = new Map<string, { day: string; listings: number }[]>();
+  if (!productIds.length) return out;
+  const rows = await db
+    .select({
+      productId: supply.productId,
+      source: supply.source,
+      bucket: supply.bucket,
+      day: supply.day,
+      listings: supply.listings,
+    })
+    .from(supply)
+    .where(
+      and(
+        inArray(supply.productId, productIds),
+        gte(supply.day, from),
+        lte(supply.day, to),
+        isNotNull(supply.listings),
+      ),
+    );
+  for (const r of rows) {
+    const key = `${r.productId}|${r.source}|${r.bucket}`;
+    out.set(key, [...(out.get(key) ?? []), { day: r.day, listings: r.listings! }]);
+  }
+  return out;
 }
 
 /** Moves a duplicate item's reports to the item it is merged into (the target's win). */

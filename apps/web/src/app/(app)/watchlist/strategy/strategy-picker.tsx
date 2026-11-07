@@ -178,7 +178,10 @@ function TypePanel({ view }: { view: StrategyTypeView }) {
                     {r.checked > 0 && (
                       <>
                         {' · '}
-                        {t('after90', { higher: r.higher, checked: r.checked })}
+                        {t(r.checked < 10 ? 'after90Few' : 'after90', {
+                          higher: r.higher,
+                          checked: r.checked,
+                        })}
                       </>
                     )}
                   </span>

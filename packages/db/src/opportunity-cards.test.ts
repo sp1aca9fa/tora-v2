@@ -3,14 +3,20 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { localDate, toLocalIso } from '@tora/core';
-import { beforeEach, expect, it } from 'vitest';
+import { type UserPreferences, localDate, toLocalIso } from '@tora/core';
+import { eq } from 'drizzle-orm';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct } from './mutations';
-import { type OpportunityItem, opportunityCards, setSignalPick } from './opportunities';
+import {
+  type OpportunityItem,
+  opportunityCards,
+  rarityOptions,
+  setSignalPick,
+} from './opportunities';
 import { saveSetting } from './registry';
-import { signals } from './schema';
+import { products, signals } from './schema';
 import { createUser } from './users';
 
 let db: Db;
@@ -182,4 +188,137 @@ it('puts a plug-in signal an admin picks after the proven items, apart', async (
   expect(await names()).toEqual(['Proven', 'Picked*', 'Plain']);
   await setSignalPick(db, 'slab_cheap', false);
   expect(await names()).toEqual(['Proven', 'Picked', 'Plain']);
+});
+
+describe('ways of spotting a deal and potential (S32)', () => {
+  const names = (c: { items: { product: { name: string } }[] }) =>
+    c.items.map((i) => i.product.name);
+  const cards = (
+    filter: Partial<Parameters<typeof opportunityCards>[2]>,
+    offset = 0,
+    limit = 20,
+    preferences: UserPreferences | null = null,
+  ) =>
+    opportunityCards(
+      db,
+      { id: uid, preferences },
+      { type: 'sealed', ...filter },
+      offset,
+      limit,
+      now,
+    ).then((c) => c!);
+  /** A box with these numbers on top of the usual ones, none of them a way when left out. */
+  const withNumbers = async (
+    name: string,
+    numbers: Partial<OpportunityItem['numbers']>,
+    more: Partial<OpportunityItem> = {},
+  ) => {
+    const { item } = await box(name, [], 9000);
+    return { ...item, numbers: { ...item.numbers, salesBefore: null, ...numbers }, ...more };
+  };
+  const save = (items: OpportunityItem[]) =>
+    saveSetting(db, 'opportunities', { day: localDate(now), tests: {}, items });
+
+  it('filters by a way, counts each way with items, pages, and leaves unknown out', async () => {
+    await save([
+      await withNumbers('Fall one', { jump14: -0.3 }),
+      await withNumbers('Fall two', { jump14: -0.25 }),
+      await withNumbers('Fall three', { jump14: -0.2 }),
+      await withNumbers('Calm', { jump14: 0 }),
+      // Unknown: saved before these numbers existed.
+      await withNumbers('Old data', {}),
+      (await box('Fall in another type', [], 9000, 'card')).item,
+    ]);
+    const all = await cards({});
+    expect(all.total).toBe(5);
+    expect(all.ways).toEqual([{ key: 'falling_hard', items: 3 }]);
+    const first = await cards({ way: 'falling_hard' }, 0, 2);
+    expect(first.total).toBe(3);
+    expect(first.items).toHaveLength(2);
+    const rest = await cards({ way: 'falling_hard' }, 2, 2);
+    expect(rest.items).toHaveLength(1);
+    expect(new Set([...names(first), ...names(rest)])).toEqual(
+      new Set(['Fall one', 'Fall two', 'Fall three']),
+    );
+    // A way nothing is on: no items, no chip.
+    const none = await cards({ way: 'rising_fast' });
+    expect([none.total, none.items]).toEqual([0, []]);
+    expect(none.ways.some((w) => w.key === 'rising_fast')).toBe(false);
+  });
+
+  it('combines a way with a name search and with signals', async () => {
+    await save([
+      await withNumbers('Dragon fall', { jump14: -0.3 }),
+      await withNumbers('Knight fall', { jump14: -0.3 }),
+      await withNumbers('Dragon calm', { jump14: 0 }),
+    ]);
+    const found = await cards({ way: 'falling_hard', q: 'dragon' });
+    expect(names(found)).toEqual(['Dragon fall']);
+    // The chip counts what choosing it would show.
+    expect(found.ways).toEqual([{ key: 'falling_hard', items: 1 }]);
+    const signal = await cards({ way: 'falling_hard', signals: ['sales_up'] });
+    expect([signal.total, signal.ways]).toEqual([0, []]);
+  });
+
+  it('reads old saved data as unknown for listings, and new data on, off', async () => {
+    await save([
+      await withNumbers('Old', {}),
+      await withNumbers('Drying', {}, { listings: { now: 7, before: 10 } }),
+      await withNumbers('Steady', {}, { listings: { now: 10, before: 10 } }),
+      await withNumbers('No count', {}, { listings: { now: null, before: 10 } }),
+    ]);
+    expect(names(await cards({ way: 'listings_drying' }))).toEqual(['Drying']);
+  });
+
+  it('orders a way by potential first only, tags rows, and leaves other lists as they were', async () => {
+    const items = [
+      await withNumbers('Aaa plain', { jump14: -0.3 }),
+      await withNumbers('Bbb Dragon', { jump14: -0.3 }),
+      await withNumbers('Ccc Dragon Knight', { jump14: -0.3 }),
+    ];
+    await save(items);
+    const prefs: UserPreferences = { potential: { subjects: ['dragon', 'KNIGHT'] } };
+    const plain = await cards({ way: 'falling_hard' });
+    expect(plain.items.every((i) => i.potential.length === 0)).toBe(true);
+    const set = await cards({ way: 'falling_hard' }, 0, 20, prefs);
+    expect(names(set)).toEqual(['Ccc Dragon Knight', 'Bbb Dragon', 'Aaa plain']);
+    expect(set.items.map((i) => i.potential.length)).toEqual([2, 1, 0]);
+    // Headings go only when the criteria really moved something in a way's list.
+    expect(set.reordered).toBe(true);
+    expect(plain.reordered).toBe(false);
+    expect((await cards({}, 0, 20, prefs)).reordered).toBe(false);
+    const unmet: UserPreferences = { potential: { subjects: ['nothing like this'] } };
+    expect((await cards({ way: 'falling_hard' }, 0, 20, unmet)).reordered).toBe(false);
+    // Across batches too.
+    expect(names(await cards({ way: 'falling_hard' }, 1, 1, prefs))).toEqual(['Bbb Dragon']);
+    // Criteria set with no way: tags, but the usual order, the same as with none.
+    const noWay = await cards({}, 0, 20, prefs);
+    expect(names(noWay)).toEqual(names(await cards({})));
+    expect(noWay.items.find((i) => i.product.name === 'Bbb Dragon')!.potential).toEqual([
+      { kind: 'subject', value: 'dragon' },
+    ]);
+    // Empty criteria: the same as none.
+    const empty: UserPreferences = {
+      potential: { subjects: [], rarities: [], outOfPrint: false, ranked: false },
+    };
+    expect(names(await cards({ way: 'falling_hard' }, 0, 20, empty))).toEqual(names(plain));
+  });
+
+  it('meets rarity, the out of print mark and a current rank from the item', async () => {
+    const a = await withNumbers('Marked', { jump14: -0.3 });
+    const b = await withNumbers('Plain', { jump14: -0.3 });
+    await db
+      .update(products)
+      .set({ reprint: 'none', rarity: 'XR' })
+      .where(eq(products.id, a.productId));
+    await save([a, b]);
+    expect(await rarityOptions(db)).toEqual(['XR']);
+    const c = await cards({ way: 'falling_hard' }, 0, 20, {
+      potential: { rarities: ['XR'], outOfPrint: true, ranked: true },
+    });
+    expect(c.items.map((i) => [i.product.name, i.potential])).toEqual([
+      ['Marked', [{ kind: 'rarity', value: 'XR' }, { kind: 'out_of_print' }]],
+      ['Plain', []],
+    ]);
+  });
 });

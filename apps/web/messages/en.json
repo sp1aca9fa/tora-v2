@@ -1995,7 +1995,7 @@
       "plan": "Buy plan"
     },
     "updated": "Prices as of {day}.",
-    "typeCount": "{proven} of {items}",
+    "typeCount": "{proven} of {items} proven",
     "filtered": "{count} items with {signals}.",
     "clearFilter": "Clear",
     "withWarning": "the warning {name}",
@@ -2032,7 +2032,7 @@
       "sales_down": "Sales slowing",
       "strong_for_age": "Strong for its age",
       "weak_for_age": "Weak for its age",
-      "quick_rise": "Quick rise",
+      "quick_rise": "Rising fast",
       "out_of_print": "Out of print",
       "cheap_steady": "Cheap, fall paused",
       "reprint_coming": "Reprint coming"
@@ -2138,6 +2138,30 @@
       }
     },
     "signalsHere": "Filter by signal:",
+    "way": {
+      "here": "Ways of spotting a deal (an item can be in several):",
+      "name": {
+        "falling_hard": "Falling hard",
+        "cheap_paused": "Cheap, fall paused",
+        "sales_up": "Sales picking up",
+        "listings_drying": "Listings drying up",
+        "under_market": "A listing under the market",
+        "rising_fast": "Rising fast"
+      },
+      "record": {
+        "weak_or_mixed": "{way} on {type}: in a test on past prices ({day}), this did not clearly find better buys. This list is not advice.",
+        "cannot_be_tested": "{way} on {type}: there is not enough past data to test whether this finds better buys (checked {day}). This list is not advice."
+      },
+      "why": "Listings: {now} now, {before} about 14 days earlier.",
+      "verdictWait": "Buy timing: {verdict}, but a warning says wait",
+      "verdict": "Buy timing: {verdict}"
+    },
+    "potential": {
+      "mark": "Your preference, not proven:",
+      "rarity": "Rarity {value}",
+      "out_of_print": "Out of print",
+      "ranked": "Ranked"
+    },
     "noneWithSignals": "No item has all of these on today.",
     "provenTitle": "With a proven signal ({count})",
     "restTitle": "Not worth a look yet ({count})",
@@ -2237,6 +2261,15 @@
     "conditionItems": "{count, plural, one {# item} other {# items}}",
     "conditionsSave": "Save conditions",
     "conditionsSaved": "Saved.",
+    "potentialTitle": "What you look for (optional)",
+    "potentialIntro": "Items meeting these come first in a list by way of spotting a deal, and show a tag on Worth a look. This only changes the order: it does not check the price.",
+    "potentialNote": "Some subjects and rarities were tested on past prices on 2026-11-07, and none clearly beat the rest. One you add here is not tested by itself.",
+    "potentialSubjects": "Subjects, comma between each (up to 10)",
+    "potentialSubjectsHint": "Dragon, Knight",
+    "potentialRarities": "Rarities",
+    "potentialOutOfPrint": "Marked out of print",
+    "potentialRanked": "Has a current rank on a ranking Tora follows",
+    "potentialSave": "Save",
     "anyCondition": "Any condition",
     "title": "Buy strategy",
     "intro": "How Tora decides that a price is good to buy at. Pick one for each kind of item you watch or own; try each on the three examples first. A target price on a watch always counts too.",
@@ -2254,6 +2287,7 @@
     "paidUnder": "{pct}% under the average",
     "paidOver": "{pct}% over the average",
     "after90": "the price was higher 90 days later after {higher} of {checked}",
+    "after90Few": "the price was higher 90 days later after {higher} of {checked}, too few to judge",
     "marginLabel": "Under the usual price by",
     "use": "Use {name} for {type}",
     "name": {

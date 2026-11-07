@@ -44,6 +44,38 @@ past prices only and is never a sure thing.
   - **Buy plan** (`/opportunities/plan`): the budget and date below.
 - **MCP** (`opportunities`): the same list for a Claude chat.
 
+## Ways of spotting a deal
+
+Worth a look has one more filter (`?way=`, S32), for the chosen item type. It is a view, not a
+signal: no way has a record, so a way does not rank, count as proven, or feed alerts, the plan or
+scores. Items today's numbers leave unknown are in no list. A chip shows only with items on.
+
+| Way                        | On when                                                                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Falling hard               | the last 14 days 20 % or more under the 60 before (`quick_rise`'s mirror)                                                                                   |
+| Cheap, fall paused         | the `cheap_steady` signal                                                                                                                                   |
+| Sales picking up           | the `sales_up` signal                                                                                                                                       |
+| Listings drying up         | the listings count 30 % or more under its count 14 days ago, from 5 or more: the item's price source and condition, the report at most 3 days from that day |
+| A listing under the market | the lowest ask 15 % to 50 % under the recent price, as on the card                                                                                          |
+| Rising fast                | the `quick_rise` signal                                                                                                                                     |
+
+The rule is `dealWayStates` in `packages/core`, which the measure reads too. A list by way shows
+one line with its record per item type from the measure of 2026-11-07 (`dealWayRecord`: "weak or
+mixed" or "cannot be tested yet"), shows Buy timing's word on each row, and has no proven and rest
+headings. Listing counts are saved with the opportunities, apart from `numbers`, so the MCP does
+not pass them on; data saved before reads unknown.
+
+## Potential
+
+What a person looks for (Watchlist > Strategy, kept in their preferences): subjects (up to 10
+words, matched inside the name and alias), rarities, marked out of print, has a current rank. Each
+word and rarity is one criterion. A row meeting some says so, marked as a preference and not
+proven; only a list by way is ordered by how many it meets, ahead of its usual order. None set:
+no tags, order unchanged. Tested once on 2026-11-07, none proved out; a new one is not tested
+until the measure is rerun.
+
+A subject word matches anywhere inside a name, since Japanese names have no word breaks: "Cat" also matches "Catfish". A test that left the longer name out does not cover the word as the page reads it.
+
 ## Budget and date
 
 On the Buy plan sub page: a budget, and a date when there is one, and the items to choose from

@@ -48,6 +48,12 @@ export interface OpportunityRowData {
   targetWhy: string | null;
   /** Buy timing says a good price now. */
   good: boolean;
+  /** Buy timing's word when not good, in a list by way (S32). */
+  verdict: string | null;
+  /** Why it is on the chosen way's list. */
+  wayWhy: string | null;
+  /** The person's criteria it meets (S32). */
+  potential: string[];
   askUnder: string | null;
   buylistNear: string | null;
   signals: {
@@ -67,6 +73,7 @@ export interface OpportunityLabels {
   now: string;
   target: string;
   good: string;
+  preference: string;
   watch: string;
   noSignal: string;
   seeRecord: string;
@@ -120,6 +127,11 @@ export function OpportunityRow({
             {labels.good}
           </span>
         )}
+        {o.verdict && (
+          <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', CHIP.unproven)}>
+            {o.verdict}
+          </span>
+        )}
         {o.ranks.map((r) => (
           <InfoTag
             key={r.text}
@@ -141,10 +153,21 @@ export function OpportunityRow({
             </Link>
           </InfoTag>
         ))}
-        {!o.good && !o.ranks.length && !o.signals.length && (
+        {!o.good && !o.verdict && !o.ranks.length && !o.signals.length && (
           <span className="text-xs text-muted-foreground">{labels.noSignal}</span>
         )}
       </div>
+      {o.wayWhy && <p className="text-xs text-muted-foreground">{o.wayWhy}</p>}
+      {o.potential.length > 0 && (
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{labels.preference}</span>
+          {o.potential.map((p) => (
+            <span key={p} className="rounded border px-1.5 py-0.5">
+              {p}
+            </span>
+          ))}
+        </p>
+      )}
       {o.now !== null && (
         <div className="space-y-1 text-sm tabular-nums">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3">

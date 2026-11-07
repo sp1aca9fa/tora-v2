@@ -3,7 +3,9 @@
 import {
   DEFAULT_MARGIN,
   STRATEGIES,
+  type PotentialCriteria,
   type StrategyChoice,
+  cleanPotential,
   productClass,
   toLocalIso,
 } from '@tora/core';
@@ -12,6 +14,7 @@ import {
   getProduct,
   linkSets,
   loadOpportunities,
+  rarityOptions,
   removeWatch,
   setPreferences,
   suggestFromKnownProducts,
@@ -119,6 +122,17 @@ export async function saveConditionsAction(byType: Record<string, string[]>) {
   }
   await setPreferences(db, user.id, { suggestConditions: clean });
   revalidatePath('/', 'layout');
+}
+
+/** What the person looks for in an item (S32), from the strategy page; returns what was kept. */
+export async function savePotentialAction(criteria: PotentialCriteria) {
+  const { db, user } = await authed();
+  // A rarity chosen earlier stays pickable when it falls off the list of those in use.
+  const known = [...(await rarityOptions(db)), ...(user.preferences?.potential?.rarities ?? [])];
+  const potential = cleanPotential(criteria, known);
+  await setPreferences(db, user.id, { potential });
+  revalidatePath('/', 'layout');
+  return potential;
 }
 
 /** The person's buy strategy for item types (S9 part 4), from the strategy page. */

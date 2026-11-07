@@ -53,7 +53,7 @@
 | S29 | Store notices and Lotteries: notices only when a sale starts, lottery posts out of Now | built 2026-11-07, both per-person settings that change nothing until picked (replay of the busiest week: 436 messages to 55; 13 threads leave Now), awaiting the owner's check |
 | S30 | Sales accuracy: fewer wrong sales from search-based sources | in progress: rules, the re-check command and the self check built 2026-11-07; the run, and the measure of one listing under several items, to come |
 | S31 | Buy timing: target prices with dates and confidence, a simpler card | in progress: targets tested on past days 2026-11-07, no type earned a place; the owner decides what the card shows |
-| S32 | Opportunities as a deal finder: ways of spotting deals, potential, price | planned 2026-11-07 |
+| S32 | Opportunities as a deal finder: ways of spotting deals, potential, price | built 2026-11-07: six lists and per-person criteria, each saying its past test found no record; the owner decides definitions and Buy plan. About 540 lines against a 400 limit (the form and the record table, no extra guards); kept since the owner named the lists |
 | S33 | Look-back test (from S27 step 7) | planned 2026-11-07, after the owner is happy with S31 |
 | S34 | Sell timing | planned 2026-11-07, spec later; needs S31 and S32 |
 | S35 | Sources and collection load: identity sources, which stores earn their place, a rhythm per item | planned 2026-11-07 |

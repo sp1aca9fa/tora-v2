@@ -24,6 +24,8 @@ export * from './pull-rates';
 export * from './stores';
 export * from './tracking';
 export * from './opportunities';
+export * from './deal-ways';
+export * from './potential';
 export * from './plan';
 export * from './spread';
 export * from './alert-notices';

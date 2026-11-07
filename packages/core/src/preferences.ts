@@ -1,5 +1,6 @@
 // Per-user display preferences (requirements S8).
 import type { NoticePrefs } from './alert-notices';
+import type { PotentialCriteria } from './potential';
 import type { StrategyChoice } from './signals';
 import type { StoreArea, StoreFeedPrefs, StoreNoticeMode } from './stores';
 
@@ -45,6 +46,8 @@ export interface UserPreferences {
    * Strategy); every condition when a type is not listed.
    */
   suggestConditions?: Record<string, string[]>;
+  /** What the person looks for in an item (S32, Watchlist > Strategy): a stated preference. */
+  potential?: PotentialCriteria;
   /** The stores watched for store notices (S25). */
   storeArea?: StoreArea;
   /** What the person is sent about their stores (S29); unset: everything, as before S29. */
