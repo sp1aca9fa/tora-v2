@@ -430,7 +430,7 @@ describe('sales starting and confirmed lotteries (S29)', () => {
     const late = (minutes: number, over: Partial<NoticePost> = {}) => {
       const when = new Date(nowAt.getTime() - minutes * 60_000);
       return post({
-        postedAt: `2026-11-01T${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}:00.000+09:00`,
+        postedAt: toLocalIso(when),
         receivedAt: nowAt.toISOString(),
         ...over,
       });
