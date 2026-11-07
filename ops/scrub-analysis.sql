@@ -48,6 +48,11 @@ update product_sources set recent_sales = null, state = null, failure = null, ti
 update sources set quality = null
   where key in hidden or exists (select 1 from hidden h where instr(quality, '"' || h.key || '"'));
 
+-- The self check leaves these sources out where it reads; only one marked after its numbers were
+-- stored can still be here, until the next morning.
+delete from app_settings
+  where key = 'dataCheck' and exists (select 1 from hidden h where instr(value, '"' || h.key || '"'));
+
 -- Messages and logs name sources and quote their errors.
 update activity set detail = '{}'
   where kind in ('collect', 'check', 'admin') and exists (select 1 from hidden);

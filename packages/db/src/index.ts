@@ -39,6 +39,7 @@ export * from './spread';
 export * from './schedule';
 export * from './opening';
 export * from './sales-recheck';
+export * from './data-check';
 export * from './stores';
 export * from './accounts';
 export * from './collect-request';

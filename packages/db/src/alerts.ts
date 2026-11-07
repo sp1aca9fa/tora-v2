@@ -22,9 +22,11 @@ import {
   plainText,
   telegramHtml,
   SHARP_DROP_7D,
+  type DataCheckDescribed,
   type SignalStats,
   alertPrefs,
   baseCurrency,
+  dataCheckLine,
   fillText,
   fromMinor,
   judge,
@@ -38,6 +40,7 @@ import { and, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { actionTotal, pendingActions } from './actions';
 import { lastActivity, markAlerted, recordActivity, unalerted } from './activity';
 import type { Db } from './client';
+import { DATA_CHECK_HREF, runDataCheck } from './data-check';
 import { checkDbBudget } from './db-usage';
 import { holdingBucket } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
@@ -842,11 +845,15 @@ export function stoppedReason(log: string): string | null {
   return reason ? reason.slice(0, 300) : null;
 }
 
+/** Lines of a self check message; the first 10, then how many more (the link shows them all). */
+const DATA_CHECK_LINES = 10;
+
 /** The card about a failed (or missed) run, in one person's language. */
 function failureCard(
   t: AlertTexts,
   entry: Activity,
   base: string | null,
+  money: (minor: number) => string,
 ): { text: string; role: NoticeRole; url: string | null } {
   const d = entry.detail as Record<string, unknown>;
   const lines: string[] = [];
@@ -883,6 +890,22 @@ function failureCard(
       lines.push(fillText(t.sourceQuiet!, { sources: ((d.sources as string[]) ?? []).join(', ') }));
     } else if (entry.action === 'self_check') {
       lines.push(fillText(t.selfCheck!, { items: ((d.fixed as string[]) ?? []).join(', ') }));
+    } else if (entry.action === 'data_check') {
+      const findings = (d.findings as DataCheckDescribed[]) ?? [];
+      lines.push(t.dataCheckTitle!);
+      for (const f of findings.slice(0, DATA_CHECK_LINES)) {
+        const line = dataCheckLine(f, money, conditionWords);
+        lines.push(fillText(t[line.key]!, line.params));
+      }
+      if (findings.length > DATA_CHECK_LINES) {
+        lines.push(fillText(t.dataCheckMore!, { count: findings.length - DATA_CHECK_LINES }));
+      }
+    } else if (entry.action === 'data_check_failed') {
+      lines.push(
+        d.since
+          ? fillText(t.dataCheckStopped!, { day: String(d.since), days: Number(d.days ?? 0) })
+          : fillText(t.dataCheckFailed!, { error: String(d.error ?? '') }),
+      );
     } else if (entry.action === 'db_budget') {
       const millions = (n: unknown) => (Number(n ?? 0) / 1e6).toFixed(1);
       lines.push(
@@ -902,7 +925,12 @@ function failureCard(
   }
   return {
     text: lines.join('\n'),
-    role: entry.kind === 'check' && entry.action !== 'self_check' ? 'warning' : 'bad',
+    role:
+      entry.kind === 'check' &&
+      entry.action !== 'self_check' &&
+      entry.action !== 'data_check_failed'
+        ? 'warning'
+        : 'bad',
     url: linkUrl(base, entry.href),
   };
 }
@@ -924,16 +952,23 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     )
   )
     .flat()
-    // Listings set aside and quiet sources are not a failure of a run, but someone must look.
+    // Listings set aside, quiet sources and odd data are not a failure of a run, but someone must
+    // look.
     .filter(
-      (e) => e.level === 'failed' || e.action === 'listings_gone' || e.action === 'quiet_source',
+      (e) =>
+        e.level === 'failed' ||
+        e.action === 'listings_gone' ||
+        e.action === 'quiet_source' ||
+        e.action === 'data_check',
     );
   if (entries.length === 0) return 0;
   const today = localDate();
   const sentToday = (await readSetting<Record<string, string>>(db, 'alertsSentToday')) ?? {};
-  const toSend = entries.filter(
-    (e) => sentToday[e.action ? `${e.kind}:${e.action}` : e.kind] !== today,
-  );
+  const capKey = (e: Activity) => (e.action ? `${e.kind}:${e.action}` : e.kind);
+  // The self check tells a finding once and never again, so its cap goes by the morning an entry
+  // belongs to: yesterday's going out late must not use up today's, which would be lost for good.
+  const capDay = (e: Activity) => (e.action === 'data_check' ? e.occurredAt.slice(0, 10) : today);
+  const toSend = entries.filter((e) => sentToday[capKey(e)] !== capDay(e));
   let sent = 0;
   if (toSend.length) {
     const base = await appUrl(db);
@@ -941,13 +976,14 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     for (const admin of await adminsToAlert(db)) {
       if ((await channelsOf(db, admin.id)).length) reachable = true;
       const t = await textsFor(db, admin, ctx);
+      const money = await moneyFor(db, admin);
       sent += await sendToUser(
         db,
         admin.id,
         lines(
           'admin',
           null,
-          toSend.map((e) => failureCard(t, e, base)),
+          toSend.map((e) => failureCard(t, e, base, money)),
         ),
         ctx,
       );
@@ -961,7 +997,10 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
       );
       return 0;
     }
-    for (const e of toSend) sentToday[e.action ? `${e.kind}:${e.action}` : e.kind] = today;
+    for (const e of toSend) {
+      const stamped = sentToday[capKey(e)];
+      if (!stamped || stamped < capDay(e)) sentToday[capKey(e)] = capDay(e);
+    }
     await saveSetting(db, 'alertsSentToday', sentToday);
   }
   await markAlerted(
@@ -1201,39 +1240,62 @@ export async function checkMissedRuns(
   now = new Date(),
 ): Promise<string[]> {
   const missed: string[] = [];
-  for (const kind of ['collect', 'backup'] as const) {
-    const last = await lastActivity(db, kind);
-    if (!last) continue;
-    const hours = Math.floor((now.getTime() - Date.parse(last.occurredAt)) / 3_600_000);
-    if (hours < MISSED_HOURS) continue;
-    // Once a day, even when the check runs twice.
-    const said = await lastActivity(db, 'check', { action: `no_${kind}` });
-    if (said && now.getTime() - Date.parse(said.occurredAt) < 20 * 3_600_000) continue;
+  // Tora's check of its own data (S30), first and on its own: nothing else here can stop it, and
+  // its failing is said, never a quiet pass. Sent by `alertFailures` below, or the next run's.
+  try {
+    if ((await runDataCheck(db, now))?.length) missed.push('data_check');
+  } catch (error) {
+    ctx.log?.(`alerts: self check failed: ${errorText(error)}`);
     await recordActivity(db, {
       kind: 'check',
-      action: `no_${kind}`,
+      action: 'data_check_failed',
       level: 'failed',
-      detail: { last: last.occurredAt, hours },
-      href: kind === 'collect' ? '/settings/collectors' : '/settings/activity',
-    });
-    missed.push(kind);
+      detail: { error: errorText(error) },
+      href: DATA_CHECK_HREF,
+    }).catch((e: unknown) => ctx.log?.(`alerts: self check not recorded: ${errorText(e)}`));
+    missed.push('data_check_failed');
   }
-  // The hosted database's rows read this month against the admin's budget (S19).
-  if (await checkDbBudget(db, now)) missed.push('db_budget');
-  // Sources whose runs suddenly find nothing (S15), once a day while they stay quiet.
-  const quiet = await quietSources(db, now);
-  const said = quiet.length ? await lastActivity(db, 'check', { action: 'quiet_source' }) : null;
-  if (quiet.length && !(said && now.getTime() - Date.parse(said.occurredAt) < 20 * 3_600_000)) {
-    await recordActivity(db, {
-      kind: 'check',
-      action: 'quiet_source',
-      level: 'problem',
-      detail: { sources: quiet },
-      href: '/settings/collectors',
-    });
-    missed.push('quiet_source');
+  // Whatever fails below, what was recorded above still goes out, and the failure still surfaces.
+  try {
+    for (const kind of ['collect', 'backup'] as const) {
+      const last = await lastActivity(db, kind);
+      if (!last) continue;
+      const hours = Math.floor((now.getTime() - Date.parse(last.occurredAt)) / 3_600_000);
+      if (hours < MISSED_HOURS) continue;
+      // Once a day, even when the check runs twice.
+      const said = await lastActivity(db, 'check', { action: `no_${kind}` });
+      if (said && now.getTime() - Date.parse(said.occurredAt) < 20 * 3_600_000) continue;
+      await recordActivity(db, {
+        kind: 'check',
+        action: `no_${kind}`,
+        level: 'failed',
+        detail: { last: last.occurredAt, hours },
+        href: kind === 'collect' ? '/settings/collectors' : '/settings/activity',
+      });
+      missed.push(kind);
+    }
+    // The hosted database's rows read this month against the admin's budget (S19).
+    if (await checkDbBudget(db, now)) missed.push('db_budget');
+    // Sources whose runs suddenly find nothing (S15), once a day while they stay quiet.
+    const quiet = await quietSources(db, now);
+    const said = quiet.length ? await lastActivity(db, 'check', { action: 'quiet_source' }) : null;
+    if (quiet.length && !(said && now.getTime() - Date.parse(said.occurredAt) < 20 * 3_600_000)) {
+      await recordActivity(db, {
+        kind: 'check',
+        action: 'quiet_source',
+        level: 'problem',
+        detail: { sources: quiet },
+        href: '/settings/collectors',
+      });
+      missed.push('quiet_source');
+    }
+  } catch (error) {
+    // Said here too: a failure in `alertFailures` below would replace this one.
+    ctx.log?.(`alerts: morning check failed: ${errorText(error)}`);
+    throw error;
+  } finally {
+    await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)));
   }
-  await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)));
   return missed;
 }
 

@@ -1,3 +1,4 @@
+import { type DataCheckDescribed, dataCheckLine } from '@tora/core';
 import { ACTIVITY_KINDS, type ActivityEntry, type ActivityKind, listActivity } from '@tora/db';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -5,6 +6,8 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { nativeName } from '@/i18n/locale';
 import { authed } from '@/lib/auth/guard';
+import { getMoney } from '@/lib/money-server';
+import { bucketLabel } from '@/lib/product-display';
 import { marketLabels, sourceLabels } from '@/lib/sources';
 import { cn } from '@/lib/utils';
 
@@ -34,12 +37,13 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
     ? (sp.kind as ActivityKind)
     : null;
   const before = typeof sp.before === 'string' && sp.before ? sp.before : null;
-  const [entries, t, format, sourceLabel, marketLabel] = await Promise.all([
+  const [entries, t, format, sourceLabel, marketLabel, money] = await Promise.all([
     listActivity(db, { id: user.id, admin }, { kind, before, limit: PAGE }),
     getTranslations(),
     getFormatter(),
     sourceLabels(),
     marketLabels(),
+    getMoney(),
   ]);
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
@@ -141,16 +145,33 @@ export default async function ActivityPage({ searchParams }: { searchParams: Par
                 ? t('activity.sourceQuiet', { sources: ((d.sources as string[]) ?? []).join(', ') })
                 : e.action === 'self_check'
                   ? t('activity.selfCheck', { items: ((d.fixed as string[]) ?? []).join(', ') })
-                  : e.action === 'db_budget'
-                    ? t('activity.dbBudget', {
-                        read: (Number(d.read ?? 0) / 1e6).toFixed(1),
-                        projected: (Number(d.projected ?? 0) / 1e6).toFixed(1),
-                        budget: (Number(d.budget ?? 0) / 1e6).toFixed(1),
-                      })
-                    : t(e.action === 'no_backup' ? 'activity.noBackup' : 'activity.noCollect', {
-                        hours: Number(d.hours ?? 0),
-                        last: d.last ? dateTime(String(d.last)) : '-',
-                      }),
+                  : e.action === 'data_check'
+                    ? [
+                        t('activity.dataCheck', {
+                          count: ((d.findings as unknown[]) ?? []).length,
+                        }),
+                        ...((d.findings as DataCheckDescribed[]) ?? []).map((f) => {
+                          const line = dataCheckLine(f, money, (b) => bucketLabel(b, t));
+                          return t(`alertText.${line.key}`, line.params);
+                        }),
+                      ].join(' · ')
+                    : e.action === 'data_check_failed'
+                      ? d.since
+                        ? t('alertText.dataCheckStopped', {
+                            day: String(d.since),
+                            days: Number(d.days ?? 0),
+                          })
+                        : t('alertText.dataCheckFailed', { error: String(d.error ?? '') })
+                      : e.action === 'db_budget'
+                        ? t('activity.dbBudget', {
+                            read: (Number(d.read ?? 0) / 1e6).toFixed(1),
+                            projected: (Number(d.projected ?? 0) / 1e6).toFixed(1),
+                            budget: (Number(d.budget ?? 0) / 1e6).toFixed(1),
+                          })
+                        : t(e.action === 'no_backup' ? 'activity.noBackup' : 'activity.noCollect', {
+                            hours: Number(d.hours ?? 0),
+                            last: d.last ? dateTime(String(d.last)) : '-',
+                          }),
           ],
         };
       case 'admin': {

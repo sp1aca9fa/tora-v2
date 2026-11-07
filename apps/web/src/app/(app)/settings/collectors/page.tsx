@@ -17,6 +17,8 @@ import { getMoney } from '@/lib/money-server';
 import { ConfirmButton } from '../admin/accounts/account-forms';
 import { CollectWindowForm } from '../collect-window-form';
 import { bucketLabel } from '@/lib/product-display';
+import { cn } from '@/lib/utils';
+import { DataCheckSection } from './data-check-section';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.collectors.title') };
@@ -54,14 +56,15 @@ export default async function CollectorSettingsPage() {
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
   return (
-    <div className="space-y-4">
-      <Card>
+    // Half a 4K screen and more: the collectors and the self check side by side.
+    <div className={cn('grid items-start gap-4', admin && 'min-[1200px]:grid-cols-2')}>
+      <Card className="min-w-0">
         <CardHeader>
-          <CardTitle>{t('settings.collectors')}</CardTitle>
+          <CardTitle>{t('settings.collectorRuns')}</CardTitle>
           <CardDescription>{t('settings.collectorsInfo')}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm">
+        <CardContent className="grid gap-2 min-[2400px]:grid-cols-2">
+          <p className="text-sm min-[2400px]:col-span-2">
             {schedule.nextCollect
               ? t('schedule.nextCollect', {
                   at: format.dateTime(new Date(schedule.nextCollect), {
@@ -121,7 +124,7 @@ export default async function CollectorSettingsPage() {
                 ? t('settings.lastBackup', {
                     date: dateTime(backup.at),
                     mb: (backup.bytes / 1024 / 1024).toFixed(1),
-                    rows: backup.rows,
+                    rows: format.number(backup.rows),
                   })
                 : t('settings.noBackup')}
             </p>
@@ -130,22 +133,31 @@ export default async function CollectorSettingsPage() {
             const time = times.sources[h.source];
             return (
               // Collapsed: the name and the last run's status; open for the details.
-              <details key={h.source} className="group rounded-md border text-sm">
+              <details key={h.source} className="group self-start rounded-md border text-sm">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center gap-1.5 font-medium">
                     <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
                     {sourceLabel(h.source)}
                   </span>
                   {h.lastRun && (
-                    <span
-                      className={
-                        h.lastRun.status === 'ok' && !time?.long
-                          ? 'text-right text-xs text-muted-foreground'
-                          : 'text-right text-xs font-medium text-destructive'
-                      }
-                    >
-                      {t(`runStatus.${h.lastRun.status}`)} · {dateTime(h.lastRun.startedAt)}
-                      {time && ` · ${duration(time.last)}`}
+                    // Red marks what is wrong: the status, or only the time when a run that worked ran long.
+                    <span className="text-right text-xs text-muted-foreground">
+                      <span
+                        className={
+                          h.lastRun.status === 'ok' ? undefined : 'font-medium text-destructive'
+                        }
+                      >
+                        {t(`runStatus.${h.lastRun.status}`)}
+                      </span>{' '}
+                      · {dateTime(h.lastRun.startedAt)}
+                      {time && (
+                        <>
+                          {' · '}
+                          <span className={time.long ? 'font-medium text-destructive' : undefined}>
+                            {duration(time.last)}
+                          </span>
+                        </>
+                      )}
                     </span>
                   )}
                 </summary>
@@ -205,11 +217,11 @@ export default async function CollectorSettingsPage() {
             );
           })}
           {runs.length === 0 ? (
-            <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground min-[2400px]:col-span-2">
               {t('settings.noRuns')}
             </p>
           ) : (
-            <details className="text-sm">
+            <details className="text-sm min-[2400px]:col-span-2">
               <summary className="cursor-pointer text-muted-foreground">
                 {t('settings.recentRuns')}
               </summary>
@@ -231,6 +243,7 @@ export default async function CollectorSettingsPage() {
           )}
         </CardContent>
       </Card>
+      {admin && <DataCheckSection db={db} />}
     </div>
   );
 }

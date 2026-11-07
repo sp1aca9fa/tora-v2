@@ -50,6 +50,7 @@ const SCHEMA = `
     title text, image_url text, last_success_at text, details_synced_at text);
   create table activity (kind text, detail text);
   create table alert_log (kind text, text text);
+  create table app_settings (key text, value text);
 `;
 
 let dir: string;

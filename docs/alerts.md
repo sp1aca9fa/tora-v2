@@ -11,12 +11,42 @@ happened (Settings > Activity).
 | No collect or no backup for over 26 hours (the PC is off)                 | Admins      | The morning check                                                            | The app's morning check         |
 | Listings set aside (gone 3 nights), a quiet source, a self-check fix      | Admins      | Right after the run, or the morning check (a quiet source: once a day)       | Both                            |
 | The database's month heading past its read budget (hosted database)       | Admins      | The morning check                                                            | The app's morning check         |
+| Odd data, from Tora's self check (below), or the check itself failing     | Admins      | The morning check (each finding once while it lasts)                         | The app's morning check         |
 | A server's update that failed and was rolled back                         | Admins      | At once                                                                      | The server's update script      |
 | Imports that did not add every row (already in Tora, left out, a problem) | Each person | The morning summary (at most one a day, only when there is something to say) | The app's morning check         |
 | How many things wait on Actions                                           | Each person | The morning summary                                                          | The app's morning check         |
 | A watched item turned Good price, or its lowest ask went under the target | Each person | Right after the nightly collect (again only after 14 days out)               | The home PC (`collect-cron.sh`) |
 | Sharp drops: owned or watched items down 15 % or more in a week           | Each person | The morning summary (each item at most once in 14 days)                      | The app's morning check         |
 | Store posts and comments for your area (your choice below), a feed silent | Each person | At once ([Store notices](store-feeds.md))                                    | The app                         |
+
+### Tora's self check
+
+Each morning, once, Tora checks its own data and tells admins when something looks odd, with what,
+how much and the usual level. It fixes nothing: the message is the cue to look into it. It says
+nothing until it has about 14 nights of its own numbers. Settings > Collectors shows one row per
+source with sold prices (watching, learning, not seen since a date, or too few sales to judge) and
+what is open.
+
+- Within a source, on its sales of the last 7 days: the share far from the item's median (over 2x or
+  under half) at 1.5x its usual share, or 5 % whatever is usual; sales kept under 0.7x the level a
+  week ago; the part of found sales it keeps under 0.7x usual; sales it can judge under half of usual
+  (while kept sales are low too, only when they fell clearly harder than those: one fault, one line).
+- Across sources of one market, on 30 days: an item and condition with medians over 2x apart with 5+
+  sales each, told in one group at most once a week; a source reading high or low on 10 more items one
+  way than the other. Markets are never compared with each other.
+
+A finding is told once while it lasts and closes after 3 nights judged and fine; a night not judged
+(the server off, too few sales) does not count. A re-check of stored sales restarts only the far
+share's level. Sources kept from AI models are left out where it reads. Sales with a guessed lot size
+are left out of prices, and so is a sale with no condition.
+
+It does not catch slabs filed as raw cards: only a sudden leak of them through the far share.
+
+After a real lasting change has been looked at, `pnpm alerts data-check-reset <source>` accepts the
+numbers as they are: that source's levels start over and its findings close. A new or reset source
+says nothing for its own 14 nights, so one still at 5 % or more is told again, once, after them.
+`apart`, and a lean of a source that has already learned, can speak from a new source's first night:
+in a market of two, a new source's prices can make the older one read high or low.
 
 ### Store notices: how you are told
 
@@ -141,7 +171,7 @@ Settings > Activity lists, newest first, each linked to its page:
 
 - collects (each run of `pnpm collect`, with the sources that did not finish) and backups;
 - imports (what happened to their rows; members see their own);
-- the morning check's "nothing ran" and quiet sources;
+- the morning check's "nothing ran" and quiet sources, and what the self check found;
 - a self-hosted server's updates and what its own scripts report (`pnpm alerts update`, `server`);
 - admin changes: markets, sources and roles, identity pages, categories, languages, time zone,
   currency and rates, the night window, the Telegram bot, accounts (Settings > Admin > Accounts, or `pnpm user`:
@@ -156,4 +186,5 @@ pnpm alerts after-run --since <time> --collect-exit <n> --backup-exit <n>  # wha
 pnpm alerts check   # the morning check, run from the PC (e.g. to try it)
 pnpm alerts update --from <rev> --to <rev> [--failed <step>]   # a server's update script: logs it, a failure to admins
 pnpm alerts server <title> [--text <details>] [--level ok|problem|failed] [--tell]   # a server script's own event
+pnpm alerts data-check-reset <source>   # the self check accepts a source's numbers as they are
 ```

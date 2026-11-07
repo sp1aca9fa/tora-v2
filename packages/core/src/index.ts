@@ -26,3 +26,4 @@ export * from './opportunities';
 export * from './plan';
 export * from './spread';
 export * from './alert-notices';
+export * from './data-check';

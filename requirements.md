@@ -51,7 +51,7 @@
 | S27 | Opportunities part 2: chains in store posts; singles (market note, steadier prices, the set as the line); tested signal plug-ins (PSA 10 vs raw A, a quick rise); planning: spend a budget well, a monthly plan, a spread check, a look-back test | steps 1-6 built (to 2026-10-31); the owner's check (2026-11-07) moved its follow-ups to S28, S31 and S32, step 7 to S33 |
 | S28 | The owner's notes, small round: Spread on wide screens and its links, refused rankings alert, store codes, franchise fix, old backup codes | built 2026-11-07 (a shop's sold-out items read correctly, set-aside listings tried again weekly; old backup code form waits for the owner's new codes), awaiting the owner's check |
 | S29 | Store notices and Lotteries: notices only when a sale starts, lottery posts out of Now | built 2026-11-07, both per-person settings that change nothing until picked (replay of the busiest week: 436 messages to 55; 13 threads leave Now), awaiting the owner's check |
-| S30 | Sales accuracy: fewer wrong sales from search-based sources | in progress: rules and the re-check command built 2026-11-07; the run, the measure of one listing under several items, and the self check to come |
+| S30 | Sales accuracy: fewer wrong sales from search-based sources | in progress: rules, the re-check command and the self check built 2026-11-07; the run, and the measure of one listing under several items, to come |
 | S31 | Buy timing: target prices with dates and confidence, a simpler card | planned 2026-11-07 |
 | S32 | Opportunities as a deal finder: ways of spotting deals, potential, price | planned 2026-11-07 |
 | S33 | Look-back test (from S27 step 7) | planned 2026-11-07, after the owner is happy with S31 |

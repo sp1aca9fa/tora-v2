@@ -8,11 +8,13 @@ import {
   insertObservations,
   linkSource,
   refreshItemSales,
+  runDataCheck,
+  saveSetting,
   saveSourceInfos,
   schema,
 } from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
-import { toLocalIso } from '@tora/core';
+import { localDate, toLocalIso } from '@tora/core';
 import { eq } from 'drizzle-orm';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -312,6 +314,195 @@ describe('query_sql on a database holding a noAi source', () => {
     await db.$client.executeMultiple(await scrubScript());
     const [entry] = (await db.$client.execute('select detail from activity')).rows;
     expect(entry!.detail).toBe(JSON.stringify({ sources: ['x'] }));
+  });
+
+  describe("Tora's self check", () => {
+    const steady = { judged: 300, far: 3, kept: 300, found: 500 };
+    const days = (sources: Record<string, typeof steady>) =>
+      Object.fromEntries(
+        Array.from({ length: 14 }, (_, i) => [
+          localDate(new Date(Date.now() - (i + 1) * 86_400_000)),
+          { sources, compared: 0 },
+        ]),
+      );
+    const state = (sources: Record<string, typeof steady>) => ({
+      days: days(sources),
+      open: {},
+      resets: {},
+      lastRun: null,
+      firstSeen: null,
+      itemsToldOn: null,
+    });
+    const now = () => toLocalIso(new Date());
+
+    beforeEach(async () => {
+      await saveSourceInfos(db, [
+        { key: 'ebay', label: 'E', market: 'jp', noAi: true, priceKinds: ['sold'] },
+        { key: 'mercari', label: 'M', market: 'jp', priceKinds: ['sold'] },
+      ]);
+    });
+
+    it('reads no sold row of such a source: no state, activity, message or `dataChecks` output', async () => {
+      const row = (source: string, price: number, i: number) => ({
+        productId,
+        source,
+        observationType: 'sold' as const,
+        bucket: 'raw:A',
+        priceBase: price,
+        currency: 'JPY',
+        observedAt: now(),
+        fetchedAt: now(),
+        externalRef: `${source}-day-${i}`,
+        excluded: false,
+        excludedReason: null,
+        raw: {},
+      });
+      // Read together they would be 5x apart, so a leak here opens a finding that names it.
+      await insertObservations(
+        db,
+        [1, 2, 3, 4, 5].flatMap((i) => [row('mercari', 1000, i), row('ebay', 5000, i)]),
+      );
+      await refreshItemSales(db, { full: true });
+      await db.insert(schema.activity).values({
+        kind: 'collect',
+        level: 'ok',
+        detail: {},
+        occurredAt: now(),
+      });
+      await saveSetting(db, 'dataCheck', state({ mercari: steady }));
+
+      expect(await runDataCheck(db)).toEqual([expect.objectContaining({ source: 'mercari' })]);
+      const stored = await db.$client.execute(
+        "select value from app_settings where key = 'dataCheck'",
+      );
+      expect(String(stored.rows[0]!.value)).toContain('mercari');
+      expect(String(stored.rows[0]!.value)).not.toContain('ebay');
+      const entries = await db.$client.execute(
+        "select detail from activity where action = 'data_check'",
+      );
+      expect(entries.rows).toHaveLength(1);
+      expect(JSON.stringify(entries.rows)).not.toContain('ebay');
+      expect(JSON.stringify(await dataChecks(db, userId))).not.toContain('"ebay"');
+      expect((await dataChecks(db, userId)).map((c) => c.check)).toContain('self_check');
+    });
+
+    it('`query_sql` reads the history, but not with such a source in it', async () => {
+      await saveSetting(db, 'dataCheck', state({ mercari: steady }));
+      const [fine] = await rows("select value from app_settings where key = 'dataCheck'");
+      expect(String(fine!.value)).toContain('mercari');
+
+      await saveSetting(db, 'dataCheck', state({ mercari: steady, ebay: steady }));
+      expect(await rows("select value from app_settings where key = 'dataCheck'")).toEqual([
+        { value: null },
+      ]);
+    });
+
+    const keptOn = (source: string) => ({
+      key: `kept:${source}`,
+      kind: 'kept',
+      source,
+      kept: 1,
+      usual: 300,
+      openedOn: 'a',
+    });
+
+    it('`dataChecks` shows the same rows and findings as Settings', async () => {
+      await saveSetting(db, 'dataCheck', {
+        ...state({ mercari: steady }),
+        lastRun: localDate(new Date(Date.now() - 86_400_000)),
+        open: { 'kept:mercari': keptOn('mercari') },
+      });
+      const checks = await dataChecks(db, userId);
+      const open = checks.find((c) => c.check === 'self_check')!;
+      expect(open.items).toMatchObject([{ source: 'mercari' }]);
+      expect(open.severity).toBe('warn');
+      const sources = checks.find((c) => c.check === 'self_check_sources')!;
+      expect(sources.items).toEqual([{ source: 'mercari', label: 'M', status: 'watching' }]);
+    });
+
+    it('a source that stopped appearing: `dataChecks` says not seen, with the date', async () => {
+      const yesterday = localDate(new Date(Date.now() - 86_400_000));
+      // The last night with numbers was 2 days back, and a night looks over its 7 days.
+      const lastActive = localDate(new Date(Date.now() - 8 * 86_400_000));
+      const seeded = state({ mercari: steady });
+      await saveSetting(db, 'dataCheck', {
+        ...seeded,
+        lastRun: yesterday,
+        days: { ...seeded.days, [yesterday]: { sources: {}, compared: 0 } },
+      });
+      const sources = (await dataChecks(db, userId)).find((c) => c.check === 'self_check_sources')!;
+      expect(sources.items).toEqual([
+        { source: 'mercari', label: 'M', status: 'notSeen', lastSeen: lastActive },
+      ]);
+    });
+
+    it('`dataChecks` shows nothing shaped by one marked after it was stored', async () => {
+      await saveSetting(db, 'dataCheck', {
+        ...state({ mercari: steady, ebay: steady }),
+        open: { 'kept:ebay': keptOn('ebay'), 'kept:mercari': keptOn('mercari') },
+      });
+      const checks = await dataChecks(db, userId);
+      expect(JSON.stringify(checks.filter((c) => c.check.startsWith('self_check')))).not.toContain(
+        '"ebay"',
+      );
+      const open = checks.find((c) => c.check === 'self_check')!;
+      expect(open.items).toEqual([]);
+      expect(open.severity).toBe('info');
+      const sources = checks.find((c) => c.check === 'self_check_sources')!;
+      expect(sources.items).toEqual([
+        { source: 'mercari', label: 'M', status: 'learning', nights: 0 },
+      ]);
+    });
+
+    it('the morning after, `query_sql` reads no number pooled against it, though its name is gone', async () => {
+      const seeded = state({ mercari: steady, ebay: steady });
+      await saveSetting(db, 'dataCheck', {
+        ...seeded,
+        days: Object.fromEntries(
+          Object.entries(seeded.days).map(([day, night]) => [day, { ...night, compared: 40 }]),
+        ),
+        open: {
+          'leans:mercari': {
+            key: 'leans:mercari',
+            kind: 'leans',
+            source: 'mercari',
+            high: 40,
+            low: 0,
+            openedOn: 'a',
+          },
+        },
+      });
+      await db.insert(schema.activity).values({
+        kind: 'collect',
+        level: 'ok',
+        detail: {},
+        occurredAt: now(),
+      });
+      await runDataCheck(db);
+
+      const [stored] = await rows("select value from app_settings where key = 'dataCheck'");
+      const value = JSON.parse(String(stored!.value)) as {
+        days: Record<string, { compared: number }>;
+        open: Record<string, unknown>;
+      };
+      expect(value.open).toEqual({});
+      expect(Object.keys(value.days)).toEqual([localDate()]);
+      expect(value.days[localDate()]!.compared).toBe(0);
+    });
+
+    it('the analysis copy loses a history naming such a source, and keeps one that does not', async () => {
+      await saveSetting(db, 'dataCheck', state({ mercari: steady }));
+      await db.$client.executeMultiple(await scrubScript());
+      expect(
+        (await db.$client.execute("select key from app_settings where key = 'dataCheck'")).rows,
+      ).toHaveLength(1);
+
+      await saveSetting(db, 'dataCheck', state({ mercari: steady, ebay: steady }));
+      await db.$client.executeMultiple(await scrubScript());
+      expect(
+        (await db.$client.execute("select key from app_settings where key = 'dataCheck'")).rows,
+      ).toHaveLength(0);
+    });
   });
 
   it('every table is sorted for the guards (a new one must be, and go in the scrub if it holds a source)', async () => {

@@ -13,6 +13,9 @@
 //       also sends it to admins at once.
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
 //       each person at most once in 20 hours).
+//   data-check-reset <source>
+//       Tora's self check (S30): accepts a source's numbers as they are, after someone has looked.
+//       Its levels start over and its findings close.
 import { localDate, toLocalIso } from '@tora/core';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,6 +33,7 @@ import {
   stoppedReason,
 } from '../alerts';
 import { createDb } from '../client';
+import { resetDataCheck, watchDataCheck } from '../data-check';
 import { dbConfigFromEnv, findRepoRoot, loadRootEnv } from '../env';
 import { loadTimeZone } from '../registry';
 
@@ -100,6 +104,12 @@ if (command === 'after-run') {
       href: '/settings/activity',
     });
   }
+  // A self check that has stopped, whatever stopped it: said from here, another process.
+  try {
+    await watchDataCheck(db);
+  } catch (error) {
+    console.log(`alerts: self check watch stopped: ${String(error)}`);
+  }
   const failures = await alertFailures(db, ctx, since);
   console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
   const buy = await sendWatchAlerts(db, ctx);
@@ -143,9 +153,16 @@ if (command === 'after-run') {
   console.log(
     `alerts: missed ${missed.join(', ') || 'nothing'}; ${summaries} summary message(s) sent`,
   );
+} else if (command === 'data-check-reset') {
+  const source = positionals[1];
+  if (!source || !(await resetDataCheck(db, source))) {
+    console.error(`alerts: nothing to reset for ${source ?? '(no source given)'}.`);
+    process.exit(1);
+  }
+  console.log(`alerts: self check levels of ${source} start over; its findings are closed.`);
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry] | server <title> [--text <details>] [--level ok|problem|failed] [--tell]',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry] | server <title> [--text <details>] [--level ok|problem|failed] [--tell] | data-check-reset <source>',
   );
   process.exit(1);
 }

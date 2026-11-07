@@ -9,6 +9,7 @@ import {
   cardGradeCounts,
   cardNumberKey,
   collectorHealth,
+  dataCheckView,
   getProduct,
   holdingBucket,
   listPendingCandidates,
@@ -595,6 +596,23 @@ export async function dataChecks(db: Db, userId: string, now = new Date()): Prom
     ),
   );
 
+  // Tora's own nightly check (S30). Sources kept from AI models are left out where it reads.
+  const selfCheck = await dataCheckView(db);
+  findings.push(
+    finding(
+      'self_check',
+      selfCheck.open.length ? 'warn' : 'info',
+      "What Tora's nightly check of its own data has open: far-off sales, kept sales or keep rate against a source's usual level, two sources of one market far apart on an item. It changes nothing. It does not catch slabs filed as raw. The history is in app_settings, key dataCheck.",
+      selfCheck.open,
+    ),
+    finding(
+      'self_check_sources',
+      'info',
+      `One row per source with sold prices: watching, learning (nights of 14), not seen since a date, or too few sales to judge. Last checked: ${selfCheck.lastRun ?? 'never'}.`,
+      selfCheck.sources,
+    ),
+  );
+
   const images = new Set(
     (
       await db
@@ -786,8 +804,14 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
         .join(' or ')} then null else quality end`,
   },
   app_settings: {
-    value: () =>
-      `case when key in (${READABLE_SETTINGS.map((k) => `'${k}'`).join(', ')}) then value end`,
+    // The self check's history names sources; one marked after its numbers were stored is still in
+    // it until the next morning.
+    value: (l) =>
+      `case when key = 'dataCheck' and (${l
+        .split(', ')
+        .map((k) => `instr(value, '"' || ${k} || '"')`)
+        .join(' or ')}) then null ` +
+      `when key in (${READABLE_SETTINGS.map((k) => `'${k}'`).join(', ')}) then value end`,
   },
 };
 
@@ -805,6 +829,7 @@ const READABLE_SETTINGS = [
   'closingStepsDay',
   'collectWindow',
   'currency',
+  'dataCheck',
   'dbBudget',
   'itemSalesBuiltAt',
   'languages',
