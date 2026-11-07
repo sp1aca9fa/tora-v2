@@ -87,7 +87,7 @@ watch_server() {
 }
 watch_server || true
 
-held="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST" "ls $REMOTE_DIR/*.db.gz 2>/dev/null | wc -l")"
+held="$(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST" "ls $REMOTE_DIR/tora-*.db.gz 2>/dev/null | wc -l")"
 delete=()
 if [ "$held" -ge 3 ]; then
   delete=(--delete)
@@ -96,7 +96,7 @@ else
 fi
 rsync -a "${delete[@]}" --include='*.db.gz' --exclude='*' -e 'ssh -o BatchMode=yes' \
   "$HOST:$REMOTE_DIR/" "$LOCAL_DIR/"
-newest="$(ls "$LOCAL_DIR"/*.db.gz 2>/dev/null | sort | tail -1)"
+newest="$(ls "$LOCAL_DIR"/tora-*.db.gz 2>/dev/null | sort | tail -1)"
 echo "$(ls "$LOCAL_DIR"/*.db.gz 2>/dev/null | wc -l) backup(s) here, newest $(basename "${newest:-none}")"
 
 # The analysis copy follows the newest backup.

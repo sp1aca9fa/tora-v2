@@ -33,6 +33,15 @@ export function analysisCopyPath(env: Record<string, string | undefined> = proce
 }
 const NAME = /^tora-(\d{4}-\d{2}-\d{2})\.db\.gz$/;
 
+/**
+ * A copy kept under a name of its own (`pnpm backup --keep <name>`), or null for a name that cannot
+ * be one. Outside `NAME`, so neither pruning nor the analysis copy ever reads it.
+ */
+export function keptBackupName(name: string): string | null {
+  const file = `${name}.db.gz`;
+  return /^[a-z0-9-]+$/.test(name) && !NAME.test(file) ? file : null;
+}
+
 interface SchemaEntry {
   type: string;
   name: string;

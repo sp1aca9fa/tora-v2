@@ -42,7 +42,8 @@
     "stress-data": "pnpm --silent --filter @tora/db stress-data",
     "demo": "pnpm --silent --filter @tora/collector-sdk demo",
     "mcp": "pnpm --silent --filter @tora/mcp start",
-    "plugins": "pnpm --silent --filter @tora/collector-sdk plugins"
+    "plugins": "pnpm --silent --filter @tora/collector-sdk plugins",
+    "recheck-sales": "pnpm --silent --filter @tora/collector-sdk recheck-sales"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

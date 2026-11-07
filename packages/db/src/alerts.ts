@@ -41,6 +41,7 @@ import type { Db } from './client';
 import { checkDbBudget } from './db-usage';
 import { holdingBucket } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
+import { VALUE_SERIES_BREAK_KEY, type ValueSeriesBreak } from './sales-recheck';
 import {
   type Activity,
   type AlertChannel,
@@ -1529,7 +1530,10 @@ export async function sendWatchAlerts(
 /**
  * Sharp drops for a person's daily summary (S9 part 5): owned and watched items whose market
  * value fell 15 % or more in 7 days (from the saved daily numbers), each item at most once in 14
- * days (`shown`: item and condition -> day last shown).
+ * days (`shown`: item and condition -> day last shown). A re-check of stored sales changes which sales
+ * count for an item, so a number is never compared with a stored row up to that day (`valueSeriesBreak`).
+ * That day's own row counts as before the run: the night's collect wrote it first. So a fall in the
+ * week after a run is told about a week late, and a fall on the run's own night not at all.
  */
 export async function sharpDrops(
   db: Db,
@@ -1576,13 +1580,17 @@ export async function sharpDrops(
       byPair.set(key, list);
     }
   }
+  const breaks = (await readSetting<ValueSeriesBreak>(db, VALUE_SERIES_BREAK_KEY)) ?? {};
   const out = [];
   for (const [key, list] of byPair) {
     list.sort((a, b) => a.day.localeCompare(b.day));
     const last = list.at(-1)!;
     // Today's or yesterday's numbers, against those of 7 days before (a day either way).
     if (last.fair === null || day(today) - day(last.day) > 1) continue;
-    const before = list.find((r) => Math.abs(day(last.day) - day(r.day) - 7) <= 1 && r.fair);
+    const seriesBreak = breaks[pairs.get(key)!.product.id] ?? '';
+    const before = list.find(
+      (r) => Math.abs(day(last.day) - day(r.day) - 7) <= 1 && r.fair && r.day > seriesBreak,
+    );
     if (!before?.fair) continue;
     const change = last.fair / before.fair - 1;
     if (change > SHARP_DROP_7D) continue;

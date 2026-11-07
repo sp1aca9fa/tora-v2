@@ -16,11 +16,23 @@ pnpm collect --product <product-id>  # one item
 pnpm collect --refresh                # also listings already collected today
 pnpm collect --review                # then the data review (or TORA_REVIEW=1)
 pnpm valuate                         # only refresh values and the value history
+pnpm --silent recheck-sales          # today's plug-in rules on stored sales: counts only, see below
 ```
 
 A full run: exchange rates, uploaded files waiting to be read, each collector in turn, pictures,
 values, and the day's value snapshot. It refuses to run against a database that needs a migration
 (run `pnpm db:migrate`).
+
+**Re-check of stored sales (`pnpm --silent recheck-sales`).** Runs a plug-in's sales filters again on
+what it stored, rules alone unless `--far` also marks sales far from the item's own history. Dry unless `--apply --limits <file>`, a file a rehearsal on a copy writes, with that copy's date; it
+refuses above or below those limits, under other rules or options, while a collect runs, outside the
+state folder collects use, and when that folder's `collect.log` is over 3 days old (likely a server
+that has been off: run `scripts/collect-cron.sh`, wait for it to end, and try again; undo too). No `pnpm collect` by hand may be running: those hold
+no lock in their closing steps. It only excludes, adding the reason to the row, and never touches a row a person included,
+excluded or pasted. `--undo <run> --apply` puts a run's rows back, except what a person changed since;
+an unknown id lists the runs. After a crash, the same command continues. Item values are refreshed at
+the end; charts and the rest at the next collect. A run or undo marks a break in its items' value
+series, so a sharp drop warning on them compares only with a value from after it.
 
 **Once a day, once per site.** Prices are daily, so a listing already collected today (a day in the
 app's time zone, Settings > Admin preferences > Time zone) is left out: a run started again the same

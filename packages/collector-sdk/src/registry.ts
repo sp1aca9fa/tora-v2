@@ -18,6 +18,7 @@ import type {
   PullRateSource,
   PurchaseImporter,
   RateSource,
+  SalesRechecker,
   SetCardSource,
   StoreDirectory,
   RankingSource,
@@ -45,6 +46,7 @@ export interface LoadedCollectors {
   catalogs: SetCatalog[];
   signals: SignalRule[];
   reprintHints: ReprintHint[];
+  recheckers: SalesRechecker[];
   missing: string[];
 }
 
@@ -60,6 +62,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
   const catalogs: SetCatalog[] = [];
   const signals: SignalRule[] = [];
   const reprintHints: ReprintHint[] = [];
+  const recheckers: SalesRechecker[] = [];
   const missing: string[] = [];
   for (const pkg of COLLECTOR_PACKAGES) {
     const entry = join(root, pkg.dir, 'src', 'index.ts');
@@ -79,6 +82,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     catalogs.push(...(mod.catalogs ?? []));
     signals.push(...(mod.signals ?? []).filter((r) => !isBuiltInSignal(r.key)));
     reprintHints.push(...(mod.reprintHints ?? []));
+    recheckers.push(...(mod.recheckers ?? []));
   }
   return {
     collectors,
@@ -92,6 +96,7 @@ export async function loadCollectors(root: string = findRepoRoot()): Promise<Loa
     catalogs,
     signals,
     reprintHints,
+    recheckers,
     missing,
   };
 }

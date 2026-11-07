@@ -23,6 +23,9 @@ It runs even when the collect failed, and only once a day (the day in the app's 
 Settings > Collectors shows admins when the last copy was made (in red after two days without one).
 
 By hand: `pnpm backup` (skips when today's copy exists; `pnpm backup --force` makes it again).
+Before a change made by hand: `pnpm backup --keep <name>` writes `<name>.db.gz` and exits 1 if it is
+already there, so `pnpm backup --keep x && <the change>` run a second time stops before the change.
+Pruning and the analysis copy leave that file alone; it stays until you remove it.
 
 ### Copies off the PC
 

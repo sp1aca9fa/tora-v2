@@ -346,6 +346,65 @@ export interface RankingSource {
   rank(ctx: Pick<CollectorContext, 'http' | 'now' | 'log'>): Promise<RankedEntry[]>;
 }
 
+/** A stored sold row, as the re-check of stored sales gives it to its plug-in (S30). */
+export interface StoredSale {
+  id: string;
+  title: string | null;
+  /** The row's `raw`, parsed; null when missing or broken. */
+  raw: Record<string, unknown> | null;
+  /** Its stored condition. */
+  bucket: string | null;
+  /** In the sale's own currency when known, else the base currency. */
+  price: number;
+  observedAt: string;
+}
+
+/**
+ * What today's rules say of a stored row. `skipped`: it cannot be read as the live path wrote it,
+ * so nothing is said (never a rejection). `bucket`: the condition its title reads as today. `low`:
+ * the rejection is not applied unless asked (it rests on what a title does not show).
+ */
+export type StoredVerdict =
+  | { id: string; skipped: string }
+  | { id: string; ok: true; bucket: string | null }
+  | { id: string; ok: false; detail: string; bucket: string | null; low?: boolean };
+
+/** A stored sale in the far check's replay. `markable`: a kept row no person vouched for. */
+export interface StoredPeer {
+  id: string;
+  bucket: string | null;
+  price: number;
+  at: number;
+  markable: boolean;
+}
+
+/**
+ * The plug-in's own rules, run again on the sales it stored (S30 step 5). Pure: it decides, the SDK
+ * runs the flow and `@tora/db` writes. `assess` gets one listing's rows at a time, `far` one item's
+ * rows; `id` on a history row lets a flag take it out.
+ */
+export interface SalesRechecker {
+  /** The sources it can judge; never a noAi one. */
+  sources: string[];
+  /** Hash of the rules, so a run proves it uses the rules that were rehearsed. */
+  rulesId(): string;
+  /** Verdicts of a listing's stored rows, or why the whole listing is not judged. */
+  assess(
+    source: string,
+    product: Product,
+    link: ProductSource,
+    sales: StoredSale[],
+  ): StoredVerdict[] | { skipped: string };
+  /** Kept rows to mark as far from the item's history: one list of peers per source. */
+  far(
+    peersBySource: StoredPeer[][],
+    history: { id?: string; bucket: string | null; price: number; at: number }[],
+    now: number,
+  ): Set<string>;
+  /** The live path's wording for such a row. */
+  farDetail: string;
+}
+
 export interface CollectorModule {
   collectors: Collector[];
   importers?: PurchaseImporter[];
@@ -367,4 +426,6 @@ export interface CollectorModule {
   signals?: SignalRule[];
   /** Guesses whether items will be reprinted (S27), until an admin marks them. */
   reprintHints?: ReprintHint[];
+  /** Re-checks the sales it stored with today's rules (S30). */
+  recheckers?: SalesRechecker[];
 }

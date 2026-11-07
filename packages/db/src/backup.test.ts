@@ -1,4 +1,7 @@
 import { createClient } from '@libsql/client';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -211,3 +214,59 @@ it('keeps the last 30 days and the first backup of each month for a year', async
   expect(await pruneBackups(dir, '2026-10-16')).toBe(2);
   expect(await listBackups(dir)).toEqual(['2026-03-05']);
 });
+
+it(
+  '--keep writes a copy no second call replaces, and pruning and the analysis copy never read',
+  { timeout: 60_000 },
+  async () => {
+    const backups = join(dir, 'kept');
+    const analysis = join(dir, 'analysis.db');
+    const run = (...args: string[]) =>
+      spawnSync(
+        process.execPath,
+        [
+          '--import',
+          new URL('../../../node_modules/tsx/dist/esm/index.mjs', import.meta.url).href,
+          new URL('./scripts/backup.ts', import.meta.url).pathname,
+          ...args,
+        ],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DATABASE_URL: `file:${join(dir, 'live.db')}`,
+            BACKUP_DIR: backups,
+            TORA_ANALYSIS_DB: analysis,
+          },
+        },
+      );
+    const file = join(backups, 'pre-recheck.db.gz');
+    const hash = () => createHash('sha256').update(readFileSync(file)).digest('hex');
+
+    const first = run('--keep', 'pre-recheck');
+    expect(first.status, first.stderr).toBe(0);
+    expect(first.stdout).toContain('pre-recheck.db.gz');
+    const once = hash();
+
+    const second = run('--keep', 'pre-recheck');
+    expect(second.status).toBe(1);
+    // Its date and size: the owner reads from them whether it is the copy they meant to keep.
+    expect(second.stderr).toMatch(
+      /already there \(made \d{4}-\d{2}-\d{2} \d{2}:\d{2}, \d+\.\d MB\)/,
+    );
+    expect(hash()).toBe(once);
+
+    // Not a dated copy: pruning and the analysis copy do not see it.
+    expect(await listBackups(backups)).toEqual([]);
+    expect(await pruneBackups(backups, '2030-01-01')).toBe(0);
+    expect(hash()).toBe(once);
+    expect(await refreshAnalysisCopy(backups, analysis)).toBeNull();
+    expect(existsSync(analysis)).toBe(false);
+
+    for (const bad of [['--keep'], ['--keep', 'tora-2026-01-01'], ['--keep', '../out']]) {
+      expect(run(...bad).status, bad.join(' ')).toBe(1);
+    }
+    expect(existsSync(join(backups, 'tora-2026-01-01.db.gz'))).toBe(false);
+  },
+);
