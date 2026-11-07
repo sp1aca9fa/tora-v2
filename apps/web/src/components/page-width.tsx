@@ -17,7 +17,7 @@ const WIDE = [
 ];
 
 /** Pages that use a 4K screen's whole width (cards in columns). */
-const EXTRA_WIDE = [/^\/spread$/, /^\/settings\/collectors$/];
+const EXTRA_WIDE = [/^\/spread$/, /^\/settings\/collectors$/, /^\/products\/[^/]+\/buy$/];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */
 const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist(\/opening)?$/];

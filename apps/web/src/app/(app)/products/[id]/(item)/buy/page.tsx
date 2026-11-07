@@ -60,10 +60,11 @@ export default async function BuyPage({ params, searchParams }: Props) {
   const forSale = supply.get(product.id) ?? [];
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
 
-  // Wide screens: the verdict, the chart and the reasons on the left; what is for sale and the
-  // watches beside them. Phones keep that order in one column.
+  // Wide screens: the verdict and its reasons on one side; the chart, what is for sale and the
+  // watches on the other, so the chart stays beside what it explains. A full 4K screen gives those
+  // their own column. Phones keep that order.
   return (
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] min-[2400px]:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)]">
       <div className="space-y-5">
         {conditions.length > 1 && (
           <nav className="flex flex-wrap gap-1.5" aria-label={t('valuation.bucket')}>
@@ -96,72 +97,76 @@ export default async function BuyPage({ params, searchParams }: Props) {
           condition={bucket}
         />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('valuation.history')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PriceChart
-              key={bucket}
-              points={history}
-              defaultBucket={bucket}
-              sourceLabels={Object.fromEntries(
-                history.map((p) => [p.source, sourceLabel(p.source)]),
-              )}
-              guides={
-                stats
-                  ? { zoneTop, low: stats.q25d180, high: stats.q75d180, ask: stats.ask }
-                  : undefined
-              }
-              className="h-72 xl:h-96"
-            />
-          </CardContent>
-        </Card>
-
         {stats && <BuyReasons stats={stats} />}
-
-        {choice.strategy !== 'target' && (
-          <RuleTestCard test={ruleTest} strategyName={t(`strategy.name.${choice.strategy}`)} />
-        )}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1">
-        <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} />
-        <div className="space-y-3">
-          <WatchCard
-            productId={product.id}
-            cls={cls}
-            retail={product.retailPriceBase}
-            watches={watches.map((w) => {
-              const best = lowestAsk(forSale, w.bucket);
-              return {
-                id: w.id,
-                label: lotConditionLabel(w, product, t),
-                target: w.targetPriceBase,
-                note: w.note,
-                alertLimited: w.alertLimited,
-                defaults: w,
-                ask: best && {
-                  price: best.lowestAskBase!,
-                  source: sourceLabel(best.source),
-                  url: best.url,
-                  listings: listingsIn(forSale, w.bucket),
-                },
-              };
-            })}
-          />
-          {lots.length === 0 && (
-            // Watched, not owned: bought it, register the lot.
-            <Button asChild variant="outline" size="sm">
-              <Link href={`/add?product=${product.id}`}>
-                <Plus /> {t('watchlist.bought')}
-              </Link>
-            </Button>
+      <div className="space-y-5 min-[2400px]:contents">
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('valuation.history')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PriceChart
+                key={bucket}
+                points={history}
+                defaultBucket={bucket}
+                sourceLabels={Object.fromEntries(
+                  history.map((p) => [p.source, sourceLabel(p.source)]),
+                )}
+                guides={
+                  stats
+                    ? { zoneTop, low: stats.q25d180, high: stats.q75d180, ask: stats.ask }
+                    : undefined
+                }
+                className="h-72 xl:h-96"
+              />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1 min-[1600px]:grid-cols-2 min-[2400px]:grid-cols-1">
+            <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} />
+            <div className="space-y-3">
+              <WatchCard
+                productId={product.id}
+                cls={cls}
+                retail={product.retailPriceBase}
+                watches={watches.map((w) => {
+                  const best = lowestAsk(forSale, w.bucket);
+                  return {
+                    id: w.id,
+                    label: lotConditionLabel(w, product, t),
+                    target: w.targetPriceBase,
+                    note: w.note,
+                    alertLimited: w.alertLimited,
+                    defaults: w,
+                    ask: best && {
+                      price: best.lowestAskBase!,
+                      source: sourceLabel(best.source),
+                      url: best.url,
+                      listings: listingsIn(forSale, w.bucket),
+                    },
+                  };
+                })}
+              />
+              {lots.length === 0 && (
+                // Watched, not owned: bought it, register the lot.
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/add?product=${product.id}`}>
+                    <Plus /> {t('watchlist.bought')}
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+          {choice.strategy !== 'target' && (
+            <RuleTestCard test={ruleTest} strategyName={t(`strategy.name.${choice.strategy}`)} />
           )}
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground xl:col-span-2">{t('strategy.notAdvice')}</p>
+      <p className="text-xs text-muted-foreground xl:col-span-full">{t('strategy.notAdvice')}</p>
     </div>
   );
 }
