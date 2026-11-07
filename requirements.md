@@ -56,7 +56,7 @@
 | S32 | Opportunities as a deal finder: ways of spotting deals, potential, price | built 2026-11-07: six lists and per-person criteria, each saying its past test found no record; the owner decides definitions and Buy plan. About 540 lines against a 400 limit (the form and the record table, no extra guards); kept since the owner named the lists |
 | S33 | Look-back test (from S27 step 7) | planned 2026-11-07, after the owner is happy with S31 |
 | S34 | Sell timing | planned 2026-11-07, spec later; needs S31 and S32 |
-| S35 | Sources and collection load: identity sources, which stores earn their place, a rhythm per item | planned 2026-11-07 |
+| S35 | Sources and collection load: identity sources, which stores earn their place, a rhythm per item | measured 2026-11-07, nothing built: a rhythm saves about a quarter on two sites, with costs the replay cannot count, on 28 nights; no store reads as noise; the owner decides |
 
 ### Decision log
 
