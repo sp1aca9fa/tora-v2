@@ -21,6 +21,9 @@ const STATUS_STYLE = {
 /** A source with an open finding never reads green beside its warning. */
 const NEEDS_LOOK_STYLE = 'font-medium text-amber-700 dark:text-amber-400';
 
+const runStale = (day: string) =>
+  Date.now() - Date.parse(`${day}T12:00:00`) > STALE_DAYS * 86_400_000;
+
 /**
  * Tora's check of its own data (S30), for admins: is it running, what is it watching, what is open.
  * Reads one setting row. Source findings first and item findings under them, in columns when wide.
@@ -33,8 +36,7 @@ export async function DataCheckSection({ db }: { db: Db }) {
     getMoney(),
   ]);
   const day = (d: string) => format.dateTime(new Date(`${d}T12:00:00`), { dateStyle: 'short' });
-  const stale =
-    view.lastRun && Date.now() - Date.parse(`${view.lastRun}T12:00:00`) > STALE_DAYS * 86_400_000;
+  const stale = view.lastRun && runStale(view.lastRun);
   const line = (f: DataCheckDescribed) => {
     const l = dataCheckLine(f, money, (b) => bucketLabel(b, t));
     return t(`alertText.${l.key}`, l.params);
