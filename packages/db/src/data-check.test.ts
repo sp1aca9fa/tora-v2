@@ -80,7 +80,13 @@ const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => 
 
 const ctx: AlertContext = { secret: SECRET, texts: () => EN.alertText, fetch: fakeFetch };
 
-const now = new Date();
+// Some cases call the check again a minute or two later on the same day: started just before
+// midnight (CI at 23:57, 2026-11-11), those calls fell on the next day. Kept clear of midnight.
+const started = new Date();
+const now =
+  toLocalIso(started).slice(11, 16) >= '23:50'
+    ? new Date(started.getTime() - 15 * 60_000)
+    : started;
 const today = localDate(now);
 const at = (daysAgo: number) => toLocalIso(new Date(now.getTime() - daysAgo * DAY));
 const dayBack = (daysAgo: number) => localDate(new Date(now.getTime() - daysAgo * DAY));
