@@ -183,10 +183,19 @@ it('checks what a feed pushes', () => {
     chain: 'megastore',
     products: null,
     next: null,
+    lagMinutes: 0,
     posts: [
       { id: '1', text: 'x', author: null, url: null, postedAt: null, chain: null, replyTo: null },
     ],
   });
+  // A lag is a number of minutes up to 180; a post's staff mark only when true.
+  const lagged = (lagMinutes: unknown, official: unknown = true) =>
+    readPush({ source: 'myboard', lagMinutes, posts: [{ id: '1', text: 'x', official }] });
+  expect(lagged(29.6)).toMatchObject({ lagMinutes: 30, posts: [{ official: true }] });
+  expect(lagged(999)).toMatchObject({ lagMinutes: 180 });
+  for (const bad of [-5, '30', null, Number.NaN])
+    expect(lagged(bad)).toMatchObject({ lagMinutes: 0 });
+  expect((lagged(0, 'yes') as { posts: object[] }).posts[0]).not.toHaveProperty('official');
   const at = '2026-10-19T03:01:00.000Z';
   expect(readPush({ source: 'myboard', posts: [], next: { board: 'b', at } })).toMatchObject({
     next: { board: 'b', at },
@@ -257,6 +266,81 @@ it("notifies the people whose area holds a post's store, once per store for a wh
   // Another post about the same store soon after: no second notice.
   const again = await push([post('5', 'KTA まだある')]);
   expect(await sendStoreNotices(db, again, ctx, now)).toBe(0);
+});
+
+it("counts a post's age from when a lagging board shows it", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  const push = (posts: ReturnType<typeof post>[], lagMinutes?: number) =>
+    receivePush(db, uid, { source: 'myboard', chain: 'megastore', lagMinutes, posts }, now);
+  await push([post('1', 'KTA 販売中')]);
+  // No lag: 34 minutes old is too old.
+  const plain = await push([post('2', 'KTA 販売中', 34)]);
+  expect(await sendStoreNotices(db, plain, ctx, now)).toBe(0);
+  // The board shows posts 30 minutes late: 34 minutes old is 4 minutes on the board.
+  const lagged = await push([post('3', 'KTA 30th 販売', 34)], 30);
+  expect(lagged.lag).toBe(30);
+  expect(await sendStoreNotices(db, lagged, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('KTA 30th 販売');
+  // Past the window even with the lag (and another store, out of any quiet time).
+  const stale = await push([post('4', 'MID 販売中', 61)], 30);
+  expect(await sendStoreNotices(db, stale, ctx, now)).toBe(0);
+});
+
+it("tells everyone the board staff's new posts, once, whatever their area", async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await setPreferences(db, uid, {
+    storeArea: { home: { mode: 'distance', point: { lat: 35.69, lon: 139.7 }, km: 10 } },
+  });
+  await newFeedToken(db, uid);
+  const staff = (p: ReturnType<typeof post>) => ({ ...p, official: true });
+  const push = (posts: (ReturnType<typeof post> & { official?: boolean; replyTo?: string })[]) =>
+    receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts }, now);
+  // A feed's first push: nothing, staff or not.
+  const first = await push([staff(post('1', 'Lottery opens today'))]);
+  expect(await sendStoreNotices(db, first, ctx, now)).toBe(0);
+  sent = [];
+  // Naming no store, and a store outside the area: both told, as the staff's card.
+  const r = await push([staff(post('2', 'Lottery opens online')), staff(post('3', 'MID 販売中'))]);
+  expect(r.official?.size).toBe(2);
+  expect(await sendStoreNotices(db, r, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain("news from the board's staff");
+  expect(sent.at(-1)).toContain("From the board's staff");
+  expect(sent.at(-1)).toContain('Lottery opens online');
+  expect(sent.at(-1)).toContain('MID 販売中');
+  // Not also told as an unknown store.
+  expect(await sendFeedMessages(db, uid, r, ctx, now)).toBe(0);
+  // Seen again: not new, not told again.
+  expect(
+    await sendStoreNotices(db, await push([staff(post('2', 'Lottery opens online'))]), ctx, now),
+  ).toBe(0);
+  // In the area: told once, under its store, not again as the staff's card.
+  sent = [];
+  const near = await push([staff(post('4', 'KTA 販売中'))]);
+  expect(await sendStoreNotices(db, near, ctx, now)).toBe(1);
+  expect(sent.at(-1)!.split('KTA 販売中').length).toBe(2);
+  expect(sent.at(-1)).not.toContain("From the board's staff");
+  // In the area but within the store's quiet time: still told, as the staff's card.
+  const quiet = await push([staff(post('5', 'KTA 追加'))]);
+  expect(await sendStoreNotices(db, quiet, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain("From the board's staff");
+  // A staff reply, an old staff post: the usual rules (here none).
+  const reply = await push([
+    { ...staff(post('6', 'Thanks!')), replyTo: '2' },
+    staff(post('7', 'Old news', 90)),
+  ]);
+  expect(await sendStoreNotices(db, reply, ctx, now)).toBe(0);
+  // 'starts': the staff's posts as a message of their own.
+  await setPreferences(db, uid, { storeNoticeMode: 'starts' });
+  const starts = await push([staff(post('8', 'Lottery results tonight'))]);
+  expect(await sendStoreNotices(db, starts, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('Lottery results tonight');
+  // 'off': nothing.
+  await setPreferences(db, uid, { storeNoticeMode: 'off' });
+  expect(await sendStoreNotices(db, await push([staff(post('9', 'More news'))]), ctx, now)).toBe(0);
 });
 
 it("starts a store's quiet time only when a channel took its notice", async () => {

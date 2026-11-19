@@ -61,6 +61,8 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'storeStarts',
     'storeBusy',
     'storeBurst',
+    'storeStaff',
+    'storeStaffNews',
   ],
   storeUnknown: ['storeUnknown', 'storeLink', 'storeOpen'],
   feed: [

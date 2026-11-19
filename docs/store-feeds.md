@@ -108,6 +108,11 @@ Content-Type: application/json
 - `watching`: every board the feed goes through; its person is told "connected, tracking these
   boards" on the first push, after a silence, and when the list changes.
 - `chain`: the board's chain when the whole push is about one chain; a post can carry its own.
+- `lagMinutes` (optional): the board shows posts this many minutes after their posted time (a
+  board that shows members posts at once and guests 30 minutes later: `30`). A number up to 180;
+  anything else counts as 0. A post counts as new for notices for 30 minutes plus the lag (the
+  sales starting choice: its 2-hour window for a late start word, and bursts, grow by it too);
+  notices still show the post's own time, and the quiet time between notices does not change.
 - `products` (optional): the board's own list of product codes (`[{ "code": "X1", "meaning":
 "スノーセット" }]`), saved when it changes; send it when it changes (and with `hello`).
 - `replyTo` (per post): the id of the post it answers, for replies (comments) such as "still a
@@ -117,6 +122,12 @@ Content-Type: application/json
   makes at most one notice every 30 minutes; a person can choose only sales starting, see
   [Alerts](alerts.md)). On the Stores pages a post shows every reply in its
   thread under it, answers to replies included, oldest first.
+- `official` (per post, optional): `true` when the board's own staff (its admins) wrote it, as the
+  board marks it. A new first post marked so goes to everyone with store notices on and an area,
+  whatever stores it names or none, as a card "From the board's staff" (in its own message under
+  the sales starting choice); once per post, its pictures attached. One the area's rules already
+  tell is not repeated; staff replies follow the usual rules; a staff post naming no store is not
+  sent as an unknown store.
 - `images` (per post, optional): its pictures, `[{ "url": "<where it was found>", "data": "<base64>" }]`,
   up to 4, 8 MB each (JPEG, PNG, WebP or GIF). Kept a week, attached to the post's notices and
   shown on the Posts page. Send a post's pictures with its first push only (a post sent again is

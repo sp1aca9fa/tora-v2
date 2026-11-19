@@ -413,6 +413,24 @@ export const STORE_FRESH_MINUTES = 30;
 export const STORE_QUIET_MINUTES = 30;
 /** S29: how late a start word may reach Tora and still be told, at its real time. */
 export const STORE_LATE_WORD_MINUTES = 120;
+/** The most a feed may say its board shows posts late (`lagMinutes`). */
+export const STORE_LAG_MAX_MINUTES = 180;
+
+/**
+ * A feed's lag: its board shows posts this many minutes after their posted time (members first,
+ * guests later). A number 0-180, rounded; anything else is 0 (no lag, the usual rules).
+ */
+export const readLag = (v: unknown): number =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0
+    ? Math.min(STORE_LAG_MAX_MINUTES, Math.round(v))
+    : 0;
+
+/**
+ * From when a post counts as fresh: STORE_FRESH_MINUTES back, plus the board's lag, so a post the
+ * board only just showed still makes a notice (at its real time).
+ */
+export const freshSince = (now: Date, lag = 0): string =>
+  toLocalIso(new Date(now.getTime() - (STORE_FRESH_MINUTES + lag) * 60_000));
 /** S29: this many different authors on one store, within this time, is a burst, whatever the words. */
 export const BURST_AUTHORS = 3;
 export const BURST_MINUTES = 15;
@@ -544,28 +562,32 @@ export interface SaleStart<T extends NoticePost = NoticePost> {
 export const noticeablePosts = <T extends Pick<NoticePost, 'storeIds' | 'postedAt'>>(
   fresh: T[],
   now: Date,
+  lag = 0,
 ): T[] => {
-  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
+  const since = freshSince(now, lag);
   return fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
 };
 
-/** How far back a start word can still be told, at most 2 hours late. */
-const lateWordSince = (now: Date): string =>
-  toLocalIso(new Date(now.getTime() - STORE_LATE_WORD_MINUTES * 60_000));
+/** How far back a start word can still be told, at most 2 hours late (plus the board's lag). */
+const lateWordSince = (now: Date, lag = 0): string =>
+  toLocalIso(new Date(now.getTime() - (STORE_LATE_WORD_MINUTES + lag) * 60_000));
 
 /**
  * From when stored posts matter to the rules below: as far back as a late start word counts, and a
  * quiet time further, so the word that opened a quiet time is still seen.
  */
-export const startsReadSince = (now: Date): string =>
-  toLocalIso(new Date(now.getTime() - (STORE_LATE_WORD_MINUTES + STORE_QUIET_MINUTES) * 60_000));
+export const startsReadSince = (now: Date, lag = 0): string =>
+  toLocalIso(
+    new Date(now.getTime() - (STORE_LATE_WORD_MINUTES + lag + STORE_QUIET_MINUTES) * 60_000),
+  );
 
 /** New posts that may make a 'starts' notice, naming a store: a start word may come in late. */
 export const startsPosts = <T extends Pick<NoticePost, 'storeIds' | 'postedAt'>>(
   fresh: T[],
   now: Date,
+  lag = 0,
 ): T[] => {
-  const since = lateWordSince(now);
+  const since = lateWordSince(now, lag);
   return fresh.filter((p) => p.storeIds.length && p.postedAt >= since);
 };
 
@@ -632,11 +654,14 @@ export function salesStarting<T extends NoticePost>(opts: {
   last: Map<string, string>;
   glossary: CodeMeaning[];
   now: Date;
+  /** The board's lag (minutes): the fresh and late windows grow by it, quiet times do not. */
+  lag?: number;
 }): SaleStart<T>[] {
   const { fresh, recent, area, places, lottery, last, glossary, now } = opts;
+  const lag = opts.lag ?? 0;
   const quiet = quietFrom(now);
-  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
-  const lateSince = lateWordSince(now);
+  const since = freshSince(now, lag);
+  const lateSince = lateWordSince(now, lag);
   const stored = [...new Map([...recent, ...fresh].map((p) => [p.id, p])).values()]
     .filter((p) => !lottery.has(p.id))
     .sort((a, b) => a.postedAt.localeCompare(b.postedAt) || a.id.localeCompare(b.id));
@@ -644,7 +669,7 @@ export function salesStarting<T extends NoticePost>(opts: {
     fresh.flatMap((p) => (lottery.has(p.id) ? [] : p.storeIds)).filter((id) => area.has(id)),
   );
   const cameLate = (p: T) =>
-    Date.parse(p.receivedAt) - Date.parse(p.postedAt) > STORE_FRESH_MINUTES * 60_000;
+    Date.parse(p.receivedAt) - Date.parse(p.postedAt) > (STORE_FRESH_MINUTES + lag) * 60_000;
   const out: SaleStart<T>[] = [];
   for (const storeId of woken) {
     const told = last.get(storeId) ?? '';

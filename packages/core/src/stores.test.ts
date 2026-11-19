@@ -12,6 +12,9 @@ import {
   lotteryPostIds,
   postRef,
   salesStarting,
+  readLag,
+  noticeablePosts,
+  freshSince,
   startLineOf,
   startsPosts,
   startsReadSince,
@@ -448,6 +451,40 @@ describe('sales starting and confirmed lotteries (S29)', () => {
     // Three people an hour late are no burst.
     const three = [late(60), late(61), late(62)];
     expect(run(three, zone)).toEqual([]);
+  });
+
+  it("grows the fresh and late windows by a board's lag, not the quiet time", () => {
+    const nowAt = new Date('2026-11-01T14:00:00.000+09:00');
+    const ago = (minutes: number, over: Partial<NoticePost> = {}) =>
+      post({
+        postedAt: toLocalIso(new Date(nowAt.getTime() - minutes * 60_000)),
+        receivedAt: nowAt.toISOString(),
+        ...over,
+      });
+    const lagged = { now: nowAt, lag: 30 };
+    // A start word 2h29 late on a board 30 minutes behind: told; 2h31: not.
+    expect(run([ago(149, { text: 'started' })], lagged)).toHaveLength(1);
+    expect(run([ago(151, { text: 'started' })], lagged)).toEqual([]);
+    // Three people 31-33 minutes ago, as the board shows them now: a burst.
+    expect(run([ago(31), ago(32), ago(33)], lagged)).toMatchObject([{ why: 'burst', people: 3 }]);
+    expect(run([ago(31), ago(32), ago(33)], { now: nowAt })).toEqual([]);
+    // The quiet time stays 30 minutes from the last notice (a word told 10 minutes ago).
+    const told = toLocalIso(new Date(nowAt.getTime() - 10 * 60_000));
+    const said = ago(40, { text: 'started', receivedAt: told });
+    const last = new Map([['s1', told]]);
+    expect(run([ago(31, { text: 'started' })], { ...lagged, recent: [said], last })).toEqual([]);
+  });
+
+  it("reads a feed's lag and the posts fresh with it", () => {
+    expect([readLag(30), readLag(29.5), readLag(500), readLag(-1), readLag('30')]).toEqual([
+      30, 30, 180, 0, 0,
+    ]);
+    const nowAt = new Date('2026-11-01T14:00:00.000+09:00');
+    const at = (minutes: number) => toLocalIso(new Date(nowAt.getTime() - minutes * 60_000));
+    const posts = [34, 61].map((m) => ({ storeIds: ['s1'], postedAt: at(m) }));
+    expect(noticeablePosts(posts, nowAt)).toEqual([]);
+    expect(noticeablePosts(posts, nowAt, 30)).toEqual([posts[0]]);
+    expect(freshSince(nowAt, 30)).toBe(at(60));
   });
 
   it('does not tell a store again for a late word posted before the last notice', () => {

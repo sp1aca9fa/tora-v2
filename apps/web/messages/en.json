@@ -1604,6 +1604,8 @@
     "storeBusy": "Tora: busy at your stores",
     "storeExample": "Tora: a test, this is how a sale started message looks",
     "storeBurst": "{n} people in {minutes} minutes",
+    "storeStaff": "From the board's staff",
+    "storeStaffNews": "Tora: news from the board's staff",
     "storeLink": "Store notices in Tora",
     "storeOpen": "post",
     "feedSilent": "Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).",

@@ -4,11 +4,11 @@ import {
   type CodeMeaning,
   DEFAULT_FEED_PREFS,
   PLACE,
-  STORE_FRESH_MINUTES,
   canConfirmLottery,
   chainsInPost,
   type StoreEntry,
   fillText,
+  freshSince,
   isWordOnly,
   linesNotice,
   localDate,
@@ -18,6 +18,7 @@ import {
   postRef,
   postedStores,
   postsToTell,
+  readLag,
   productsInPost,
   salesStarting,
   startsReadSince,
@@ -309,6 +310,8 @@ export interface PushedPost {
   chain?: string | null;
   /** A reply (comment): the id of the post it answers. */
   replyTo?: string | null;
+  /** Written by the board's own staff (its admins), as the board marks it: told to everyone. */
+  official?: boolean | null;
   /** Its pictures (JPEG, PNG, WebP or GIF), base64, with where they were found. */
   images?: { url?: string | null; data: string }[] | null;
 }
@@ -378,6 +381,11 @@ export interface Push {
   products?: { code: string; meaning: string }[] | null;
   /** When (an ISO time) and where (a board) the feed reads next: the Stores pages show it. */
   next?: { board?: string | null; at: string } | null;
+  /**
+   * The board shows posts this many minutes after their posted time (0-180): the windows that
+   * decide whether a post is fresh grow by it for this push.
+   */
+  lagMinutes?: number;
   posts: (PushedPost & { pictures?: PostImage[] })[];
 }
 
@@ -442,6 +450,7 @@ export function readPush(body: unknown): Push | string {
           .map((e) => ({ code: e.code.trim(), meaning: e.meaning.trim() }))
       : null,
     next: readNext(b.next),
+    lagMinutes: readLag(b.lagMinutes),
     posts: b.posts.map((p) => {
       const pictures = readImages(p.images);
       return {
@@ -452,6 +461,7 @@ export function readPush(body: unknown): Push | string {
         postedAt: p.postedAt ?? null,
         chain: typeof p.chain === 'string' ? p.chain : null,
         replyTo: typeof p.replyTo === 'string' && p.replyTo ? p.replyTo.slice(0, 200) : null,
+        ...(p.official === true ? { official: true } : {}),
         ...(pictures.length ? { pictures } : {}),
       };
     }),
@@ -464,6 +474,10 @@ export function readPush(body: unknown): Push | string {
  */
 export interface Received {
   fresh: StorePost[];
+  /** The push's lag (minutes, `Push.lagMinutes`; 0 when none). */
+  lag?: number;
+  /** The ids (`StorePost.id`) of the fresh posts written by the board's staff. */
+  official?: Set<string>;
   /** The feed's very first push (only fills the list). */
   first: boolean;
   /** The feed had been told silent: it speaks again. */
@@ -537,7 +551,14 @@ export async function receivePush(
     (b) => !offered || offered.includes(b),
   );
   const watch = chosen?.length ? chosen : null;
-  const base = { resumed, boardBack, connected, watch, user: row?.user ?? null };
+  const base = {
+    resumed,
+    boardBack,
+    connected,
+    watch,
+    user: row?.user ?? null,
+    lag: push.lagMinutes ?? 0,
+  };
   if (push.products?.length) {
     await saveGlossary(
       db,
@@ -569,6 +590,7 @@ export async function receivePush(
   const all = await cachedStores(db);
   const listed = all.map((s) => ({ ...s, codes: storeCodes(s) }));
   const fresh: StorePost[] = [];
+  const official = new Set<string>();
   // Replies take their thread and, naming no store, the stores of the post they answer: the
   // posts answered are read once (those of this push are saved first).
   const answered = [...new Set(push.posts.flatMap((p) => (p.replyTo ? [p.replyTo] : [])))];
@@ -605,6 +627,7 @@ export async function receivePush(
       .onConflictDoNothing()
       .returning();
     if (row) fresh.push(row);
+    if (row && p.official) official.add(row.id);
     // A post may be answered within the same push.
     if (row) parents.set(p.id, row);
     if (row && p.pictures?.length) {
@@ -630,7 +653,7 @@ export async function receivePush(
   )
     ? { chain: push.chain ?? null, posts: fresh.length }
     : null;
-  return { fresh, first: !known, gap, ...base };
+  return { fresh, first: !known, gap, official, ...base };
 }
 
 /**
@@ -645,10 +668,14 @@ export async function sendFeedMessages(
   ctx: AlertContext,
   now = new Date(),
 ): Promise<number> {
-  const since = toLocalIso(new Date(now.getTime() - STORE_FRESH_MINUTES * 60_000));
+  const since = freshSince(now, received.lag ?? 0);
+  // A staff post naming no store goes to everyone as one (sendStoreNotices), not as unknown.
   const unknownPosts = received.first
     ? []
-    : received.fresh.filter((p) => !p.storeIds.length && !p.replyTo && p.postedAt >= since);
+    : received.fresh.filter(
+        (p) =>
+          !p.storeIds.length && !p.replyTo && p.postedAt >= since && !received.official?.has(p.id),
+      );
   // Most pushes have nothing to say: nothing else is read then.
   if (
     !received.connected &&
@@ -922,11 +949,15 @@ function storeLabel(store: Store, t: AlertTexts, locale: string): string {
 
 /**
  * Notices of new posts and replies naming a store of a person's area (posts of the last 30 minutes,
- * none for a feed's first push). A post: one per store every 30 minutes. A reply (a comment on a
- * post, e.g. "still a line", "sold out"): every one at once, marked as a comment to its post. Each
- * names the time, the store and the products its codes stand for, then the post as written. That
- * is the 'all' choice (the default). 'starts' (S29): only sales starting, one short notice per store
- * per quiet time, read from stored posts. 'off': none.
+ * plus the board's lag; none for a feed's first push). A post: one per store every 30 minutes. A
+ * reply (a comment on a post, e.g. "still a line", "sold out"): every one at once, marked as a
+ * comment to its post. Each names the time, the store and the products its codes stand for, then
+ * the post as written. That is the 'all' choice (the default). 'starts' (S29): only sales starting,
+ * one short notice per store per quiet time, read from stored posts. 'off': none.
+ *
+ * A new first post by the board's staff (`Received.official`) goes to everyone with a store area
+ * and notices on, whatever the stores it names: a card of its own, once, with its pictures; in
+ * 'starts' as a message of its own. One the area rules already tell is not repeated.
  */
 export async function sendStoreNotices(
   db: Db,
@@ -935,10 +966,16 @@ export async function sendStoreNotices(
   now = new Date(),
 ): Promise<number> {
   if (received.first) return 0;
-  const posts = noticeablePosts(received.fresh, now);
+  const lag = readLag(received.lag);
+  const posts = noticeablePosts(received.fresh, now, lag);
   // 'starts' takes a start word up to 2 hours late; everything else stays on `posts`.
-  const newer = startsPosts(received.fresh, now);
-  if (!newer.length) return 0;
+  const newer = startsPosts(received.fresh, now, lag);
+  // The board's staff: new first posts, fresh, told to everyone.
+  const since = freshSince(now, lag);
+  const staff = received.fresh.filter(
+    (p) => received.official?.has(p.id) && !p.replyTo && p.postedAt >= since,
+  );
+  if (!newer.length && !staff.length) return 0;
   const all = await cachedStores(db);
   const byId = new Map(all.map((s) => [s.id, s]));
   const locationOf = locationsOf(all);
@@ -987,10 +1024,7 @@ export async function sendStoreNotices(
   };
   const places = new Set(all.filter((s) => s.chain === PLACE).map((s) => s.id));
   // The posts' pictures, attached to the notices that carry them.
-  const pictures = await imagesOf(
-    db,
-    posts.map((p) => p.id),
-  );
+  const pictures = await imagesOf(db, [...new Set([...posts, ...staff].map((p) => p.id))]);
   // A card per location (the Now page's rows), a section per store; posts naming only areas open
   // the page's "area known" row.
   const postData = (p: StorePost, ids: string[], t: AlertTexts, locale: string) => {
@@ -1028,6 +1062,45 @@ export async function sendStoreNotices(
       };
     });
   };
+  /** A staff post as its own card: the stores it names (any area), else none. */
+  const staffData = (p: StorePost, t: AlertTexts, locale: string) => {
+    let products = named(p.text);
+    if (!products.length && p.thread) products = named(firsts.get(p.thread) ?? '');
+    return {
+      key: `${p.source}:${p.externalId}`,
+      thread: null,
+      location: {
+        id: 'board-staff',
+        title: t.storeStaff ?? "From the board's staff",
+        url: base ? `${base}/stores` : null,
+      },
+      store: p.storeIds
+        .flatMap((id) => {
+          const s = byId.get(id);
+          return s ? [storeLabel(s, t, locale)] : [];
+        })
+        .join(', '),
+      products,
+      text: p.text,
+      when: p.postedAt.slice(11, 16),
+      at: p.postedAt,
+      url: p.url,
+      comment: false,
+      threadText: null,
+    };
+  };
+  /** The pictures of these posts, as a notice carries them. */
+  const imagesFor = (list: StorePost[]) =>
+    list
+      .flatMap((p) =>
+        (pictures.get(p.id) ?? []).map((img, i) => ({
+          name: `${p.externalId}-${i + 1}.${img.contentType.split('/')[1]}`,
+          key: `${p.source}:${p.externalId}`,
+          contentType: img.contentType,
+          bytes: img.bytes,
+        })),
+      )
+      .slice(0, IMAGES_PER_NOTICE);
   const lastNotices = async (userId: string, storeIds: string[]) =>
     new Map(
       (storeIds.length
@@ -1057,7 +1130,10 @@ export async function sendStoreNotices(
       .select()
       .from(storePosts)
       .where(
-        and(gte(storePosts.postedAt, startsReadSince(now)), sql`${storePosts.storeIds} <> '[]'`),
+        and(
+          gte(storePosts.postedAt, startsReadSince(now, lag)),
+          sql`${storePosts.storeIds} <> '[]'`,
+        ),
       );
     return {
       recent,
@@ -1070,6 +1146,19 @@ export async function sendStoreNotices(
     if (mode === 'off') continue;
     const area = storesInArea(user.preferences!.storeArea, all, today);
     if (mode === 'starts') {
+      // The staff's posts: a message of their own, whatever the sales starting say.
+      if (staff.length) {
+        const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
+        const message = storeNotice(
+          t,
+          staff.map((p) => staffData(p, t, locale)),
+          base ? `${base}/stores` : null,
+        );
+        message.head = t.storeStaffNews ?? "Tora: news from the board's staff";
+        const images = imagesFor(staff);
+        if (images.length) message.images = images;
+        if (await sendToUser(db, user.id, message, ctx)) sent++;
+      }
       const fromPush = newer.filter((p) => p.storeIds.some((id) => area.has(id)));
       if (!fromPush.length) continue;
       startsData ??= readStartsData();
@@ -1084,6 +1173,7 @@ export async function sendStoreNotices(
         last: await lastNotices(user.id, stores),
         glossary,
         now,
+        lag,
       });
       if (!starts.length) continue;
       await readFirsts(starts.map((s) => s.post));
@@ -1103,34 +1193,31 @@ export async function sendStoreNotices(
       continue;
     }
     const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
-    if (!mine.length) continue;
+    if (!mine.length && !staff.length) continue;
     const last = await lastNotices(user.id, postedStores(mine, area));
     const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
     // New posts: the latest per store not told within the quiet time; replies: all of them.
     const { chosen, told } = postsToTell(mine, area, last, now);
-    if (!chosen.length) continue;
+    // The staff's posts the area rules do not tell already, as their own card.
+    const extra = staff.filter((p) => !chosen.includes(p));
+    if (!chosen.length && !extra.length) continue;
     const message = storeNotice(
       t,
-      chosen.flatMap((p) =>
-        postData(
-          p,
-          p.storeIds.filter((id) => area.has(id)),
-          t,
-          locale,
+      [
+        ...chosen.flatMap((p) =>
+          postData(
+            p,
+            p.storeIds.filter((id) => area.has(id)),
+            t,
+            locale,
+          ),
         ),
-      ),
+        ...extra.map((p) => staffData(p, t, locale)),
+      ],
       base ? `${base}/stores` : null,
     );
-    const images = chosen
-      .flatMap((p) =>
-        (pictures.get(p.id) ?? []).map((img, i) => ({
-          name: `${p.externalId}-${i + 1}.${img.contentType.split('/')[1]}`,
-          key: `${p.source}:${p.externalId}`,
-          contentType: img.contentType,
-          bytes: img.bytes,
-        })),
-      )
-      .slice(0, IMAGES_PER_NOTICE);
+    if (!chosen.length) message.head = t.storeStaffNews ?? "Tora: news from the board's staff";
+    const images = imagesFor([...chosen, ...extra]);
     if (images.length) message.images = images;
     if (!(await sendToUser(db, user.id, message, ctx))) continue;
     sent++;
