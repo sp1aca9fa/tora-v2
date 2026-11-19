@@ -1206,7 +1206,8 @@ export async function sendStoreNotices(
           starts.map((s) => s.storeId),
         );
       }
-      await tellStaff(starts.map((s) => s.post));
+      // A burst shows only a line of its newest post: a staff post there still gets its card.
+      await tellStaff(starts.filter((s) => s.why === 'word').map((s) => s.post));
       continue;
     }
     const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
