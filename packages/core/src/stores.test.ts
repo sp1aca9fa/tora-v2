@@ -485,6 +485,9 @@ describe('sales starting and confirmed lotteries (S29)', () => {
     expect(noticeablePosts(posts, nowAt)).toEqual([]);
     expect(noticeablePosts(posts, nowAt, 30)).toEqual([posts[0]]);
     expect(freshSince(nowAt, 30)).toBe(at(60));
+    // The stored posts 'starts' reads: the late window, the lag and a quiet time back.
+    expect(startsReadSince(nowAt, 30)).toBe(at(180));
+    expect(startsReadSince(nowAt)).toBe(at(150));
   });
 
   it('does not tell a store again for a late word posted before the last notice', () => {

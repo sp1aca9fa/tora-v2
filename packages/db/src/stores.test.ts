@@ -280,14 +280,14 @@ it("counts a post's age from when a lagging board shows it", async () => {
   // No lag: 34 minutes old is too old.
   const plain = await push([post('2', 'KTA 販売中', 34)]);
   expect(await sendStoreNotices(db, plain, ctx, now)).toBe(0);
+  // Past the window even with the lag.
+  const stale = await push([post('4', 'KTA 販売中', 61)], 30);
+  expect(await sendStoreNotices(db, stale, ctx, now)).toBe(0);
   // The board shows posts 30 minutes late: 34 minutes old is 4 minutes on the board.
   const lagged = await push([post('3', 'KTA 30th 販売', 34)], 30);
   expect(lagged.lag).toBe(30);
   expect(await sendStoreNotices(db, lagged, ctx, now)).toBe(1);
   expect(sent.at(-1)).toContain('KTA 30th 販売');
-  // Past the window even with the lag (and another store, out of any quiet time).
-  const stale = await push([post('4', 'MID 販売中', 61)], 30);
-  expect(await sendStoreNotices(db, stale, ctx, now)).toBe(0);
 });
 
 it("tells everyone the board staff's new posts, once, whatever their area", async () => {
@@ -338,9 +338,12 @@ it("tells everyone the board staff's new posts, once, whatever their area", asyn
   const starts = await push([staff(post('8', 'Lottery results tonight'))]);
   expect(await sendStoreNotices(db, starts, ctx, now)).toBe(1);
   expect(sent.at(-1)).toContain('Lottery results tonight');
-  // 'off': nothing.
+  // 'off': nothing; the feed's person then gets a staff post naming no store as unknown.
   await setPreferences(db, uid, { storeNoticeMode: 'off' });
-  expect(await sendStoreNotices(db, await push([staff(post('9', 'More news'))]), ctx, now)).toBe(0);
+  const off = await push([staff(post('9', 'More news'))]);
+  expect(await sendStoreNotices(db, off, ctx, now)).toBe(0);
+  expect(await sendFeedMessages(db, uid, off, ctx, now)).toBe(1);
+  expect(sent.at(-1)).toContain('More news');
 });
 
 it("starts a store's quiet time only when a channel took its notice", async () => {
@@ -821,7 +824,7 @@ describe('store notice choices (S29)', () => {
     author,
     ...(replyTo ? { replyTo } : {}),
   });
-  const push = (posts: ReturnType<typeof by>[], at = now) =>
+  const push = (posts: (ReturnType<typeof by> & { official?: boolean })[], at = now) =>
     receivePush(db, uid, { source: 'myboard', chain: 'megastore', posts }, at);
   const start = async (mode?: 'all' | 'starts' | 'off') => {
     await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
@@ -830,8 +833,11 @@ describe('store notice choices (S29)', () => {
     await newFeedToken(db, uid);
     await push([by('0', 'first page', 'x', 300)], new Date(now.getTime() - 1000));
   };
-  const send = async (posts: ReturnType<typeof by>[], at = now, c = ctx) =>
-    sendStoreNotices(db, await push(posts, at), c, at);
+  const send = async (
+    posts: (ReturnType<typeof by> & { official?: boolean })[],
+    at = now,
+    c = ctx,
+  ) => sendStoreNotices(db, await push(posts, at), c, at);
 
   it("'all' explicitly is the same as no choice, message for message", async () => {
     const run = async (mode?: 'all') => {
@@ -886,6 +892,38 @@ describe('store notice choices (S29)', () => {
     expect(await send([by('3', 'MID started', 'b')])).toBe(0); // out of the area
     expect(await send([by('4', 'it started', 'c', 1, '1')])).toBe(1);
     expect(sent.at(-1)).toContain('it started');
+  });
+
+  it("'starts' takes a start word 2h20 old on a board 30 minutes behind", async () => {
+    await start('starts');
+    expect(await send([by('1', 'KTA started', 'a', 140)])).toBe(0);
+    const lagged = await receivePush(
+      db,
+      uid,
+      {
+        source: 'myboard',
+        chain: 'megastore',
+        lagMinutes: 30,
+        posts: [by('2', 'KTA started now', 'b', 140)],
+      },
+      now,
+    );
+    expect(await sendStoreNotices(db, lagged, ctx, now)).toBe(1);
+    expect(sent.at(-1)).toContain('KTA started now');
+  });
+
+  it("'starts' tells a staff start word once, the staff's other posts apart", async () => {
+    await start('starts');
+    sent = [];
+    expect(
+      await send([
+        { ...by('1', 'KTA started', 'admin'), official: true },
+        { ...by('2', 'MID started', 'admin'), official: true },
+      ]),
+    ).toBe(2);
+    expect(sent.join('\n').split('KTA started').length).toBe(2);
+    expect(sent.at(-1)).toContain("From the board's staff");
+    expect(sent.at(-1)).toContain('MID started');
   });
 
   it("'starts' sends one short notice for ten people saying so, no thread, no pictures", async () => {

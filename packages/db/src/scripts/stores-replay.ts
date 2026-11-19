@@ -1,8 +1,9 @@
 // `pnpm --silent --filter @tora/db stores-replay --user <name> --out <file>
-//     [--from <day> --to <day> | --busiest <days>] [--words <file.json>]`
+//     [--from <day> --to <day> | --busiest <days>] [--words <file.json>] [--lag <minutes>]`
 // What each store notice choice would have sent over stored posts (S29), for one person's area.
 // Read-only: it sends nothing and writes nothing to the database. Without days: the busiest 7.
 // --words: a JSON list of glossary entries to try besides the saved ones.
+// --lag: the board shows posts this many minutes late (as its feed says; days before it had none).
 import { createClient } from '@libsql/client';
 import type { CodeMeaning } from '@tora/core';
 import { drizzle } from 'drizzle-orm/libsql';
@@ -23,6 +24,7 @@ const { values } = parseArgs({
     busiest: { type: 'string' },
     out: { type: 'string' },
     words: { type: 'string' },
+    lag: { type: 'string' },
   },
 });
 const usage =
@@ -48,6 +50,7 @@ const result = await replayNotices(db, {
   from: values.from,
   to: values.to,
   busiest: values.busiest ? Number(values.busiest) : undefined,
+  lag: values.lag ? Number(values.lag) : undefined,
   words: values.words
     ? (JSON.parse(readFileSync(values.words, 'utf8')) as CodeMeaning[])
     : undefined,

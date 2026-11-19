@@ -18,6 +18,7 @@ import {
   productsInPost,
   salesStarting,
   startsPosts,
+  readLag,
   startsReadSince,
   storesInArea,
   toLocalIso,
@@ -119,8 +120,11 @@ export async function replayNotices(
     busiest?: number;
     /** Words to try besides the saved ones (a store list's not yet saved by a collect). */
     words?: CodeMeaning[];
+    /** The board's lag (minutes) as the feed says it now (`Push.lagMinutes`; 0: none). */
+    lag?: number;
   },
 ): Promise<ReplayResult> {
+  const lag = readLag(opts.lag);
   const [user] = await db.select().from(users).where(eq(users.username, opts.username));
   if (!user) throw new Error(`no user named ${opts.username}`);
   const area = user.preferences?.storeArea;
@@ -187,8 +191,8 @@ export async function replayNotices(
     if (first) continue;
     const inArea = storesInArea(area, stores, day);
     const named = (p: StorePost) => p.storeIds.some((id) => inArea.has(id));
-    const mine = noticeablePosts(push, now).filter(named);
-    const fromPush = startsPosts(push, now).filter(named);
+    const mine = noticeablePosts(push, now, lag).filter(named);
+    const fromPush = startsPosts(push, now, lag).filter(named);
     if (!fromPush.length) continue;
 
     const all = postsToTell(mine, inArea, lastAll, now);
@@ -197,7 +201,7 @@ export async function replayNotices(
       for (const id of all.told) lastAll.set(id, toLocalIso(now));
     }
 
-    const since = startsReadSince(now);
+    const since = startsReadSince(now, lag);
     const recent = received.filter((p) => p.postedAt >= since && p.storeIds.length);
     const starts = salesStarting({
       fresh: fromPush,
@@ -208,6 +212,7 @@ export async function replayNotices(
       last: lastStarts,
       glossary,
       now,
+      lag,
     });
     if (starts.length) {
       if (counted(day)) {
@@ -235,7 +240,7 @@ export async function replayNotices(
     const ids = p.storeIds.filter((id) => inArea.has(id));
     if (!ids.length) continue;
     areaPosts++;
-    if (!noticeablePosts([p], new Date(p.receivedAt)).length) cameLate++;
+    if (!noticeablePosts([p], new Date(p.receivedAt), lag).length) cameLate++;
     if (lottery.has(p.id)) continue;
     if (!ids.some((id) => firedPosts.has(`${p.id}|${id}`))) postsNotSent++;
     for (const id of ids) {

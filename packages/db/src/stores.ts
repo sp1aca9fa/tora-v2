@@ -668,13 +668,19 @@ export async function sendFeedMessages(
   ctx: AlertContext,
   now = new Date(),
 ): Promise<number> {
-  const since = freshSince(now, received.lag ?? 0);
-  // A staff post naming no store goes to everyone as one (sendStoreNotices), not as unknown.
+  const since = freshSince(now, readLag(received.lag));
+  // A staff post naming no store goes as the staff's card (sendStoreNotices) to everyone with an
+  // area and notices on; the feed's person without them still gets it as unknown.
+  const own = received.user?.preferences;
+  const getsStaff = !!own?.storeArea && storeNoticeModeOf(own) !== 'off';
   const unknownPosts = received.first
     ? []
     : received.fresh.filter(
         (p) =>
-          !p.storeIds.length && !p.replyTo && p.postedAt >= since && !received.official?.has(p.id),
+          !p.storeIds.length &&
+          !p.replyTo &&
+          p.postedAt >= since &&
+          !(getsStaff && received.official?.has(p.id)),
       );
   // Most pushes have nothing to say: nothing else is read then.
   if (
@@ -1146,21 +1152,26 @@ export async function sendStoreNotices(
     if (mode === 'off') continue;
     const area = storesInArea(user.preferences!.storeArea, all, today);
     if (mode === 'starts') {
-      // The staff's posts: a message of their own, whatever the sales starting say.
-      if (staff.length) {
+      // The staff's posts the sales starting do not tell: a message of their own.
+      const tellStaff = async (told: StorePost[]) => {
+        const left = staff.filter((p) => !told.includes(p));
+        if (!left.length) return;
         const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
         const message = storeNotice(
           t,
-          staff.map((p) => staffData(p, t, locale)),
+          left.map((p) => staffData(p, t, locale)),
           base ? `${base}/stores` : null,
         );
         message.head = t.storeStaffNews ?? "Tora: news from the board's staff";
-        const images = imagesFor(staff);
+        const images = imagesFor(left);
         if (images.length) message.images = images;
         if (await sendToUser(db, user.id, message, ctx)) sent++;
-      }
+      };
       const fromPush = newer.filter((p) => p.storeIds.some((id) => area.has(id)));
-      if (!fromPush.length) continue;
+      if (!fromPush.length) {
+        await tellStaff([]);
+        continue;
+      }
       startsData ??= readStartsData();
       const { recent, lottery } = await startsData;
       const stores = [...new Set(fromPush.flatMap((p) => p.storeIds))].filter((id) => area.has(id));
@@ -1175,7 +1186,10 @@ export async function sendStoreNotices(
         now,
         lag,
       });
-      if (!starts.length) continue;
+      if (!starts.length) {
+        await tellStaff([]);
+        continue;
+      }
       await readFirsts(starts.map((s) => s.post));
       const [t, locale] = await Promise.all([textsFor(db, user, ctx), localeFor(db, user)]);
       const message = storeStartsNotice(
@@ -1184,12 +1198,15 @@ export async function sendStoreNotices(
           postData(post, [storeId], t, locale).map((d) => ({ ...d, text: line, people: n })),
         ),
       );
-      if (!(await sendToUser(db, user.id, message, ctx))) continue;
-      sent++;
-      await startQuiet(
-        user.id,
-        starts.map((s) => s.storeId),
-      );
+      // Sent or not, the staff's other posts go too (one told above is not repeated).
+      if (await sendToUser(db, user.id, message, ctx)) {
+        sent++;
+        await startQuiet(
+          user.id,
+          starts.map((s) => s.storeId),
+        );
+      }
+      await tellStaff(starts.map((s) => s.post));
       continue;
     }
     const mine = posts.filter((p) => p.storeIds.some((id) => area.has(id)));
@@ -1217,7 +1234,8 @@ export async function sendStoreNotices(
       base ? `${base}/stores` : null,
     );
     if (!chosen.length) message.head = t.storeStaffNews ?? "Tora: news from the board's staff";
-    const images = imagesFor([...chosen, ...extra]);
+    // The staff's pictures first: a busy area's would fill the notice's limit.
+    const images = imagesFor([...extra, ...chosen]);
     if (images.length) message.images = images;
     if (!(await sendToUser(db, user.id, message, ctx))) continue;
     sent++;
