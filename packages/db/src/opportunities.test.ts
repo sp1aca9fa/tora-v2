@@ -170,6 +170,7 @@ it('saves listings now and 14 days ago from the price source and condition only 
     await sales(p.id, 40, () => 10000);
     return p.id;
   };
+  const [filteredNow, filteredBoth] = [await named('Filtered now'), await named('Filtered both')];
   const [full, near, far, stale, noCount, otherOnly, oldNear, oldFar, gone, notCounted] = [
     await named('Full'),
     await named('Near'),
@@ -208,6 +209,11 @@ it('saves listings now and 14 days ago from the price source and condition only 
     report(noCount!, 14, null),
     report(otherOnly!, 0, 2, 'mercari'),
     report(otherOnly!, 14, 8, 'mercari'),
+    // A count taken after an item's rules (its listings stored, S36 A4) beside one from before them.
+    { ...report(filteredNow!, 0, 6), offers: [] },
+    report(filteredNow!, 14, 10),
+    { ...report(filteredBoth!, 0, 6), offers: [] },
+    { ...report(filteredBoth!, 14, 10), offers: [] },
   ]);
   const saved = await refreshOpportunities(db, NOW);
   const of = (id: string) => saved.items.find((o) => o.productId === id)!;
@@ -228,6 +234,10 @@ it('saves listings now and 14 days ago from the price source and condition only 
   // Reported without a count is not the same: unknown, not 0.
   expect(of(notCounted!).listings).toEqual({ now: null, before: 8 });
   expect(of(otherOnly!).listings).toEqual({ now: null, before: null });
+  // Only counts of the same kind are compared: fewer listings pass the rules than were counted.
+  expect(of(filteredNow!).listings).toEqual({ now: 6, before: null });
+  expect(dealWayStates(of(filteredNow!)).listings_drying).toBeNull();
+  expect(of(filteredBoth!).listings).toEqual({ now: 6, before: 10 });
   // The MCP passes `numbers` on whole: the counts stay out of it.
   expect(of(full!).numbers).not.toHaveProperty('listings');
 });

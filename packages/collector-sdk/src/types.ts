@@ -124,6 +124,8 @@ export interface CollectResult {
    * every condition with something for sale. Left out when the source cannot tell.
    */
   supply?: SupplyInput[];
+  /** A game's found listings with the rules on (`FoundSearch`); left out otherwise. */
+  found?: FoundSearch;
 }
 
 /** One condition's listings on a source today, in the source's own currency. */
@@ -139,6 +141,56 @@ export interface SupplyInput {
   /** The cheapest listing, or the page listing them. */
   url?: string | null;
   raw?: unknown;
+}
+
+/**
+ * A game item's for-sale search with the rules on (`CollectorContext.itemRules`; S36 A2, A4), given
+ * beside `CollectResult.supply`, which stays the plug-in's own rows. Per condition, the listings the
+ * plug-in's own filter keeps (as for its supply rows) from every page it read, without its line
+ * under which an ask is not taken as a price (`foundFloor`). The SDK applies the item's rules, the
+ * "not the item" marks and that line, and stores rows from these for a game whose rules are not
+ * held; otherwise it stores `supply` as given.
+ */
+export interface FoundSearch {
+  /** Every condition with a listing the plug-in kept; empty when it kept none. */
+  buckets: FoundBucket[];
+  /** The search had more than it read (S36 A4: the count is "at least"); null: not known. */
+  foundCapped: boolean | null;
+  /** ISO 4217: the currency of a condition's row where no listing passed. */
+  currency: string;
+  /** Stored on each row, as a supply row's `raw`. */
+  raw?: unknown;
+}
+
+/** One condition's found listings (`FoundSearch`). */
+export interface FoundBucket {
+  /** Valuation bucket; null when the source does not say. */
+  bucket: string | null;
+  /** In the search's order (cheapest first): the first of equal prices is the condition's ask. */
+  found: FoundListing[];
+  /** The plug-in's own line: a listing under it is not taken as a price; null: none. */
+  foundFloor: number | null;
+}
+
+/** A listing a for-sale search found (S36 A2), its price in the source's own currency. */
+export interface FoundListing {
+  /** The listing's id at the source (what a "not the item" mark names). */
+  ref: string;
+  title: string;
+  url: string | null;
+  /** Per unit, in `currency`'s smallest unit. */
+  price: number;
+  /** ISO 4217. */
+  currency: string;
+  /** Null when the search does not say. */
+  seller: string | null;
+  /** The source's category id, as text; null when the listing does not say. */
+  category: string | null;
+  /**
+   * The source's own id of who pays shipping, opaque; null when the listing does not say. Which id
+   * means "the seller pays" is not known yet, so it is kept as given and never read as either.
+   */
+  shippingPayerId: string | null;
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

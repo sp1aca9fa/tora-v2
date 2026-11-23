@@ -5,11 +5,15 @@ import {
   createProduct,
   createQuerySource,
   createUser,
+  currentRules,
+  currentSupply,
   gameRulesOn,
   heldItemCount,
   insertObservations,
   insertObservationsWithRuleState,
+  lowestAsk,
   mergeProducts,
+  recordItemCheck,
   releaseHeld,
   ruleMarkCounts,
   ruleStates,
@@ -19,6 +23,7 @@ import {
   schema,
   setGameRules,
   setObservationExcluded,
+  supplyOffers,
 } from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { asc, eq } from 'drizzle-orm';
@@ -35,7 +40,7 @@ import {
   withoutFailing,
 } from './game-rules';
 import { runCollector } from './runner';
-import type { Collector, PriceInput } from './types';
+import type { Collector, FoundListing, FoundSearch, PriceInput } from './types';
 
 // Made-up console, category and titles only (no real marketplace category number).
 const rules = (over: Partial<EffectiveRules> = {}): EffectiveRules =>
@@ -777,5 +782,185 @@ describe('a collect with the switch on', () => {
       { log: () => {}, http: { minDelayMs: 0, maxDelayMs: 0 }, now },
     );
     expect(seen).toEqual([[{ keywords: ['Box'] }, undefined]]);
+  });
+});
+
+describe('stored listings (S36 A2, A4)', () => {
+  const found = (n: number): FoundListing[] =>
+    Array.from({ length: n }, (_, i) => ({
+      ref: `L${String(i).padStart(2, '0')}`,
+      title: i === 0 ? 'Hero Quest lot' : 'Hero Quest',
+      url: `https://flea.example/L${i}`,
+      price: 1000 + i * 10,
+      currency: 'JPY',
+      seller: i === 1 ? 's1' : null,
+      category: '111',
+      shippingPayerId: i === 1 ? '2' : null,
+    }));
+  const plain = {
+    bucket: 'used',
+    lowestAsk: 500,
+    currency: 'JPY',
+    listings: 7,
+    url: 'https://flea.example/plain',
+    raw: { more: true },
+  };
+  // A plug-in giving its own rows and, beside them, its found listings for any item: the SDK
+  // decides which are stored.
+  const lister = (buckets: FoundSearch['buckets'], supply = [plain]): Collector => ({
+    ...flea,
+    collect: async () => ({
+      state: null,
+      complete: true,
+      supply,
+      found: { buckets, foundCapped: true, currency: 'JPY', raw: { more: true } },
+    }),
+  });
+  const twentyFive = lister([{ bucket: 'used', found: found(25), foundFloor: 1010 }]);
+  const supplyOf = (productId: string) =>
+    db
+      .select()
+      .from(schema.supply)
+      .where(eq(schema.supply.productId, productId))
+      .orderBy(asc(schema.supply.day), asc(schema.supply.bucket));
+  const again = (hours: number) =>
+    db
+      .update(schema.productSources)
+      .set({ lastSuccessAt: null, nextRunAt: null } as never)
+      .then(() => ({ ...quiet, now: new Date(now.getTime() + hours * 3_600_000) }));
+  const onGame = async () => {
+    const g = await game('Hero Quest');
+    await createQuerySource(db, g.id, 'flea', { keywords: ['Hero Quest'] });
+    await words(g.id, ['lot']);
+    await setGameRules(db, true);
+    return g;
+  };
+
+  it('a game with the switch on stores the cheapest 20 that pass, the ask and count from them', async () => {
+    const g = await onGame();
+    await runCollector(db, twentyFive, quiet);
+    const [row, ...rest] = await supplyOf(g.id);
+    expect(rest).toEqual([]);
+    const offers = supplyOffers(row!)!;
+    // L00 fails the words; L01 (1010) is on the line and passes.
+    expect(offers).toHaveLength(20);
+    expect(offers[0]).toEqual({
+      ref: 'L01',
+      title: 'Hero Quest',
+      url: 'https://flea.example/L1',
+      priceBase: 1010,
+      priceOriginal: 1010,
+      currency: 'JPY',
+      seller: 's1',
+      category: '111',
+      shipping: 'unknown',
+      shippingPayerId: '2',
+    });
+    expect([
+      row!.lowestAskBase,
+      row!.lowestAskOriginal,
+      row!.listings,
+      row!.listingsCapped,
+    ]).toEqual([1010, 1010, 24, 1]);
+    expect(row!.url).toBe('https://flea.example/L1');
+    expect(row!.raw).toEqual({ more: true });
+  });
+
+  it('once confirmed, 5; marked "not the item" refs are left out', async () => {
+    const g = await onGame();
+    const current = (await currentRules(db, g.id))!;
+    await recordItemCheck(db, {
+      productId: g.id,
+      kind: 'listings',
+      source: 'flea',
+      outcome: 'passed',
+      by: 'check',
+      rulesHash: current.hashFor('listings', 'flea'),
+    });
+    await db.insert(schema.notItemMarks).values(
+      ['L01', 'L02', 'L03', 'L04', 'L05'].map((externalRef) => ({
+        productId: g.id,
+        source: 'flea',
+        externalRef,
+        userId,
+        at: '2026-11-19T12:00:00.000+09:00',
+      })),
+    );
+    await runCollector(db, twentyFive, quiet);
+    const [row] = await supplyOf(g.id);
+    expect(supplyOffers(row!)!.map((o) => o.ref)).toEqual(['L06', 'L07', 'L08', 'L09', 'L10']);
+    expect([row!.lowestAskOriginal, row!.listings]).toEqual([1060, 19]);
+  });
+
+  const asGiven = (r: typeof schema.supply.$inferSelect) => [
+    r.bucket,
+    r.lowestAskOriginal,
+    r.listings,
+    r.url,
+    r.raw,
+    r.offers,
+    r.listingsCapped,
+  ];
+  const givenRow = ['used', 500, 7, 'https://flea.example/plain', { more: true }, null, null];
+
+  it("a card, or a game with the switch off, stores the plug-in's own rows, no offers", async () => {
+    const card = await createProduct(db, userId, {
+      category: 'tcg',
+      kind: 'booster_box',
+      name: 'Box',
+    });
+    await createQuerySource(db, card.id, 'flea', { keywords: ['Box'] });
+    const g = await onGame();
+    await runCollector(db, twentyFive, quiet);
+    expect((await supplyOf(card.id)).map(asGiven)).toEqual([givenRow]);
+    // Off again: the same day's second collect takes the game's listings out of its row.
+    await setGameRules(db, false);
+    await runCollector(db, twentyFive, await again(1));
+    expect((await supplyOf(g.id)).map(asGiven)).toEqual([givenRow]);
+  });
+
+  it("a held item stores the plug-in's own rows, no offers", async () => {
+    const g = await onGame();
+    await db.insert(schema.itemRuleState).values({
+      productId: g.id,
+      appliedAt: null,
+      appliedHash: null,
+      held: { hash: 'flea=x', at: 'x', would: 12, kept: 20 },
+    });
+    await runCollector(db, twentyFive, quiet);
+    expect((await supplyOf(g.id)).map(asGiven)).toEqual([givenRow]);
+  });
+
+  it('a condition where nothing passed is written with no ask and an unknown count', async () => {
+    const g = await onGame();
+    const lots = found(3).map((l) => ({ ...l, title: 'Hero Quest lot' }));
+    await runCollector(db, lister([{ bucket: 'used', found: lots, foundFloor: null }]), quiet);
+    const rows = await supplyOf(g.id);
+    // The search was capped: real copies may sit past what was read, so the count is not 0.
+    expect(rows.map((r) => [r.bucket, r.lowestAskBase, r.lowestAskOriginal, r.listings])).toEqual([
+      ['used', null, null, null],
+    ]);
+    expect([supplyOffers(rows[0]!), rows[0]!.url, rows[0]!.listingsCapped]).toEqual([[], null, 1]);
+  });
+
+  it('writes a row only for the conditions tonight found listings in, night after night', async () => {
+    const g = await onGame();
+    const used = { bucket: 'used', found: found(3), foundFloor: null };
+    const boxed = { bucket: 'boxed', found: found(2), foundFloor: null };
+    const days = async () =>
+      (await supplyOf(g.id)).map((r) => [r.day.slice(8), r.bucket, r.lowestAskOriginal]);
+    await runCollector(db, lister([used, boxed]), quiet);
+    // The next nights find nothing boxed: no row for it, on the second night or the third.
+    await runCollector(db, lister([used]), await again(24));
+    await runCollector(db, lister([used]), await again(48));
+    const rows = await days();
+    expect(rows.filter((r) => r[1] === 'boxed')).toHaveLength(1);
+    expect(rows.filter((r) => r[1] === 'used')).toHaveLength(3);
+    // What a reader sees: the last night's report, where boxed is not for sale.
+    const current = (await currentSupply(db, [g.id], new Date(now.getTime() + 48 * 3_600_000))).get(
+      g.id,
+    )!;
+    expect(current.map((r) => r.bucket)).toEqual(['used']);
+    expect(lowestAsk(current, 'boxed')).toBeNull();
   });
 });

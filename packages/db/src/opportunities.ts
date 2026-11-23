@@ -257,8 +257,12 @@ export async function refreshOpportunities(
             (!own.some((s) => s.bucket === bucket) && own.some((s) => s.listings !== null)
               ? 0
               : null),
+          // A count taken after a game's rules is only compared with one of the same kind (S36 A4):
+          // the night the rules go on, fewer listings pass than were counted before.
           before: listingsNear(
-            listed.get(`${m.id}|${m.source}|${bucket}`) ?? [],
+            (listed.get(`${m.id}|${m.source}|${bucket}`) ?? []).filter(
+              (r) => r.filtered === own.some((s) => s.offers !== null),
+            ),
             listingsBackFrom(own[0]?.day ?? today),
           ),
         },

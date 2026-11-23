@@ -57,6 +57,7 @@ import {
   listingGone,
 } from './http';
 import { baseConverter } from './money';
+import { type SupplyWithOffers, storedOffer, supplyWithOffers } from './offers';
 import { awakeClock } from './clock';
 import {
   keepStoredState,
@@ -469,10 +470,23 @@ export async function runCollector(
               log(`collect "${product.name}": read night not recorded: ${errorText(e)}`);
             }
           }
-          if (result.supply) {
+          // A game's listings (S36 A2, A4): with the rules on and not held, its rows come from the
+          // listings the plug-in found, filtered here; otherwise (a held item, the switch off, not a
+          // game, a plug-in that reports no listings) the plug-in's own rows are stored as given.
+          const fromFound =
+            linkCtx.itemRules && result.found && !isHeld(rules?.state?.held)
+              ? { itemRules: linkCtx.itemRules, search: result.found }
+              : null;
+          const given: SupplyWithOffers[] | null = fromFound
+            ? supplyWithOffers(fromFound.search, fromFound.itemRules, collector.source)
+            : (result.supply ?? null);
+          if (given) {
             const rows = [];
-            for (const { lowestAsk, ...s } of result.supply) {
+            for (const { lowestAsk, offers, ...s } of given) {
               const c = lowestAsk === null ? null : await toBase(lowestAsk, s.currency, now);
+              const stored = [];
+              for (const o of offers ?? [])
+                stored.push(storedOffer(o, (await toBase(o.price, o.currency, now)).amount));
               rows.push({
                 ...s,
                 productId: product.id,
@@ -482,6 +496,7 @@ export async function runCollector(
                 lowestAskOriginal: lowestAsk,
                 fxRate: c?.rate ?? null,
                 fetchedAt: inAppZone(now.toISOString()),
+                ...(offers && { offers: stored }),
               });
             }
             await saveSupply(db, rows);
