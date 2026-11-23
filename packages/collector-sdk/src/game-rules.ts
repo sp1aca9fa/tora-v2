@@ -11,11 +11,11 @@
 import {
   type EffectiveRules,
   effectiveRules,
+  failsRules,
   isGameItem,
   noAiSources,
   normalizeTitle,
   rulesHash,
-  titlePasses,
   toLocalIso,
 } from '@tora/core';
 import {
@@ -39,7 +39,7 @@ import {
   writeRuleChanges,
 } from '@tora/db';
 import { protectedBy } from './recheck';
-import type { Collector, PriceInput, SaleText } from './types';
+import type { Collector, PriceInput } from './types';
 
 const compact = (text: string) => normalizeTitle(text).replace(/ /g, '');
 
@@ -86,16 +86,8 @@ export function appliedRulesHash(rules: EffectiveRules, sources: Iterable<string
 export const ruleMarkOf = (rules: EffectiveRules, source: string) =>
   `${RULE_MARK_PREFIX}${rulesHash(rules, source)}`;
 
-/**
- * Whether a sale fails the item's rules (S36 A1): its title fails `titlePasses`, or its category is
- * known and is not the console's category at `source` (compared for equality; a sale without a
- * category, or a console without one there, is judged on the title only).
- */
-export function failsRules(text: SaleText, rules: EffectiveRules, source: string): boolean {
-  if (!titlePasses(text.title, rules)) return true;
-  const want = rules.categories[source];
-  return !!want && text.category != null && text.category !== want;
-}
+/** Whether a sale fails the item's rules (S36 A1): `failsRules` in `@tora/core`, re-exported. */
+export { failsRules };
 
 /**
  * Whether the rules may mark this item's new sales at `source`: its stored sales there were judged

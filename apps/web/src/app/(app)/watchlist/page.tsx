@@ -8,6 +8,7 @@ import {
   latestSignals,
   listWatches,
   savedBucketValues,
+  wishStates,
 } from '@tora/db';
 import { ChevronRight, Plus, PackageOpen } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -23,14 +24,18 @@ import { sourceLabels } from '@/lib/sources';
 import { franchiseLabel, lotConditionLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
 import { VERDICT_STYLE, verdictKey } from '../products/[id]/buy-timing';
+import { showsPrices } from './wish-prices';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('nav'))('watchlist') };
 }
 
 /**
- * Items the person watches to buy (requirements S9): each item and condition with today's market
- * value and how far it is from the target. Items at or under their target come first.
+ * The wishlist (requirements S9, S36 B1): each item and condition with today's market value and how
+ * far it is from the target. Items at or under their target come first. A game wish reads "check
+ * needed" until its sales are confirmed (`wishStates`), and until then shows no price, ask, gap,
+ * buy timing or last sale (fix C5): they would come from sales nobody checked. A confirmed game wish
+ * shows them as cards and sealed do.
  */
 export default async function WatchlistPage() {
   const { db, user } = await authed();
@@ -40,7 +45,7 @@ export default async function WatchlistPage() {
     getMoney(),
     sourceLabels(),
   ]);
-  const [values, images, supply, timing, checks] = await Promise.all([
+  const [values, images, supply, timing, checks, states] = await Promise.all([
     savedBucketValues(
       db,
       rows.map((r) => ({ product: r.product, bucket: r.watch.bucket || null })),
@@ -61,6 +66,10 @@ export default async function WatchlistPage() {
       db,
       rows.map((r) => r.product),
     ),
+    wishStates(
+      db,
+      rows.map((r) => r.product),
+    ),
   ]);
   const typeLabel = (type: string) =>
     t.has(`sourceRoles.class.${type}`) ? t(`sourceRoles.class.${type}`) : type;
@@ -68,6 +77,18 @@ export default async function WatchlistPage() {
     const value = values.get(bucketValueKey(r.product.id, r.watch.bucket || null));
     const now = value?.valuation.unitBase ?? null;
     const target = r.watch.targetPriceBase;
+    const state = states.get(r.product.id)?.state ?? 'not_game';
+    if (!showsPrices(state))
+      return {
+        ...r,
+        state,
+        now: null,
+        ask: null,
+        unverified: null,
+        judged: null,
+        last: null,
+        gap: null,
+      };
     // The gap and the order use the price to act on (S36 A2: a game's cheapest checked ask; cards
     // and sealed: every ask, as before); a cheaper unverified one is only mentioned, muted.
     const { ask, unverified } = chooseAsk(
@@ -84,6 +105,7 @@ export default async function WatchlistPage() {
       : null;
     return {
       ...r,
+      state,
       now,
       ask,
       unverified,
@@ -155,7 +177,7 @@ export default async function WatchlistPage() {
         </p>
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
-          {items.map(({ watch, product, now, ask, unverified, last, gap, judged }) => {
+          {items.map(({ watch, product, state, now, ask, unverified, last, gap, judged }) => {
             const details = [
               lotConditionLabel(watch, product, t),
               t(`kind.${product.kind}`),
@@ -188,6 +210,21 @@ export default async function WatchlistPage() {
                     {watch.note && (
                       <p className="truncate text-xs text-muted-foreground">{watch.note}</p>
                     )}
+                    {state !== 'not_game' && (
+                      <p className="text-xs">
+                        <Link
+                          href={`/watchlist/${watch.id}/check`}
+                          className={cn(
+                            'relative z-10 inline-flex min-h-6 items-center rounded-full px-2 font-medium underline-offset-2 hover:underline',
+                            state === 'check_needed'
+                              ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'
+                              : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200',
+                          )}
+                        >
+                          {t(`wish.state.${state}`)}
+                        </Link>
+                      </p>
+                    )}
                   </div>
                   <div className="max-w-[45%] shrink-0 space-y-0.5 text-right text-sm">
                     <p
@@ -197,7 +234,13 @@ export default async function WatchlistPage() {
                     >
                       {now !== null
                         ? money(now)
-                        : t(!ask && unverified ? 'askCheck.noChecked' : 'watchlist.noPrice')}
+                        : t(
+                            state === 'check_needed'
+                              ? 'wish.needsCheck'
+                              : !ask && unverified
+                                ? 'askCheck.noChecked'
+                                : 'watchlist.noPrice',
+                          )}
                     </p>
                     {ask && (
                       <p

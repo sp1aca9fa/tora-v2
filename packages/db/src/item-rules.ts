@@ -81,7 +81,7 @@ function cleanWords(words: readonly string[] | undefined): string[] {
  * stored as its key; a boxed item names its plain item, which must exist and not be itself.
  */
 export async function saveItemRules(
-  db: Db,
+  db: Pick<Db, 'select' | 'insert'>,
   productId: string,
   rules: ItemRulesRow,
   userId: string | null,
@@ -121,19 +121,58 @@ export async function saveItemRules(
 
 /**
  * An item's effective rules today (its row, else its platform's console; its region), with the hash a
- * check of `kind` at `source` is made under (`checkHash`: listings per source, sales overall).
+ * check of `kind` at `source` is made under (`checkHash`: listings per source, sales overall; a boxed
+ * item's has its plain item's rules in it, `plain`).
  */
 export async function currentRules(
   db: Pick<Db, 'select'>,
   productId: string,
-): Promise<{ rules: EffectiveRules; hashFor(kind: ItemCheckKind, source: string): string } | null> {
+): Promise<{
+  rules: EffectiveRules;
+  /** A boxed item's plain item's effective rules (null otherwise). */
+  plain: EffectiveRules | null;
+  hashFor(kind: ItemCheckKind, source: string): string;
+} | null> {
   const [product] = await db
     .select({ platform: products.platform, region: products.region })
     .from(products)
     .where(eq(products.id, productId));
   if (!product) return null;
-  const rules = effectiveRules(product, await getItemRules(db, productId), await listConsoles(db));
-  return { rules, hashFor: (kind, source) => checkHash(rules, kind, source) };
+  const consoles = await listConsoles(db);
+  const own = await getItemRules(db, productId);
+  const rules = effectiveRules(product, own, consoles);
+  const plain =
+    own?.boxed && own.boxedOf
+      ? ((await plainRulesMany(db, [own.boxedOf], consoles)).get(own.boxedOf) ?? null)
+      : null;
+  return { rules, plain, hashFor: (kind, source) => checkHash(rules, kind, source, plain) };
+}
+
+/**
+ * The effective rules of boxed items' plain items (S36 B1: a boxed item's rows are its plain item's,
+ * so its checks' hash covers the plain item's rules too), by plain item id, in batched reads (S19).
+ * A plain item that no longer exists is left out.
+ */
+async function plainRulesMany(
+  db: Pick<Db, 'select'>,
+  ids: readonly string[],
+  consoles: Awaited<ReturnType<typeof listConsoles>>,
+): Promise<Map<string, EffectiveRules>> {
+  const out = new Map<string, EffectiveRules>();
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += IDS_PER_READ) {
+    const part = unique.slice(i, i + IDS_PER_READ);
+    const [items, rows] = await Promise.all([
+      db
+        .select({ id: products.id, platform: products.platform, region: products.region })
+        .from(products)
+        .where(inArray(products.id, part)),
+      db.select().from(itemRules).where(inArray(itemRules.productId, part)),
+    ]);
+    const own = new Map(rows.map((r) => [r.productId, toRulesRow(r)]));
+    for (const p of items) out.set(p.id, effectiveRules(p, own.get(p.id) ?? null, consoles));
+  }
+  return out;
 }
 
 /** One (kind, source) of an item's checks: '' is the source of sales. Rows of one time keep their
@@ -211,17 +250,21 @@ export async function confirmations(
     .from(itemChecks)
     .where(eq(itemChecks.productId, productId))
     .orderBy(asc(itemChecks.at), asc(sql`rowid`));
-  return confirmationsOf(current.rules, rows);
+  return confirmationsOf(current.rules, rows, current.plain);
 }
 
-/** What `rows` (one item's checks, oldest first) confirm under `rules`. */
-function confirmationsOf(rules: EffectiveRules, rows: readonly ItemCheck[]): Confirmations {
+/** What `rows` (one item's checks, oldest first) confirm under `rules` (`plain`: see `checkHash`). */
+function confirmationsOf(
+  rules: EffectiveRules,
+  rows: readonly ItemCheck[],
+  plain: EffectiveRules | null,
+): Confirmations {
   const checks = new Map<string, ItemCheck[]>();
   for (const row of rows) {
     const key = keyOf(row.kind, row.source);
     checks.set(key, [...(checks.get(key) ?? []), row]);
   }
-  const hashFor = (kind: ItemCheckKind, source: string) => checkHash(rules, kind, source);
+  const hashFor = (kind: ItemCheckKind, source: string) => checkHash(rules, kind, source, plain);
   return {
     hashFor,
     checks,
@@ -267,11 +310,21 @@ export async function confirmationsMany(
     for (const r of rows) checks.set(r.productId, [...(checks.get(r.productId) ?? []), r]);
   }
   const consoles = await listConsoles(db);
+  // Boxed items' plain items (S36 B1), read once for all of them.
+  const plainIds = [...own.values()].flatMap((r) => (r.boxed && r.boxedOf ? [r.boxedOf] : []));
+  const plains = plainIds.length
+    ? await plainRulesMany(db, plainIds, consoles)
+    : new Map<string, EffectiveRules>();
   for (const [id, item] of byId) {
     const rules = own.get(id) ?? null;
+    const plain = rules?.boxed && rules.boxedOf ? (plains.get(rules.boxedOf) ?? null) : null;
     out.set(id, {
       rules,
-      confirmations: confirmationsOf(effectiveRules(item, rules, consoles), checks.get(id) ?? []),
+      confirmations: confirmationsOf(
+        effectiveRules(item, rules, consoles),
+        checks.get(id) ?? [],
+        plain,
+      ),
     });
   }
   return out;

@@ -52,6 +52,7 @@ import {
   appSettings,
   collectorRuns,
   holdings,
+  itemRules,
   priceObservations,
   productSources,
   products,
@@ -349,7 +350,20 @@ async function trackedProductIds(db: Db): Promise<Set<string>> {
   const watched = await db.selectDistinct({ id: watches.productId }).from(watches);
   // A ranking's top items (S13): candidates are collected while they stay there.
   const ranked = await rankedProductIds(db);
-  return new Set([...[...held, ...watched].map((r) => r.id), ...ranked]);
+  const ids = new Set([...[...held, ...watched].map((r) => r.id), ...ranked]);
+  // A boxed item's sales and listings are its plain item's (S36 B1): the plain item is collected
+  // while its boxed item is. Only game items have such a row; cards and sealed never do.
+  for (const r of await boxedPairs(db)) if (ids.has(r.boxed)) ids.add(r.plain);
+  return ids;
+}
+
+/** Every boxed item with its plain item (S36 B1; a few rows: wished boxed games). */
+async function boxedPairs(db: Pick<Db, 'select'>): Promise<{ boxed: string; plain: string }[]> {
+  const rows = await db
+    .select({ boxed: itemRules.productId, plain: itemRules.boxedOf })
+    .from(itemRules)
+    .where(and(eq(itemRules.boxed, true), isNotNull(itemRules.boxedOf)));
+  return rows.flatMap((r) => (r.plain ? [{ boxed: r.boxed, plain: r.plain }] : []));
 }
 
 /** These products, oldest first (in chunks: an id list can be long). */
@@ -401,6 +415,16 @@ export async function productsToMatch(
     .from(sourceCandidates)
     .where(and(eq(sourceCandidates.source, source), eq(sourceCandidates.status, 'pending')));
   const skip = new Set([...linked, ...pending].map((r) => r.id));
+  // A boxed item has no search of its own (S36 B1, fix C3): its sales and listings are its plain
+  // item's. Only the identity shop, which has a page for the complete copy, is asked to match it.
+  const boxed = (await boxedPairs(db)).map((r) => r.boxed);
+  if (boxed.length) {
+    const registry = await loadSourceRegistry(db);
+    const second = registry.markets?.secondary;
+    const markets = [registry.markets?.primary, ...(second ? [second] : [])];
+    const identity = markets.some((m) => identitySources(registry, 'game', m).includes(source));
+    if (!identity) for (const id of boxed) skip.add(id);
+  }
   const ids = [...tracked].filter(
     (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
   );
@@ -1067,6 +1091,12 @@ export async function productsWithoutSource(
     .from(productSources)
     .where(eq(productSources.source, source));
   const skip = new Set(listed.map((r) => r.id));
+  // A boxed item has no marketplace search of its own (S36 B1): its plain item's rows are its own.
+  const boxed = await db
+    .select({ id: itemRules.productId })
+    .from(itemRules)
+    .where(eq(itemRules.boxed, true));
+  for (const r of boxed) skip.add(r.id);
   const ids = [...tracked].filter(
     (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
   );

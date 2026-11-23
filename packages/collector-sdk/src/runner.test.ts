@@ -1,5 +1,6 @@
 import {
   type Db,
+  addWatch,
   bucketStats,
   insertObservations,
   saveSourceInfos,
@@ -961,4 +962,49 @@ it('records the night a source was read for a game, not for a failed link or a c
   expect(rows.map((r) => [r.productId, r.source, r.nights])).toEqual([
     [ok.id, 'fake', [['2026-11-10', '2026-11-10']]],
   ]);
+});
+
+it("a boxed game is never offered its plain item's listing, nor searched outside the identity shop (S36)", async () => {
+  await saveSourceInfos(db, [
+    { key: 'shop', label: 'Shop', market: 'jp', currency: 'JPY', identity: ['game'] },
+    { key: 'fake', label: 'Fake', market: 'jp', currency: 'JPY' },
+  ]);
+  const game = (name: string) =>
+    createProduct(db, userId, { category: 'game', kind: 'software', name, platform: 'Alpha' });
+  const plain = await game('Hero Quest');
+  const boxed = await game('Hero Quest');
+  await saveItemRules(
+    db,
+    boxed.id,
+    {
+      console: null,
+      edition: null,
+      required: [],
+      excluded: [],
+      boxed: true,
+      boxedOf: plain.id,
+      gameRules: null,
+    },
+    userId,
+  );
+  await addWatch(db, userId, { productId: boxed.id }, {});
+  for (const source of ['fake', 'shop'])
+    await linkSource(db, plain.id, { source, externalId: `P-${source}`, title: 'Hero Quest' });
+  const searched: Record<string, string[]> = { fake: [], shop: [] };
+  for (const source of ['fake', 'shop'])
+    await runCollector(
+      db,
+      fakeCollector({
+        source,
+        supports: () => true,
+        findCandidates: async (p) => {
+          searched[source]!.push(p.id);
+          return [];
+        },
+      }),
+      { ...quiet, matchOnly: true },
+    );
+  // No keyword search at another source; the identity shop is asked, never with the plain page.
+  expect(searched).toEqual({ fake: [], shop: [boxed.id] });
+  expect(await listPendingCandidates(db, boxed.id)).toEqual([]);
 });

@@ -6,14 +6,17 @@ import {
   type PotentialCriteria,
   type StrategyChoice,
   cleanPotential,
+  isGameItem,
   productClass,
   toLocalIso,
 } from '@tora/core';
 import {
   addWatch,
+  getItemRules,
   getProduct,
   linkSets,
   loadOpportunities,
+  prefillGameRules,
   rarityOptions,
   removeWatch,
   setPreferences,
@@ -60,7 +63,11 @@ export async function createWatchAction(_prev: FormState, formData: FormData): P
   // Offer a linked look-alike's listing right away, as for a new lot.
   await suggestFromKnownProducts(db, result.value.product.id);
   await linkSets(db, [result.value.product.id]);
+  // A game picked here gets its rules row as one added as a new game, then its check (S36 B1).
+  await prefillGameRules(db, result.value.product, user.id);
   revalidatePath('/', 'layout');
+  if (isGameItem(result.value.product, await getItemRules(db, result.value.product.id)))
+    redirect(`/watchlist/${result.value.watch.id}/check`);
   redirect(`/products/${result.value.product.id}/buy`);
 }
 

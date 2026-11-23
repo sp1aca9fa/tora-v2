@@ -63,16 +63,19 @@ async function assertGame(db: Pick<Db, 'select'>, productId: string) {
 
 /**
  * Whether the listing is among the item's stored search listings at the source shown now (the reports of
- * the last `SUPPLY_FRESH_DAYS`): only a listing a person can see is marked, never a guessed ref.
+ * the last `SUPPLY_FRESH_DAYS`; a boxed item's are its plain item's): only a listing a person can see
+ * is marked, never a guessed ref.
  */
 async function isShownListing(db: Pick<Db, 'select'>, t: NotItemTarget, now: Date) {
   const since = localDate(new Date(now.getTime() - SUPPLY_FRESH_DAYS * 86_400_000));
+  // A boxed item's listings are its plain item's rows (S36 B1, `wishOffers`).
+  const from = (await getItemRules(db, t.productId))?.boxedOf ?? t.productId;
   const rows = await db
     .select({ offers: supply.offers })
     .from(supply)
     .where(
       and(
-        eq(supply.productId, t.productId),
+        eq(supply.productId, from),
         eq(supply.source, t.source),
         gte(supply.day, since),
         isNotNull(supply.offers),

@@ -14,6 +14,7 @@ const WIDE = [
   /^\/imports$/,
   /^\/opportunities(\/[a-z]+)?$/,
   /^\/watchlist\/strategy$/,
+  /^\/watchlist\/[^/]+\/check$/,
 ];
 
 /** Pages that use a 4K screen's whole width (cards in columns, a wide table beside its form). */

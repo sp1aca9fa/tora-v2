@@ -381,7 +381,7 @@ async function insertHolding(
 
 /** A new item; `userId` null for one Tora makes itself (a ranking's candidate, S13). */
 export async function createProduct(
-  db: Db,
+  db: Pick<Db, 'select' | 'insert'>,
   userId: string | null,
   input: ProductInput,
 ): Promise<Product> {

@@ -80,12 +80,9 @@ export interface ItemRulesContext {
   notItemRefs: ReadonlySet<string>;
 }
 
-/** A stored or new sale's title and category as the source gave them (S36 A1). */
-export interface SaleText {
-  title: string | null;
-  /** The source's category id, as text; null when the sale does not say. */
-  category: string | null;
-}
+/** A stored or new sale's title and category as the source gave them (S36 A1; in `@tora/core`). */
+export type { SaleText } from '@tora/core';
+import type { SaleText } from '@tora/core';
 
 /**
  * A price as a plug-in reports it: in its own currency, never converted (requirements S16); the

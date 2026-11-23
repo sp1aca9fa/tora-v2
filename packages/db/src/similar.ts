@@ -4,7 +4,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { Db } from './client';
 import { type CandidateInput, saveCandidates } from './sources';
-import { type Product, type ProductSource, productSources, products } from './schema';
+import { type Product, type ProductSource, itemRules, productSources, products } from './schema';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -110,9 +110,23 @@ export async function suggestFromKnownProducts(
         ),
       ));
   cache?.set(key, listings);
+  // A boxed item and a plain one are never the same item (S36 B1, fix C3): a boxed copy's link is its
+  // own (the shop's complete copy), so it is never offered its plain item's listing, nor the reverse.
+  const boxed =
+    product.category === 'game'
+      ? new Set(
+          (
+            await db
+              .select({ id: itemRules.productId })
+              .from(itemRules)
+              .where(eq(itemRules.boxed, true))
+          ).map((r) => r.id),
+        )
+      : new Set<string>();
   const bySource = new Map<string, CandidateInput[]>();
   for (const { listing, product: other } of listings) {
     if (!listing.externalId || !looksSame(product, other)) continue;
+    if (boxed.has(product.id) !== boxed.has(other.id)) continue;
     const list = bySource.get(listing.source) ?? [];
     if (list.some((c) => c.externalId === listing.externalId)) continue;
     list.push({

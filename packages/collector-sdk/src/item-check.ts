@@ -29,10 +29,12 @@ import {
   type ItemCheckKind,
   type ItemCheckOutcome,
   type SourceRegistry,
+  CHECK_SAMPLE_SIZE,
   baseCurrency,
+  cheapestOf,
   isGameItem,
   localDate,
-  median,
+  nearestMedianOf,
   noAiSources,
   rulesHash,
 } from '@tora/core';
@@ -68,7 +70,7 @@ import { protectedBy } from './recheck';
 export const CHECK_FILE_KIND = 'tora-item-check';
 export const CHECK_FILE_VERSION = 1;
 /** Entries per set (S36 A1, A2). */
-export const SAMPLE_SIZE = 20;
+export const SAMPLE_SIZE = CHECK_SAMPLE_SIZE;
 /** Of `SAMPLE_SIZE`, how many must be the item. */
 export const SAMPLE_PASS = 18;
 /** Fewer read than this: the set is not judged. */
@@ -198,33 +200,9 @@ export function labelsDigest(entries: readonly Pick<CheckEntry, 'source' | 'ref'
 // ---------------------------------------------------------------------------------------------
 // Sampling
 
-interface Priced {
-  price: number;
-  source: string;
-  ref: string;
-}
-const byPrice = (a: Priced, b: Priced) =>
-  a.price - b.price ||
-  (a.source < b.source ? -1 : a.source > b.source ? 1 : 0) ||
-  cmp(a.ref, b.ref);
+/** The sampling of the labeled check, shared with the registration check (`@tora/core`). */
+export { cheapestOf, nearestMedianOf };
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-
-/** The `n` cheapest (ties by source and ref, so a sample is the same each time). */
-export function cheapestOf<T extends Priced>(rows: readonly T[], n = SAMPLE_SIZE): T[] {
-  return rows.toSorted(byPrice).slice(0, n);
-}
-
-/**
- * The `n` nearest in price to the median of `rows` (all of them when fewer than `n`); ties by price,
- * then source and ref.
- */
-export function nearestMedianOf<T extends Priced>(rows: readonly T[], n = SAMPLE_SIZE): T[] {
-  if (rows.length <= n) return [...rows];
-  const mid = median(rows.map((r) => r.price))!;
-  return rows
-    .toSorted((a, b) => Math.abs(a.price - mid) - Math.abs(b.price - mid) || byPrice(a, b))
-    .slice(0, n);
-}
 
 /**
  * Sources a sample may read: one the registry knows (an unknown one is unknown: not sampled, for

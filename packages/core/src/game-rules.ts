@@ -3,6 +3,7 @@
 // and whether a title passes them. Pure. The title words and their classes were written for the Wishlist
 // dry run (2026-11-21, `collectors/scripts/wishlist-sim-rules.ts`, which now imports them from here).
 import type { Names } from './categories';
+import { median } from './market';
 
 // ---------------------------------------------------------------------------------------------
 // Which items the game rules touch
@@ -213,9 +214,23 @@ export function rulesHash(rules: EffectiveRules, source?: string): string {
   );
 }
 
-/** The hash a check of `kind` at `source` is made and read under: listings per source, sales overall. */
-export function checkHash(rules: EffectiveRules, kind: ItemCheckKind, source: string): string {
-  return kind === 'listings' ? rulesHash(rules, source) : rulesHash(rules);
+/**
+ * The hash a check of `kind` at `source` is made and read under: listings per source, sales overall;
+ * for a boxed item, with its plain item's rules in it.
+ */
+export function checkHash(
+  rules: EffectiveRules,
+  kind: ItemCheckKind,
+  source: string,
+  plain?: EffectiveRules | null,
+): string {
+  const own = kind === 'listings' ? rulesHash(rules, source) : rulesHash(rules);
+  // A boxed item reads its plain item's rows (S36 B1): which rows those are is the plain item's
+  // rules too, so its confirmation stops counting when either item's rules change. `plain` is the
+  // plain item's effective rules, given only for a boxed item.
+  if (!plain) return own;
+  const of = kind === 'listings' ? rulesHash(plain, source) : rulesHash(plain);
+  return fnv1a64(JSON.stringify(['boxed', own, of]));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -249,6 +264,57 @@ export function titlePasses(title: string | null | undefined, rules: EffectiveRu
   // Both on the title without spaces: "complete in box" and "箱 なし" are written spaced too.
   if (rules.boxed && (!BOXED.test(t) || INCOMPLETE.test(t))) return false;
   return true;
+}
+
+/** A stored or new sale's title and category as its source reads them (`Collector.saleText`, S36 A1). */
+export interface SaleText {
+  title: string | null;
+  /** The source's category id, as text; null when the sale does not say. */
+  category: string | null;
+}
+
+/**
+ * Whether a sale fails the item's rules (S36 A1): its title fails `titlePasses`, or its category is
+ * known and is not the console's category at `source` (compared for equality; a sale without a
+ * category, or a console without one there, is judged on the title only). The one judgment: the
+ * collect's marks (`@tora/collector-sdk` game-rules) and the registration check's preview use it.
+ */
+export function failsRules(text: SaleText, rules: EffectiveRules, source: string): boolean {
+  if (!titlePasses(text.title, rules)) return true;
+  const want = rules.categories[source];
+  return !!want && text.category != null && text.category !== want;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Samples of a check (S36 A1, A2, B1: the 20 cheapest and the 20 nearest the median)
+
+/** Entries per sample set (S36 A1: "the 20 cheapest ... and the 20 nearest in price to the median"). */
+export const CHECK_SAMPLE_SIZE = 20;
+
+interface Priced {
+  price: number;
+  source: string;
+  ref: string;
+}
+const cmpText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const byPrice = (a: Priced, b: Priced) =>
+  a.price - b.price || cmpText(a.source, b.source) || cmpText(a.ref, b.ref);
+
+/** The `n` cheapest (ties by source and ref, so a sample is the same each time). */
+export function cheapestOf<T extends Priced>(rows: readonly T[], n = CHECK_SAMPLE_SIZE): T[] {
+  return rows.toSorted(byPrice).slice(0, n);
+}
+
+/**
+ * The `n` nearest in price to the median of `rows` (all of them when fewer than `n`); ties by price,
+ * then source and ref.
+ */
+export function nearestMedianOf<T extends Priced>(rows: readonly T[], n = CHECK_SAMPLE_SIZE): T[] {
+  if (rows.length <= n) return [...rows];
+  const mid = median(rows.map((r) => r.price))!;
+  return rows
+    .toSorted((a, b) => Math.abs(a.price - mid) - Math.abs(b.price - mid) || byPrice(a, b))
+    .slice(0, n);
 }
 
 // ---------------------------------------------------------------------------------------------
