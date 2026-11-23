@@ -215,6 +215,7 @@
 - 2026-11-03: New-release wait shows its end date and how far similar items fell to their low (user: the card gave a day number, no date or price). Buy timing's new-release line gives the wait's end as a date; under it, how far similar items (3+ with a full first year, the item's line when enough) fell from this age to their first-year low, as a median and, with 8+ items, the deeper quarter, with the price that gives from the item's typical price of the last week. Reference only, the wait is unchanged: a leave-one-out check on 10 past Pokemon boxes (SNKRDUNK sales) found the median's price reached early on 8 of 10 but cheaper than the price at the wait's end on only 4-6 of 8, and higher 90 days later on 4-5 of 8, against 7 of 10 for waiting; the quarter's price was reached on only 3-4 of 10, too few to prove. "Falling fast" now says what flat means (under 5 % down in 2 weeks).
 - 2026-11-07: Plan S28-S35 from the owner's check (user). Sales accuracy comes before Buy timing, since targets rest on the year's lows. Buy timing changes rule: it shows target prices with their tested record and confidence instead of showing none it cannot prove (user: a number Tora is partly confident in beats no number). Notices move toward only saying a sale has started, since Now is what gets read.
 - 2026-11-23: Wishlist, S36 (user: "I want this", a list of chosen items bought as near their lowest as possible, designed from that goal and not from what the data of the day allows; all Recommended taken except a paid price archive, declined). (1) One list: the Watchlist becomes the Wishlist. (2) The record and the goal are the lowest level (the cheap quarter of clean sales over 30 days), never the lowest single sale. (3) Fixes to game sales and asks come first; until a game's marketplace ask passes a labeled check it reads "unverified" and sends no alert. The owner's 15 games and 10 comparison games are added by one rehearsed command once the list is checked and the owner has read it. (4) An estimate per wish from the first day, labeled as one; a label that claims proof only after a replay with 30 cases over 10 games. (5) An alert on a lone checked listing is sent, labeled. (6) The last 12 months of marketplace sales are saved now as raw files for the listed games, and read for each later wish, in small daily batches apart from the nightly collect. (7) Console games not on PC are tracked ahead: about 300 chosen ones weekly, the rest at one page a month once that has run a month with no refusal. (8) During the day: the marketplaces' own saved-search notices with Tora's settings; no second collect; a "buying now" switch only if those prove too coarse. (9) New copies through an official shopping search API with the owner's client id. (10) The identity shop for games is read at the 30 seconds its robots file asks of every program, in place of Tora's 2 to 5. Reason for the scope rule (cards and sealed untouched): the owner's worry that fixes for games would change the rest of Tora; each fix was checked against this file first and none is a bug, they are choices made for cards.
+- 2026-11-23: Wishlist build, three changes of means after a review of the build plan (the owner's decisions unchanged). (1) Game sales are not cleaned through S30's re-check: the game rules mark sales with a mark of their own that follows the rules each night and is taken away by turning one admin switch off, shown to the owner on a copy first. Reason: a game's verdict depends on rows people edit (the console table, an item's words), which S30's rehearsed, one-time run cannot follow, and a switch is easier to undo than a run. (2) The owner's 15 games and the 10 comparison games are added in the app from a pasted list with a preview, not by a server command (decision 4 of the Wishlist said one rehearsed command). Reason: a command writing items, rules and links could not be undone cleanly once a night's collect had run on them; the app's own flow needs no undo and the shop's candidates are checked on Actions as for any item. (3) A boxed copy is an item of its own that reads the plain item's sales whose title says boxed. Reason: a sale is stored once, for one item.
 ---
 
 # CORE
@@ -376,7 +377,7 @@ Lot rules:
 ## 7. Collector rules (all sources)
 
 - Only fetch for products with active `product_sources`. Never crawl whole sites.
-- Runs from the home PC only. Polite: 2-5 s random delay between requests, per-run request cap, daily schedule with jitter, normal browser headers, retry with backoff on 5xx.
+- Runs from the home PC only. Polite: 2-5 s random delay between requests (a plug-in may wait longer, never less; the identity shop for games waits the 30 s its robots file asks, S36 step A0), per-run request cap, daily schedule with jitter, normal browser headers, retry with backoff on 5xx.
 - On 403/429 or captcha: stop that source for the run, mark run `blocked`, do not retry aggressively.
 - Dedupe by `source` + `external_ref`.
 - Store raw payloads so matching logic can be improved and re-applied later.
@@ -1280,9 +1281,15 @@ A1. Game sales. Today each item learns its usual categories and runs up to 2 ext
 for games about 78 % of the cheap sales kept are not the game (goods, bonus cards quoting its name,
 guidebooks, bundles). Fix: a game's sold search at a marketplace takes the console's software category from
 the console table, in place of the extra searches, plus the item's required and excluded words; where a
-search takes no category the words and the re-check do the work. Stored game sales are then re-checked with
-the same rules through S30's re-check and its rehearsal: exclusions only, raw rows stay, before and after
-per game shown to the owner first, with its stop limits.
+search takes no category the words do the work. The category and words are laid over the item's stored
+search when it is read; the stored search is not rewritten. A game with no rules of its own uses its
+console (found from its platform) and no words. Stored and new game sales that fail the item's rules are
+marked excluded with a mark of their own, apart from S30's exclusions: each night the marks follow the
+rules both ways (a word added drops sales, a word removed brings them back), never touching a sale a person
+included or excluded, and raw rows stay. All of this sits behind one admin switch, off at first: the owner
+sees before and after per game from a rehearsal on a copy, then turns it on; turning it off takes every
+such mark away. An item whose rules would drop more than half of its kept sales (10 or more) is held, with
+nothing marked, until a person confirms it at the registration check. S30's own re-check is not changed.
 - Measured on the 27 games with enough sales: 12 % of kept sales removed, under 1 % of real copies lost,
   sold searches at Mercari down from 63 to 27 a night.
 - Check, per game, by hand on stored titles and categories, with a blind second reading as in S30: the 20
@@ -1339,8 +1346,11 @@ B1. Registration. A wish is made from an item (existing, new, or found through t
 which then links it and fills A5's fields). The item's rules come from the console table and the title.
 "Boxed" can be asked for the consoles the table marks (to start: N64, DS, 3DS and GameCube, where a boxed
 copy sells for about 1.3 to 2 times one whose title does not say; not Switch, PS4 or PS5, where the gap is
-about 10 %): the boxed item is an item of its own, counting only sales and listings whose title says so,
-with the shop's complete copy as its page. After the item's first read (the next night, or its deep read),
+about 10 %): the boxed item is an item of its own, with the shop's complete copy as its page and no
+marketplace search of its own: its sales and listings are those of the plain item whose title says boxed
+(a sale is stored once, under the plain item). Several games can be added at once: lines of name and
+console are pasted, a preview shows what would be created and which look-alike items exist, and the
+person confirms; the shop link then comes from the nightly candidates as for any new item. After the item's first read (the next night, or its deep read),
 the registration check shows, for sales, the 20 cheapest matches, the 20 nearest the median and what the
 rules dropped, and for each source's listings apart the 20 cheapest stored and what the rules dropped. The person confirms each, or changes a word and sees it
 again after the next read. Until its sales are confirmed a wish is marked "check needed", shows its sales as
@@ -1476,9 +1486,9 @@ ratings for the copies an alert names; suggestions of games to wish for.
 ### Order
 
 Before any of it, the last 12 months of the listed games' sales are saved as raw files, since each day
-waited loses a day. Then A0; the owner's 15 games and 10 comparison games added with their console's
-category set, by one rehearsed command, once the list is checked against the shop's pages and the owner has
-read it; A1 to A6; B; C; D; E.
+waited loses a day. Then A0; A1 to A6; B, where the owner's 15 games are added as wishes through the
+pasted list and its preview (each checked against the shop's page when its candidates come up); C; D,
+where the 10 comparison games are added as tracked games; E.
 
 ### Limits
 

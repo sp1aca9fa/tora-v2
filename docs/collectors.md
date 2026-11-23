@@ -233,7 +233,8 @@ applied once per link. Return null when the title says nothing reliable.
 
 Always fetch through `ctx.http` (`PoliteHttp`), never `fetch` directly:
 
-- 2-5 s between requests (a plug-in can only slow it down, with `http: { minDelayMs }`), a request
+- 2-5 s between requests (a plug-in can only slow it down, with `http: { minDelayMs }`; do so when
+  the site's robots file asks for a longer delay, as one shop plug-in does with 30 s), a request
   cap per run (500 by default, `http: { maxRequests }`); what is left waits for the next run;
 - retries with backoff on server errors;
 - stops the source for the run on 403, 429 or a captcha page (`BlockedError`): never work around a
