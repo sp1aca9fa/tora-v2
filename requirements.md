@@ -57,6 +57,7 @@
 | S33 | Look-back test (from S27 step 7) | planned 2026-11-07, after the owner is happy with S31 |
 | S34 | Sell timing | planned 2026-11-07, spec later; needs S31 and S32 |
 | S35 | Sources and collection load: identity sources, which stores earn their place, a rhythm per item | measured 2026-11-07, nothing built: a rhythm saves about a quarter on two sites, with costs the replay cannot count, on 28 nights; no store reads as noise; the owner decides |
+| S36 | Wishlist: items chosen to buy later (mostly used console games), bought near their lowest: fixes to game sales and asks, the wish as an item with 12 months of past sales, a page with prices as paid and alerts on copies that can be bought, console exclusives tracked ahead | planned 2026-11-23 (the owner decided the proposal that day); nothing built; next: step A0 |
 
 ### Decision log
 
@@ -213,6 +214,7 @@
 - 2026-10-31: Stores > Lotteries lists only a lottery's own posts (user): posters mention the lottery word in chatter and stock reports ("nothing but the lottery", the lottery queue), so the list leaves out replies and posts using a "Not a lottery" phrase (a new kind of code on Codes, set by an admin; never shown as a post's code). Every post still shows in the other lists. On the owner's 12 days of posts: 141 used the word, 89 kept.
 - 2026-11-03: New-release wait shows its end date and how far similar items fell to their low (user: the card gave a day number, no date or price). Buy timing's new-release line gives the wait's end as a date; under it, how far similar items (3+ with a full first year, the item's line when enough) fell from this age to their first-year low, as a median and, with 8+ items, the deeper quarter, with the price that gives from the item's typical price of the last week. Reference only, the wait is unchanged: a leave-one-out check on 10 past Pokemon boxes (SNKRDUNK sales) found the median's price reached early on 8 of 10 but cheaper than the price at the wait's end on only 4-6 of 8, and higher 90 days later on 4-5 of 8, against 7 of 10 for waiting; the quarter's price was reached on only 3-4 of 10, too few to prove. "Falling fast" now says what flat means (under 5 % down in 2 weeks).
 - 2026-11-07: Plan S28-S35 from the owner's check (user). Sales accuracy comes before Buy timing, since targets rest on the year's lows. Buy timing changes rule: it shows target prices with their tested record and confidence instead of showing none it cannot prove (user: a number Tora is partly confident in beats no number). Notices move toward only saying a sale has started, since Now is what gets read.
+- 2026-11-23: Wishlist, S36 (user: "I want this", a list of chosen items bought as near their lowest as possible, designed from that goal and not from what the data of the day allows; all Recommended taken except a paid price archive, declined). (1) One list: the Watchlist becomes the Wishlist. (2) The record and the goal are the lowest level (the cheap quarter of clean sales over 30 days), never the lowest single sale. (3) Fixes to game sales and asks come first; until a game's marketplace ask passes a labeled check it reads "unverified" and sends no alert. The owner's 15 games and 10 comparison games are added by one rehearsed command once the list is checked and the owner has read it. (4) An estimate per wish from the first day, labeled as one; a label that claims proof only after a replay with 30 cases over 10 games. (5) An alert on a lone checked listing is sent, labeled. (6) The last 12 months of marketplace sales are saved now as raw files for the listed games, and read for each later wish, in small daily batches apart from the nightly collect. (7) Console games not on PC are tracked ahead: about 300 chosen ones weekly, the rest at one page a month once that has run a month with no refusal. (8) During the day: the marketplaces' own saved-search notices with Tora's settings; no second collect; a "buying now" switch only if those prove too coarse. (9) New copies through an official shopping search API with the owner's client id. (10) The identity shop for games is read at the 30 seconds its robots file asks of every program, in place of Tora's 2 to 5. Reason for the scope rule (cards and sealed untouched): the owner's worry that fixes for games would change the rest of Tora; each fix was checked against this file first and none is a bug, they are choices made for cards.
 ---
 
 # CORE
@@ -793,6 +795,8 @@ Acceptance: a watched item not owned shows its history, where today's price sits
 
 The full chapter (design, what was built and how it was checked): [docs/history.md](docs/history.md#s9).
 
+The Watchlist becomes the Wishlist in S36.
+
 ## S13: Buy suggestions
 
 Opportunities within an item type: signals on every tracked item and ranked candidate (its line rising or falling, leader or laggard in its line, sales up or down, strong or weak for its age), each tested per group of similar items on the past and again after every collect; a signal ranks items only when proven (a higher price 90 days later at least 5 points more often than on any day, over 10 or more checks). Ranking plug-ins (e.g. a site's sealed-box ranking) bring candidates, collected while in the top 30. Budget and date: Tora suggests when and at what price to buy each ticked item and checks the plan against the budget. Never advice.
@@ -1179,6 +1183,316 @@ good options to buy).
   15+ kept sales in 14 days and 64 none. Busy items nightly, quiet ones every 3 to 7 nights, for-sale
   searches nightly only for items owned or watched. About a third fewer requests (estimate).
 
+## S36: Wishlist
+
+Added at the owner's request (2026-11-21; decided 2026-11-23). The owner registers specific items to buy
+later, mostly used console games in their Japanese physical versions, waits 3 to 12 months and wants to buy
+as near the lowest price as possible, without being caught by a game whose price bottoms out and then rises.
+Opportunities (S13, S26, S32) stays the place for finding things to buy; the Wishlist is for items already
+chosen. It is designed from that goal, not from what the data of the day allows: each limit is written as a
+problem with its way around, or as a permanent limit with its effect ("Limits").
+
+Numbers are from the owner's data and tests to 2026-11-23. The measurements, the owner's list of games and
+each source's specifics (category numbers, page formats) are private, in the notes' Wishlist files. Each
+step below is its own task with a spec; a step that changes what a page shows gets a UX review and the
+owner's check. A number marked "to start" is a setting with no measurement behind it yet: it is changed
+without a new decision.
+
+### Scope rule
+
+Nothing changes for cards and sealed products: their searches, stored asks, values and alerts stay as they
+are, and the version number shared by all automatic searches is not raised (raising it would rewrite every
+item's search). Each fix lives in the code path for games or in the Wishlist's own view. The same measures
+can be run on cards and sealed later, as tasks of their own. What the rest of Tora does notice is said in
+each step ("Outside the Wishlist"). One exception, by the owner's decision: step A0 slows one shop for
+every item.
+
+"Game" below means an item of the game category whose kind is software. For the other game kinds (a limited
+edition, an amiibo, a controller) the game rules apply only when a person turns them on for the item at
+the registration check, after seeing what they drop. A wish on anything that is not a game under this rule
+keeps what the Watchlist does today (S9's zone, target and alerts), unchanged.
+
+### Terms
+
+- Wish: an item a person wants to buy, in one condition, with a note and an optional price of their own:
+  the watch's target, called "the person's price" below, never prefilled. One list: the Watchlist (S9)
+  becomes the Wishlist and every watch is a wish, its condition and its price carried over.
+- Condition: a wish's condition is one of Core 6's buckets for items (new, like new, good, fair), as a watch
+  has it today. "A better one" is an earlier bucket in that order. A listing with no bucket is shown apart
+  as "condition not stated" and sends no alert.
+- The item's rules: what counts as the item, shared by everyone: the console, the edition, the region, words
+  a title must have, words it must not have, and "boxed" (B1). They belong to the item, not to a wish.
+  Changing them takes the item's confirmation away (below) and marks every wish on it "check needed".
+- Console table: one row per console, edited by admins: its name, its software category at each marketplace
+  whose search takes a category (a plug-in may bring them), and whether "boxed" can be asked (B1). Adding a
+  console is adding a row. A game whose console has no row, or no category at a marketplace, keeps today's
+  search there, and its sales and asks there stay unconfirmed.
+- Clean sale: a kept sale (not excluded) of one unit that passes the item's rules and the re-check of S30.
+- Confirmed: an item's sales are confirmed once its labeled check passed (A1) or a person confirmed them at
+  the registration check (B1). Its listings at a source are confirmed once that source's labeled check
+  passed (A2) or a person confirmed that source's listings at the registration check. Sales never confirm
+  listings. Checks count distinct sales and distinct listings. After a labeled check failed, only an admin
+  can confirm in its place.
+- Checked listing: a listing for sale that passes the item's rules, at a source whose listings are confirmed
+  for the item. A source linked to the item by the item's own page there, not by a search (the identity
+  shop's own copy and the outside sellers on that page), is checked by that link, in the bucket its plug-in
+  maps it to. A person can mark any listing shown or alerted "not the item": it is excluded for the item
+  (the raw row stays) and no longer counts anywhere.
+- As paid: the stored price, in the base currency, plus what the buyer adds: shipping when the buyer pays
+  it, and a buyer's fee where a source charges one. Each source's plug-in says, for its sales and for its
+  listings, whether its price includes them, adds a known amount, or does not tell (C1). Not known is never
+  taken as zero.
+- Level: the price a quarter of recent sales were at or under. For a day: the 0.25 quantile (of single
+  sales, interpolated as Core's quantile is) of the as-paid prices of the item's clean sales in the wish's
+  bucket, over the 30 days ending that day, from every source of the home market whose sales' added cost is
+  known and whose days in the window are all covered; the page names the sources counted. A day has a level
+  only with 10 or more such sales. With fewer than 10 the window is 90 days, on the same conditions, and
+  the page says so. Otherwise there is no level: the page shows the lowest, the highest and the count of the clean sales of the last 90 days, and
+  from which day they are whole. The level is per bucket, as the replay measured it; pooling the used
+  buckets is measured at the rerun (step D).
+- Covered day, per source: a day whose night read that source for the item, from the item's first nightly
+  collect on; a day a later read-back reached past (A3, a tracked game's weekly read); or a day inside the
+  span of a finished deep read (B3). A deep read's span runs to the day it finished, from the date it was
+  asked to reach when it read 4 weeks past that date, and otherwise (the pages ran out first) from 4 weeks
+  after the oldest listing it reached. A deep read that has not finished covers nothing yet.
+- Record: the lowest level of any day, with its date and window. It is computed from the clean sales as they
+  are now, never kept as a running minimum, so it follows an exclusion or a change of rules. It is never the
+  lowest single sale: that is usually a loose or wrong copy, or was gone within hours.
+- Young game: released under 90 days ago (from its first clean sale when the release date is unknown). Its
+  page shows its age beside the level and never says "near the low so far".
+- Buyable price tonight: what the item could be bought for at the last nightly read (C2).
+- Tracked game: a game collected lightly without being wished or owned, so that its history exists before it
+  is wished (step D).
+- Night: one nightly collect. A night on which a source was not read (failed, refused, skipped) says nothing
+  about that source: it is skipped in every count of nights below, never counted as "none found".
+
+### Step A: fixes to today's data, games only
+
+None of these is a bug against this file: they are choices that work for cards and fail for games, which
+are valued from marketplace sales. Each is measured before and after.
+
+A0. A shop's pace. The identity shop for games asks every program, in its robots file, for 30 seconds
+between requests; Tora waited 2 to 5. Its plug-in waits 30 seconds. Its run goes from about 15 minutes to
+about 2 hours a night (about 250 requests, two an item). Core 7's pace line and the collector guide gain
+this exception with the step. Outside the Wishlist: the nightly collect ends about 1 h 45 later.
+
+A1. Game sales. Today each item learns its usual categories and runs up to 2 extra searches inside them;
+for games about 78 % of the cheap sales kept are not the game (goods, bonus cards quoting its name,
+guidebooks, bundles). Fix: a game's sold search at a marketplace takes the console's software category from
+the console table, in place of the extra searches, plus the item's required and excluded words; where a
+search takes no category the words and the re-check do the work. Stored game sales are then re-checked with
+the same rules through S30's re-check and its rehearsal: exclusions only, raw rows stay, before and after
+per game shown to the owner first, with its stop limits.
+- Measured on the 27 games with enough sales: 12 % of kept sales removed, under 1 % of real copies lost,
+  sold searches at Mercari down from 63 to 27 a night.
+- Check, per game, by hand on stored titles and categories, with a blind second reading as in S30: the 20
+  cheapest clean sales of the last 12 months, and the 20 nearest in price to the median of those 12 months'
+  clean sales (all conditions). The game passes when 18 or more of each 20 are the item. With fewer than 20
+  clean sales all are read and 90 % (rounded up) must be the item; with fewer than 10 the game is not judged
+  and its sales stay unconfirmed until a person confirms them (B1). Every sale a check finds not to be the
+  item is excluded by hand (the raw row stays), passed or not. A game that fails gets words added and is
+  checked again.
+- Outside the Wishlist: owned games' values move (junk at the cheap end goes, so medians mostly rise);
+  fewer requests for games.
+
+A2. Game asks. A marketplace's stored cheapest ask for a game is mostly not the game: asks under 30 % of the
+item's own sales are not searched, by design, and the first listing over that line is usually something
+else. From the start of step A, wherever a game's ask from a search-based marketplace is shown or used (the
+list, the item's pages, the target alert, the deal lists) it reads "unverified" and triggers nothing. Fix:
+the for-sale search takes the console's category; the cheapest listings that pass the item's rules are
+stored per source and bucket with title, link, seller and category (the cheapest 20 until that source's
+listings are confirmed for the item, then 3 to 5); the lowest ask is the cheapest of them. The 30 % line
+stays. Check per game as in A1, on the distinct listings stored over 7 or more nights (to start): the 20
+cheapest, 18 or more the item, the same rule for fewer. Passing confirms the game's listings at that source, and
+"unverified" then goes for that game there. Outside the Wishlist: a game's ask on its item pages and in the
+deal lists is the checked one, or none.
+
+A3. The nightly read is a sample (one page of the newest sold listings; 81 % of the busiest game's sales
+caught). Fix, for wishes: once a week the sold search is read back until the listings are 6 weeks old (to
+start), so the level's 30 days are whole; it counts against the daily ceiling (B4). Tracked games get this
+by their weekly read.
+
+A4. A listing count that the source caps is "at least N" (72 % of game rows at Mercari). The Wishlist shows
+it so and builds no fact on a falling count.
+
+A5. Release date and list price. No game has a release date and one has a list price. The identity shop's
+two pages read each night (its search result for the item and its buy-back list) already carry the release
+date and the list price; the plug-in reads them and drops the first. Fix: both get fields of their own, and
+the product code (JAN) and the maker are read from those same two pages where they show them. No other page
+is read: the shop's product pages are behind a challenge. The release date fills the item's date only when
+it is empty. The list price is stored on its own, never as the item's retail price (a value falls back on
+that), and is shown as "list price at the shop": whether it includes tax is not known. Before any share of
+it is shown, it is compared on 10 games with their printed launch prices. Outside the Wishlist: "New
+release: wait" (S9) starts to apply to games out for weeks.
+
+A6. The identity shop's ask is the lower of its own copy and an outside seller's on its site; the outside
+seller's price is already in the stored row. The two get fields of their own; the merged figure stays for
+everything that reads it today.
+
+Acceptance, step A: the labeled checks pass for every wished game with 10 or more clean sales; on a copy of
+the data, the searches, kept sales, stored asks, values and alerts of cards and sealed items are the same
+before and after each step.
+
+### Step B: the wish as an item, and its history
+
+B1. Registration. A wish is made from an item (existing, new, or found through the identity shop's search,
+which then links it and fills A5's fields). The item's rules come from the console table and the title.
+"Boxed" can be asked for the consoles the table marks (to start: N64, DS, 3DS and GameCube, where a boxed
+copy sells for about 1.3 to 2 times one whose title does not say; not Switch, PS4 or PS5, where the gap is
+about 10 %): the boxed item is an item of its own, counting only sales and listings whose title says so,
+with the shop's complete copy as its page. After the item's first read (the next night, or its deep read),
+the registration check shows, for sales, the 20 cheapest matches, the 20 nearest the median and what the
+rules dropped, and for each source's listings apart the 20 cheapest stored and what the rules dropped. The person confirms each, or changes a word and sees it
+again after the next read. Until its sales are confirmed a wish is marked "check needed", shows its sales as
+unconfirmed and has no level, record or alert. Game watches that exist when this step is built get the same
+check.
+
+B2. The identity shop's prices kept every night for wishes: used, new, buyback and stock, the shop's own
+copy and outside sellers apart (A6).
+
+B3. Deep read. A marketplace's sold search holds about the last 12 months (tested at Mercari on three games:
+12 months for any game, 120 a page, no refusal at one request every 10 to 20 seconds; not tested: many games
+in one day, and from the server's address; the window moves a day each day). The past sales of a new wish
+are read once, to 12 months back: the read goes on until the listings are 4 weeks (to start) older than the
+date wanted, since the order is only roughly by listing time, and is then cut by sale date. A read stopped
+by the day's number or a refusal keeps what it read and goes on the next day from where it stopped. The
+sales enter Tora through the collect, pass the same rules as nightly sales, and count once the read has
+finished (covered days). Sales saved as raw files before this step existed are loaded the same way. The
+deep read and the nightly read each find sales the other misses; together they are the history. With the
+12 months loaded, the record is measured against the lowest 7-day median of the daily levels (the lowest of
+many small samples runs low); the result goes to the owner before any page shows a record.
+
+B4. Daily ceiling, one per marketplace. Everything Tora asks of a marketplace beyond the nightly collect
+(deep reads, A3's re-reads, tracked games' reads, a "buying now" switch) is a job of its own: one request
+every 10 to 20 seconds, at most 200 a day to start, never while a collect is running and, to start, only
+between 05:00 and 22:00 (the install's time). It stops at the day's number or at a refusal. A refusal
+alerts the admins as a refused collector does; the job then waits 3 days and halves its number, down to 25
+(to start); refused at 25, it stops until an admin starts it again. The number never rises on its own. Its
+order: A3's re-reads, deep reads of wishes, tracked games' weekly reads, deep reads of tracked games (those
+out for 12 to 24 months first, whose launch months are leaving the window), and last the monthly pages of
+step D, from what is left of the day's number. The collectors page shows the day's number, what was used
+and what waits. A refusal is never worked around.
+
+B5. New copies: an official shopping search API finds new and used copies by product code across shops,
+with stock (the owner's client id; not yet tested). It gives the cheapest new copy and whether the item is
+still sold new.
+
+Acceptance, step B: a game on the owner's list is wished, confirmed at its registration check, and once its
+deep read has finished shows 12 months of clean sales with a level for each day that has one; the
+collectors page shows the ceiling and its use.
+
+### Step C: the page, prices as paid, alerts
+
+C1. As paid is computed in the Wishlist's view and alerts only; stored prices, values and every other page
+stay as they are. Where a source shows, sale by sale, who pays the shipping, the plug-in stores it, and a
+sale the buyer paid shipping on stays out of the level unless the amount is known. For the sales a source
+does not tell this about, a plug-in may say its prices include shipping as a rule when a sample of 100 of
+its sales shows 95 % or more do (to start); such sales count as known. A sale whose added cost is not known
+stays out of the level and the record (at first: a marketplace whose sold search does not give shipping,
+until the plug-in stores it). A listing whose added cost is not known is shown at its stored price with
+"plus shipping".
+
+C2. A wish shows:
+- The buyable price tonight, from the last nightly read: the identity shop's own copy; outside sellers on
+  its site, apart; the cheapest 3 to 5 checked listings per source in the wish's condition or a better one,
+  each with title, link, seller and price as paid. A source not read that night shows the date of its last
+  read, and its copies under that date, not as tonight's.
+- The level with its count and window, its change over 4 weeks, and the record with its date.
+- Bounds: the shop's buyback price under, the cheapest new copy over, and the share of the list price (A5).
+- An estimate, labeled as one: a range where the price likely settles, roughly when, and named risks (a
+  re-release likely, no longer sold new, a limited edition). It is entered on the wish with its date, basis
+  and sources: from games of the same kind in Tora (step D), outside cases, or research the owner asks
+  agents for (the app holds no model key). As the wish's own history grows the page says how much rests on
+  the game and how much on its kind. Past estimates stay and are scored against what happened.
+- Plain facts from stored data: the level's and the buyback price's change over 4 weeks; the shop out of
+  stock, or no new copy found, for 5 or more nights running (to start; nights not read are skipped); a
+  dated fact a person recorded (a re-release announced, with its source).
+- No verdict on the list. A label that claims proof ("falling", "the low is in") appears only once a replay
+  on past days has 30 or more separate cases over 10 or more games behind it and its outcome differs from
+  the other labels'. Until then the page says "near the low so far" at most, never "this is the bottom".
+  The item page's Buy timing card is not changed here; what it shows is S31's.
+
+C3. Alerts. From this step a wish on a game gets only the alert below: S9's zone and target alerts stop for
+every wish on a game, confirmed or not, with a price or not.
+- In and out: after a nightly collect, a wish is "in" when a checked listing in its condition or a better
+  one is at or under the person's price, as paid, and "out" otherwise. A listing whose added cost is not
+  known counts on its stored price, and its alert says "plus shipping". A source not read that night keeps
+  the listings of its last read for this state only: an alert is sent only for a copy read that night.
+- The alert names the cheapest such copy (title, price as paid, seller, link) and the three cheapest checked
+  listings from different sellers; when it is the only one at or under the price it says so, with the next
+  price up.
+- Sent when the wish goes from out to in, unless it was last in under 14 nights ago. While in, or on coming
+  back within those 14 nights, sent again only when the cheapest copy is 3 % or more under the reference.
+- The reference is the price of the copy last alerted, while that copy is still listed and for 14 nights at
+  most. From the first night that copy is gone, marked "not the item", or past its 14 nights, the reference
+  is the cheapest other checked price of that night (above the person's price or not), fixed until the next
+  alert; with no other checked listing that night it stays as it was.
+- A copy is alerted once: again only when its own price is 3 % or more under the price it was alerted at.
+- Saving a new price starts this over: the wish counts as out and as never in, so the first night with a
+  copy not yet alerted at or under the new price alerts.
+- On saving a price the page says on how many of the last 30 nights with checked listings it would have
+  been in. A wish with no price says no alert will come; one marked "check needed" says why none will.
+- The morning summary carries, for the person's wishes: a level move of 5 % or more over 4 weeks, a buyback
+  move of 10 % or more (the replay's sizes), the stock and new-copy facts, a newly recorded fact, and wishes
+  marked "check needed".
+
+C4. During the day. No second collect: the level moves over weeks. What a nightly read misses is the single
+underpriced listing (at Mercari 46 % of listings 15 % under their week's average ask were gone by the next
+night). The wish gives the words, the category and the price cap to save as a search in the marketplace's
+own app, which notifies within minutes; the summary points to them when the cheapest checked listing is
+within 10 % of the person's price (to start). Only if those notices prove too coarse: a "buying now" switch
+on one wish, read a few times a day inside the daily ceiling until bought or switched off.
+
+Acceptance, step C: for a wished game with a price, the page shows the last read's copies as paid, the
+level, the record, the bounds and a labeled estimate; the morning after a checked copy at or under the price
+is listed an alert names that copy; no alert comes from an unverified ask, from a listing not read that
+night, or from sales alone.
+
+### Step D: tracked games
+
+Console games that are not on PC, tracked before they are wished: for nine consoles to start, more by
+adding rows to the console table. Tracking ahead adds what cannot be read back: history older than 12
+months, the shop's prices, and the cases the estimates rest on.
+- A chosen set of about 300 (the makers' own games and the best-known exclusive series per console, drafted
+  from a catalog, trimmed by the owner), read weekly: sold searches read back 2 weeks (to start), about 90
+  requests a day of a marketplace's daily ceiling; and the identity shop's prices in the nightly collect, a
+  seventh of the set each night: about 600 requests a week, about 45 minutes more a night at A0's pace.
+- The rest of the exclusives, console by console, at one page a month at one marketplace, started only after
+  the chosen set has run a month with no refusal, and only as far as the day's number allows after
+  everything before them in B4's order. They get no deep read until wished.
+- A game that later comes to PC stays tracked, marked. Tracked games belong to no person and show in no
+  portfolio; admins see the list.
+- Needs a catalog that knows each game's consoles; its terms are read before it is used.
+- Estimates from kinds (how games of a kind aged), and a rerun of the replay after the deep reads and at 3
+  and 6 months: only what it supports is added (a label, a tighter estimate, pooled used buckets).
+
+### Step E: later, in this order, as the owner chooses
+
+The price after points on campaign days; a monthly news pass by agents over the wishes (re-release, port,
+price cut), recorded as dated facts with sources; each purchase recorded against the level and the low that
+followed, the real measure of the goal; digital sale prices as dated facts; listing descriptions and seller
+ratings for the copies an alert names; suggestions of games to wish for.
+
+### Order
+
+Before any of it, the last 12 months of the listed games' sales are saved as raw files, since each day
+waited loses a day. Then A0; the owner's 15 games and 10 comparison games added with their console's
+category set, by one rehearsed command, once the list is checked against the shop's pages and the owner has
+read it; A1 to A6; B; C; D; E.
+
+### Limits
+
+- News. A re-release cut the old copy by 25 to 85 % in the 4 cases found; a game no longer sold new rises
+  (in 3 of 14 outside cases, about double). Neither shows in prices beforehand. Tora shows the second as it
+  happens (C2's facts) and records announcements within days to a month. It never says a bottom is in.
+- The exact bottom is known only afterwards. The aim is the settled level, not the lowest sale.
+- A young game is still falling from its launch price: its level, once it has one, is only the lowest so
+  far. Its wish collects from the first day.
+- Thin items (one or two sales a month) have no level: a range with its count, the shop's price, and an
+  alert on any checked copy at or under the person's price. "Is this cheap" stays the person's judgment.
+- The state of one particular copy, other regions' imports, and a site that refuses the connection.
+- Nothing older than the 12 months a marketplace gives back (a paid archive was declined).
+
 ## S18: Documentation pass
 
 The last phase (user, 2026-10-16): nothing to build, so it comes after everything else. Each phase keeps its guide current as it goes; this pass reads `docs/` and the README from start to finish against the app as it is then (S17, S9, S13, S10's France + China setup, S14, S15 all change what a newcomer sees), fixes what drifted, fills gaps, and checks every command and link. To consider then: the Japanese documentation for the portfolio (Open issues).
@@ -1213,7 +1527,7 @@ Logged at the user's request (2026-10-13): known gaps to come back to with a pla
 
 The user does not know yet what to do with these (2026-10-17): analyse before any plan.
 
-- Partial items: the user owns only part of an item, but the item's price sources track the whole package. Example: ゼルダの伝説 ムジュラの仮面 (N64), cartridge only (箱・説明書なし), valued as a complete boxed copy, so the value is clearly too high. Editing the item by hand to "cartridge only" is easy; the hard part is recognising a partial item during the import (Mercari / 駿河屋 / SNKRDUNK titles and receipts: ソフトのみ, 箱なし, 箱説なし, 本体のみ, カードのみ...) without AI interpretation, and then matching and valuing it as that partial item (its own product or a "completeness" attribute of the lot, with buckets / search words to match, e.g. 駿河屋 lists 箱説なし copies separately). To decide: product vs lot attribute, which words mark completeness per category, how the import review shows it.
+- Partial items: the user owns only part of an item, but the item's price sources track the whole package. Example: ゼルダの伝説 ムジュラの仮面 (N64), cartridge only (箱・説明書なし), valued as a complete boxed copy, so the value is clearly too high. Editing the item by hand to "cartridge only" is easy; the hard part is recognising a partial item during the import (Mercari / 駿河屋 / SNKRDUNK titles and receipts: ソフトのみ, 箱なし, 箱説なし, 本体のみ, カードのみ...) without AI interpretation, and then matching and valuing it as that partial item (its own product or a "completeness" attribute of the lot, with buckets / search words to match, e.g. 駿河屋 lists 箱説なし copies separately). To decide: product vs lot attribute, which words mark completeness per category, how the import review shows it. For wished items on consoles where loose copies are common, S36 (B1) makes the boxed copy an item of its own; owned partial items stay open here.
 - Bundles: one purchase of several items in one listing (see "Mixed bundles" below for the idea so far). Needs a plan: how an import recognises a bundle, splitting into one lot per item, how the cost is divided, and what happens to the items' price sources.
 
 ### Optional features
