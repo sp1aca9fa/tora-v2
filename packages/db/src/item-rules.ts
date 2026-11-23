@@ -152,10 +152,11 @@ export function allowedCheck(by: string, outcome: string): boolean {
  * Whether a failed labeled check stands over the checks of one (item, kind, source), oldest first,
  * under `hash` (S36 Terms "Confirmed": after a labeled check failed, only an admin confirms). Only
  * rows made under `hash` count, since rules that changed are rules nobody failed: walking back from
- * the newest, a check's `failed` stands; a `passed` or an admin's `confirmed` clears it. A person's
- * rows (their own "not my item" included) and a check that did not judge leave it as it was. Read
- * (`confirmedBy`) and write (`recordItemCheck`) both use it, so a person's confirmation is refused
- * exactly when it would not count.
+ * the newest, a check's `failed` stands until an admin's `confirmed` clears it. A later `passed` by
+ * the check does not (a sample taken again after the wrong ones were excluded is not the admin's
+ * word), nor do a person's rows (their own "not my item" included) or a check that did not judge.
+ * Read (`confirmedBy`) and write (`recordItemCheck`) both use it, so a person's confirmation is
+ * refused exactly when it would not count.
  */
 export function failureStands(
   rows: readonly Pick<ItemCheck, 'outcome' | 'by' | 'rulesHash'>[],
@@ -165,7 +166,7 @@ export function failureStands(
     const { outcome, by, rulesHash } = rows[i]!;
     if (rulesHash !== hash) continue;
     if (outcome === 'failed' && by === 'check') return true;
-    if (outcome === 'passed' || (outcome === 'confirmed' && by === 'admin')) return false;
+    if (outcome === 'confirmed' && by === 'admin') return false;
   }
   return false;
 }
@@ -174,8 +175,9 @@ export function failureStands(
  * Whether the checks of one (item, kind, source), oldest first, confirm it under `hash` (S36 Terms
  * "Confirmed"): among the rows made under today's hash for that kind and source, leaving out a check
  * that did not judge (too few sales says nothing, so it never undoes a confirmation), the latest is
- * the check's `passed` or a `confirmed`. A person's `confirmed` counts only when no failed check
- * stands before it; an admin's always does. A row whose maker may not write its outcome is ignored.
+ * the check's `passed` or a `confirmed`. The check's `passed` and a person's `confirmed` count only
+ * when no failed check stands before them; an admin's always does. A row whose maker may not write
+ * its outcome is ignored.
  */
 export function confirmedBy(rows: readonly ItemCheck[], hash: string): boolean {
   const mine = rows.filter(
@@ -183,8 +185,7 @@ export function confirmedBy(rows: readonly ItemCheck[], hash: string): boolean {
   );
   const latest = mine.at(-1);
   if (!latest) return false;
-  if (latest.outcome === 'passed') return true;
-  if (latest.outcome !== 'confirmed') return false;
+  if (latest.outcome !== 'passed' && latest.outcome !== 'confirmed') return false;
   if (latest.by === 'admin') return true;
   return !failureStands(mine.slice(0, -1), hash);
 }
@@ -298,7 +299,10 @@ export interface ItemCheckInput {
  * an admin; or a person confirms while a failure stands (S36 Terms "Confirmed": then only an admin
  * can; `failureStands` over the rows up to its time, as `confirmedBy` reads them).
  */
-export async function recordItemCheck(db: Db, input: ItemCheckInput): Promise<ItemCheck> {
+export async function recordItemCheck(
+  db: Pick<Db, 'select' | 'insert'>,
+  input: ItemCheckInput,
+): Promise<ItemCheck> {
   if (
     !ITEM_CHECK_KINDS.includes(input.kind) ||
     !ITEM_CHECK_OUTCOMES.includes(input.outcome) ||

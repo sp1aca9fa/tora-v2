@@ -2255,6 +2255,13 @@
     "listings": "{count, plural, one {# listing} other {# listings}}, unverified",
     "unverified": "unverified"
   },
+  "gameListings": {
+    "summary": "{count, plural, one {# listing} other {# listings}} found at {source}{state, select, open {, not yet confirmed} other {}}.{mark, select, yes { Mark the wrong ones.} other {}}",
+    "summaryMany": "{count, plural, one {# listing} other {# listings}} found{state, select, open {, not yet confirmed} other {}}.{mark, select, yes { Mark the wrong ones.} other {}}",
+    "notItem": "Not the item",
+    "undo": "Undo",
+    "marked": "Marked not the item ({count})"
+  },
   "forSale": {
     "title": "For sale now",
     "info": "Lowest asking price per condition, read with the nightly collect ({date}). Asking prices, not sales.",

@@ -4,6 +4,7 @@ import {
   currentSupply,
   holdingBucket,
   listingsIn,
+  notItemMarksOf,
   priceHistory,
   ruleTestFor,
 } from '@tora/db';
@@ -21,6 +22,7 @@ import { BuyReasons, BuyVerdict, RuleTestCard } from '../../buy-timing';
 import { ForSale } from '../../for-sale';
 import { loadItem, loadSignal } from '../../item-data';
 import { WatchCard } from '../../watch-card';
+import { GameListings } from './listings';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -67,6 +69,24 @@ export default async function BuyPage({ params, searchParams }: Props) {
     forSale.filter((r) => checks.status(r) === 'unverified').map((r) => r.source),
   );
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
+  // A game's stored listings in this condition (S36 A2; cards and sealed store none). A person with
+  // a wish on the item or an admin may mark one "not the item" (checked again in the action); a mark
+  // is taken back by its maker or an admin.
+  // "Any condition" is a null bucket here and an empty one in a supply row.
+  const listed = forSale.filter(
+    (r) => (r.bucket || null) === (bucket || null) && Array.isArray(r.offers),
+  );
+  const canMark = listed.length > 0 && (user.role === 'admin' || watches.length > 0);
+  const marks = listed.some((r) => r.markedOffers?.length)
+    ? await notItemMarksOf(db, product.id)
+    : new Map<string, { userId: string | null }>();
+  // The maker may take their mark back without a wish still on the item; an admin any.
+  const mayUndo = new Set(
+    [...marks].filter(([, m]) => user.role === 'admin' || m.userId === user.id).map(([key]) => key),
+  );
+  const listingsChecked = new Set(
+    listed.filter((r) => checks.status(r) === 'checked').map((r) => r.source),
+  );
 
   // Wide screens: the verdict and its reasons on one side; the chart, what is for sale and the
   // watches on the other, so the chart stays beside what it explains. A full 4K screen gives those
@@ -134,7 +154,15 @@ export default async function BuyPage({ params, searchParams }: Props) {
         </div>
         <div className="space-y-5">
           <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1 min-[1600px]:grid-cols-2 min-[2400px]:grid-cols-1">
-            <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} unverified={unverified} />
+            <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} unverified={unverified}>
+              <GameListings
+                productId={product.id}
+                rows={listed}
+                canMark={canMark}
+                mayUndo={mayUndo}
+                checked={listingsChecked}
+              />
+            </ForSale>
             <div className="space-y-3">
               <WatchCard
                 productId={product.id}

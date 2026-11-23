@@ -1,7 +1,7 @@
 import { localDate, toLocalIso } from '@tora/core';
 import { and, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { Db } from './client';
-import { type Supply, supply } from './schema';
+import { type Supply, notItemMarks, supply } from './schema';
 
 /** One source's report for one item and condition on one day (S9 part 2). */
 export interface SupplyRow {
@@ -123,16 +123,86 @@ export async function saveSupply(db: Db, rows: SupplyRow[]): Promise<void> {
 export const SUPPLY_FRESH_DAYS = 3;
 
 /**
+ * A row of what is for sale now. A game's row whose stored listings include some marked "not the
+ * item" carries them apart (`markedOffers`), so the page can show them with an undo; the row itself
+ * is read without them (`withoutNotItem`).
+ */
+export type CurrentSupplyRow = Supply & { markedOffers?: SupplyOffer[] };
+
+/** The key of `notItemRefs`. */
+export const notItemKey = (productId: string, source: string) => `${productId}|${source}`;
+
+/**
+ * The listing refs marked "not the item" (S36 Terms "Checked listing"), by `notItemKey(item,
+ * source)`. Marks are shared per item: every person's and the labeled check's count.
+ */
+export async function notItemRefs(
+  db: Pick<Db, 'select'>,
+  productIds: readonly string[],
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  const ids = [...new Set(productIds)];
+  for (let i = 0; i < ids.length; i += 500) {
+    const rows = await db
+      .select({
+        productId: notItemMarks.productId,
+        source: notItemMarks.source,
+        ref: notItemMarks.externalRef,
+      })
+      .from(notItemMarks)
+      .where(inArray(notItemMarks.productId, ids.slice(i, i + 500)));
+    for (const r of rows) {
+      const key = notItemKey(r.productId, r.source);
+      out.set(key, (out.get(key) ?? new Set()).add(r.ref));
+    }
+  }
+  return out;
+}
+
+/**
+ * A supply row read without its listings marked "not the item" (S36 Terms "Checked listing": a
+ * marked listing no longer counts anywhere): only a row with stored listings (`offers`, game items)
+ * can change. Its ask is the cheapest listing left (none left: no ask, unknown stays unknown), its
+ * link that listing's, its count lowered by the marked ones it stored (more may have been counted
+ * than stored: the count stays above zero then, with no ask); the marked ones go to `markedOffers`. A row with nothing marked is returned as it is (cards and sealed: always).
+ */
+export function withoutNotItem<T extends Supply>(
+  row: T,
+  marked: ReadonlySet<string> | undefined,
+): T & { markedOffers?: SupplyOffer[] } {
+  if (!marked?.size || !Array.isArray(row.offers)) return row;
+  const offers = supplyOffers(row) ?? [];
+  const gone = offers.filter((o) => marked.has(o.ref));
+  if (!gone.length) return row;
+  const left = offers.filter((o) => !marked.has(o.ref));
+  const first = left[0];
+  return {
+    ...row,
+    offers: (row.offers as unknown[]).filter(
+      (o) => !(o && typeof o === 'object' && marked.has((o as { ref?: unknown }).ref as string)),
+    ),
+    lowestAskBase: first?.priceBase ?? null,
+    lowestAskOriginal: first?.priceOriginal ?? null,
+    currency: first?.currency ?? row.currency,
+    // No listing left: no ask, so no rate it was converted at either.
+    fxRate: first ? row.fxRate : null,
+    url: first?.url ?? null,
+    listings: row.listings === null ? null : Math.max(0, row.listings - gone.length),
+    markedOffers: gone,
+  };
+}
+
+/**
  * What is for sale now: per item, each source's latest report (its last collected day within
  * `SUPPLY_FRESH_DAYS`), every condition of that day. A condition missing from that day had nothing
- * for sale.
+ * for sale. A game's listings marked "not the item" are left out (`withoutNotItem`).
  */
 export async function currentSupply(
   db: Db,
   productIds: string[],
   now: Date = new Date(),
-): Promise<Map<string, Supply[]>> {
-  const out = new Map<string, Supply[]>();
+): Promise<Map<string, CurrentSupplyRow[]>> {
+  const out = new Map<string, CurrentSupplyRow[]>();
   if (!productIds.length) return out;
   const since = localDate(new Date(now.getTime() - SUPPLY_FRESH_DAYS * 86_400_000));
   const rows = await db
@@ -144,10 +214,13 @@ export async function currentSupply(
     const key = `${r.productId}|${r.source}`;
     if ((lastDay.get(key) ?? '') < r.day) lastDay.set(key, r.day);
   }
-  for (const r of rows) {
-    if (lastDay.get(`${r.productId}|${r.source}`) !== r.day) continue;
+  const latest = rows.filter((r) => lastDay.get(`${r.productId}|${r.source}`) === r.day);
+  // Only a game's rows store listings (S36 A2): a page of cards and sealed items reads no mark.
+  const withOffers = latest.filter((r) => Array.isArray(r.offers)).map((r) => r.productId);
+  const marks = withOffers.length ? await notItemRefs(db, withOffers) : new Map();
+  for (const r of latest) {
     const list = out.get(r.productId) ?? [];
-    list.push(r);
+    list.push(withoutNotItem(r, marks.get(notItemKey(r.productId, r.source))));
     out.set(r.productId, list);
   }
   for (const list of out.values()) {

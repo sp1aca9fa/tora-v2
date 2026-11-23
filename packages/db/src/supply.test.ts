@@ -5,7 +5,7 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, deleteUnusedProduct, mergeProducts } from './mutations';
-import { supply as supplyTable } from './schema';
+import { type Supply, supply as supplyTable } from './schema';
 import { chooseAsk } from './ask-check';
 import {
   type SupplyRow,
@@ -14,6 +14,7 @@ import {
   lowestAsk,
   saveSupply,
   supplyOffers,
+  withoutNotItem,
 } from './supply';
 import { createUser } from './users';
 
@@ -168,4 +169,59 @@ it("a condition where nothing passed tonight reads as today's report: no ask, 0 
   ]);
   for (const status of ['checked', 'unverified'] as const)
     expect(chooseAsk(rows, 'raw:A', () => status)).toEqual({ ask: null, unverified: null });
+});
+
+it('reads a row without its listings marked "not the item"', () => {
+  const offer = (ref: string, price: number) => ({
+    ref,
+    title: `Hero Quest ${ref}`,
+    url: `https://flea.example/${ref}`,
+    priceBase: price,
+    priceOriginal: price / 100,
+    currency: 'USD',
+    seller: null,
+    category: null,
+    shipping: 'unknown',
+    shippingPayerId: null,
+  });
+  const row = {
+    id: 'r',
+    productId: 'p',
+    source: 'flea',
+    bucket: 'used',
+    day: '2026-11-20',
+    lowestAskBase: 1000,
+    lowestAskOriginal: 10,
+    currency: 'USD',
+    fxRate: 100,
+    listings: 7,
+    url: 'https://flea.example/A',
+    fetchedAt: '2026-11-20T03:00:00.000+09:00',
+    offers: [offer('A', 1000), offer('B', 1200)],
+  } as unknown as Supply;
+  // No mark, or marks on refs it did not store: the same object.
+  expect(withoutNotItem(row, undefined)).toBe(row);
+  expect(withoutNotItem(row, new Set(['Z']))).toBe(row);
+  expect(withoutNotItem({ ...row, offers: null }, new Set(['A']))).toMatchObject({
+    lowestAskBase: 1000,
+  });
+  const one = withoutNotItem(row, new Set(['A']));
+  expect([one.lowestAskBase, one.lowestAskOriginal, one.fxRate, one.url, one.listings]).toEqual([
+    1200,
+    12,
+    100,
+    'https://flea.example/B',
+    6,
+  ]);
+  // Every stored listing marked while 7 were counted: no ask, no rate, the count lowered by 2.
+  const all = withoutNotItem(row, new Set(['A', 'B']));
+  expect([all.lowestAskBase, all.lowestAskOriginal, all.fxRate, all.url, all.listings]).toEqual([
+    null,
+    null,
+    null,
+    null,
+    5,
+  ]);
+  expect(all.markedOffers?.map((o) => o.ref)).toEqual(['A', 'B']);
+  expect(all.offers).toEqual([]);
 });

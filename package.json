@@ -43,7 +43,8 @@
     "demo": "pnpm --silent --filter @tora/collector-sdk demo",
     "mcp": "pnpm --silent --filter @tora/mcp start",
     "plugins": "pnpm --silent --filter @tora/collector-sdk plugins",
-    "recheck-sales": "pnpm --silent --filter @tora/collector-sdk recheck-sales"
+    "recheck-sales": "pnpm --silent --filter @tora/collector-sdk recheck-sales",
+    "item-check": "pnpm --silent --filter @tora/collector-sdk item-check"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

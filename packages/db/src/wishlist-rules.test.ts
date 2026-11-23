@@ -397,9 +397,10 @@ describe('confirmations', () => {
     await check(p.id, h, { outcome: 'not_judged', at: at(5) });
     await expect(check(p.id, h, { ...person, at: at(6) })).rejects.toThrow('forbidden');
     expect(await isConfirmed()).toBe(false);
-    // A person's confirmation in between does not lift the failure either.
+    // A later pass by the check does not lift the failure under the same rules either (S36 Terms
+    // "Confirmed": after a failed labeled check only an admin confirms).
     await check(p.id, h, { outcome: 'passed', at: at(7) });
-    expect(await isConfirmed()).toBe(true);
+    expect(await isConfirmed()).toBe(false);
     await check(p.id, h, { outcome: 'failed', at: at(8) });
     await expect(check(p.id, h, { ...person, at: at(9) })).rejects.toThrow('forbidden');
     expect(await db.select().from(itemChecks)).toHaveLength(7);
@@ -410,7 +411,28 @@ describe('confirmations', () => {
       ({ outcome, by, rulesHash: 'h' }) as Parameters<typeof confirmedBy>[0][number];
     expect(confirmedBy([], 'h')).toBe(false);
     expect(confirmedBy([row('failed'), row('confirmed', 'person')], 'h')).toBe(false);
-    expect(confirmedBy([row('failed'), row('passed'), row('confirmed', 'person')], 'h')).toBe(true);
+    expect(confirmedBy([row('failed'), row('passed'), row('confirmed', 'person')], 'h')).toBe(
+      false,
+    );
+    // The check's pass, by order: alone it confirms; after a failure under the same rules it does
+    // not, until an admin confirms; a later failure unconfirms; other rules' failure does not count.
+    expect(confirmedBy([row('passed')], 'h')).toBe(true);
+    expect(confirmedBy([row('failed'), row('passed')], 'h')).toBe(false);
+    expect(failureStands([row('failed'), row('passed')], 'h')).toBe(true);
+    expect(confirmedBy([row('passed'), row('failed')], 'h')).toBe(false);
+    expect(confirmedBy([row('failed'), row('confirmed', 'admin'), row('passed')], 'h')).toBe(true);
+    expect(
+      confirmedBy([row('failed'), row('confirmed', 'admin'), row('failed'), row('passed')], 'h'),
+    ).toBe(false);
+    expect(
+      confirmedBy(
+        [
+          { ...row('failed'), rulesHash: 'old' } as Parameters<typeof confirmedBy>[0][number],
+          row('passed'),
+        ],
+        'h',
+      ),
+    ).toBe(true);
     expect(confirmedBy([row('failed'), row('confirmed', 'admin')], 'h')).toBe(true);
     // A check that could not judge never undoes a confirmation (re-review).
     expect(confirmedBy([row('passed'), row('not_judged')], 'h')).toBe(true);

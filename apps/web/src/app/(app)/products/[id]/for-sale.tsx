@@ -1,6 +1,7 @@
 import type { Supply } from '@tora/db';
 import { chooseAsk, listingsIn } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import type { ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
 import { bucketLabel } from '@/lib/product-display';
@@ -18,6 +19,7 @@ export async function ForSale({
   mainBucket,
   zoneTop = null,
   unverified = new Set(),
+  children,
 }: {
   rows: Supply[];
   mainBucket: string | null;
@@ -29,6 +31,8 @@ export async function ForSale({
    * the zone. Empty for cards and sealed.
    */
   unverified?: ReadonlySet<string>;
+  /** Shown under the conditions (a game's listings, S36 A2). */
+  children?: ReactNode;
 }) {
   const [t, tAll, format, money, sourceLabel] = await Promise.all([
     getTranslations('forSale'),
@@ -187,6 +191,7 @@ export async function ForSale({
               );
             })}
           </ul>
+          {children}
         </CardContent>
       )}
     </Card>
