@@ -57,7 +57,7 @@ import {
   refreshItemSales,
   ruleStates,
   schema,
-  supplyOffers,
+  searchOffers,
 } from '@tora/db';
 import { and, asc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { createHash, randomUUID } from 'node:crypto';
@@ -459,7 +459,10 @@ async function listingsBlocks(
       .from(schema.supply)
       .where(and(eq(schema.supply.productId, productId), isNotNull(schema.supply.offers)))
       .orderBy(asc(schema.supply.day))
-  ).filter((r) => r.day <= lastDay && Date.parse(r.updatedAt) <= until);
+  ).filter(
+    // The shop's own copy and outside seller (S36 A6) are not search listings: never sampled.
+    (r) => r.day <= lastDay && Date.parse(r.updatedAt) <= until && searchOffers(r) !== null,
+  );
   const coverage = new Map(
     (
       await db
@@ -488,7 +491,7 @@ async function listingsBlocks(
     if (!ctx.allowed(r.source)) continue;
     const seen = bySource.get(r.source) ?? { first: r.day, listings: new Map<string, Seen>() };
     bySource.set(r.source, seen);
-    for (const offer of supplyOffers(r) ?? []) {
+    for (const offer of searchOffers(r) ?? []) {
       if (marks.has(`${r.source}|${offer.ref}`)) continue;
       // Rows are read oldest first: a listing seen again keeps its latest title, price and night.
       seen.listings.set(offer.ref, {
@@ -1040,7 +1043,7 @@ async function planMarks(
         isNotNull(schema.supply.offers),
       ),
     ))
-    for (const offer of supplyOffers(r) ?? []) stored.add(offer.ref);
+    for (const offer of searchOffers(r) ?? []) stored.add(offer.ref);
   const marked = marks.get(notItemKey(productId, source));
   for (const e of notItem) {
     if (marked?.has(e.ref)) bp.already.push(refOf(e));

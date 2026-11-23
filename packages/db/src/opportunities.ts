@@ -53,7 +53,14 @@ import { productLines, releaseDates, similarKey } from './release';
 import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, latestSignals, pickSeries } from './signals';
 import { askChecks } from './ask-check';
-import { SUPPLY_FRESH_DAYS, currentSupply, listingHistory, listingsIn, lowestAsk } from './supply';
+import {
+  SUPPLY_FRESH_DAYS,
+  currentSupply,
+  listingHistory,
+  listingsIn,
+  lowestAsk,
+  searchOffers,
+} from './supply';
 
 const DAY = 86_400_000;
 /** Days of sales a reference source's series needs to be preferred over a longer one elsewhere. */
@@ -261,7 +268,7 @@ export async function refreshOpportunities(
           // the night the rules go on, fewer listings pass than were counted before.
           before: listingsNear(
             (listed.get(`${m.id}|${m.source}|${bucket}`) ?? []).filter(
-              (r) => r.filtered === own.some((s) => s.offers !== null),
+              (r) => r.filtered === own.some((s) => searchOffers(s) !== null),
             ),
             listingsBackFrom(own[0]?.day ?? today),
           ),

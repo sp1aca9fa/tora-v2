@@ -50,3 +50,4 @@ export * from './rule-marks';
 export * from './ask-check';
 export * from './sale-coverage';
 export * from './not-item';
+export * from './source-facts';

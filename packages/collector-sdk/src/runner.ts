@@ -42,6 +42,7 @@ import {
   refreshItemSales,
   updateSourceQuery,
   saveCandidates,
+  saveSourceFacts,
   saveSupply,
   suggestFromKnownProducts,
   startRun,
@@ -460,10 +461,9 @@ export async function runCollector(
           // sealed have no coverage); a failed or skipped link records nothing. A failure to record is
           // logged and does not fail the link (its data is saved).
           const read = nightsRead ? (nights.get(product.id) ?? []) : undefined;
-          if (
-            isGameItem(product, { gameRules: switches.get(product.id) ?? null }) &&
-            !(read && coversDay(read, today))
-          ) {
+          // S36 Terms "Game": what the game-only writes below are limited to (not the rules' switch).
+          const game = isGameItem(product, { gameRules: switches.get(product.id) ?? null });
+          if (game && !(read && coversDay(read, today))) {
             try {
               nights.set(product.id, await addNight(db, product.id, collector.source, today, read));
             } catch (e) {
@@ -480,9 +480,14 @@ export async function runCollector(
           const given: SupplyWithOffers[] | null = fromFound
             ? supplyWithOffers(fromFound.search, fromFound.itemRules, collector.source)
             : (result.supply ?? null);
+          // A plug-in's own listings on its rows (S36 A6, B2: the identity shop's own copy and outside
+          // seller) are stored for a game item only; any other item's rows are stored as before. An
+          // empty list of them is stored as none (null): an empty list means a search where nothing
+          // passed (`isShopOffers`).
           if (given) {
             const rows = [];
-            for (const { lowestAsk, offers, ...s } of given) {
+            for (const { lowestAsk, offers: listed, ...s } of given) {
+              const offers = fromFound ? listed : game && listed?.length ? listed : undefined;
               const c = lowestAsk === null ? null : await toBase(lowestAsk, s.currency, now);
               const stored = [];
               for (const o of offers ?? [])
@@ -500,6 +505,24 @@ export async function runCollector(
               });
             }
             await saveSupply(db, rows);
+          }
+          // S36 A5: what the pages show beside the prices, and the item's release date while it has
+          // none and the date has come (`today`, the app's zone), for a game item only (the shop is the identity source of sealed products too). A
+          // failure to store them is logged and does not fail the link (its prices are saved).
+          if (game && result.facts) {
+            try {
+              const { releaseDateFilled } = await saveSourceFacts(
+                db,
+                link,
+                result.facts,
+                inAppZone(now.toISOString()),
+                today,
+              );
+              if (releaseDateFilled)
+                log(`collect "${product.name}": release date filled from the linked listing`);
+            } catch (e) {
+              log(`collect "${product.name}": facts not stored: ${errorText(e)}`);
+            }
           }
           const title = (overlaid ? null : result.title) ?? link.title;
           if (!link.detailsSyncedAt && title && collector.productDetails) {

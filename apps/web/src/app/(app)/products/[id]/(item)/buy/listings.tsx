@@ -1,4 +1,4 @@
-import { type CurrentSupplyRow, type SupplyOffer, supplyOffers } from '@tora/db';
+import { type CurrentSupplyRow, type SupplyOffer, searchOffers } from '@tora/db';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { getMoney } from '@/lib/money-server';
@@ -35,7 +35,7 @@ export async function GameListings({
   const groups = rows
     .map((r) => ({
       source: r.source,
-      offers: (supplyOffers(r) ?? []).slice(0, PER_SOURCE),
+      offers: (searchOffers(r) ?? []).slice(0, PER_SOURCE),
       marked: r.markedOffers ?? [],
     }))
     .filter((g) => g.offers.length || g.marked.length);

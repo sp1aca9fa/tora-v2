@@ -104,5 +104,12 @@ export function storedOffer(l: FoundListing, priceBase: number): SupplyOffer {
     category: l.category,
     shipping: 'unknown',
     shippingPayerId: l.shippingPayerId,
+    // The identity shop's fields (S36 A6), only on its entries: the marketplaces' rows stay as they were.
+    ...(l.own && {
+      own: l.own,
+      stock: l.stock ?? null,
+      count: l.count ?? null,
+      condition: l.condition ?? null,
+    }),
   };
 }

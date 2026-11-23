@@ -50,11 +50,24 @@ export interface SupplyOffer {
    * meaning is confirmed); null when the listing does not say.
    */
   shippingPayerId: string | null;
+  /**
+   * The identity shop's entries only (S36 A6, B2; the marketplaces' offers leave these out): `own`, the
+   * shop's own copy; `outside`, the cheapest outside seller on its site. The row's ask stays the lower
+   * of the two, as before.
+   */
+  own?: 'own' | 'outside';
+  /** The shop's own copy: how many it has, when the page shows it; null: not shown. */
+  stock?: number | null;
+  /** An outside seller's entry: how many copies its site lists, when shown; null: not shown. */
+  count?: number | null;
+  /** An outside seller's entry: the condition the page states (`used`, `new`); null: not shown. */
+  condition?: string | null;
 }
 
 const SHIPPING = new Set(['included', 'buyer', 'unknown']);
 const text = (v: unknown) => (typeof v === 'string' ? v : null);
 const amount = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const OWN = new Set(['own', 'outside']);
 
 /**
  * A supply row's stored listings (`supply.offers`), cheapest first; null when the row stores none
@@ -89,10 +102,62 @@ export function supplyOffers(row: { offers: unknown }): SupplyOffer[] | null {
         category: text(e.category),
         shipping,
         shippingPayerId: text(e.shippingPayerId),
+        // The identity shop's fields, only on its entries; a count of unknown shape reads as unknown.
+        ...(OWN.has(e.own as string) && {
+          own: e.own as 'own' | 'outside',
+          stock: amount(e.stock),
+          count: amount(e.count),
+          condition: text(e.condition),
+        }),
       },
     ];
   });
 }
+
+/**
+ * Whether a row's stored entries are the identity shop's (S36 A6, B2): its own copy and outside
+ * seller, kept for the item's facts, are not a game's stored search listings (S36 A2, A4). They are
+ * told apart by `own`, which only the shop's entries carry; the SDK stores no empty list of them
+ * (`offers` null instead), so an empty list is always a search where nothing passed.
+ */
+export function isShopOffers(offers: unknown): boolean {
+  return (
+    Array.isArray(offers) &&
+    offers.some(
+      (o) => !!o && typeof o === 'object' && OWN.has((o as { own?: unknown }).own as string),
+    )
+  );
+}
+
+/**
+ * A row's stored search listings (S36 A2): what every reader of "a game's listings" uses (the buy
+ * page's list, "not the item" marks, the labeled check, the counts after a game's rules). Null when
+ * the row stores none, or only the shop's entries (`isShopOffers`).
+ */
+export function searchOffers(row: { offers: unknown }): SupplyOffer[] | null {
+  return isShopOffers(row.offers) ? null : supplyOffers(row);
+}
+
+/**
+ * The rows of what is for sale now that store search listings (`searchOffers`) in a condition: the
+ * buy page's list of a game's listings. "Any condition" is a null bucket here and an empty one in a
+ * supply row.
+ */
+export function searchListingRows<T extends { bucket: string; offers: unknown }>(
+  rows: readonly T[],
+  bucket: string | null,
+): T[] {
+  return rows.filter((r) => (r.bucket || null) === (bucket || null) && searchOffers(r) !== null);
+}
+
+/**
+ * `searchOffers` in SQL: the row stores search listings (none of its entries carries `own`). A
+ * value that is not an array reads as none, as in `supplyOffers`, instead of failing the query
+ * (SQLite does not short-circuit AND, hence the CASE).
+ */
+const storesSearchOffers = sql<number>`(case when json_valid(${supply.offers}) and json_type(${supply.offers}) = 'array' then not exists (
+  select 1 from json_each(${supply.offers}) where case when type = 'object'
+    then json_extract(value, '$.own') end in ('own', 'outside')) else 0 end)`;
 
 /** Saves a collect's report; a second collect the same day replaces that day's rows. */
 export async function saveSupply(db: Db, rows: SupplyRow[]): Promise<void> {
@@ -164,14 +229,16 @@ export async function notItemRefs(
  * marked listing no longer counts anywhere): only a row with stored listings (`offers`, game items)
  * can change. Its ask is the cheapest listing left (none left: no ask, unknown stays unknown), its
  * link that listing's, its count lowered by the marked ones it stored (more may have been counted
- * than stored: the count stays above zero then, with no ask); the marked ones go to `markedOffers`. A row with nothing marked is returned as it is (cards and sealed: always).
+ * than stored: the count stays above zero then, with no ask); the marked ones go to `markedOffers`.
+ * A row with nothing marked is returned as it is (cards and sealed, and the shop's entries
+ * (`searchOffers` null): always).
  */
 export function withoutNotItem<T extends Supply>(
   row: T,
   marked: ReadonlySet<string> | undefined,
 ): T & { markedOffers?: SupplyOffer[] } {
-  if (!marked?.size || !Array.isArray(row.offers)) return row;
-  const offers = supplyOffers(row) ?? [];
+  const offers = searchOffers(row);
+  if (!marked?.size || !offers) return row;
   const gone = offers.filter((o) => marked.has(o.ref));
   if (!gone.length) return row;
   const left = offers.filter((o) => !marked.has(o.ref));
@@ -215,8 +282,9 @@ export async function currentSupply(
     if ((lastDay.get(key) ?? '') < r.day) lastDay.set(key, r.day);
   }
   const latest = rows.filter((r) => lastDay.get(`${r.productId}|${r.source}`) === r.day);
-  // Only a game's rows store listings (S36 A2): a page of cards and sealed items reads no mark.
-  const withOffers = latest.filter((r) => Array.isArray(r.offers)).map((r) => r.productId);
+  // Only a game's rows store search listings (S36 A2): a page of cards and sealed items, or of the
+  // shop's entries alone, reads no mark.
+  const withOffers = latest.filter((r) => searchOffers(r) !== null).map((r) => r.productId);
   const marks = withOffers.length ? await notItemRefs(db, withOffers) : new Map();
   for (const r of latest) {
     const list = out.get(r.productId) ?? [];
@@ -268,8 +336,9 @@ export async function listingHistory(
       bucket: supply.bucket,
       day: supply.day,
       listings: supply.listings,
-      // A game's count after its rules (S36 A4): never compared with a count from before them.
-      filtered: sql<number>`${supply.offers} is not null`,
+      // A game's count after its rules (S36 A4): never compared with a count from before them. A
+      // row of the shop's entries alone (S36 A6) is counted as before them.
+      filtered: storesSearchOffers,
     })
     .from(supply)
     .where(

@@ -20,10 +20,11 @@ import type {
   RankedEntry,
   RankingInfo,
   RecentSale,
+  SourceFactsInput,
   SourceQuery,
 } from '@tora/db';
 
-export type { ConsoleInput } from '@tora/db';
+export type { ConsoleInput, SourceFactsInput } from '@tora/db';
 import type { PoliteHttp, PoliteHttpOptions } from './http';
 import type { Email } from './mbox';
 
@@ -126,6 +127,12 @@ export interface CollectResult {
   supply?: SupplyInput[];
   /** A game's found listings with the rules on (`FoundSearch`); left out otherwise. */
   found?: FoundSearch;
+  /**
+   * What the pages read show about the item beside its prices (S36 A5); a field not shown is null.
+   * The SDK stores them (`product_sources.facts`) and fills the item's empty release date for a game
+   * item only (`isGameItem`); for any other item they are dropped.
+   */
+  facts?: SourceFactsInput;
 }
 
 /** One condition's listings on a source today, in the source's own currency. */
@@ -141,6 +148,12 @@ export interface SupplyInput {
   /** The cheapest listing, or the page listing them. */
   url?: string | null;
   raw?: unknown;
+  /**
+   * The row's listings, cheapest first (S36 A6, B2: the identity shop's own copy and its outside
+   * seller as separate entries). Stored (`supply.offers`) for a game item only (`isGameItem`); for
+   * any other item the SDK drops them and stores the row as before.
+   */
+  offers?: FoundListing[];
 }
 
 /**
@@ -191,6 +204,14 @@ export interface FoundListing {
    * means "the seller pays" is not known yet, so it is kept as given and never read as either.
    */
   shippingPayerId: string | null;
+  /** The identity shop's entries only (`SupplyOffer.own`, S36 A6): its own copy or an outside seller. */
+  own?: 'own' | 'outside';
+  /** The shop's own copy: how many it has, when shown; null: not shown. */
+  stock?: number | null;
+  /** An outside seller's entry: how many copies its site lists, when shown; null: not shown. */
+  count?: number | null;
+  /** An outside seller's entry: the condition the page states; null: not shown. */
+  condition?: string | null;
 }
 
 /** A price source (requirements section 7). Implementations live in collectors packages. */

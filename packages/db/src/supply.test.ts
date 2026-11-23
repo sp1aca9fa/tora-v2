@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,14 +6,18 @@ import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, deleteUnusedProduct, mergeProducts } from './mutations';
-import { type Supply, supply as supplyTable } from './schema';
+import { type Supply, notItemMarks, supply as supplyTable } from './schema';
 import { chooseAsk } from './ask-check';
 import {
   type SupplyRow,
   currentSupply,
+  isShopOffers,
+  listingHistory,
   listingsIn,
   lowestAsk,
   saveSupply,
+  searchListingRows,
+  searchOffers,
   supplyOffers,
   withoutNotItem,
 } from './supply';
@@ -224,4 +229,64 @@ it('reads a row without its listings marked "not the item"', () => {
   ]);
   expect(all.markedOffers?.map((o) => o.ref)).toEqual(['A', 'B']);
   expect(all.offers).toEqual([]);
+});
+
+it("keeps the identity shop's entries out of a game's search listings (S36 A6)", async () => {
+  const g = await card('Hero Quest');
+  const entry = (ref: string, own?: 'own' | 'outside') => ({
+    ref,
+    title: 'Hero Quest',
+    url: null,
+    priceBase: 1000,
+    priceOriginal: 1000,
+    currency: 'JPY',
+    seller: null,
+    category: null,
+    shipping: 'unknown' as const,
+    shippingPayerId: null,
+    ...(own && { own, stock: null, count: null, condition: null }),
+  });
+  const shop = [entry('S|outside|used', 'outside'), entry('S|own|used', 'own')];
+  expect([
+    isShopOffers(shop),
+    isShopOffers([entry('m1')]),
+    isShopOffers([]),
+    isShopOffers(null),
+  ]).toEqual([true, false, false, false]);
+  expect(searchOffers({ offers: shop })).toBeNull();
+  expect(supplyOffers({ offers: shop })).toHaveLength(2);
+  expect(searchOffers({ offers: [] })).toEqual([]);
+  // A shop row in tonight's report, beside a search's row on another source; both marked.
+  await saveSupply(db, [
+    { ...row(g.id, '2026-10-11', 1000), source: 'shop', offers: shop, listings: 38 },
+    { ...row(g.id, '2026-10-11', 1000), offers: [entry('m1')] },
+    { ...row(g.id, '2026-10-10', 1000), source: 'shop', listings: 40 },
+    { ...row(g.id, '2026-10-10', 1000), offers: [entry('m1')] },
+  ]);
+  await db.insert(notItemMarks).values([
+    { productId: g.id, source: 'shop', externalRef: 'S|outside|used', userId: null, at: 'x' },
+    { productId: g.id, source: 'snkrdunk', externalRef: 'm1', userId: null, at: 'x' },
+  ]);
+  const now = (await currentSupply(db, [g.id], new Date('2026-10-11T03:00:00Z'))).get(g.id)!;
+  const shopRow = now.find((r) => r.source === 'shop')!;
+  // The shop's row: its ask and count as stored, no mark taken off; the buy page lists only the search.
+  expect([shopRow.lowestAskBase, shopRow.listings, shopRow.markedOffers]).toEqual([
+    1000,
+    38,
+    undefined,
+  ]);
+  expect(searchListingRows(now, 'raw:A').map((r) => r.source)).toEqual(['snkrdunk']);
+  expect(searchListingRows(now, null)).toEqual([]);
+  // Its history counts as before a game's rules; the search's as after them.
+  const history = await listingHistory(db, [g.id], '2026-10-01', '2026-10-31');
+  expect(history.get(`${g.id}|shop|raw:A`)?.map((h) => h.filtered)).toEqual([false, false]);
+  expect(history.get(`${g.id}|snkrdunk|raw:A`)?.map((h) => h.filtered)).toEqual([true, true]);
+  // A stored value that is not a list of entries reads as no listings and never fails the query.
+  await db.run(sql`update supply set offers = '{"own":"own"}' where day = '2026-10-10'`);
+  await db.run(
+    sql`update supply set offers = '["abc"]' where day = '2026-10-11' and source = 'shop'`,
+  );
+  const odd = await listingHistory(db, [g.id], '2026-10-01', '2026-10-31');
+  expect(odd.get(`${g.id}|shop|raw:A`)?.map((h) => h.filtered)).toEqual([false, true]);
+  expect(odd.get(`${g.id}|snkrdunk|raw:A`)?.map((h) => h.filtered)).toEqual([false, true]);
 });

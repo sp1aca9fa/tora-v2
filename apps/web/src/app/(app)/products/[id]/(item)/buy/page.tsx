@@ -7,6 +7,7 @@ import {
   notItemMarksOf,
   priceHistory,
   ruleTestFor,
+  searchListingRows,
 } from '@tora/db';
 import { judge, productClass, strategyOf } from '@tora/core';
 import { Plus } from 'lucide-react';
@@ -69,13 +70,11 @@ export default async function BuyPage({ params, searchParams }: Props) {
     forSale.filter((r) => checks.status(r) === 'unverified').map((r) => r.source),
   );
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
-  // A game's stored listings in this condition (S36 A2; cards and sealed store none). A person with
+  // A game's stored search listings in this condition (S36 A2; cards and sealed store none, and the
+  // identity shop's own copy and outside seller, S36 A6, are not among them). A person with
   // a wish on the item or an admin may mark one "not the item" (checked again in the action); a mark
   // is taken back by its maker or an admin.
-  // "Any condition" is a null bucket here and an empty one in a supply row.
-  const listed = forSale.filter(
-    (r) => (r.bucket || null) === (bucket || null) && Array.isArray(r.offers),
-  );
+  const listed = searchListingRows(forSale, bucket);
   const canMark = listed.length > 0 && (user.role === 'admin' || watches.length > 0);
   const marks = listed.some((r) => r.markedOffers?.length)
     ? await notItemMarksOf(db, product.id)

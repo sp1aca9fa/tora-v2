@@ -171,6 +171,22 @@ it('saves listings now and 14 days ago from the price source and condition only 
     return p.id;
   };
   const [filteredNow, filteredBoth] = [await named('Filtered now'), await named('Filtered both')];
+  const shopNow = await named('Shop entries now');
+  // The identity shop's own copy (S36 A6): stored for the item, not a search's listings.
+  const shopEntry = {
+    ref: 'X|own|used',
+    title: 'Shop entries now',
+    url: null,
+    priceBase: 9000,
+    priceOriginal: 9000,
+    currency: 'JPY',
+    seller: null,
+    category: null,
+    shipping: 'unknown' as const,
+    shippingPayerId: null,
+    own: 'own' as const,
+    stock: null,
+  };
   const [full, near, far, stale, noCount, otherOnly, oldNear, oldFar, gone, notCounted] = [
     await named('Full'),
     await named('Near'),
@@ -214,6 +230,9 @@ it('saves listings now and 14 days ago from the price source and condition only 
     report(filteredNow!, 14, 10),
     { ...report(filteredBoth!, 0, 6), offers: [] },
     { ...report(filteredBoth!, 14, 10), offers: [] },
+    // The shop's entries are no count after a game's rules: compared as before them.
+    { ...report(shopNow!, 0, 6), offers: [shopEntry] },
+    report(shopNow!, 14, 10),
   ]);
   const saved = await refreshOpportunities(db, NOW);
   const of = (id: string) => saved.items.find((o) => o.productId === id)!;
@@ -238,6 +257,7 @@ it('saves listings now and 14 days ago from the price source and condition only 
   expect(of(filteredNow!).listings).toEqual({ now: 6, before: null });
   expect(dealWayStates(of(filteredNow!)).listings_drying).toBeNull();
   expect(of(filteredBoth!).listings).toEqual({ now: 6, before: 10 });
+  expect(of(shopNow!).listings).toEqual({ now: 6, before: 10 });
   // The MCP passes `numbers` on whole: the counts stay out of it.
   expect(of(full!).numbers).not.toHaveProperty('listings');
 });

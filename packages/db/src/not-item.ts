@@ -11,7 +11,7 @@ import type { Db } from './client';
 import { getItemRules } from './item-rules';
 import { DomainError } from './mutations';
 import { type User, notItemMarks, products, supply, watches } from './schema';
-import { SUPPLY_FRESH_DAYS, supplyOffers } from './supply';
+import { SUPPLY_FRESH_DAYS, searchOffers } from './supply';
 
 /** One stored listing of an item at a source. */
 export interface NotItemTarget {
@@ -62,7 +62,7 @@ async function assertGame(db: Pick<Db, 'select'>, productId: string) {
 }
 
 /**
- * Whether the listing is among the item's stored listings at the source shown now (the reports of
+ * Whether the listing is among the item's stored search listings at the source shown now (the reports of
  * the last `SUPPLY_FRESH_DAYS`): only a listing a person can see is marked, never a guessed ref.
  */
 async function isShownListing(db: Pick<Db, 'select'>, t: NotItemTarget, now: Date) {
@@ -78,7 +78,8 @@ async function isShownListing(db: Pick<Db, 'select'>, t: NotItemTarget, now: Dat
         isNotNull(supply.offers),
       ),
     );
-  return rows.some((r) => supplyOffers(r)?.some((o) => o.ref === t.ref));
+  // The shop's own copy and outside seller (S36 A6) are not search listings: never marked.
+  return rows.some((r) => searchOffers(r)?.some((o) => o.ref === t.ref));
 }
 
 /**

@@ -319,6 +319,24 @@ describe('sample', () => {
       ['N7', 1507, '2026-11-07'],
     ]);
   });
+
+  it("listings: the identity shop's own copy and outside seller are never sampled (S36 A6)", async () => {
+    const g = await game('Hero Quest');
+    for (let d = 1; d <= 7; d++) {
+      await night(g.id, `2026-11-0${d}`, [offer('L1', 900)]);
+      await night(
+        g.id,
+        `2026-11-0${d}`,
+        [
+          offer('S|outside|used', 700, { own: 'outside', count: 3, condition: 'used' }),
+          offer('S|own|used', 800, { own: 'own', stock: null }),
+        ],
+        'auction',
+      );
+    }
+    const file = await buildSample(db, 'listings', [{ id: g.id, name: 'Hero Quest' }], opts(NOW));
+    expect(file.items[0]!.checks.map((b) => b.source)).toEqual(['flea']);
+  });
 });
 
 describe('record', () => {
@@ -1059,6 +1077,27 @@ describe('"not the item" marks by a person', () => {
       ['X1', member],
       ['X2', admin],
     ]);
+  });
+
+  it("refuses a mark on the identity shop's entries (S36 A6); the row's ask stays", async () => {
+    const g = await game('Hero Quest');
+    const today = new Date().toISOString().slice(0, 10);
+    await night(
+      g.id,
+      today,
+      [
+        offer('S|outside|used', 700, { own: 'outside', count: 3, condition: 'used' }),
+        offer('S|own|used', 800, { own: 'own', stock: null }),
+      ],
+      'auction',
+    );
+    for (const ref of ['S|outside|used', 'S|own|used'])
+      await expect(
+        markNotItem(db, who(admin, 'admin'), { productId: g.id, source: 'auction', ref }),
+      ).rejects.toMatchObject({ code: 'not_found' });
+    expect(await db.select().from(schema.notItemMarks)).toEqual([]);
+    const [row] = (await currentSupply(db, [g.id])).get(g.id)!;
+    expect([row!.lowestAskBase, row!.listings, row!.markedOffers]).toEqual([700, 2, undefined]);
   });
 
   it('a mark is scoped to (item, source, ref), and only its maker or an admin undoes it', async () => {
