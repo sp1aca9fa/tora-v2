@@ -2243,6 +2243,13 @@
     "listingsN": "{n} listed",
     "favoritesN": "{n} favorites"
   },
+  "askCheck": {
+    "also": "also <k>{amount} unverified</k> at {source}",
+    "about": "Found by a search not yet checked for this game: it may be another item. Not used for targets, alerts or deals.",
+    "noChecked": "No checked price yet",
+    "listings": "{count, plural, one {# listing} other {# listings}}, unverified",
+    "unverified": "unverified"
+  },
   "forSale": {
     "title": "For sale now",
     "info": "Lowest asking price per condition, read with the nightly collect ({date}). Asking prices, not sales.",

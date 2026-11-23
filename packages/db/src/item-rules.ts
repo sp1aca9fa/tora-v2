@@ -17,7 +17,7 @@ import {
   effectiveRules,
   toLocalIso,
 } from '@tora/core';
-import { and, asc, eq, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { listConsoles } from './consoles';
 import { DomainError } from './mutations';
@@ -29,7 +29,11 @@ export async function getItemRules(
   productId: string,
 ): Promise<ItemRulesRow | null> {
   const [row] = await db.select().from(itemRules).where(eq(itemRules.productId, productId));
-  if (!row) return null;
+  return row ? toRulesRow(row) : null;
+}
+
+/** A stored rules row as the rules read it. */
+function toRulesRow(row: typeof itemRules.$inferSelect): ItemRulesRow {
   return {
     console: row.console,
     edition: row.edition,
@@ -201,24 +205,75 @@ export async function confirmations(
 ): Promise<Confirmations | null> {
   const current = await currentRules(db, productId);
   if (!current) return null;
-  const checks = new Map<string, ItemCheck[]>();
-  for (const row of await db
+  const rows = await db
     .select()
     .from(itemChecks)
     .where(eq(itemChecks.productId, productId))
-    .orderBy(asc(itemChecks.at), asc(sql`rowid`))) {
+    .orderBy(asc(itemChecks.at), asc(sql`rowid`));
+  return confirmationsOf(current.rules, rows);
+}
+
+/** What `rows` (one item's checks, oldest first) confirm under `rules`. */
+function confirmationsOf(rules: EffectiveRules, rows: readonly ItemCheck[]): Confirmations {
+  const checks = new Map<string, ItemCheck[]>();
+  for (const row of rows) {
     const key = keyOf(row.kind, row.source);
     checks.set(key, [...(checks.get(key) ?? []), row]);
   }
+  const hashFor = (kind: ItemCheckKind, source: string) => checkHash(rules, kind, source);
   return {
-    hashFor: current.hashFor,
+    hashFor,
     checks,
     // Sales never confirm listings: each (kind, source) stands alone, under its own hash.
     isConfirmed: (kind, source) => {
       const s = kind === 'sales' ? '' : source;
-      return confirmedBy(checks.get(keyOf(kind, s)) ?? [], current.hashFor(kind, s));
+      return confirmedBy(checks.get(keyOf(kind, s)) ?? [], hashFor(kind, s));
     },
   };
+}
+
+/** How many item ids go in one `IN (...)` list (SQLite's limit on bound values). */
+const IDS_PER_READ = 500;
+
+/**
+ * Many items' own rules rows and confirmations at once (S19: a page or a job reads them in a few
+ * batched reads, never one per row): their rules rows, the console table and their checks. The
+ * caller passes the items it already read (their platform and region decide the rules), so no item
+ * is read again. `rules` is the item's own row (null: by its kind and platform).
+ */
+export async function confirmationsMany(
+  db: Pick<Db, 'select'>,
+  // Required, null when the item has none: a projection without them would hash other rules.
+  items: readonly { id: string; platform: string | null; region: string | null }[],
+): Promise<Map<string, { rules: ItemRulesRow | null; confirmations: Confirmations }>> {
+  const out = new Map<string, { rules: ItemRulesRow | null; confirmations: Confirmations }>();
+  const byId = new Map(items.map((p) => [p.id, p]));
+  const ids = [...byId.keys()];
+  if (!ids.length) return out;
+  const own = new Map<string, ItemRulesRow>();
+  const checks = new Map<string, ItemCheck[]>();
+  for (let i = 0; i < ids.length; i += IDS_PER_READ) {
+    const part = ids.slice(i, i + IDS_PER_READ);
+    const [rules, rows] = await Promise.all([
+      db.select().from(itemRules).where(inArray(itemRules.productId, part)),
+      db
+        .select()
+        .from(itemChecks)
+        .where(inArray(itemChecks.productId, part))
+        .orderBy(asc(itemChecks.at), asc(sql`rowid`)),
+    ]);
+    for (const r of rules) own.set(r.productId, toRulesRow(r));
+    for (const r of rows) checks.set(r.productId, [...(checks.get(r.productId) ?? []), r]);
+  }
+  const consoles = await listConsoles(db);
+  for (const [id, item] of byId) {
+    const rules = own.get(id) ?? null;
+    out.set(id, {
+      rules,
+      confirmations: confirmationsOf(effectiveRules(item, rules, consoles), checks.get(id) ?? []),
+    });
+  }
+  return out;
 }
 
 export interface ItemCheckInput {

@@ -40,6 +40,7 @@ import {
   alertChannels,
   alertLog,
   collectorRuns,
+  productSources,
   signals,
   supply,
   users,
@@ -435,6 +436,174 @@ it("keeps a watch's alert memory until a channel took the alert; asks under half
   expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 1, alerts: 1 });
   expect(sent.map((s) => s.text)).toEqual(['-# buy\nBox\nask ¥9,000 SNKRDUNK under ¥9,000']);
   expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
+});
+
+it("sends no target alert on a game's unverified ask, and keeps a page-linked shop's (S36 A2)", async () => {
+  await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
+  const day = '2026-11-01';
+  const now = new Date(`${day}T12:00:00Z`);
+  // Made-up games: one found only by a saved search, one also on a shop's own page.
+  const watched = async (name: string) => {
+    const product = await createProduct(db, member, {
+      category: 'game',
+      kind: 'software',
+      name,
+      platform: 'Alpha Station',
+    });
+    const { watch } = await addWatch(
+      db,
+      member,
+      { productId: product.id },
+      { targetPriceBase: 9000 },
+    );
+    await db.insert(productSources).values({
+      productId: product.id,
+      source: 'mercari',
+      externalId: 'search',
+      query: { keywords: [name] },
+    });
+    await db.insert(supply).values({
+      productId: product.id,
+      source: 'mercari',
+      bucket: watch.bucket,
+      day,
+      lowestAskBase: 5_000,
+      fetchedAt: `${day}T03:00:00`,
+    });
+    return { product, watch };
+  };
+  await watched('Search Game');
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
+  // Out of the target (its asks are all unverified), remembered as a game's state.
+  expect((await db.select().from(watches))[0]!.alertState).toEqual({
+    target: { on: false, checked: true },
+  });
+
+  const withShop = await watched('Shop Game');
+  await db.insert(productSources).values({
+    productId: withShop.product.id,
+    source: 'snkrdunk',
+    externalId: 'item-1',
+    url: 'https://example.test/item-1',
+  });
+  await db.insert(supply).values({
+    productId: withShop.product.id,
+    source: 'snkrdunk',
+    bucket: withShop.watch.bucket,
+    day,
+    lowestAskBase: 8_000,
+    fetchedAt: `${day}T03:00:00`,
+  });
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 1, alerts: 1 });
+  // The checked ask, not the cheaper unverified one beside it.
+  expect(sent.map((s) => s.text)).toEqual(['-# buy\nShop Game\nask ¥8,000 SNKRDUNK under ¥9,000']);
+});
+
+it("forgets a game's target state from before unverified asks stopped counting; cards and sealed keep theirs (S36 A2)", async () => {
+  await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
+  // Made-up items, each found by a saved search at the same marketplace, target 9,000.
+  const items = {
+    Card: { category: 'tcg', kind: 'single', name: 'Card', franchise: 'pokemon', region: 'jp' },
+    Box: { category: 'tcg', kind: 'booster_box', name: 'Box', franchise: 'pokemon', region: 'jp' },
+    Game: { category: 'game', kind: 'software', name: 'Game', platform: 'Alpha Station' },
+    Flagged: { category: 'game', kind: 'software', name: 'Flagged', platform: 'Alpha Station' },
+  };
+  // Sent on 10-20 and still on: before this change for the plain ones, after it for "Flagged".
+  const before = { target: { on: true, sent: '2026-10-20' } };
+  const flagged = { target: { ...before.target, checked: true } };
+  const ids: Record<string, { productId: string; bucket: string; watchId: string }> = {};
+  for (const [name, item] of Object.entries(items)) {
+    const product = await createProduct(db, member, item);
+    const { watch } = await addWatch(
+      db,
+      member,
+      { productId: product.id },
+      { targetPriceBase: 9000 },
+    );
+    await db
+      .update(watches)
+      .set({
+        alertState: name === 'Flagged' ? flagged : before,
+      })
+      .where(eq(watches.id, watch.id));
+    await db.insert(productSources).values({
+      productId: product.id,
+      source: 'mercari',
+      externalId: 'search',
+      query: { keywords: [name] },
+    });
+    ids[name] = { productId: product.id, bucket: watch.bucket, watchId: watch.id };
+  }
+  const asks = async (day: string, price: number, source = 'mercari') =>
+    db.insert(supply).values(
+      Object.values(ids).map((i) => ({
+        productId: i.productId,
+        source,
+        bucket: i.bucket,
+        day,
+        lowestAskBase: price,
+        fetchedAt: `${day}T03:00:00`,
+      })),
+    );
+  const states = async () =>
+    Object.fromEntries(
+      await Promise.all(
+        Object.entries(ids).map(async ([name, i]) => [
+          name,
+          (await db.select().from(watches).where(eq(watches.id, i.watchId)))[0]!.alertState,
+        ]),
+      ),
+    );
+
+  // Day 1: every ask is the marketplace's, under the target. Cards and sealed stay on (no alert,
+  // the state untouched); the games' asks are unverified, so they are out of the target, and the
+  // plain game's old state is read as none.
+  await asks('2026-11-01', 5_000);
+  expect(await sendWatchAlerts(db, ctx, new Date('2026-11-01T12:00:00Z'))).toEqual({
+    sent: 0,
+    alerts: 0,
+  });
+  expect(await states()).toEqual({
+    Card: before,
+    Box: before,
+    Game: { target: { on: false, checked: true } },
+    Flagged: { target: { on: false, offSince: '2026-11-01', sent: '2026-10-20', checked: true } },
+  });
+
+  // Day 2: a shop's own page shows the games under the target. The plain game alerts at once (its
+  // old state neither blocks nor quiets it); "Flagged" is still in its 14 days. Cards and sealed:
+  // an ask over the target turns them off, with no new field.
+  for (const name of ['Game', 'Flagged']) {
+    await db.insert(productSources).values({
+      productId: ids[name]!.productId,
+      source: 'snkrdunk',
+      externalId: `item-${name}`,
+      url: 'https://example.test/item',
+    });
+  }
+  await asks('2026-11-02', 9_500);
+  await db.insert(supply).values(
+    ['Game', 'Flagged'].map((name) => ({
+      productId: ids[name]!.productId,
+      source: 'snkrdunk',
+      bucket: ids[name]!.bucket,
+      day: '2026-11-02',
+      lowestAskBase: 8_000,
+      fetchedAt: '2026-11-02T03:00:00',
+    })),
+  );
+  expect(await sendWatchAlerts(db, ctx, new Date('2026-11-02T12:00:00Z'))).toEqual({
+    sent: 1,
+    alerts: 1,
+  });
+  expect(sent.map((s) => s.text)).toEqual(['-# buy\nGame\nask ¥8,000 SNKRDUNK under ¥9,000']);
+  const off = { target: { on: false, offSince: '2026-11-02', sent: '2026-10-20' } };
+  expect(await states()).toEqual({
+    Card: off,
+    Box: off,
+    Game: { target: { on: true, sent: '2026-11-02', checked: true } },
+    Flagged: { target: { on: true, sent: '2026-10-20', checked: true } },
+  });
 });
 
 it('keeps a mentioned Discord message within 2000 characters', async () => {

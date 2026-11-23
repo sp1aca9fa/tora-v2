@@ -8,6 +8,7 @@ import { type ConditionDefaults, ConditionFields } from '@/components/condition-
 import { FormError } from '@/components/form-error';
 import { useMoney } from '@/components/money-context';
 import { Button } from '@/components/ui/button';
+import { UnverifiedNote } from '@/components/unverified-note';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { submitWith } from '@/lib/submit-form';
@@ -24,6 +25,11 @@ export interface WatchRow {
   defaults: ConditionDefaults;
   /** The lowest ask in this condition today (S9 part 2), across sources. */
   ask: { price: number; source: string; url: string | null; listings: number | null } | null;
+  /**
+   * A game's cheaper ask from a search not yet checked for it (S36 A2): a muted note, never the
+   * lowest ask. Absent for cards and sealed.
+   */
+  unverified?: { price: number; source: string };
 }
 
 function WatchForm({
@@ -114,7 +120,8 @@ export function WatchCard({
                   key={w.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 text-sm"
                 >
-                  <div className="min-w-0 flex-1">
+                  {/* At least 12rem for the text: on a phone both buttons go below it, together. */}
+                  <div className="min-w-0 flex-[1_1_12rem]">
                     <p className="font-medium">{w.label ?? t('watchlist.anyCondition')}</p>
                     <p className="text-xs break-words text-muted-foreground tabular-nums">
                       {[
@@ -149,21 +156,31 @@ export function WatchCard({
                         </a>
                       </p>
                     )}
+                    {w.unverified && (
+                      <p className="text-xs">
+                        <UnverifiedNote
+                          amount={money(w.unverified.price)}
+                          source={w.unverified.source}
+                        />
+                      </p>
+                    )}
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(w.id)}>
-                    {t('watchlist.edit')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={pending}
-                    onClick={() => {
-                      if (!window.confirm(t('watchlist.removeConfirm'))) return;
-                      startTransition(() => removeWatchAction(w.id));
-                    }}
-                  >
-                    {t('watchlist.remove')}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditing(w.id)}>
+                      {t('watchlist.edit')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => {
+                        if (!window.confirm(t('watchlist.removeConfirm'))) return;
+                        startTransition(() => removeWatchAction(w.id));
+                      }}
+                    >
+                      {t('watchlist.remove')}
+                    </Button>
+                  </div>
                 </li>
               ),
             )}

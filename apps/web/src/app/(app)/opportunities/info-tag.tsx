@@ -11,12 +11,15 @@ export function InfoTag({
   label,
   className,
   icon: Icon,
+  align = 'start',
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
   className?: string;
   /** Drawn before the label (a warning's triangle). */
   icon?: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  /** Which edge of the tag the details line up with (`end` for a tag near the right edge). */
+  align?: 'start' | 'end';
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -51,7 +54,10 @@ export function InfoTag({
       {open && (
         <span
           role="tooltip"
-          className="absolute top-full left-0 z-20 mt-1 block w-64 max-w-[80vw] space-y-1 rounded-md border bg-card p-2 text-xs font-normal text-card-foreground shadow-md"
+          className={cn(
+            'absolute top-full z-20 mt-1 block w-64 max-w-[80vw] space-y-1 rounded-md border bg-card p-2 text-left text-xs font-normal text-card-foreground shadow-md',
+            align === 'end' ? 'right-0' : 'left-0',
+          )}
         >
           {children}
         </span>

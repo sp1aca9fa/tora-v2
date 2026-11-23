@@ -1,5 +1,5 @@
 import type { Supply } from '@tora/db';
-import { listingsIn, lowestAsk } from '@tora/db';
+import { chooseAsk, listingsIn } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getMoney } from '@/lib/money-server';
@@ -17,11 +17,18 @@ export async function ForSale({
   rows,
   mainBucket,
   zoneTop = null,
+  unverified = new Set(),
 }: {
   rows: Supply[];
   mainBucket: string | null;
   /** The buy zone's top in the main condition. */
   zoneTop?: number | null;
+  /**
+   * Sources whose asks are a game's from a search not yet checked for it (S36 A2): listed after the
+   * checked ones, muted and labeled, never the headline price, its listing count or compared with
+   * the zone. Empty for cards and sealed.
+   */
+  unverified?: ReadonlySet<string>;
 }) {
   const [t, tAll, format, money, sourceLabel] = await Promise.all([
     getTranslations('forSale'),
@@ -33,6 +40,12 @@ export async function ForSale({
   const buckets = [...new Set(rows.map((r) => r.bucket))].sort(
     (a, b) => Number(b === mainBucket) - Number(a === mainBucket) || a.localeCompare(b),
   );
+  // A row of an unverified source is unverified with or without a price: its listings never count
+  // beside the checked headline.
+  const isUnverified = (r: Supply) => unverified.has(r.source);
+  const checked = rows.filter((r) => !isUnverified(r));
+  // One explanation per card, with the first condition's unverified rows.
+  const explainIn = buckets.find((b) => rows.some((r) => r.bucket === b && isUnverified(r)));
   const day = rows
     .map((r) => r.day)
     .sort()
@@ -53,10 +66,13 @@ export async function ForSale({
         <CardContent>
           <ul className="divide-y rounded-md border">
             {buckets.map((bucket) => {
-              const best = lowestAsk(rows, bucket);
-              const count = listingsIn(rows, bucket);
-              const more = rows.some((r) => r.bucket === bucket && (r.raw as Raw)?.more);
-              const sources = rows.filter((r) => r.bucket === bucket);
+              const { ask: best } = chooseAsk(rows, bucket, (r) =>
+                isUnverified(r) ? 'unverified' : 'checked',
+              );
+              const count = listingsIn(checked, bucket);
+              const more = checked.some((r) => r.bucket === bucket && (r.raw as Raw)?.more);
+              const sources = checked.filter((r) => r.bucket === bucket);
+              const others = rows.filter((r) => r.bucket === bucket && isUnverified(r));
               return (
                 <li key={bucket} className="space-y-1 px-3 py-2.5 text-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -82,6 +98,8 @@ export async function ForSale({
                               </span>
                             ))}
                         </span>
+                      ) : others.length ? (
+                        <span className="text-muted-foreground">{tAll('askCheck.noChecked')}</span>
                       ) : (
                         <span className="text-muted-foreground">{t('nothing')}</span>
                       )}
@@ -122,6 +140,49 @@ export async function ForSale({
                       );
                     })}
                   </p>
+                  {others.length > 0 && (
+                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                      {bucket === explainIn && <p>{tAll('askCheck.about')}</p>}
+                      {others.map((r) => {
+                        const raw = r.raw as Raw;
+                        const text = (
+                          <>
+                            {r.lowestAskBase !== null ? (
+                              <>
+                                {sourceLabel(r.source)}{' '}
+                                <span className="tabular-nums">{money(r.lowestAskBase)}</span>
+                                {raw?.lotSize &&
+                                  raw.lotSize > 1 &&
+                                  ` ${t('lot', { count: raw.lotSize })}`}
+                              </>
+                            ) : (
+                              `${sourceLabel(r.source)}: ${t(raw?.lotSuspect ? 'lotOnly' : 'nothingShort')}`
+                            )}
+                            {' · '}
+                            {r.listings
+                              ? tAll('askCheck.listings', { count: r.listings })
+                              : tAll('askCheck.unverified')}
+                          </>
+                        );
+                        return (
+                          <p key={r.id}>
+                            {r.url ? (
+                              <a
+                                href={r.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-2"
+                              >
+                                {text}
+                              </a>
+                            ) : (
+                              text
+                            )}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -52,6 +52,7 @@ import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, latestSignals, pickSeries } from './signals';
+import { askChecks } from './ask-check';
 import { SUPPLY_FRESH_DAYS, currentSupply, listingHistory, listingsIn, lowestAsk } from './supply';
 
 const DAY = 86_400_000;
@@ -202,7 +203,7 @@ export async function refreshOpportunities(
 
   const ids = [...memberOf.keys()];
   const daysAgo = (days: number) => localDate(new Date(now.getTime() - days * DAY));
-  const [supply, buylist, listed] = await Promise.all([
+  const [supply, buylist, listed, checks] = await Promise.all([
     currentSupply(db, ids, now),
     latestBuylist(db, now),
     listingHistory(
@@ -211,6 +212,10 @@ export async function refreshOpportunities(
       // The latest report can be SUPPLY_FRESH_DAYS old, and "before" is measured from it.
       daysAgo(LISTINGS_BACK_DAYS + LISTINGS_GAP_DAYS + SUPPLY_FRESH_DAYS),
       daysAgo(LISTINGS_BACK_DAYS - LISTINGS_GAP_DAYS),
+    ),
+    askChecks(
+      db,
+      all.filter((p) => memberOf.has(p.id)),
     ),
   ]);
   const byId = new Map(all.map((p) => [p.id, p]));
@@ -229,7 +234,8 @@ export async function refreshOpportunities(
       // Like for like: another site's cheapest listing is too often something else (no shrink,
       // one pack), so the ask is the price source's own.
       const own = (supply.get(m.id) ?? []).filter((s) => s.source === m.source);
-      const ask = lowestAsk(own, bucket);
+      // A game's unverified ask is dropped before the under-value test (S36 A2); listing counts stay.
+      const ask = lowestAsk(checks.usable(own), bucket);
       const shop = buylist.get(m.id)?.find((b) => b.bucket === bucket || b.bucket === null);
       items.push({
         productId: m.id,

@@ -42,7 +42,8 @@ import {
   loadSourceRegistry,
   listWatches,
   listingsIn,
-  lowestAsk,
+  askChecks,
+  chooseAsk,
   currentSupply,
   savedBucketValues,
   bucketValueKey,
@@ -1055,12 +1056,16 @@ export async function watchlist(db: Db, userId: string) {
     db,
     rows.map((r) => r.product.id),
   );
-  const [timing, user] = await Promise.all([
+  const [timing, user, checks] = await Promise.all([
     latestSignals(
       db,
       rows.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket || null })),
     ),
     getUserById(db, userId),
+    askChecks(
+      db,
+      rows.map((r) => r.product),
+    ),
   ]);
   return rows.map(({ watch, product }) => {
     const signal = timing.get(`${product.id}|${watch.bucket}`);
@@ -1074,7 +1079,12 @@ export async function watchlist(db: Db, userId: string) {
         ? { ...signal.stats, ask: null }
         : null;
     const asks = (supply.get(product.id) ?? []).filter((s) => !noAi.includes(s.source));
-    const ask = lowestAsk(asks, watch.bucket);
+    // A game's lowest ask is its cheapest checked one, with a cheaper unverified one beside it
+    // (S36 A2: from a search not yet confirmed for the game, it may be another item); other items'
+    // output is as before (every ask usable, no field added).
+    const { ask, unverified } = chooseAsk(asks, watch.bucket, checks.status);
+    const status = ask && checks.status(ask);
+    const usable = checks.usable(asks);
     return {
       watchId: watch.id,
       productId: product.id,
@@ -1101,9 +1111,13 @@ export async function watchlist(db: Db, userId: string) {
             unitBase: ask.lowestAskBase,
             source: ask.source,
             day: ask.day,
-            listings: listingsIn(asks, watch.bucket),
+            listings: listingsIn(usable, watch.bucket),
+            ...(status && status !== 'not_game' && { askStatus: status }),
           }
         : null,
+      ...(unverified && {
+        unverifiedAsk: { unitBase: unverified.lowestAskBase, source: unverified.source },
+      }),
       // Buy timing (S9 part 4): the person's strategy for the item's type, its verdict and zone
       // on the last saved numbers, and the numbers (fractions, not percents).
       buyTiming: stats

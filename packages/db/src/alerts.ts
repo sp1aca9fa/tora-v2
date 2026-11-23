@@ -67,6 +67,7 @@ import {
 import { productsWithBrokenListings, quietSources } from './sources';
 import { getUserById } from './users';
 import { latestSignals } from './signals';
+import { askChecks } from './ask-check';
 import { currentSupply, lowestAsk } from './supply';
 
 export { ALERT_CHANNEL_KINDS, ALERT_LOG_STATUSES } from './schema';
@@ -1457,8 +1458,12 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
   return sent;
 }
 
-/** A watch's alert memory, read back. */
-type WatchAlertState = { zone?: AlertState; target?: AlertState };
+/**
+ * A watch's alert memory, read back. A game's target state carries `checked` (S36 A2): set on every
+ * state written for a game since unverified asks stopped counting, so a state from before (maybe
+ * set by an ask that was another item) is read as none. Other items' states never carry it.
+ */
+type WatchAlertState = { zone?: AlertState; target?: AlertState & { checked?: true } };
 
 /**
  * Watched items' alerts, at once after the nightly collect (S9 part 5): a watch whose verdict
@@ -1482,13 +1487,17 @@ export async function sendWatchAlerts(
     .where(isNull(users.disabledAt));
   if (rows.length === 0) return { sent: 0, alerts: 0 };
   const ids = [...new Set(rows.map((r) => r.product.id))];
-  const [stats, supply] = await Promise.all([
+  const [stats, supply, checks] = await Promise.all([
     latestSignals(
       db,
       rows.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket || null })),
       now,
     ),
     currentSupply(db, ids, now),
+    askChecks(
+      db,
+      rows.map((r) => r.product),
+    ),
   ]);
   const base = await appUrl(db);
   const sourceLabel = new Map(
@@ -1532,21 +1541,33 @@ export async function sendWatchAlerts(
     }
     // Today's asks only: a source that read nothing tonight says nothing. An ask under half the
     // fair value is more likely something else (parts, one pack), as on Opportunities (S27);
-    // without a fair value every ask counts.
+    // without a fair value every ask counts. A game's unverified ask triggers nothing (S36 A2).
     const fair = (signal?.stats as SignalStats | undefined)?.fair ?? null;
-    const ask = lowestAsk(
-      (supply.get(product.id) ?? []).filter(
-        (r) =>
-          r.day === today &&
-          (fair === null || r.lowestAskBase === null || r.lowestAskBase >= fair * ASK_FLOOR),
-      ),
-      watch.bucket,
+    const todays = (supply.get(product.id) ?? []).filter(
+      (r) =>
+        r.day === today &&
+        (fair === null || r.lowestAskBase === null || r.lowestAskBase >= fair * ASK_FLOOR),
     );
-    if (watch.targetPriceBase && ask) {
-      const under = ask.lowestAskBase !== null && ask.lowestAskBase <= watch.targetPriceBase;
+    const ask = lowestAsk(checks.usable(todays), watch.bucket);
+    const game = checks.isGame(product.id);
+    if (game && state.target && !state.target.checked) delete state.target;
+    // A game whose asks today are all unverified is out of its target (not "no news"): an earlier
+    // state stays on otherwise, and a real ask under the target later would send nothing.
+    const onlyUnverified =
+      game &&
+      !ask &&
+      todays.some(
+        (r) =>
+          r.bucket === watch.bucket &&
+          r.lowestAskBase !== null &&
+          checks.status(r) === 'unverified',
+      );
+    if (watch.targetPriceBase && (ask || onlyUnverified)) {
+      const under =
+        ask !== null && ask.lowestAskBase !== null && ask.lowestAskBase <= watch.targetPriceBase;
       const step = stepAlert(state.target, under, today);
-      state.target = step.state;
-      if (step.send) {
+      state.target = game ? { ...step.state, checked: true } : step.state;
+      if (step.send && ask) {
         items.push({
           name,
           target: {

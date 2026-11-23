@@ -33,6 +33,7 @@ import type { SavedOpportunities } from './opportunities';
 import { productLines, releaseDates, similarKey } from './release';
 import { type Product, holdings, products, signals, users, watches } from './schema';
 import { fileSuggestion } from './suggestions';
+import { askChecks } from './ask-check';
 import { currentSupply, lowestAsk } from './supply';
 import { holdingBucket, savedBucketValues } from './valuation';
 
@@ -179,11 +180,15 @@ export async function refreshSignals(
   const today = localDate(now);
   const productIds = [...new Set(pairs.map((p) => p.product.id))];
   const since = toLocalIso(new Date(now.getTime() - SERIES_DAYS * DAY));
-  const [values, series, supply, released] = await Promise.all([
+  const [values, series, supply, released, checks] = await Promise.all([
     savedBucketValues(db, pairs, now),
     dailySeries(db, productIds, since),
     currentSupply(db, productIds, now),
     releaseDates(
+      db,
+      pairs.map((p) => p.product),
+    ),
+    askChecks(
       db,
       pairs.map((p) => p.product),
     ),
@@ -307,9 +312,12 @@ export async function refreshSignals(
     const lowDrop = drop && { ...drop, from: recentPrice(picked?.series ?? [], today) };
     if (pattern) withPattern++;
     // Like for like (as Opportunities): the price source's own ask; another site's cheapest
-    // listing is too often something else (Mercari asks at a third of the sales price).
+    // listing is too often something else (Mercari asks at a third of the sales price). A game's
+    // unverified ask counts as no ask (S36 A2; cards and sealed: every ask, as before).
     const ask = lowestAsk(
-      (supply.get(product.id) ?? []).filter((x) => !picked || x.source === picked.source),
+      checks.usable(
+        (supply.get(product.id) ?? []).filter((x) => !picked || x.source === picked.source),
+      ),
       bucket ?? '',
     );
     rows.push({

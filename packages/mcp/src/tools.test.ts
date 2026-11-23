@@ -1,5 +1,6 @@
 import {
   type Db,
+  addWatch,
   createDb,
   createHolding,
   createProduct,
@@ -12,8 +13,9 @@ import { migrateDb } from '@tora/db/migrate';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { localDate } from '@tora/core';
 import { beforeEach, expect, it } from 'vitest';
-import { dataChecks, portfolioSummary, querySql, sales } from './tools';
+import { dataChecks, portfolioSummary, querySql, sales, watchlist } from './tools';
 
 let db: Db;
 let uid: string;
@@ -110,4 +112,86 @@ it('finds a twin nobody holds, and a listing linked to two items', async () => {
   expect(checks.shared_listings?.items).toEqual([
     expect.objectContaining({ source: 'snkrdunk', listing: '93021' }),
   ]);
+});
+
+it("leaves a game's unverified ask out of its lowest ask, and other items' asks exactly as before (S36 A2)", async () => {
+  const today = localDate(new Date());
+  // Made-up items, each found by a saved search at the same source.
+  const items = [
+    { category: 'tcg', kind: 'single', name: 'Card', franchise: 'pokemon' },
+    { category: 'tcg', kind: 'booster_box', name: 'Box', franchise: 'pokemon' },
+    { category: 'game', kind: 'software', name: 'Game', platform: 'Alpha Station' },
+  ];
+  for (const item of items) {
+    const { product, watch } = await addWatch(db, uid, { product: item }, {});
+    await db.insert(schema.productSources).values({
+      productId: product.id,
+      source: 'market',
+      externalId: 'search',
+      query: { keywords: [item.name] },
+    });
+    await db.insert(schema.supply).values({
+      productId: product.id,
+      source: 'market',
+      bucket: watch.bucket,
+      day: today,
+      lowestAskBase: 1000,
+      listings: 2,
+      fetchedAt: `${today}T03:00:00`,
+    });
+  }
+  const rows = await watchlist(db, uid);
+  const of = (name: string) => rows.find((r) => r.name === name)!.lowestAsk;
+  for (const name of ['Card', 'Box']) {
+    expect(rows.find((r) => r.name === name)).not.toHaveProperty('unverifiedAsk');
+    expect(JSON.stringify(of(name))).toBe(
+      JSON.stringify({ unitBase: 1000, source: 'market', day: today, listings: 2 }),
+    );
+  }
+  // A game found only by the search: no ask to act on, the unverified one beside it.
+  expect(of('Game')).toBeNull();
+  expect(rows.find((r) => r.name === 'Game')).toMatchObject({
+    unverifiedAsk: { unitBase: 1000, source: 'market' },
+  });
+});
+
+it("gives a game's cheapest checked ask as its lowest ask, and a cheaper unverified one beside it", async () => {
+  const today = localDate(new Date());
+  const { product, watch } = await addWatch(
+    db,
+    uid,
+    { product: { category: 'game', kind: 'software', name: 'Game', platform: 'Alpha Station' } },
+    {},
+  );
+  // A made-up marketplace found by a saved search, and a shop linked by the game's own page.
+  await db.insert(schema.productSources).values([
+    { productId: product.id, source: 'market', externalId: 'search', query: { keywords: ['x'] } },
+    { productId: product.id, source: 'shop', externalId: 'item-1', url: 'https://example.test/1' },
+  ]);
+  const row = (source: string, lowestAskBase: number, listings: number) => ({
+    productId: product.id,
+    source,
+    bucket: watch.bucket,
+    day: today,
+    lowestAskBase,
+    listings,
+    fetchedAt: `${today}T03:00:00`,
+  });
+  await db.insert(schema.supply).values([row('market', 800, 5), row('shop', 3000, 1)]);
+  const [entry] = await watchlist(db, uid);
+  expect(entry!.lowestAsk).toEqual({
+    unitBase: 3000,
+    source: 'shop',
+    day: today,
+    listings: 1,
+    askStatus: 'checked',
+  });
+  expect(entry).toMatchObject({ unverifiedAsk: { unitBase: 800, source: 'market' } });
+
+  // Only the unverified one: no lowest ask, the unverified one beside it.
+  await db.delete(schema.supply);
+  await db.insert(schema.supply).values(row('market', 800, 5));
+  const [alone] = await watchlist(db, uid);
+  expect(alone!.lowestAsk).toBeNull();
+  expect(alone).toMatchObject({ unverifiedAsk: { unitBase: 800, source: 'market' } });
 });

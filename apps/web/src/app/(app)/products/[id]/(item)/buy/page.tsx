@@ -1,8 +1,9 @@
 import {
+  askChecks,
+  chooseAsk,
   currentSupply,
   holdingBucket,
   listingsIn,
-  lowestAsk,
   priceHistory,
   ruleTestFor,
 } from '@tora/db';
@@ -49,15 +50,22 @@ export default async function BuyPage({ params, searchParams }: Props) {
   const bucket = asked && conditions.includes(asked) ? asked : mainBucket;
   const cls = productClass(product);
   const choice = strategyOf(user.preferences, cls);
-  const [t, sourceLabel, stats, history, supply, ruleTest] = await Promise.all([
+  const [t, sourceLabel, stats, history, supply, ruleTest, checks] = await Promise.all([
     getTranslations(),
     sourceLabels(),
     loadSignal(id, bucket),
     priceHistory(db, product.id, 365),
     currentSupply(db, [product.id]),
     ruleTestFor(db, product, bucket, choice),
+    askChecks(db, [product]),
   ]);
   const forSale = supply.get(product.id) ?? [];
+  // A game's asks from a search not yet checked for it (S36 A2): shown muted and labeled, used for
+  // nothing (cards and sealed: none).
+  const checked = checks.usable(forSale);
+  const unverified = new Set(
+    forSale.filter((r) => checks.status(r) === 'unverified').map((r) => r.source),
+  );
   const zoneTop = stats ? judge(stats, choice).zone.top : null;
 
   // Wide screens: the verdict and its reasons on one side; the chart, what is for sale and the
@@ -126,14 +134,19 @@ export default async function BuyPage({ params, searchParams }: Props) {
         </div>
         <div className="space-y-5">
           <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-1 min-[1600px]:grid-cols-2 min-[2400px]:grid-cols-1">
-            <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} />
+            <ForSale rows={forSale} mainBucket={bucket} zoneTop={zoneTop} unverified={unverified} />
             <div className="space-y-3">
               <WatchCard
                 productId={product.id}
                 cls={cls}
                 retail={product.retailPriceBase}
                 watches={watches.map((w) => {
-                  const best = lowestAsk(forSale, w.bucket);
+                  // The price to act on; a cheaper unverified one is only mentioned.
+                  const { ask: best, unverified: other } = chooseAsk(
+                    forSale,
+                    w.bucket,
+                    checks.status,
+                  );
                   return {
                     id: w.id,
                     label: lotConditionLabel(w, product, t),
@@ -145,8 +158,14 @@ export default async function BuyPage({ params, searchParams }: Props) {
                       price: best.lowestAskBase!,
                       source: sourceLabel(best.source),
                       url: best.url,
-                      listings: listingsIn(forSale, w.bucket),
+                      listings: listingsIn(checked, w.bucket),
                     },
+                    ...(other && {
+                      unverified: {
+                        price: other.lowestAskBase!,
+                        source: sourceLabel(other.source),
+                      },
+                    }),
                   };
                 })}
               />
