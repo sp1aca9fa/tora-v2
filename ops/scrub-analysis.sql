@@ -20,6 +20,14 @@ delete from stores where source in hidden;
 delete from store_posts where source in hidden;
 delete from tcg_sets where source in hidden;
 delete from collector_runs where source in hidden;
+delete from not_item_marks where source in hidden;
+delete from sale_coverage where source in hidden;
+delete from sale_spans where source in hidden;
+-- A game's checks (S36): a listings check is one source's; a sales check reads every source together,
+-- so its counts and note go. Why an item's rules are held may quote a source's sales.
+delete from item_checks where source in hidden;
+update item_checks set counts = null, note = null where source = '' and exists (select 1 from hidden);
+update item_rule_state set held = null where held is not null and exists (select 1 from hidden);
 
 update item_sales set sales = json_set(sales,
     '$.n', json((select json_group_object(n.key, json(n.value))
@@ -41,7 +49,7 @@ update bucket_values set value = json_set(value,
   where exists (select 1 from hidden where instr(bucket_values.value, '"' || hidden.key || '"'));
 
 update product_sources set recent_sales = null, state = null, failure = null, title = null,
-    image_url = null, last_success_at = null, details_synced_at = null
+    image_url = null, last_success_at = null, details_synced_at = null, facts = null
   where source in hidden;
 -- Gap and bias come from a source's prices, and another source's row may be compared against it.
 -- Roles read from the copy then ignore a "disagrees" against a hidden source (none today).

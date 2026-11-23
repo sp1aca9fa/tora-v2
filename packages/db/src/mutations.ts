@@ -27,11 +27,12 @@ import {
   splitHolding,
   toLocalIso,
 } from '@tora/core';
-import { and, count, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
 import { loadSourceRegistry } from './registry';
 import { refreshItemSales } from './item-sales';
+import { mergeRanges } from './sale-coverage';
 import { moveSupply } from './supply';
 import { clearBucketValues } from './valuation';
 import {
@@ -43,11 +44,17 @@ import {
   canceledOrders,
   holdingEvents,
   holdings,
+  itemChecks,
+  itemRuleState,
+  itemRules,
   manualPrices,
+  notItemMarks,
   priceObservations,
   productImages,
   rankings,
   productSources,
+  saleCoverage,
+  saleSpans,
   products,
   sourceCandidates,
   sourceWarningDismissals,
@@ -1047,6 +1054,91 @@ export async function flagForReview(
 }
 
 /**
+ * A game's rule and coverage rows (S36) when item `fromId` is merged into `intoId`, or deleted (`intoId`
+ * null). Merge: checks, "not the item" marks (one the target has is dropped), covered nights (the
+ * union) and spans move over. The item's rules stay the target's when it has a row; when it has none,
+ * the duplicate's row (a person's words) moves to it. The duplicate's applied state is deleted, and the
+ * target's applied hash is cleared (its hold kept) so the sales that moved in are judged again (S36 A1).
+ * Checks hold by rules hash, so the duplicate's checks confirm the target only when both items'
+ * effective rules are the same. Another item boxed "of" the duplicate now names the target (or none
+ * when that is itself, or the duplicate is deleted).
+ */
+async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Promise<void> {
+  const [intoRules] =
+    intoId === null
+      ? []
+      : await tx
+          .select({ id: itemRules.productId })
+          .from(itemRules)
+          .where(eq(itemRules.productId, intoId));
+  if (intoId !== null && !intoRules) {
+    await tx.update(itemRules).set({ productId: intoId }).where(eq(itemRules.productId, fromId));
+  } else {
+    await tx.delete(itemRules).where(eq(itemRules.productId, fromId));
+  }
+  await tx.delete(itemRuleState).where(eq(itemRuleState.productId, fromId));
+  if (intoId === null) {
+    await tx.update(itemRules).set({ boxedOf: null }).where(eq(itemRules.boxedOf, fromId));
+    await tx.delete(itemChecks).where(eq(itemChecks.productId, fromId));
+    await tx.delete(notItemMarks).where(eq(notItemMarks.productId, fromId));
+    await tx.delete(saleCoverage).where(eq(saleCoverage.productId, fromId));
+    await tx.delete(saleSpans).where(eq(saleSpans.productId, fromId));
+    return;
+  }
+  await tx
+    .update(itemRuleState)
+    .set({ appliedHash: null })
+    .where(eq(itemRuleState.productId, intoId));
+  // The target is never boxed "of" itself (the moved row may have named it, or the duplicate).
+  await tx
+    .update(itemRules)
+    .set({ boxedOf: null })
+    .where(
+      and(
+        eq(itemRules.productId, intoId),
+        or(eq(itemRules.boxedOf, fromId), eq(itemRules.boxedOf, intoId)),
+      ),
+    );
+  await tx.update(itemRules).set({ boxedOf: intoId }).where(eq(itemRules.boxedOf, fromId));
+  await tx.update(itemChecks).set({ productId: intoId }).where(eq(itemChecks.productId, fromId));
+  const marked = new Set(
+    (
+      await tx
+        .select({ source: notItemMarks.source, ref: notItemMarks.externalRef })
+        .from(notItemMarks)
+        .where(eq(notItemMarks.productId, intoId))
+    ).map((m) => `${m.source}|${m.ref}`),
+  );
+  for (const m of await tx.select().from(notItemMarks).where(eq(notItemMarks.productId, fromId))) {
+    if (marked.has(`${m.source}|${m.externalRef}`)) {
+      await tx.delete(notItemMarks).where(eq(notItemMarks.id, m.id));
+    } else {
+      await tx.update(notItemMarks).set({ productId: intoId }).where(eq(notItemMarks.id, m.id));
+    }
+  }
+  const intoNights = new Map(
+    (await tx.select().from(saleCoverage).where(eq(saleCoverage.productId, intoId))).map((c) => [
+      c.source,
+      c.nights,
+    ]),
+  );
+  for (const c of await tx.select().from(saleCoverage).where(eq(saleCoverage.productId, fromId))) {
+    const nights = mergeRanges([...(intoNights.get(c.source) ?? []), ...(c.nights ?? [])]);
+    await tx
+      .delete(saleCoverage)
+      .where(and(eq(saleCoverage.productId, fromId), eq(saleCoverage.source, c.source)));
+    await tx
+      .insert(saleCoverage)
+      .values({ productId: intoId, source: c.source, nights, updatedAt: toLocalIso() })
+      .onConflictDoUpdate({
+        target: [saleCoverage.productId, saleCoverage.source],
+        set: { nights, updatedAt: toLocalIso() },
+      });
+  }
+  await tx.update(saleSpans).set({ productId: intoId }).where(eq(saleSpans.productId, fromId));
+}
+
+/**
  * Merges a duplicate product into another (same category and kind): its lots, sales data, manual
  * prices, watches, listings and what was for sale move over, then the duplicate is deleted. Listings the target already has,
  * the duplicate's suggestions about its own details and its picture are dropped; those about a sale
@@ -1143,6 +1235,7 @@ export async function mergeProducts(
     await tx.delete(sourceWarningDismissals).where(eq(sourceWarningDismissals.productId, fromId));
     await tx.delete(productImages).where(eq(productImages.productId, fromId));
     await moveSupply(tx, fromId, intoId);
+    await moveGameRows(tx, fromId, intoId);
     await tx.update(rankings).set({ productId: intoId }).where(eq(rankings.productId, fromId));
     // Buy timing numbers are worked out again for the merged item on the next collect.
     await tx.delete(signals).where(eq(signals.productId, fromId));
@@ -1181,6 +1274,7 @@ export async function deleteUnusedProduct(db: Db, productId: string): Promise<bo
     await tx.delete(productImages).where(eq(productImages.productId, productId));
     await tx.delete(supply).where(eq(supply.productId, productId));
     await tx.delete(signals).where(eq(signals.productId, productId));
+    await moveGameRows(tx, productId, null);
     await clearBucketValues(tx, [productId]);
     await tx.delete(products).where(eq(products.id, productId));
     return true;

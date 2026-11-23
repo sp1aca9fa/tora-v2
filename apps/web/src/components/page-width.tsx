@@ -16,8 +16,13 @@ const WIDE = [
   /^\/watchlist\/strategy$/,
 ];
 
-/** Pages that use a 4K screen's whole width (cards in columns). */
-const EXTRA_WIDE = [/^\/spread$/, /^\/settings\/collectors$/, /^\/products\/[^/]+\/buy$/];
+/** Pages that use a 4K screen's whole width (cards in columns, a wide table beside its form). */
+const EXTRA_WIDE = [
+  /^\/spread$/,
+  /^\/settings\/collectors$/,
+  /^\/settings\/admin\/consoles$/,
+  /^\/products\/[^/]+\/buy$/,
+];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */
 const MEDIUM = [/^\/settings(\/.*)?$/, /^\/watchlist(\/opening)?$/];

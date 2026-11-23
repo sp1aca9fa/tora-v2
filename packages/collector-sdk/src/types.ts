@@ -8,6 +8,7 @@ import type {
 } from '@tora/core';
 import type {
   CandidateInput,
+  ConsoleInput,
   FoundSetCard,
   ListedStore,
   HoldingInput,
@@ -20,6 +21,8 @@ import type {
   RecentSale,
   SourceQuery,
 } from '@tora/db';
+
+export type { ConsoleInput } from '@tora/db';
 import type { PoliteHttp, PoliteHttpOptions } from './http';
 import type { Email } from './mbox';
 
@@ -137,6 +140,12 @@ export interface Collector {
    * run; queries the user edited (`extra.edited`) are kept.
    */
   queryVersion?: number;
+  /**
+   * Search-based sources: the address of the site's search for one category id (S36 Terms "Console
+   * table"), so an admin can open it from the console page and see the number is right. Null, or not
+   * declared: no link. The app only links to it; it never fetches it.
+   */
+  categoryUrl?(category: string): string | null;
   /**
    * The collector fills in older history apart from the new sales (`ctx.phase`): every listing
    * gets its fresh pass first, and the history is caught up with the requests left, so a long
@@ -428,4 +437,9 @@ export interface CollectorModule {
   reprintHints?: ReprintHint[];
   /** Re-checks the sales it stored with today's rules (S30). */
   recheckers?: SalesRechecker[];
+  /**
+   * Suggested rows for the console table (S36 Terms "Console table"): names, other spellings, the
+   * software category per marketplace. Offered on the admin page; saved only when an admin adds them.
+   */
+  consoles?: ConsoleInput[];
 }

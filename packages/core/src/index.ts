@@ -30,3 +30,4 @@ export * from './plan';
 export * from './spread';
 export * from './alert-notices';
 export * from './data-check';
+export * from './game-rules';

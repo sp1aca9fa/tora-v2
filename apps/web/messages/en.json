@@ -457,6 +457,10 @@
       "schedule": {
         "title": "Schedule",
         "info": "When the collectors and the other timers run."
+      },
+      "consoles": {
+        "title": "Consoles",
+        "info": "The consoles games are matched to, with their category per marketplace."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -1936,7 +1940,10 @@
       "signalUnpicked": "Admin's pick stopped",
       "trackingHours": "Board tracker hours",
       "trackHour": "Board tracker: an hour outside the hours",
-      "trackUntilStart": "Board tracker: until the start of the hours"
+      "trackUntilStart": "Board tracker: until the start of the hours",
+      "consoleSaved": "Console",
+      "consoleRemoved": "Console removed",
+      "consolesSuggested": "Suggested consoles added"
     },
     "role": {
       "admin": "admin",
@@ -2816,6 +2823,56 @@
       "signIn": "Wrong username or password, or this account is already signed in on 2 devices or not set up yet. Sign out on one of its devices, or ask the admin.",
       "invalid": "That did not match. Try again.",
       "newCode": "The authenticator's code did not match (check the phone's clock is automatic)."
+    }
+  },
+  "consoles": {
+    "info": "Games are matched to these consoles by their platform.",
+    "more": "How matching works",
+    "moreText": "A game's platform is compared with each console's key, names and other spellings (case, width and spaces ignored). A category number limits that console's game searches on a marketplace to its software; with none, the search runs without a category.",
+    "key": "Key",
+    "keyInfo": "A short id: lower case letters, digits and dashes. It cannot be changed later.",
+    "required": "required",
+    "requiredNote": "Only the key is required.",
+    "names": "Name",
+    "aliases": "Other spellings",
+    "aliasesInfo": "How the platform may be written on an item, separated by commas.",
+    "categoryAt": "Category number at {source}",
+    "categoriesInfo": "The number in the marketplace's search address for this console's games.",
+    "boxed": "Boxed",
+    "boxedAllowed": "Games on this console can be wished for boxed (with box and manual)",
+    "sort": "Order",
+    "sortInfo": "Position in lists, lowest first.",
+    "noFilter": "no filter",
+    "test": "test",
+    "testTitle": "Open the {source} search for category {category} in a new tab",
+    "used": "Items",
+    "usedCount": "{count, plural, =0 {not used} one {# item} other {# items}}",
+    "yes": "Yes",
+    "no": "No",
+    "actions": "Actions",
+    "edit": "Edit {key}",
+    "delete": "Delete {key}",
+    "cancel": "Cancel",
+    "addTitle": "Add a console",
+    "add": "Add",
+    "save": "Save",
+    "saved": "{key} saved.",
+    "deleted": "{key} deleted.",
+    "confirmDelete": "Delete the console {key}? No item uses it.",
+    "usedNoDelete": "{key} cannot be deleted: {count, plural, one {# item uses it} other {# items use it}} (by its platform or its rules).",
+    "inUse": "{key} is in use and was not deleted: {rules, plural, one {# item names it in its rules} other {# items name it in their rules}}, {products, plural, one {# item has it as its platform} other {# items have it as their platform}}.",
+    "empty": "No consoles yet. Games keep their search as today until their console is here.",
+    "suggestedInfo": "{count, plural, one {# console is} other {# consoles are}} suggested by the plug-ins.",
+    "addSuggested": "Add the suggested consoles",
+    "suggestedAdded": "{count, plural, =0 {Nothing added: they are all here.} one {# console added.} other {# consoles added.}}",
+    "error": {
+      "key": "The key needs lower case letters, digits or dashes (up to 32).",
+      "exists": "A console with this key exists already.",
+      "names": "A name is too long.",
+      "aliases": "Too many other spellings, or one is too long.",
+      "category": "A category number can hold only letters, digits and dashes.",
+      "sort": "The order is a whole number from 0 to 9999.",
+      "missing": "That console was already deleted."
     }
   }
 }

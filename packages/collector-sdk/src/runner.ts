@@ -2,12 +2,17 @@ import {
   type CollectorRunStatus,
   baseCurrency,
   inAppZone,
+  isGameItem,
   localDate,
   sourceInfo,
 } from '@tora/core';
 import {
   type Db,
+  addNight,
+  coversDay,
   createQuerySource,
+  type DayRange,
+  gameRulesSwitches,
   heldBuckets,
   finishRun,
   LISTING_BROKEN_NIGHTS,
@@ -20,6 +25,7 @@ import {
   listProductSources,
   loadItemSales,
   setSourceQuery,
+  sourceNights,
   insertObservations,
   loadSourceRegistry,
   productSetInfo,
@@ -286,6 +292,14 @@ export async function runCollector(
         product: (typeof all)[number]['product'];
       }[] = [];
       const fresh: CollectorContext = collector.historyPhase ? { ...ctx, phase: 'fresh' } : ctx;
+      // S36 Terms "Covered day": what the read nights need, read once per run (S19), not per link.
+      const games = sources.some(({ product }) => product.category === 'game');
+      const switches = games ? await gameRulesSwitches(db) : new Map<string, 0 | 1>();
+      // A one-item run ("collect now") reads that item's own row in `addNight`, not every item's.
+      const nightsRead = games && !options.productId;
+      const nights = nightsRead
+        ? await sourceNights(db, collector.source)
+        : new Map<string, DayRange[]>();
       for (const { source: listing, product } of sources) {
         tick();
         let link = listing;
@@ -352,6 +366,20 @@ export async function runCollector(
               )),
             imageUrl: result.imageUrl,
           });
+          // S36 Terms "Covered day": the night this source was read for a game. Games only (cards and
+          // sealed have no coverage); a failed or skipped link records nothing. A failure to record is
+          // logged and does not fail the link (its data is saved).
+          const read = nightsRead ? (nights.get(product.id) ?? []) : undefined;
+          if (
+            isGameItem(product, { gameRules: switches.get(product.id) ?? null }) &&
+            !(read && coversDay(read, today))
+          ) {
+            try {
+              nights.set(product.id, await addNight(db, product.id, collector.source, today, read));
+            } catch (e) {
+              log(`collect "${product.name}": read night not recorded: ${errorText(e)}`);
+            }
+          }
           if (result.supply) {
             const rows = [];
             for (const { lowestAsk, ...s } of result.supply) {

@@ -745,6 +745,10 @@ export const SALES_TABLES = [
   'stores',
   'store_posts',
   'tcg_sets',
+  // A game's "not the item" marks and which days each source was read (S36).
+  'not_item_marks',
+  'sale_coverage',
+  'sale_spans',
 ];
 /** Tables mixing every source's data in one row: never read through `query_sql`. */
 const PACKED_TABLES: Record<string, string> = {
@@ -769,6 +773,7 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
       'image_url',
       'last_success_at',
       'details_synced_at',
+      'facts',
     ].map((c) => [c, (l: string) => `case when source in (${l}) then null else ${c} end`]),
   ),
   // A saved value (BucketValue in @tora/db valuation.ts) carries the last sale, the buy price and
@@ -786,6 +791,16 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
   },
   // Each lot's recent values by day (the same values as holding_values): totals in `series` stay.
   portfolio_charts: { recent: () => 'null' },
+  // A game's checks (S36): a listings check is one source's (its rows go with it, ROW_FILTERS); a
+  // sales check reads every source together, so its counts and note are left out.
+  item_checks: Object.fromEntries(
+    ['counts', 'note'].map((c) => [
+      c,
+      (l: string) => `case when source <> '' and source not in (${l}) then ${c} end`,
+    ]),
+  ),
+  // Why an item's rules are held may quote what they would drop at a source (S36 A1).
+  item_rule_state: { held: () => 'null' },
   // Sent messages may quote a price or ask of any source, and failure cards (kind admin) name the
   // sources and quote their errors: only kinds that never do keep their text.
   alert_log: {
@@ -819,6 +834,7 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
 const ROW_FILTERS: Record<string, (l: string) => string> = {
   // Valued from those sources' sales: the whole value is theirs.
   bucket_values: (l) => `coalesce(json_extract(value, '$.valuation.source'), '') not in (${l})`,
+  item_checks: (l) => `source not in (${l})`,
 };
 
 /** Settings readable through `query_sql`; any other's value is left out (a new one holds nothing). */
@@ -854,6 +870,7 @@ export const SOURCE_FREE_TABLES = [
   'account_setups',
   'alert_channels',
   'canceled_orders',
+  'consoles',
   'db_usage',
   'feed_tokens',
   'fx_rates',
@@ -862,6 +879,7 @@ export const SOURCE_FREE_TABLES = [
   'import_rows',
   'import_runs',
   'import_uploads',
+  'item_rules',
   'login_attempts',
   'lottery_marks',
   'manual_prices',

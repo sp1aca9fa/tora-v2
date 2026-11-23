@@ -20,6 +20,7 @@ import {
   pendingMatchesForUser,
   productsWithBrokenListings,
   rejectCandidate,
+  saveItemRules,
   saveTaxonomy,
   schema,
   unlinkSource,
@@ -914,4 +915,50 @@ it('a history read that fails leaves the listing running, its sales unchecked', 
   expect(got).toEqual([]);
   expect(summary).toMatchObject({ status: 'ok', errors: [] });
   expect(logs.join('\n')).toContain('far prices not checked');
+});
+
+it('records the night a source was read for a game, not for a failed link or a card (S36)', async () => {
+  const { product: card } = await box();
+  const game = (name: string) =>
+    createProduct(db, userId, { category: 'game', kind: 'software', name, platform: 'Alpha' });
+  const ok = await game('Hero Quest');
+  const broken = await game('Broken Quest');
+  const off = await game('Off Quest');
+  await saveItemRules(
+    db,
+    off.id,
+    {
+      console: null,
+      edition: null,
+      required: [],
+      excluded: [],
+      boxed: false,
+      boxedOf: null,
+      gameRules: 0,
+    },
+    userId,
+  );
+  for (const [p, id] of [
+    [card, 'C1'],
+    [ok, 'G1'],
+    [broken, 'G2'],
+    [off, 'G3'],
+  ] as const)
+    await linkSource(db, p.id, { source: 'fake', externalId: id });
+  const now = new Date('2026-11-10T03:00:00.000Z');
+  await runCollector(
+    db,
+    fakeCollector({
+      supports: () => true,
+      collect: async (link) => {
+        if (link.externalId === 'G2') throw new Error('parse error');
+        return { state: null, complete: true };
+      },
+    }),
+    { ...quiet, now },
+  );
+  const rows = await db.select().from(schema.saleCoverage);
+  expect(rows.map((r) => [r.productId, r.source, r.nights])).toEqual([
+    [ok.id, 'fake', [['2026-11-10', '2026-11-10']]],
+  ]);
 });

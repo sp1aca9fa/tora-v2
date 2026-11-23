@@ -44,10 +44,15 @@ const SCHEMA = `
   create table store_posts (source text);
   create table tcg_sets (source text);
   create table collector_runs (source text);
+  create table not_item_marks (source text);
+  create table sale_coverage (source text);
+  create table sale_spans (source text);
+  create table item_checks (source text, counts text, note text);
+  create table item_rule_state (held text);
   create table item_sales (sales text);
   create table bucket_values (value text);
   create table product_sources (source text, recent_sales text, state text, failure text,
-    title text, image_url text, last_success_at text, details_synced_at text);
+    title text, image_url text, last_success_at text, details_synced_at text, facts text);
   create table activity (kind text, detail text);
   create table alert_log (kind text, text text);
   create table app_settings (key text, value text);

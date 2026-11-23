@@ -9,17 +9,26 @@ import {
   GRADINGS,
   HOLDING_EVENT_TYPES,
   HOLDING_STATUSES,
+  ITEM_CHECK_BY,
+  ITEM_CHECK_KINDS,
+  ITEM_CHECK_OUTCOMES,
   OBSERVATION_TYPES,
   PACKAGING_STATES,
   RAW_GRADES,
+  SALE_SPAN_HOWS,
   SET_TYPES,
   USER_ROLES,
   newId,
   toLocalIso,
   type AlertState,
+  type ItemCheckBy,
+  type ItemCheckKind,
+  type ItemCheckOutcome,
+  type Names,
   type NoticeLevels,
   type ProductClass,
   type PullTier,
+  type SaleSpanHow,
   type SignalStats,
   type SourceInfo,
   type SourceRole,
@@ -32,6 +41,7 @@ import {
   check,
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -270,6 +280,11 @@ export const productSources = sqliteTable(
      * the item asks for a new link on Actions and it is tried again every `LISTING_RETRY_DAYS`.
      */
     failure: text('failure', { mode: 'json' }).$type<ListingFailure>(),
+    /**
+     * What the page says about the item beside its prices (S36 A5: release date, list price, product
+     * code, maker), games only. Null until a plug-in reads them.
+     */
+    facts: text('facts', { mode: 'json' }).$type<Record<string, unknown>>(),
     ...timestamps,
   },
   (t) => [
@@ -617,6 +632,11 @@ export const priceObservations = sqliteTable(
      * `price_original` divided by an estimated lot size (see `inferLotSizes`).
      */
     quantityInferred: integer('quantity_inferred', { mode: 'boolean' }).notNull().default(false),
+    /**
+     * Set with `excluded` by the game rules (S36 A1, plan section 9 A): `rules:<hash>` when the sale
+     * fails the item's rules, so the mark can follow the rules both ways apart from other exclusions.
+     */
+    ruleMark: text('rule_mark'),
     ...timestamps,
   },
   (t) => [
@@ -957,6 +977,10 @@ export const supply = sqliteTable(
     url: text('url'),
     raw: text('raw', { mode: 'json' }).$type<unknown>(),
     fetchedAt: text('fetched_at').notNull(),
+    /** The cheapest listings that pass the item's rules (S36 A2), games only; null: not stored. */
+    offers: text('offers', { mode: 'json' }).$type<unknown[]>(),
+    /** The source caps its count: `listings` is "at least" this (S36 A4); null: not known. */
+    listingsCapped: integer('listings_capped'),
     ...timestamps,
   },
   (t) => [
@@ -1360,6 +1384,143 @@ export const noticeMessages = sqliteTable(
   (t) => [uniqueIndex('notice_messages_uq').on(t.channelId, t.postKey)],
 );
 
+// --- S36 Wishlist (migration 0070): consoles, an item's rules, checks, marks, read coverage.
+
+/**
+ * The consoles Tora knows (S36 Terms "Console table"), edited by admins: names, other spellings, the
+ * software category per marketplace (a plug-in may suggest them) and whether "boxed" can be asked.
+ */
+export const consoles = sqliteTable('consoles', {
+  /** Lower case, chosen by an admin. */
+  key: text('key').primaryKey(),
+  names: text('names', { mode: 'json' }).notNull().$type<Names>(),
+  aliases: text('aliases', { mode: 'json' }).notNull().$type<string[]>(),
+  /** Source key to the site's software category id. */
+  categories: text('categories', { mode: 'json' }).notNull().$type<Record<string, string>>(),
+  boxedAllowed: integer('boxed_allowed', { mode: 'boolean' }).notNull().default(false),
+  sort: integer('sort').notNull().default(0),
+  ...timestamps,
+});
+
+/**
+ * An item's own rules (S36 Terms "The item's rules"), shared by everyone. An item without a row has
+ * the console its platform names and no words. No version: confirmations hold by `rulesHash`.
+ */
+export const itemRules = sqliteTable('item_rules', {
+  productId: text('product_id')
+    .primaryKey()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  console: text('console'),
+  edition: text('edition'),
+  required: text('required', { mode: 'json' }).notNull().$type<string[]>(),
+  excluded: text('excluded', { mode: 'json' }).notNull().$type<string[]>(),
+  boxed: integer('boxed', { mode: 'boolean' }).notNull().default(false),
+  /** The plain item a boxed item's sales and listings come from (S36 B1). */
+  boxedOf: text('boxed_of').references((): AnySQLiteColumn => products.id, {
+    onDelete: 'set null',
+  }),
+  /** Null: by kind; 1: on for another game kind; 0: off. */
+  gameRules: integer('game_rules').$type<0 | 1>(),
+  updatedBy: text('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  ...timestamps,
+});
+
+/**
+ * Checks of an item's sales or of its listings at a source (S36 A1, A2, B1), append-only: a later row
+ * stands over an earlier one. Confirmed while the latest row passed or confirmed under today's rules
+ * hash (`item-rules.ts`).
+ */
+export const itemChecks = sqliteTable(
+  'item_checks',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ITEM_CHECK_KINDS }).notNull().$type<ItemCheckKind>(),
+    /** '' for sales (every source together). */
+    source: text('source').notNull(),
+    outcome: text('outcome', { enum: ITEM_CHECK_OUTCOMES }).notNull().$type<ItemCheckOutcome>(),
+    by: text('by', { enum: ITEM_CHECK_BY }).notNull().$type<ItemCheckBy>(),
+    rulesHash: text('rules_hash').notNull(),
+    /** What was read and how many were the item (e.g. the cheap and the median samples). */
+    counts: text('counts', { mode: 'json' }).$type<Record<string, unknown>>(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    note: text('note'),
+    at: text('at').notNull(),
+  },
+  (t) => [
+    check('item_checks_kind_check', oneOf(t.kind, ITEM_CHECK_KINDS)),
+    index('item_checks_lookup_idx').on(t.productId, t.kind, t.source, t.at),
+  ],
+);
+
+/** A listing a person marked "not the item" (S36 Terms "Checked listing"): excluded for the item. */
+export const notItemMarks = sqliteTable(
+  'not_item_marks',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    externalRef: text('external_ref').notNull(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    at: text('at').notNull(),
+  },
+  (t) => [uniqueIndex('not_item_marks_uq').on(t.productId, t.source, t.externalRef)],
+);
+
+/** The rules hash last applied to an item's stored sales (S36 A1), and why it is held, if it is. */
+export const itemRuleState = sqliteTable('item_rule_state', {
+  productId: text('product_id')
+    .primaryKey()
+    .references(() => products.id, { onDelete: 'cascade' }),
+  appliedHash: text('applied_hash'),
+  appliedAt: text('applied_at'),
+  held: text('held', { mode: 'json' }).$type<Record<string, unknown>>(),
+});
+
+/**
+ * The nights a source was read for a game (S36 Terms "Covered day"), as sorted day ranges
+ * `[from, to]` (one row per item and source, S19). A night not read is not in it.
+ */
+export const saleCoverage = sqliteTable(
+  'sale_coverage',
+  {
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    nights: text('nights', { mode: 'json' }).notNull().$type<[string, string][]>(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.source] })],
+);
+
+/** Days a finished read-back, deep read or load covered (S36 Terms "Covered day"; plan section 9 H). */
+export const saleSpans = sqliteTable(
+  'sale_spans',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    fromDay: text('from_day').notNull(),
+    toDay: text('to_day').notNull(),
+    how: text('how', { enum: SALE_SPAN_HOWS }).notNull().$type<SaleSpanHow>(),
+    jobId: text('job_id'),
+    createdAt: text('created_at')
+      .notNull()
+      .$defaultFn(() => toLocalIso()),
+  },
+  (t) => [
+    check('sale_spans_days_check', sql`${t.fromDay} <= ${t.toDay}`),
+    index('sale_spans_product_idx').on(t.productId, t.source),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1392,3 +1553,8 @@ export type OpeningSet = typeof openingSets.$inferSelect;
 export type Store = typeof stores.$inferSelect;
 export type StorePost = typeof storePosts.$inferSelect;
 export type OpeningCardRow = typeof openingCards.$inferSelect;
+export type ConsoleRecord = typeof consoles.$inferSelect;
+export type ItemRules = typeof itemRules.$inferSelect;
+export type ItemCheck = typeof itemChecks.$inferSelect;
+export type NotItemMark = typeof notItemMarks.$inferSelect;
+export type SaleSpan = typeof saleSpans.$inferSelect;

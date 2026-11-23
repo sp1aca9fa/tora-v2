@@ -491,6 +491,13 @@
       "when": 1793374812853,
       "tag": "0069_lottery_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "6",
+      "when": 1795443290966,
+      "tag": "0070_wishlist_a",
+      "breakpoints": true
     }
   ]
 }
