@@ -17,6 +17,7 @@ import {
   fieldsFor,
   categoryDef,
   itemTypeOf,
+  isGameItem,
   resolveTaxonomy,
   kindsForSetType,
   orderSourceOf,
@@ -48,6 +49,7 @@ import {
   itemRuleState,
   itemRules,
   manualPrices,
+  marketJobs,
   notItemMarks,
   priceObservations,
   productImages,
@@ -1054,6 +1056,50 @@ export async function flagForReview(
 }
 
 /**
+ * A game's marketplace jobs (S36 B4) when item `fromId` is merged into `intoId`, or deleted (`intoId`
+ * null): merged, they go to the target, except one of a marketplace and kind the target already has
+ * waiting or running (the target's wins); a target that is not a game item gets none (jobs are for
+ * games only). Deleted, they go with the item.
+ */
+async function moveMarketJobs(tx: Tx, fromId: string, intoId: string | null): Promise<void> {
+  const [into] =
+    intoId === null
+      ? []
+      : await tx
+          .select({
+            category: products.category,
+            kind: products.kind,
+            gameRules: itemRules.gameRules,
+          })
+          .from(products)
+          .leftJoin(itemRules, eq(itemRules.productId, products.id))
+          .where(eq(products.id, intoId));
+  const g = into?.gameRules;
+  if (intoId === null || !into || !isGameItem(into, { gameRules: g === 0 || g === 1 ? g : null })) {
+    await tx.delete(marketJobs).where(eq(marketJobs.productId, fromId));
+    return;
+  }
+  const active = inArray(marketJobs.status, ['waiting', 'running']);
+  const taken = await tx
+    .select({ source: marketJobs.source, kind: marketJobs.kind })
+    .from(marketJobs)
+    .where(and(eq(marketJobs.productId, intoId), active));
+  for (const t of taken) {
+    await tx
+      .delete(marketJobs)
+      .where(
+        and(
+          eq(marketJobs.productId, fromId),
+          eq(marketJobs.source, t.source),
+          eq(marketJobs.kind, t.kind),
+          active,
+        ),
+      );
+  }
+  await tx.update(marketJobs).set({ productId: intoId }).where(eq(marketJobs.productId, fromId));
+}
+
+/**
  * A game's rule and coverage rows (S36) when item `fromId` is merged into `intoId`, or deleted (`intoId`
  * null). Merge: checks, "not the item" marks (one the target has is dropped), covered nights (the
  * union) and spans move over. The item's rules stay the target's when it has a row; when it has none,
@@ -1076,6 +1122,7 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
   } else {
     await tx.delete(itemRules).where(eq(itemRules.productId, fromId));
   }
+  await moveMarketJobs(tx, fromId, intoId);
   const [fromState] = await tx
     .select({ id: itemRuleState.productId })
     .from(itemRuleState)

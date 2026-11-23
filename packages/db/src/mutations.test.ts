@@ -24,6 +24,7 @@ import {
   canceledOrderIds,
   confirmImportReview,
   createProduct,
+  deleteUnusedProduct,
   mergeProducts,
   flagForReview,
   markOrderCanceled,
@@ -41,6 +42,8 @@ import {
 } from './queries';
 import { mergeImportedLots } from './imports';
 import { holdings, suggestions, tcgSets } from './schema';
+import { itemRules, marketJobs, priceObservations } from './schema';
+import { queueMarketJob } from './market-jobs';
 import { linkSource } from './sources';
 import { type SuggestionInput, fileSuggestion } from './suggestions';
 import { createUser } from './users';
@@ -800,4 +803,87 @@ it("keeps a merged duplicate's judgments about sales and moved listings", async 
     ['sale_ok', 'obs1', into.id, 'closed'],
     ['search_ok', moved.id, into.id, 'closed'],
   ]);
+});
+
+describe("a game's marketplace jobs on merge and delete (S36 B4)", () => {
+  const game = (name: string, kind = 'software') =>
+    createProduct(db, uid, {
+      category: 'game',
+      kind,
+      name,
+      platform: 'Alpha Station',
+      region: 'jp',
+    });
+  const jobsOf = (id: string) =>
+    db
+      .select()
+      .from(marketJobs)
+      .where(eq(marketJobs.productId, id))
+      .orderBy(marketJobs.source, marketJobs.kind);
+
+  it('moves the duplicate jobs to the target; one the target has active wins', async () => {
+    const dup = await game('Game B');
+    const into = await game('Game A');
+    const own = await queueMarketJob(db, { source: 'marketa', productId: into.id, kind: 'deep' });
+    await queueMarketJob(db, { source: 'marketa', productId: dup.id, kind: 'deep' });
+    const moved = await queueMarketJob(db, { source: 'marketb', productId: dup.id, kind: 'deep' });
+    const read = await queueMarketJob(db, {
+      source: 'marketa',
+      productId: dup.id,
+      kind: 'readback',
+    });
+    await db.update(marketJobs).set({ status: 'done' }).where(eq(marketJobs.id, read.id));
+    await mergeProducts(db, { id: uid, role: 'admin' }, dup.id, into.id);
+    expect((await jobsOf(into.id)).map((j) => [j.id, j.source, j.kind, j.status])).toEqual([
+      [own.id, 'marketa', 'deep', 'waiting'],
+      [read.id, 'marketa', 'readback', 'done'],
+      [moved.id, 'marketb', 'deep', 'waiting'],
+    ]);
+    expect(await jobsOf(dup.id)).toEqual([]);
+  });
+
+  it('drops the jobs when the target is no game item', async () => {
+    const dup = await game('Game B');
+    const into = await game('Game A');
+    await queueMarketJob(db, { source: 'marketa', productId: dup.id, kind: 'deep' });
+    await db
+      .insert(itemRules)
+      .values({ productId: into.id, required: [], excluded: [], gameRules: 0 });
+    await mergeProducts(db, { id: uid, role: 'admin' }, dup.id, into.id);
+    expect(await db.select().from(marketJobs)).toEqual([]);
+  });
+
+  it("deletes an item's jobs with it", async () => {
+    const g = await game('Game B');
+    await queueMarketJob(db, { source: 'marketa', productId: g.id, kind: 'deep' });
+    expect(await deleteUnusedProduct(db, g.id)).toBe(true);
+    expect(await db.select().from(marketJobs)).toEqual([]);
+  });
+
+  it('enforces the item reference: a job or a sale of a deleted item fails (plan 9c)', async () => {
+    const fk = (p: Promise<unknown>) =>
+      p.then(
+        () => 'inserted',
+        (e: Error) => String((e.cause as Error | undefined)?.message ?? e.message),
+      );
+    expect(
+      await fk(
+        db.insert(marketJobs).values({ source: 'marketa', productId: 'gone', kind: 'deep' }),
+      ),
+    ).toMatch(/FOREIGN KEY/);
+    expect(
+      await fk(
+        db.insert(priceObservations).values({
+          productId: 'gone',
+          source: 'marketa',
+          observationType: 'sold',
+          priceBase: 100,
+          currency: 'JPY',
+          observedAt: day('11-01'),
+          fetchedAt: day('11-01'),
+          externalRef: 'x1',
+        }),
+      ),
+    ).toMatch(/FOREIGN KEY/);
+  });
 });

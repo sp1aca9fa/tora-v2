@@ -5,6 +5,7 @@ import {
   collectorTimes,
   lastBackup,
   listRecentCollectorRuns,
+  marketStates,
 } from '@tora/db';
 import { ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -19,6 +20,7 @@ import { CollectWindowForm } from '../collect-window-form';
 import { bucketLabel } from '@/lib/product-display';
 import { cn } from '@/lib/utils';
 import { DataCheckSection } from './data-check-section';
+import { EXTRA_READS_ID, ExtraReads } from './market-reads';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.collectors.title') };
@@ -31,7 +33,7 @@ export default async function CollectorSettingsPage() {
   const money = await getMoney();
   const { db, user } = await authed();
   const admin = user.role === 'admin';
-  const [schedule, sourceLabel, runs, health, times, backup, request, t, format] =
+  const [schedule, sourceLabel, runs, health, times, backup, request, markets, t, format] =
     await Promise.all([
       collectSchedule(db),
       sourceLabels(),
@@ -40,6 +42,7 @@ export default async function CollectorSettingsPage() {
       collectorTimes(db),
       admin ? lastBackup(db) : null,
       admin ? collectRequest(db) : null,
+      marketStates(db),
       getTranslations(),
       getFormatter(),
     ]);
@@ -55,10 +58,28 @@ export default async function CollectorSettingsPage() {
   };
   const dateTime = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: 'short', timeStyle: 'short' });
+  // Extra daytime reads (S36 B4): their own panel; a collector's row only links to it.
+  const reads = markets.length > 0;
+  const readsLink = (source: string) =>
+    markets.some((m) => m.source === source) && (
+      <a
+        href={`#${EXTRA_READS_ID}`}
+        className="pl-5.5 text-xs font-normal text-muted-foreground underline sm:pl-0"
+      >
+        {t('settings.market.link')}
+      </a>
+    );
   return (
-    // Half a 4K screen and more: the collectors and the self check side by side.
-    <div className={cn('grid items-start gap-4', admin && 'min-[1200px]:grid-cols-2')}>
-      <Card className="min-w-0">
+    // Half a 4K screen and more: the collectors, then the extra reads over the self check; on a
+    // full 4K screen the three side by side.
+    <div
+      className={cn(
+        'grid items-start gap-4',
+        (admin || reads) && 'min-[1200px]:grid-cols-2',
+        admin && reads && 'min-[1200px]:grid-rows-[auto_1fr] min-[2400px]:grid-cols-3',
+      )}
+    >
+      <Card className={cn('min-w-0', admin && reads && 'min-[1200px]:row-span-2')}>
         <CardHeader>
           <CardTitle>{t('settings.collectorRuns')}</CardTitle>
           <CardDescription>{t('settings.collectorsInfo')}</CardDescription>
@@ -135,9 +156,13 @@ export default async function CollectorSettingsPage() {
               // Collapsed: the name and the last run's status; open for the details.
               <details key={h.source} className="group self-start rounded-md border text-sm">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
-                    {sourceLabel(h.source)}
+                  {/* Phone: the link on its own line under the name. */}
+                  <span className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+                      {sourceLabel(h.source)}
+                    </span>
+                    {readsLink(h.source)}
                   </span>
                   {h.lastRun && (
                     // Red marks what is wrong: the status, or only the time when a run that worked ran long.
@@ -243,6 +268,13 @@ export default async function CollectorSettingsPage() {
           )}
         </CardContent>
       </Card>
+      {reads && (
+        <ExtraReads
+          views={markets}
+          labels={Object.fromEntries(markets.map((m) => [m.source, sourceLabel(m.source)]))}
+          admin={admin}
+        />
+      )}
       {admin && <DataCheckSection db={db} />}
     </div>
   );

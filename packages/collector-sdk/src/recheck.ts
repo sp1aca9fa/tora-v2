@@ -27,7 +27,7 @@ import {
 import { analysisCopyPath } from '@tora/db/backup';
 import { existsSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import { defaultLockDir, holdCollectLocks, lockSource, stateDir } from './lock';
+import { defaultLockDir, holdCollectLocks, lockSourceWaiting, stateDir } from './lock';
 import type { SalesRechecker, StoredPeer, StoredSale, StoredVerdict } from './types';
 
 /** A kept row whose `updated_at` is this far after its `created_at` was changed later. */
@@ -495,7 +495,8 @@ export async function holdRecheckLocks(
   const held: (() => void)[] = [collect.release];
   const release = () => held.forEach((r) => r());
   for (const source of ['recheck-sales', ...sources]) {
-    const lock = lockSource(source, locks);
+    // A daytime job holds a site's lock for one request: waited for, never a refusal (S36 B4).
+    const lock = await lockSourceWaiting(source, { dir: locks });
     if ('heldBy' in lock) {
       release();
       return { refused: `${source} is being collected (process ${lock.heldBy}).` };
@@ -508,7 +509,7 @@ export async function holdRecheckLocks(
       interrupted.push(source);
       continue;
     }
-    const lock = lockSource(source, locks);
+    const lock = await lockSourceWaiting(source, { dir: locks });
     if ('heldBy' in lock) {
       release();
       return { refused: `${source} is being collected (process ${lock.heldBy}).` };

@@ -65,6 +65,13 @@ export interface PoliteHttpOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Called before each attempt, after the pace wait (the daytime job runner's checks and count,
+   * S36 B4); throwing stops the request unsent.
+   */
+  beforeRequest?: () => Promise<void>;
+  now?: () => number;
+  random?: () => number;
 }
 
 export class PoliteHttp {
@@ -81,6 +88,9 @@ export class PoliteHttp {
       timeoutMs: 30_000,
       fetchImpl: fetch,
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+      beforeRequest: async () => {},
+      now: Date.now,
+      random: Math.random,
       ...options,
     };
   }
@@ -144,6 +154,7 @@ export class PoliteHttp {
     for (let attempt = 0; ; attempt++) {
       if (this.requests >= this.o.maxRequests) throw new RequestCapError();
       await this.pace();
+      await this.o.beforeRequest();
       this.requests++;
       let res: Response;
       try {
@@ -184,10 +195,10 @@ export class PoliteHttp {
   private async pace(): Promise<void> {
     if (this.last) {
       const { minDelayMs: min, maxDelayMs: max } = this.o;
-      const wait = min + Math.random() * (max - min) - (Date.now() - this.last);
+      const wait = min + this.o.random() * (max - min) - (this.o.now() - this.last);
       if (wait > 0) await this.o.sleep(wait);
     }
-    this.last = Date.now();
+    this.last = this.o.now();
   }
 }
 

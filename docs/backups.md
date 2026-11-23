@@ -65,6 +65,12 @@ it.
    the app). Sign in and check the portfolio.
 4. Once happy, delete the old database (`turso db destroy tora`).
 
+Daytime reads (requirements S36 B4): before switching databases, stop them with `sudo systemctl
+disable --now tora-market-jobs.timer`, and enable them again the next day. A restored database has
+lost the day's count of requests, so the day after the switch starts fresh. A refusal recorded
+after the copy was made is not lost: the runner keeps a stamp of it (`market-refused-<marketplace>`
+in the state folder) until its 3-day wait ends, and writes it back at its next start.
+
 To look inside a copy without the app, unzip it and open it with any SQLite tool:
 
 ```bash

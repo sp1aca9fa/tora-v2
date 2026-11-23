@@ -12,6 +12,7 @@ import {
   cancelSetupAction,
   createAccountAction,
   requestCollectAction,
+  restartMarketAction,
   revokeDeviceAdminAction,
   setDisabledAction,
   setupLinkAction,
@@ -194,7 +195,8 @@ export function ConfirmButton({
   task:
     | { kind: 'revoke'; userId: string; deviceId: string | 'all' }
     | { kind: 'cancelSetup'; userId: string }
-    | { kind: 'collect' };
+    | { kind: 'collect' }
+    | { kind: 'restartMarket'; source: string };
 }) {
   const [pending, start] = useTransition();
   return (
@@ -208,6 +210,7 @@ export function ConfirmButton({
         start(async () => {
           if (task.kind === 'revoke') await revokeDeviceAdminAction(task.userId, task.deviceId);
           else if (task.kind === 'cancelSetup') await cancelSetupAction(task.userId);
+          else if (task.kind === 'restartMarket') await restartMarketAction(task.source);
           else await requestCollectAction();
         });
       }}

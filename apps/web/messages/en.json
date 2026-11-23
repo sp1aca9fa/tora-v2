@@ -368,6 +368,29 @@
     "never": "never",
     "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
     "recentRuns": "Recent runs",
+    "market": {
+      "title": "Extra daytime reads",
+      "info": "Reads of sales beyond the nightly collect, 05:00 to 22:00, within a number a day per marketplace.",
+      "link": "Extra reads",
+      "marketplace": "Marketplace",
+      "today": "Today",
+      "jobs": "Jobs",
+      "state": "State",
+      "usedOf": "{used} of {perDay}",
+      "usedOfToday": "{used} of {perDay} today",
+      "jobsWaiting": "{count} waiting",
+      "jobsStopped": "{count} stopped",
+      "jobsFailing": "{count} failing ({most, plural, one {# failure} other {up to # failures}} in a row)",
+      "active": "Active",
+      "notRun": "Not run yet; jobs waiting since {since}",
+      "usedUp": "{used} used today; next reads tomorrow, {perDay} a day",
+      "paused": "Paused after a refusal until {at}",
+      "stopped": "Stopped, restart needed",
+      "lastError": "Last error of a stopped job:",
+      "lastFailure": "Last error of a failing job:",
+      "restart": "Restart",
+      "restartConfirm": "Starts the extra reads of {source} again at 25 a day (from tomorrow if today's 25 are used)."
+    },
     "section": {
       "account": {
         "title": "Account",
@@ -1578,6 +1601,9 @@
     "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
     "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
     "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan 500 million). See Settings > Admin > Database.",
+    "marketRefused": "Tora: {source} refused one of its extra reads. Its extra reads are now at most {perDay} a day, from {at}.",
+    "marketStopped": "Tora: {source} refused its extra reads at 25 a day: they are stopped until an admin restarts them in Settings > Collectors.",
+    "marketJobsFailed": "Tora: the extra reads could not run: {error}",
     "sourceQuiet": "Tora: {sources} found no new sales on its last 3 days of runs, though it usually finds some. Its site may have changed: look at the collect log, or open one of its listings (Settings > Collectors).",
     "selfCheck": "Tora: the nightly self-check found saved prices that did not match the collected sales, and rebuilt them: {items}. If this repeats, tell the developer.",
     "dataCheckTitle": "Tora's self check found something odd in its data. It changed nothing; this needs a look.",
@@ -1948,7 +1974,11 @@
       "consoleSaved": "Console",
       "consoleRemoved": "Console removed",
       "consolesSuggested": "Suggested consoles added",
-      "gameRules": "Game rules switched"
+      "gameRules": "Game rules switched",
+      "marketRefused": "Extra reads refused by a marketplace: fewer a day after a 3-day wait",
+      "marketStopped": "Extra reads stopped: a marketplace refused at 25 a day",
+      "marketRestarted": "Extra reads restarted at 25 a day",
+      "marketJobsFailed": "Extra reads could not run"
     },
     "role": {
       "admin": "admin",

@@ -11,6 +11,7 @@ import {
   makeSetupLink,
   recordAdminChange,
   requestCollect,
+  restartMarket,
   revokeAllDevices,
   revokeDevice,
   setUserDisabled,
@@ -153,6 +154,26 @@ export async function requestCollectAction(): Promise<AccountTaskState> {
     session.user.id,
     'collectRequested',
     {},
+    '/settings/collectors',
+  );
+  revalidatePath('/settings/collectors');
+  return {};
+}
+
+/**
+ * Starts a marketplace's extra reads again at 25 a day (S36 B4: stopped or waiting after a refusal
+ * until an admin restarts it). The day's count is kept, so when 25 are already used today the reads
+ * go on tomorrow.
+ */
+export async function restartMarketAction(source: string): Promise<AccountTaskState> {
+  const { session, error } = await admin();
+  if (!session) return { error };
+  if (!(await restartMarket(session.db, source, session.user.id))) return { error: 'missing' };
+  await recordAdminChange(
+    session.db,
+    session.user.id,
+    'marketRestarted',
+    { source },
     '/settings/collectors',
   );
   revalidatePath('/settings/collectors');

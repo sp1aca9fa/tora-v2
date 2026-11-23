@@ -229,6 +229,26 @@ made earlier are regenerated, ones the user edited are kept. A search source fil
 Optional: details read from a confirmed listing's title (set code, card number, rarity, picture),
 applied once per link. Return null when the title says nothing reliable.
 
+### Daytime jobs: `jobKinds` and `runJob(job, ctx)`
+
+Reads beyond the nightly collect (read-backs, deep reads, tracked games, monthly pages) run as
+queued jobs in the daytime (requirements S36 B4), for game items only. A plug-in lists the kinds it
+reads in `jobKinds` and reads one step at a time in `runJob`:
+
+- Exactly one request per step, only through `ctx.http`. Before it, the runner checks the hours
+  (05:00 to 22:00, app time zone), that no collect runs, and counts the request against the
+  marketplace's number for the day; a second request in a step stops the job.
+- Return `{ rows, cursor, done, oldestReached }`. Never save: the runner stores the rows under the
+  job's marketplace and its item as it is now. A step whose request failed is discarded, even when
+  the plug-in caught the error, so do not hide errors.
+- A cursor names the search it belongs to. Given one of another search (the item was merged or
+  renamed), start over. A step that is not done must move the cursor.
+- A refusal (403, 429, a challenge page) halves the marketplace's number after a 3-day wait; at 25
+  a day it stops until an admin restarts it (Settings > Collectors).
+
+Tests for a job plug-in replace the global `fetch` with one that fails, so a request around
+`ctx.http` shows up.
+
 ## Polite fetching
 
 Always fetch through `ctx.http` (`PoliteHttp`), never `fetch` directly:

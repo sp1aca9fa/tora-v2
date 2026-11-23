@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { listActivity, recordActivity } from './activity';
 import {
+  alertMarketRefusals,
   type AlertContext,
   type AlertTexts,
   addDiscordChannel,
@@ -33,6 +34,7 @@ import {
 import { type Db, createDb } from './client';
 import { finishImportRun, saveImportRows, startImportRun } from './imports';
 import { migrateDb } from './migrate';
+import { recordRefusal } from './market-jobs';
 import { saveSetting, saveSourceInfos } from './registry';
 import { createProduct } from './mutations';
 import {
@@ -968,4 +970,25 @@ it('keeps a history of every delivery, per channel, with filters', async () => {
   expect((await listAlertLog(db, admin, { kind: 'admin' }))[0]!.channelId).toBeNull();
   expect(await pruneAlertLog(db, new Date(Date.now() + 181 * 86_400_000))).toBeGreaterThan(0);
   expect(await db.select().from(alertLog)).toEqual([]);
+});
+
+it('sends a marketplace refusal to admins once, again when no channel took it (S36 B4)', async () => {
+  await addDiscordChannel(db, admin, HOOK, SECRET, fakeFetch);
+  const refusals: AlertContext = {
+    ...ctx,
+    texts: (l) => ({ ...TEXTS[l], marketRefused: '{source} refused: {perDay} a day from {at}' }),
+  };
+  const at = new Date('2026-11-24T12:00:00+09:00');
+  const later = new Date('2026-11-24T12:05:00+09:00');
+  await recordRefusal(db, { source: 'marketa', at });
+  failDiscord = true;
+  expect(await alertMarketRefusals(db, refusals, later)).toBe(0);
+  failDiscord = false;
+  expect(await alertMarketRefusals(db, refusals, later)).toBe(1);
+  const from = toLocalIso(new Date('2026-11-27T12:00:00+09:00')).slice(0, 16).replace('T', ' ');
+  expect(sent.map((s) => s.text)).toEqual([`marketa refused: 100 a day from ${from}`]);
+  expect(await alertMarketRefusals(db, refusals, later)).toBe(0);
+  // Other admin entries are not this pass's.
+  await recordActivity(db, { kind: 'admin', action: 'gameRules', level: 'ok', detail: {} });
+  expect(await alertMarketRefusals(db, refusals, later)).toBe(0);
 });

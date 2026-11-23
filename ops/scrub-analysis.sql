@@ -23,6 +23,10 @@ delete from collector_runs where source in hidden;
 delete from not_item_marks where source in hidden;
 delete from sale_coverage where source in hidden;
 delete from sale_spans where source in hidden;
+-- Daytime reads (S36 B4): a job's cursor and error come from the site.
+delete from market_jobs where source in hidden;
+delete from market_days where source in hidden;
+delete from market_state where source in hidden;
 -- A game's checks (S36): a listings check is one source's; a sales check reads every source together,
 -- so its counts and note go. Why an item's rules are held may quote a source's sales.
 delete from item_checks where source in hidden;

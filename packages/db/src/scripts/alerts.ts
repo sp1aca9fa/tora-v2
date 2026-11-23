@@ -13,6 +13,9 @@
 //       also sends it to admins at once.
 //   check   The app's morning check, run here (nothing ran for over a day; the daily summaries,
 //       each person at most once in 20 hours).
+//   market-refusals
+//       Run by scripts/market-jobs-cron.sh after every daytime job run (S36 B4): a marketplace's
+//       refusal or stop, and a runner that could not run, to admins. `after-run` also sends them.
 //   data-check-reset <source>
 //       Tora's self check (S30): accepts a source's numbers as they are, after someone has looked.
 //       Its levels start over and its findings close.
@@ -25,6 +28,7 @@ import {
   type AlertContext,
   type AlertTexts,
   alertFailures,
+  alertMarketRefusals,
   alertServerEvent,
   alertServerUpdate,
   checkMissedRuns,
@@ -112,6 +116,8 @@ if (command === 'after-run') {
   }
   const failures = await alertFailures(db, ctx, since);
   console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
+  const market = await alertMarketRefusals(db, ctx);
+  if (market) console.log(`alerts: ${market} daytime reads message(s) sent`);
   const buy = await sendWatchAlerts(db, ctx);
   console.log(`alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`);
 } else if (command === 'update') {
@@ -153,6 +159,8 @@ if (command === 'after-run') {
   console.log(
     `alerts: missed ${missed.join(', ') || 'nothing'}; ${summaries} summary message(s) sent`,
   );
+} else if (command === 'market-refusals') {
+  console.log(`alerts: ${await alertMarketRefusals(db, ctx)} daytime reads message(s) sent`);
 } else if (command === 'data-check-reset') {
   const source = positionals[1];
   if (!source || !(await resetDataCheck(db, source))) {
@@ -162,7 +170,7 @@ if (command === 'after-run') {
   console.log(`alerts: self check levels of ${source} start over; its findings are closed.`);
 } else {
   console.error(
-    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry] | server <title> [--text <details>] [--level ok|problem|failed] [--tell] | data-check-reset <source>',
+    'Usage: pnpm alerts after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <file>] | check | market-refusals | update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry] | server <title> [--text <details>] [--level ok|problem|failed] [--tell] | data-check-reset <source>',
   );
   process.exit(1);
 }

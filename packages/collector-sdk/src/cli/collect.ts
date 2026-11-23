@@ -48,7 +48,7 @@ import { importPurchaseLinks } from '../links';
 import { staleRates, updateRates } from '../rates';
 import { syncCatalogs } from '../catalog';
 import { loadAndRegister } from '../registry';
-import { defaultLockDir, lockSource } from '../lock';
+import { defaultLockDir, lockSourceWaiting } from '../lock';
 import { readOpeningCards } from '../opening';
 import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
@@ -271,7 +271,8 @@ if (withRankings) {
         return new Set<string>();
       });
   const readable = notBlocked.filter((r) => !savedToday.has(r.key));
-  const locks = readable.map((r) => lockSource(r.source));
+  // A daytime job's lock (one request) is waited for, up to a minute (S36 B4).
+  const locks = await Promise.all(readable.map((r) => lockSourceWaiting(r.source)));
   try {
     if (notBlocked.length === 0) {
       log('rankings: skipped, their sites blocked an earlier run today (tried again tomorrow)');
@@ -301,7 +302,7 @@ for (const collector of selected) {
     log(`${collector.source}: skipped, it blocked an earlier run today (tried again tomorrow)`);
     continue;
   }
-  const lock = lockSource(collector.source);
+  const lock = await lockSourceWaiting(collector.source);
   if ('heldBy' in lock) {
     // Not a success: the schedule tries again later, when the other run is done.
     log(`${collector.source}: skipped, another collect is running it (process ${lock.heldBy})`);
@@ -342,7 +343,7 @@ for (const collector of selected) {
 if (withOpening) {
   progress.next('box opening cards');
   const readable = usedSetCards.filter((s) => !blocked.has(s.source));
-  const locks = readable.map((s) => lockSource(s.source));
+  const locks = await Promise.all(readable.map((s) => lockSourceWaiting(s.source)));
   try {
     if (readable.length === 0) {
       log('box opening cards: skipped, their sites blocked a run today (tried again tomorrow)');

@@ -65,6 +65,7 @@ import {
   watches,
 } from './schema';
 import { productsWithBrokenListings, quietSources } from './sources';
+import { MARKET_ALERT_ACTIONS } from './market-jobs';
 import { getUserById } from './users';
 import { latestSignals } from './signals';
 import { askChecks } from './ask-check';
@@ -1004,6 +1005,47 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     }
     await saveSetting(db, 'alertsSentToday', sentToday);
   }
+  await markAlerted(
+    db,
+    entries.map((e) => e.id),
+  );
+  return sent;
+}
+
+/**
+ * Daytime reads (S36 B4): a marketplace that refused or stopped, and a job runner that could not
+ * run, to admins at once (scripts/market-jobs-cron.sh, after every run; `after-run` catches up).
+ * Entries of the last 7 days not alerted yet; marked unless every channel failed.
+ */
+export async function alertMarketRefusals(
+  db: Db,
+  ctx: AlertContext,
+  now = new Date(),
+): Promise<number> {
+  const since = toLocalIso(new Date(now.getTime() - 7 * 86_400_000));
+  const entries = (await unalerted(db, { kind: 'admin', since })).filter((e) =>
+    MARKET_ALERT_ACTIONS.includes(e.action ?? ''),
+  );
+  if (entries.length === 0) return 0;
+  const base = await appUrl(db);
+  let sent = 0;
+  let reachable = false;
+  for (const admin of await adminsToAlert(db)) {
+    if ((await channelsOf(db, admin.id)).length) reachable = true;
+    const t = await textsFor(db, admin, ctx);
+    const items = entries.map((e) => {
+      const d = (e.detail ?? {}) as Record<string, string | number | null>;
+      const text = fillText(t[e.action!] ?? e.action!, {
+        source: d.source ?? '',
+        perDay: d.perDay ?? '',
+        at: d.waitUntil ? shortTime(String(d.waitUntil)) : '',
+        error: d.error ?? '',
+      });
+      return { text, role: 'bad' as const, url: linkUrl(base, e.href) };
+    });
+    sent += await sendToUser(db, admin.id, lines('admin', null, items), ctx);
+  }
+  if (reachable && sent === 0) return 0;
   await markAlerted(
     db,
     entries.map((e) => e.id),

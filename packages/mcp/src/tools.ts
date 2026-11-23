@@ -750,6 +750,10 @@ export const SALES_TABLES = [
   'not_item_marks',
   'sale_coverage',
   'sale_spans',
+  // Daytime reads (S36 B4): a source's jobs (cursors, its errors), daily counts and refusals.
+  'market_jobs',
+  'market_days',
+  'market_state',
 ];
 /** Tables mixing every source's data in one row: never read through `query_sql`. */
 const PACKED_TABLES: Record<string, string> = {

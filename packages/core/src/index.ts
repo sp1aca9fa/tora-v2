@@ -31,3 +31,4 @@ export * from './spread';
 export * from './alert-notices';
 export * from './data-check';
 export * from './game-rules';
+export * from './market-ceiling';

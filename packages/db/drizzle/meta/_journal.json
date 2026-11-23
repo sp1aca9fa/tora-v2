@@ -498,6 +498,13 @@
       "when": 1795443290966,
       "tag": "0070_wishlist_a",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "6",
+      "when": 1795465905444,
+      "tag": "0071_wishlist_b",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import type {
   CatalogSetEntry,
   CodeMeaning,
   EffectiveRules,
+  MarketJobKind,
   ReprintHint,
   SignalRule,
   SourceInfo,
@@ -280,6 +281,52 @@ export interface Collector {
    * boxes): its picture is never the product's while a plain listing has one.
    */
   variantListing?(title: string): boolean;
+  /** Daytime job kinds it reads (S36 B4); a job of another kind waits. */
+  jobKinds?: readonly MarketJobKind[];
+  /**
+   * Per kind, the days a job reads past its `wantedFrom` (default 0): the runner calls a job done
+   * once a step's `oldestReached` is at or before `wantedFrom` minus these days, even when the
+   * plug-in did not say so.
+   */
+  jobMarginDays?: Partial<Record<MarketJobKind, number>>;
+  /**
+   * One step of a daytime job (S36 B4): exactly one request, only through `ctx.http` (the runner
+   * counts it against the marketplace's day, checks the hours and the collect before it, and
+   * discards the step when the request failed, even if the plug-in caught the error). Returns the
+   * rows to save (the SDK saves them; a plug-in never writes), the cursor to go on from and
+   * whether the job is done. A cursor names the search it belongs to: given one of another search
+   * (the item was merged or renamed), the plug-in starts over. A step that is not done must move
+   * the cursor (the same cursor back stops the job).
+   */
+  runJob?(job: MarketJob, ctx: JobContext): Promise<JobStep>;
+}
+
+/** A daytime job as a plug-in sees it. */
+export interface MarketJob {
+  id: string;
+  source: string;
+  kind: MarketJobKind;
+  productId: string | null;
+  /** The oldest day it wants (YYYY-MM-DD), or null for as far as the site goes. */
+  wantedFrom: string | null;
+  /** The last step's cursor; null at the start. */
+  cursor: unknown;
+}
+
+export interface JobContext {
+  http: Pick<PoliteHttp, 'text' | 'json' | 'postJson' | 'bytes'>;
+  now: Date;
+  log: (message: string) => void;
+  /** The job's item now (it may have been merged since the job was queued); null: none. */
+  product: Product | null;
+}
+
+export interface JobStep {
+  rows: PriceInput[];
+  cursor: unknown;
+  done: boolean;
+  /** The oldest sale day this step reached (YYYY-MM-DD), or null. */
+  oldestReached: string | null;
 }
 
 export type ProductDetails = Partial<

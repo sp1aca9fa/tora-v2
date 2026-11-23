@@ -1521,6 +1521,73 @@ export const saleSpans = sqliteTable(
   ],
 );
 
+/**
+ * Daytime reads of a marketplace (S36 B4): one row per job. Kind and status are checked in code
+ * (`MARKET_JOB_KINDS`, `MARKET_JOB_STATUSES`). One active job per marketplace, item and kind.
+ */
+export const marketJobs = sqliteTable(
+  'market_jobs',
+  {
+    id: id(),
+    source: text('source').notNull(),
+    productId: text('product_id').references(() => products.id),
+    kind: text('kind').notNull(),
+    status: text('status').notNull().default('waiting'),
+    /** The oldest day the job wants to reach (YYYY-MM-DD), or null for as far as the site goes. */
+    wantedFrom: text('wanted_from'),
+    /** Where the plug-in goes on; it names the search it belongs to. */
+    cursor: text('cursor', { mode: 'json' }).$type<unknown>(),
+    oldestReached: text('oldest_reached'),
+    requests: integer('requests').notNull().default(0),
+    createdAt: text('created_at')
+      .notNull()
+      .$defaultFn(() => toLocalIso()),
+    /** The last attempt (a job failing 5 times in a row is tried at most once a day). */
+    startedAt: text('started_at'),
+    finishedAt: text('finished_at'),
+    /** Why the last step failed (kept until a step is saved), or why the job stopped. */
+    error: text('error'),
+    /** Failed steps in a row; a saved step resets it (the W10 review's error rule). */
+    failures: integer('failures').notNull().default(0),
+  },
+  (t) => [
+    index('market_jobs_queue_idx').on(t.source, t.status, t.kind, t.createdAt),
+    index('market_jobs_product_idx').on(t.productId),
+    uniqueIndex('market_jobs_active_uq')
+      .on(t.source, sql`ifnull(${t.productId}, '')`, t.kind)
+      .where(sql`status IN ('waiting', 'running')`),
+  ],
+);
+
+/** Job requests a marketplace got on a day (the app's zone), and the number that day allowed. */
+export const marketDays = sqliteTable(
+  'market_days',
+  {
+    source: text('source').notNull(),
+    day: text('day').notNull(),
+    used: integer('used').notNull().default(0),
+    limitThatDay: integer('limit_that_day').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.day] })],
+);
+
+/**
+ * A marketplace's number per day and refusal state (S36 B4). `wait_until` is compared as an
+ * instant (a time zone change does not rewrite it: its name does not end in `_at`).
+ */
+export const marketState = sqliteTable('market_state', {
+  source: text('source').primaryKey(),
+  perDay: integer('per_day').notNull(),
+  waitUntil: text('wait_until'),
+  stopped: integer('stopped', { mode: 'boolean' }).notNull().default(false),
+  lastRefusalAt: text('last_refusal_at'),
+  refusals: integer('refusals').notNull().default(0),
+  restartedBy: text('restarted_by').references(() => users.id, { onDelete: 'set null' }),
+  updatedAt: text('updated_at')
+    .notNull()
+    .$defaultFn(() => toLocalIso()),
+});
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1558,3 +1625,5 @@ export type ItemRules = typeof itemRules.$inferSelect;
 export type ItemCheck = typeof itemChecks.$inferSelect;
 export type NotItemMark = typeof notItemMarks.$inferSelect;
 export type SaleSpan = typeof saleSpans.$inferSelect;
+export type MarketJobRow = typeof marketJobs.$inferSelect;
+export type MarketStateRow = typeof marketState.$inferSelect;

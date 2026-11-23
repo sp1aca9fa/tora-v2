@@ -77,6 +77,41 @@ collected today: `date +%F > ~/.local/state/tora/last-success-date`.
 
 Enable them: `sudo systemctl daemon-reload && sudo systemctl enable --now tora-app tora-collect.timer`.
 
+Daytime reads of the marketplaces (requirements S36 B4): `tora-market-jobs.service` and its timer.
+Until a plug-in reads jobs, a run finds nothing to read and sends no request.
+
+```ini
+# /etc/systemd/system/tora-market-jobs.service
+[Unit]
+Description=Tora daytime reads of the marketplaces
+
+[Service]
+Type=oneshot
+User=<user>
+WorkingDirectory=/home/<user>/code/tora-v2
+Environment=PATH=$NODE_BIN:/usr/bin:/bin
+Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ExecStart=/home/<user>/code/tora-v2/scripts/market-jobs-cron.sh
+TimeoutStartSec=90min
+
+# /etc/systemd/system/tora-market-jobs.timer
+[Unit]
+Description=Tora daytime reads, every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:10,40:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable: `sudo systemctl daemon-reload && sudo systemctl enable --now tora-market-jobs.timer`. Its
+log: `~/.local/state/tora/market-jobs.log`. It runs from 05:00 to 22:00 (the app's time zone), at
+most each marketplace's number a day (200 to start; a refusal halves it after a 3-day wait), and
+stops for a collect. Stop all daytime reads: `sudo systemctl disable --now tora-market-jobs.timer`;
+a run in progress: `sudo systemctl stop tora-market-jobs.service` (safe at any point).
+
 ## 4. The address (Tailscale, tailnet only)
 
 Since 2026-10-31 Tora answers only on the tailnet (Tailscale Serve), not on the internet (Funnel):

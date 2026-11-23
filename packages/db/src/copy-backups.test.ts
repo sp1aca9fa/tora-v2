@@ -47,6 +47,9 @@ const SCHEMA = `
   create table not_item_marks (source text);
   create table sale_coverage (source text);
   create table sale_spans (source text);
+  create table market_jobs (source text);
+  create table market_days (source text);
+  create table market_state (source text);
   create table item_checks (source text, counts text, note text);
   create table item_rule_state (held text);
   create table item_sales (sales text);

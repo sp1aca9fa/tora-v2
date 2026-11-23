@@ -38,7 +38,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { holdCollectLocks, lockSource, stateDir } from './lock';
+import { bootId, holdCollectLocks, lockSource, stateDir } from './lock';
 import {
   type RecheckPlan,
   applyRecheck,
@@ -885,6 +885,28 @@ describe('the locks', () => {
     }
     expect(held).toMatchObject({ interrupted: ['shop'] });
     if ('release' in held) held.release();
+  });
+
+  it("waits for a daytime job's lock (one request at most), not for any other holder", async () => {
+    const { state, locks } = paths();
+    const job = lockSource('flea', locks, process.ppid, bootId(), 'job');
+    setTimeout(() => 'release' in job && job.release(), 1000);
+    const started = Date.now();
+    const held = await holdRecheckLocks(db, ['flea'], { state, locks });
+    expect('release' in held).toBe(true);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+    if ('release' in held) held.release();
+    // Another state folder: the collect locks just let go take a moment to be free.
+    const second = join(dir, 'state-2');
+    mkdirSync(second);
+    writeFileSync(join(second, 'collect.log'), '');
+    const site = lockSource('flea', locks, process.ppid, bootId());
+    const asked = Date.now();
+    expect(await holdRecheckLocks(db, ['flea'], { state: second, locks })).toEqual({
+      refused: `flea is being collected (process ${process.ppid}).`,
+    });
+    expect(Date.now() - asked).toBeLessThan(500);
+    if ('release' in site) site.release();
   });
 
   it('its own lock keeps a second re-check out', async () => {

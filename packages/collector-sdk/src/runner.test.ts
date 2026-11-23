@@ -36,6 +36,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { BlockedError, ListingGoneError, RequestCapError } from './http';
 import { pace, runCollector } from './runner';
 import type { Collector } from './types';
+import { baseConverter } from './money';
+import { saveObservations } from './save';
 
 let db: Db;
 let userId: string;
@@ -1007,4 +1009,45 @@ it("a boxed game is never offered its plain item's listing, nor searched outside
   // No keyword search at another source; the identity shop is asked, never with the plain page.
   expect(searched).toEqual({ fake: [], shop: [boxed.id] });
   expect(await listPendingCandidates(db, boxed.id)).toEqual([]);
+});
+
+it("stores a job's rows as the nightly save does (one save path, S36 B4)", async () => {
+  const { product } = await box();
+  const rows = (ref: string) => [
+    {
+      productId: product.id,
+      source: 'fake',
+      observationType: 'sold' as const,
+      bucket: 'sealed:shrink',
+      price: 12_340,
+      currency: 'JPY',
+      observedAt: '2026-10-01T03:00:00.000Z',
+      fetchedAt: '2026-10-02T00:00:00.000-05:00',
+      externalRef: `${ref}|1`,
+      raw: { page: 1 },
+    },
+  ];
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1' });
+  await runCollector(
+    db,
+    fakeCollector({
+      collect: async (_link, _product, ctx) => {
+        await ctx.save(rows('night'));
+        return { state: { mode: 'incremental' }, complete: true };
+      },
+    }),
+    quiet,
+  );
+  expect(await saveObservations(db, await baseConverter(db), rows('job'))).toBe(1);
+  const stored = await db
+    .select()
+    .from(schema.priceObservations)
+    .where(eq(schema.priceObservations.productId, product.id))
+    .orderBy(schema.priceObservations.externalRef);
+  const same = stored.map(
+    ({ id: _id, externalRef: _ref, createdAt: _c, updatedAt: _u, ...r }) => r,
+  );
+  expect(stored.map((r) => r.externalRef)).toEqual(['job|1', 'night|1']);
+  expect(same[0]).toEqual(same[1]);
+  expect(same[0]).toMatchObject({ observedAt: '2026-10-01T12:00:00.000+09:00', priceBase: 12_340 });
 });

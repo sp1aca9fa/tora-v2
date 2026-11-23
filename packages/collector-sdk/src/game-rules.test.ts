@@ -298,12 +298,14 @@ describe('applyItemRules', () => {
     await sales(g.id, ['Hero Quest', 'Hero Quest', 'Hero Quest lot', 'Hero Quest']);
     await setGameRules(db, true);
     await words(g.id, ['lot']);
+    const before = new Map((await rowsOf(g.id)).map((r) => [r.id, r.updatedAt]));
     expect(await apply()).toMatchObject({ judged: 1, marked: 1 });
     const marked = (await rowsOf(g.id)).find((r) => r.excluded)!;
     expect(marked).toMatchObject({ excludedReason: 'mismatch' });
     expect(marked.ruleMark).toMatch(/^rules:/);
-    // Marks never touch updated_at (S30 reads a later change as a person's).
-    expect(marked.updatedAt).toBe(marked.createdAt);
+    // Marks never touch updated_at (S30 reads a later change as a person's). Compared with the
+    // row's own value before the mark: an insert's two clock reads can differ by a millisecond.
+    expect(marked.updatedAt).toBe(before.get(marked.id));
     expect(await apply()).toMatchObject({ judged: 0, marked: 0, restored: 0 });
 
     await words(g.id, []);

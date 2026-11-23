@@ -30,7 +30,6 @@ import {
   setSourceQuery,
   sourceNights,
   excludedSaleRefs,
-  insertObservationsWithRuleState,
   isHeld,
   loadSourceRegistry,
   productSetInfo,
@@ -58,6 +57,7 @@ import {
   listingGone,
 } from './http';
 import { baseConverter } from './money';
+import { saveObservations } from './save';
 import { type SupplyWithOffers, storedOffer, supplyWithOffers } from './offers';
 import { awakeClock } from './clock';
 import {
@@ -151,21 +151,7 @@ export async function runCollector(
     now,
     log,
     save: async (rows) => {
-      const converted = [];
-      for (const { price, ...row } of rows) {
-        const c = await toBase(price, row.currency, row.observedAt);
-        converted.push({
-          ...row,
-          // Plug-ins may give times with any offset (a site's own): stored in the app's zone.
-          observedAt: inAppZone(row.observedAt),
-          fetchedAt: inAppZone(row.fetchedAt),
-          priceBase: c.amount,
-          fxRate: c.rate,
-          raw: c.rateDate ? { ...(row.raw as object), fxDate: c.rateDate } : row.raw,
-        });
-      }
-      // A row the game rules marked goes in with its item's rule state (S36 A1); others as before.
-      const n = await insertObservationsWithRuleState(db, converted);
+      const n = await saveObservations(db, toBase, rows);
       added += n;
       return n;
     },

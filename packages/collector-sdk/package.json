@@ -12,6 +12,7 @@
     "build": "tsc -p .",
     "typecheck": "tsc -p .",
     "collect": "tsx src/cli/collect.ts",
+    "market-jobs": "tsx src/cli/market-jobs.ts",
     "purchases": "tsx src/cli/purchases.ts",
     "review": "tsx src/cli/review.ts",
     "demo": "tsx src/cli/demo.ts",
