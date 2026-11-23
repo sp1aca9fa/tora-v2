@@ -46,5 +46,6 @@ export * from './collect-request';
 export * from './catalog';
 export * from './consoles';
 export * from './item-rules';
+export * from './rule-marks';
 export * from './ask-check';
 export * from './sale-coverage';

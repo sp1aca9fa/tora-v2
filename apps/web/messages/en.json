@@ -78,7 +78,11 @@
     "spentShort": "spent {amount}",
     "lotsValued": "{valued} of {total} lots valued",
     "inclOpened": "incl. {amount} in opened items",
-    "tab": { "summary": "Summary", "items": "Items", "spread": "Spread" },
+    "tab": {
+      "summary": "Summary",
+      "items": "Items",
+      "spread": "Spread"
+    },
     "units": "{count, plural, one {# unit} other {# units}}",
     "itemCount": "{count, plural, one {# item} other {# items}}",
     "insights": {
@@ -1943,7 +1947,8 @@
       "trackUntilStart": "Board tracker: until the start of the hours",
       "consoleSaved": "Console",
       "consoleRemoved": "Console removed",
-      "consolesSuggested": "Suggested consoles added"
+      "consolesSuggested": "Suggested consoles added",
+      "gameRules": "Game rules switched"
     },
     "role": {
       "admin": "admin",
@@ -2836,6 +2841,13 @@
     "info": "Games are matched to these consoles by their platform.",
     "more": "How matching works",
     "moreText": "A game's platform is compared with each console's key, names and other spellings (case, width and spaces ignored). A category number limits that console's game searches on a marketplace to its software; with none, the search runs without a category.",
+    "gameRules": "Game rules",
+    "gameRulesOn": "On",
+    "gameRulesOff": "Off",
+    "gameRulesInfo": "For every user: each game's sales are filtered by its console's category and the game's words, and sales that do not match are left out of its prices. Saved at once, applied at the next nightly collect. Turning it off brings those sales back; sales the narrower search skipped while it was on are not read again.",
+    "gameRulesStop": "A game whose rules would leave out more than half of its sales is held back and left unfiltered until someone checks it.",
+    "gameRulesHeld": "{count, plural, =0 {No game is held back.} one {# game is held back and left unfiltered: its rules would leave out more than half of its sales.} other {# games are held back and left unfiltered: their rules would leave out more than half of their sales.}}",
+    "gameRulesFailed": "The switch was not saved. Try again.",
     "key": "Key",
     "keyInfo": "A short id: lower case letters, digits and dashes. It cannot be changed later.",
     "required": "required",

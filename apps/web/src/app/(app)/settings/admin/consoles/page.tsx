@@ -1,10 +1,18 @@
-import { consolePlugins, consoleUseCounts, getDb, listConsoles } from '@tora/db';
+import {
+  consolePlugins,
+  consoleUseCounts,
+  gameRulesOn,
+  getDb,
+  heldItemCount,
+  listConsoles,
+} from '@tora/db';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { adminOnly } from '@/lib/auth/guard';
 import { getLanguages } from '@/lib/languages';
 import { sourceLabels } from '@/lib/sources';
 import { ConsolesEditor } from './consoles-editor';
+import { GameRulesSwitch } from './game-rules-switch';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('settings'))('section.consoles.title') };
@@ -17,13 +25,15 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ConsolesSettingsPage() {
   await adminOnly();
   const db = getDb();
-  const [rows, plugins, used, languages, label, t] = await Promise.all([
+  const [rows, plugins, used, languages, label, t, rulesOn, held] = await Promise.all([
     listConsoles(db),
     consolePlugins(db),
     consoleUseCounts(db),
     getLanguages(),
     sourceLabels(),
     getTranslations('consoles'),
+    gameRulesOn(db),
+    heldItemCount(db),
   ]);
   // Marketplaces with a search plug-in, then any other a saved row names (kept, not lost on save).
   const sources = [
@@ -40,6 +50,7 @@ export default async function ConsolesSettingsPage() {
           <p className="mt-1">{t('moreText')}</p>
         </details>
       </div>
+      <GameRulesSwitch on={rulesOn} held={held} />
       <ConsolesEditor
         rows={rows.map((r) => ({
           key: r.key,

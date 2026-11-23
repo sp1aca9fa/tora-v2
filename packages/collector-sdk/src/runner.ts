@@ -4,6 +4,7 @@ import {
   inAppZone,
   isGameItem,
   localDate,
+  noAiSources,
   sourceInfo,
 } from '@tora/core';
 import {
@@ -12,6 +13,8 @@ import {
   coversDay,
   createQuerySource,
   type DayRange,
+  gameRuleInputs,
+  gameRulesOn,
   gameRulesSwitches,
   heldBuckets,
   finishRun,
@@ -26,7 +29,9 @@ import {
   loadItemSales,
   setSourceQuery,
   sourceNights,
-  insertObservations,
+  excludedSaleRefs,
+  insertObservationsWithRuleState,
+  isHeld,
   loadSourceRegistry,
   productSetInfo,
   productsToMatch,
@@ -53,7 +58,15 @@ import {
 } from './http';
 import { baseConverter } from './money';
 import { awakeClock } from './clock';
-import type { Collector, CollectorContext } from './types';
+import {
+  keepStoredState,
+  markNewSales,
+  marksNewSales,
+  newSaleFails,
+  overlayQuery,
+  withoutFailing,
+} from './game-rules';
+import type { Collector, CollectorContext, PriceInput } from './types';
 
 export interface RunOptions {
   /** Only this product (matching and collection). */
@@ -149,7 +162,8 @@ export async function runCollector(
           raw: c.rateDate ? { ...(row.raw as object), fxDate: c.rateDate } : row.raw,
         });
       }
-      const n = await insertObservations(db, converted);
+      // A row the game rules marked goes in with its item's rule state (S36 A1); others as before.
+      const n = await insertObservationsWithRuleState(db, converted);
       added += n;
       return n;
     },
@@ -290,6 +304,9 @@ export async function runCollector(
       const behind: {
         link: (typeof all)[number]['source'];
         product: (typeof all)[number]['product'];
+        ctx: CollectorContext;
+        /** The stored state, when the search run had the game rules laid over it. */
+        overlaid?: { stored: unknown };
       }[] = [];
       const fresh: CollectorContext = collector.historyPhase ? { ...ctx, phase: 'fresh' } : ctx;
       // S36 Terms "Covered day": what the read nights need, read once per run (S19), not per link.
@@ -300,6 +317,17 @@ export async function runCollector(
       const nights = nightsRead
         ? await sourceNights(db, collector.source)
         : new Map<string, DayRange[]>();
+      // S36 A1, A2: the game items' rules, with the admin's switch on; read once per run (S19).
+      const rulesOn = games && (await gameRulesOn(db));
+      const gameRules = rulesOn
+        ? await gameRuleInputs(
+            db,
+            sources.filter(({ product }) => product.category === 'game').map((s) => s.product),
+            collector.source,
+          )
+        : new Map<string, never>();
+      // The sources the rules judge: a plug-in that says how to read a sale, never a noAi source.
+      const judged = !!collector.saleText && !noAiSources(registry).includes(collector.source);
       for (const { source: listing, product } of sources) {
         tick();
         let link = listing;
@@ -329,11 +357,50 @@ export async function runCollector(
               log(`search for "${product.name}" updated: ${(query.keywords ?? []).join(' ')}`);
             }
           }
+          // A game's search carries its rules for this run only (S36 A1, A2): the stored search is
+          // never rewritten with them, and its sales failing them are saved marked.
+          let searched = link;
+          let linkCtx = fresh;
+          // The sales of this run failing the rules: left out of its recent sales (S36 A1).
+          const failing: PriceInput[] = [];
+          const rules = gameRules.get(product.id);
+          if (rules) {
+            const stored = link.query ?? collector.defaultQuery?.(product) ?? null;
+            const query = stored && overlayQuery(stored, rules.rules, collector.source);
+            if (query && query !== stored) searched = { ...link, query };
+            linkCtx = {
+              ...fresh,
+              itemRules: {
+                rules: rules.rules,
+                hash: rules.hash,
+                listingsConfirmed: rules.listingsConfirmed,
+                notItemRefs: rules.notItemRefs,
+              },
+            };
+            // A held item is left unfiltered. New sales are marked only once its stored sales here
+            // were judged under these rules: until then the closing step judges them with the rest.
+            const saleText = collector.saleText?.bind(collector);
+            if (judged && saleText && !isHeld(rules.state?.held)) {
+              const marks = marksNewSales(rules.state, collector.source, rules.hash);
+              linkCtx.save = (rows) => {
+                for (const row of rows)
+                  if (newSaleFails(row, rules.rules, collector.source, saleText)) failing.push(row);
+                return fresh.save(
+                  marks ? markNewSales(rows, rules.rules, collector.source, saleText) : rows,
+                );
+              };
+            }
+          }
+          // A search run with the rules laid over it leaves the listing's title, address and the
+          // state keys the plug-in names as they were (S36 A1): they would outlive the switch.
+          const overlaid = searched !== link;
+          const keep = (state: unknown, stored: unknown) =>
+            overlaid ? keepStoredState(state, stored, collector.overlayKeeps ?? []) : state;
           const before = added;
           const result = await collector.collect(
-            link,
+            searched,
             product,
-            fresh,
+            linkCtx,
             await heldBuckets(db, product.id),
           );
           if (onTrial) {
@@ -346,19 +413,41 @@ export async function runCollector(
           }
           if (collector.historyPhase && !result.complete)
             behind.push({
-              link: { ...link, state: result.state ?? null, title: result.title ?? link.title },
+              link: {
+                ...searched,
+                state: result.state ?? null,
+                title: (overlaid ? null : result.title) ?? link.title,
+              },
               product,
+              ctx: linkCtx,
+              ...(overlaid && { overlaid: { stored: link.state } }),
             });
-          if (result.query) await setSourceQuery(db, link.id, result.query);
+          // A search run with the rules laid over it is not stored back (S36 A1).
+          if (result.query && searched === link) await setSourceQuery(db, link.id, result.query);
+          // Only a sale stored excluded is left out: one a person kept (or any row stored kept before)
+          // comes back from the search every night and stays the item's sale.
+          const dropped =
+            result.recentSales && failing.length
+              ? await excludedSaleRefs(
+                  db,
+                  collector.source,
+                  failing.flatMap((r) => (r.externalRef ? [r.externalRef] : [])),
+                )
+              : null;
+          const recentSales =
+            result.recentSales &&
+            withoutFailing(
+              result.recentSales,
+              failing.filter((r) => r.externalRef && dropped?.has(r.externalRef)),
+            );
           await updateSourceProgress(db, link.id, {
-            state: result.state,
+            state: keep(result.state, link.state),
             success: true,
-            title: result.title,
-            url: result.url,
+            ...(!overlaid && { title: result.title, url: result.url }),
             recentSales:
-              result.recentSales &&
+              recentSales &&
               (await Promise.all(
-                result.recentSales.map(async ({ price, ...r }) => ({
+                recentSales.map(async ({ price, ...r }) => ({
                   ...r,
                   observedAt: inAppZone(r.observedAt),
                   priceBase: (await toBase(price, own, r.observedAt)).amount,
@@ -397,7 +486,7 @@ export async function runCollector(
             }
             await saveSupply(db, rows);
           }
-          const title = result.title ?? link.title;
+          const title = (overlaid ? null : result.title) ?? link.title;
           if (!link.detailsSyncedAt && title && collector.productDetails) {
             const changed = await syncProductDetails(
               db,
@@ -436,15 +525,19 @@ export async function runCollector(
       }
       // Older history with the requests left once every listing had its new sales; running out
       // here is normal (it continues next run), not a partial run.
-      for (const { link, product } of behind) {
+      for (const { link, product, ctx: linkCtx, overlaid } of behind) {
         try {
           const result = await collector.collect(
             link,
             product,
-            { ...ctx, phase: 'history' },
+            { ...linkCtx, phase: 'history' },
             await heldBuckets(db, product.id),
           );
-          await updateSourceProgress(db, link.id, { state: result.state });
+          await updateSourceProgress(db, link.id, {
+            state: overlaid
+              ? keepStoredState(result.state, overlaid.stored, collector.overlayKeeps ?? [])
+              : result.state,
+          });
           log(
             `history of "${product.name}": ${result.complete ? 'caught up' : 'continues next run'}`,
           );

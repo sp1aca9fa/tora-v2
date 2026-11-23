@@ -153,7 +153,10 @@ async function planOne(
   const products = await recheckItems(db);
 
   const rows: StoredSaleRow[] = [];
-  for (const source of rechecker.sources) rows.push(...(await readStoredSales(db, source)));
+  // One push per row: spreading a whole source's rows into `push` overflows the stack from about
+  // 130,000 rows.
+  for (const source of rechecker.sources)
+    for (const row of await readStoredSales(db, source)) rows.push(row);
   plan.read += rows.length;
   const parsed = new Map(rows.map((r) => [r.id, parseRaw(r.rawText)]));
 

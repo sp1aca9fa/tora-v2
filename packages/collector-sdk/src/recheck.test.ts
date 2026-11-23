@@ -161,6 +161,25 @@ beforeEach(async () => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+describe('a large copy', () => {
+  it('reads 150,000 stored sales of one source without overflowing the stack', async () => {
+    const at = stamp(new Date(now.getTime() - 5 * 86_400_000));
+    await db.$client.execute({
+      sql: `with recursive n(i) as (select 1 union all select i + 1 from n where i < 150000)
+            insert into price_observations (id, product_id, source, observation_type, bucket,
+              price_base, price_original, currency, observed_at, fetched_at, external_ref, raw,
+              excluded, quantity_inferred, created_at, updated_at)
+            select 'bulk' || i, ?, 'flea', 'sold', 'sealed:shrink', 1000, 1000, 'JPY', ?, ?,
+              'bulk' || i, '{"name":"fine"}', 0, 0, ?, ?
+            from n`,
+      args: [productId, at, at, at, at],
+    });
+    const p = await plan();
+    expect(p.read).toBe(150_000);
+    expect(p.changes).toEqual([]);
+  }, 120_000);
+});
+
 describe('what a re-check leaves alone', () => {
   it("never changes a pasted reference, a person's exclude or include, or a dismissed suggestion", async () => {
     const [reference, excluded, included, touched, dismissed, plain, already] = await insertSales(

@@ -1076,6 +1076,10 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
   } else {
     await tx.delete(itemRules).where(eq(itemRules.productId, fromId));
   }
+  const [fromState] = await tx
+    .select({ id: itemRuleState.productId })
+    .from(itemRuleState)
+    .where(eq(itemRuleState.productId, fromId));
   await tx.delete(itemRuleState).where(eq(itemRuleState.productId, fromId));
   if (intoId === null) {
     await tx.update(itemRules).set({ boxedOf: null }).where(eq(itemRules.boxedOf, fromId));
@@ -1089,6 +1093,14 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
     .update(itemRuleState)
     .set({ appliedHash: null })
     .where(eq(itemRuleState.productId, intoId));
+  // The duplicate's rows may carry rules marks: the target gets a state row, so the closing step
+  // judges them again, or takes them back when the switch is off (S36 A1; rule-marks.ts).
+  if (fromState) {
+    await tx
+      .insert(itemRuleState)
+      .values({ productId: intoId, appliedHash: null })
+      .onConflictDoNothing();
+  }
   // The target is never boxed "of" itself (the moved row may have named it, or the duplicate).
   await tx
     .update(itemRules)

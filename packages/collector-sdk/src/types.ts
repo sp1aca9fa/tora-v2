@@ -1,6 +1,7 @@
 import type {
   CatalogSetEntry,
   CodeMeaning,
+  EffectiveRules,
   ReprintHint,
   SignalRule,
   SourceInfo,
@@ -58,6 +59,31 @@ export interface CollectorContext {
    * Undefined for other collectors (one pass doing everything).
    */
   phase?: 'fresh' | 'history';
+  /**
+   * A game item's rules (S36 A1, A2), with the admin's "Game rules" switch on; absent for every other
+   * item and with the switch off. The search the plug-in gets already carries the console's category
+   * and the required words (never the excluded ones); the SDK judges the sales it saves.
+   */
+  itemRules?: ItemRulesContext;
+}
+
+/** What a plug-in is told about a game item's rules (`CollectorContext.itemRules`). */
+export interface ItemRulesContext {
+  /** The item's effective rules (S36 Terms "The item's rules"). */
+  rules: EffectiveRules;
+  /** `rulesHash(rules, source)`: this source's rules, the hash its sales here are marked under. */
+  hash: string;
+  /** Whether this source's listings are confirmed for the item (S36 Terms "Confirmed"). */
+  listingsConfirmed: boolean;
+  /** Listing refs at this source a person marked "not the item". */
+  notItemRefs: ReadonlySet<string>;
+}
+
+/** A stored or new sale's title and category as the source gave them (S36 A1). */
+export interface SaleText {
+  title: string | null;
+  /** The source's category id, as text; null when the sale does not say. */
+  category: string | null;
 }
 
 /**
@@ -146,6 +172,17 @@ export interface Collector {
    * declared: no link. The app only links to it; it never fetches it.
    */
   categoryUrl?(category: string): string | null;
+  /**
+   * How to read a sale's title and category from its row as stored (its `title` column and its raw,
+   * parsed), for the game rules (S36 A1). Sources without it are never judged by item rules.
+   */
+  saleText?(sale: { title: string | null; raw: unknown }): SaleText;
+  /**
+   * Keys of its state (`CollectResult.state`) the runner keeps as stored when it handed the plug-in a
+   * game's search with the rules laid over it (S36 A1): what a narrowed search would teach it (e.g.
+   * the categories it searches besides) must not outlive the admin's switch.
+   */
+  overlayKeeps?: readonly string[];
   /**
    * The collector fills in older history apart from the new sales (`ctx.phase`): every listing
    * gets its fresh pass first, and the history is caught up with the requests left, so a long

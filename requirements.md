@@ -1280,16 +1280,18 @@ this exception with the step. Outside the Wishlist: the nightly collect ends abo
 A1. Game sales. Today each item learns its usual categories and runs up to 2 extra searches inside them;
 for games about 78 % of the cheap sales kept are not the game (goods, bonus cards quoting its name,
 guidebooks, bundles). Fix: a game's sold search at a marketplace takes the console's software category from
-the console table, in place of the extra searches, plus the item's required and excluded words; where a
-search takes no category the words do the work. The category and words are laid over the item's stored
+the console table, in place of the extra searches, plus the item's required words; where a search takes no
+category the words do the work. Excluded words are not sent in the search: the marks below apply them, so a
+sale a word drops comes back when the word goes. The category and words are laid over the item's stored
 search when it is read; the stored search is not rewritten. A game with no rules of its own uses its
 console (found from its platform) and no words. Stored and new game sales that fail the item's rules are
 marked excluded with a mark of their own, apart from S30's exclusions: each night the marks follow the
 rules both ways (a word added drops sales, a word removed brings them back), never touching a sale a person
 included or excluded, and raw rows stay. All of this sits behind one admin switch, off at first: the owner
 sees before and after per game from a rehearsal on a copy, then turns it on; turning it off takes every
-such mark away. An item whose rules would drop more than half of its kept sales (10 or more) is held, with
-nothing marked, until a person confirms it at the registration check. S30's own re-check is not changed.
+such mark away (sales outside the console's category that were not read while it was on are not read
+again). An item whose rules would drop more than half of its kept sales (10 or more) is held, with nothing
+marked, until a person confirms it at the registration check. S30's own re-check is not changed.
 - Measured on the 27 games with enough sales: 12 % of kept sales removed, under 1 % of real copies lost,
   sold searches at Mercari down from 63 to 27 a night.
 - Check, per game, by hand on stored titles and categories, with a blind second reading as in S30: the 20

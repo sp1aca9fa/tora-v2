@@ -4,6 +4,7 @@ export * from './http';
 export * from './sweep';
 export * from './match';
 export * from './runner';
+export * from './game-rules';
 export * from './lock';
 export * from './mbox';
 export * from './images';

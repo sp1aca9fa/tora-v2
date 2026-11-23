@@ -8,6 +8,7 @@ import {
   listConsoles,
   recordAdminChange,
   saveConsole,
+  setGameRules,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { authed } from '@/lib/auth/guard';
@@ -90,4 +91,18 @@ export async function addSuggestedConsolesAction(): Promise<{ added: number } | 
     revalidatePath(PAGE);
   }
   return { added: added.length };
+}
+
+/**
+ * The install's "Game rules" switch (S36 A1): on, games' searches carry their rules and failing
+ * sales are left out; off, every rules mark is taken back at the next collect. Admins only.
+ */
+export async function setGameRulesAction(on: boolean): Promise<{ saved: boolean } | undefined> {
+  const { db, user } = await authed();
+  if (user.role !== 'admin') return;
+  if (typeof on !== 'boolean') return { saved: false };
+  await setGameRules(db, on);
+  await recordAdminChange(db, user.id, 'gameRules', { on }, PAGE);
+  revalidatePath(PAGE);
+  return { saved: true };
 }

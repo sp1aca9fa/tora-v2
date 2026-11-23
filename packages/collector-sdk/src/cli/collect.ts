@@ -52,6 +52,7 @@ import { defaultLockDir, lockSource } from '../lock';
 import { readOpeningCards } from '../opening';
 import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
+import { applyItemRules } from '../game-rules';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
 import { type SourceResult, offEverywhere, refusedResult, runFailed } from './collect-plan';
@@ -396,6 +397,13 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
   log(
     `lot sizes: ${lots.checked} estimated trade(s) checked${lots.full ? ' (all)' : ''}, ${lots.updated} updated`,
   );
+  // The game rules on stored sales (S36 A1): judged again where an item's rules changed, every mark
+  // taken back when the admin's switch is off. Before the packed sales, which follow the marks.
+  try {
+    await applyItemRules(db, collectors, { log });
+  } catch (error) {
+    log(`game rules: stopped (${errorText(error)})`);
+  }
   // Each item's packed sales, which the pages and the steps below read (the days changed by this
   // run and the lot sizes; everything once a week).
   try {
