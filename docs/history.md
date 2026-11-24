@@ -559,3 +559,120 @@ signals. On the data up to October 2026 the zones paid less than average but wer
 rise: Steady signals were followed by a higher price 90 days later less often than any day (sealed
 boxes 25 % against 67 %, PSA 10 cards 33 % against 58 %), because a fall into the cheapest quarter
 usually went on for a while. Rethinking the strategies is planned with S13.
+
+<a id="opportunities-record"></a>
+
+## Opportunities guide: ways, potential, budget, rankings, signals and tests (as written 2026-10-21 to 2026-11-07)
+
+A record, moved out of docs/opportunities.md on 2026-11-24 when [docs/rules/opportunities.md](rules/opportunities.md) became the home of these rules. Not kept current here.
+
+### Ways of spotting a deal
+
+Worth a look has one more filter (`?way=`, S32), for the chosen item type. It is a view, not a
+signal: no way has a record, so a way does not rank, count as proven, or feed alerts, the plan or
+scores. Items today's numbers leave unknown are in no list. A chip shows only with items on.
+
+| Way                        | On when                                                                                                                                                     |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Falling hard               | the last 14 days 20 % or more under the 60 before (`quick_rise`'s mirror)                                                                                   |
+| Cheap, fall paused         | the `cheap_steady` signal                                                                                                                                   |
+| Sales picking up           | the `sales_up` signal                                                                                                                                       |
+| Listings drying up         | the listings count 30 % or more under its count 14 days ago, from 5 or more: the item's price source and condition, the report at most 3 days from that day |
+| A listing under the market | the lowest ask 15 % to 50 % under the recent price, as on the card                                                                                          |
+| Rising fast                | the `quick_rise` signal                                                                                                                                     |
+
+The rule is `dealWayStates` in `packages/core`, which the measure reads too. A list by way shows
+one line with its record per item type from the measure of 2026-11-07 (`dealWayRecord`: "weak or
+mixed" or "cannot be tested yet"), shows Buy timing's word on each row, and has no proven and rest
+headings. Listing counts are saved with the opportunities, apart from `numbers`, so the MCP does
+not pass them on; data saved before reads unknown.
+
+### Potential
+
+What a person looks for (Watchlist > Strategy, kept in their preferences): subjects (up to 10
+words, matched inside the name and alias), rarities, marked out of print, has a current rank. Each
+word and rarity is one criterion. A row meeting some says so, marked as a preference and not
+proven; only a list by way is ordered by how many it meets, ahead of its usual order. None set:
+no tags, order unchanged. Tested once on 2026-11-07, none proved out; a new one is not tested
+until the measure is rerun.
+
+A subject word matches anywhere inside a name, since Japanese names have no word breaks: "Cat" also matches "Catfish". A test that left the longer name out does not cover the word as the page reads it.
+
+### Budget and date
+
+On the Buy plan sub page: a budget, and a date when there is one, and the items to choose from
+(those worth a look, the person's watches, and what their plan already holds). Each says when to
+buy and at what price, from its buy timing ([Buy timing](buy-timing.md)) and the person's
+strategy for its type: buy now (a good price; a listing in the zone when cheaper), from a day (a
+new release waits until similar items' usual first-year low), or once under a price (falling,
+its market falling, or above its buy zone: the zone's top). The person ticks items; the card adds
+their prices and says what is left of the budget, which come after the date and which wait for a
+price (no day). Saved in the person's preferences (`buyPlan`). Buy timing numbers are saved each
+night for these items too (besides those owned or watched), and for every item with signal
+numbers (their cards' target).
+
+**Suggest a mix** (S27) ticks a varied set within the budget: the best item of each item type
+first (so more than one type when the budget allows), then the next best of any type; never two
+items of one set, nor one item over 40 % of the budget. Only items with a reason to buy come in
+(worth a look, or watched; a good price alone is not one), best first: worth a look, buyable now,
+then by score. Items to wait for count at their buy zone's top. Each pick can be swapped for the
+next best that fits (of the same type first). When few items qualify, the rest of the budget is
+left free and the page says so, rather than filling it with items nothing points to.
+
+### Rankings
+
+Ranking plug-ins ([Collectors](collectors.md#ranking-sources)) read a site's popularity ranking
+once a day (the private package reads SNKRDUNK's Pokemon rankings sorted by popularity: boxes
+from the sealed category, singles from all of Pokemon, pages until 60 of each). Each ranked item
+is matched to an item Tora knows; the top 60 nobody tracks become candidates ("suggested" in the
+app), created and collected like
+watched items while they stay in the top 60 (within 30 days). Popular now shows each ranking
+(rank, the change in a week, price, listings, favorites, owned / watching / suggested), and a
+ranked item's card its rank; MCP `opportunities` gives the ranks too. Candidates
+join the signals once their prices are collected. Rank changes as a signal are tested once enough
+days are saved (ranks partly follow price moves).
+
+### Signals
+
+Worked out after each collect, per item, on its steadiest prices (one source and condition): a
+reference source's condition with the most days of sales (30 or more), else the one with the most
+days on any source. A single's line is its own set when 5 or more of the set's singles have
+prices, else its set line, else the whole group.
+
+A warning on for 80 % or more of an item type's items (5 or more) is the market's: Worth a look
+says it once above the list, with its record, and leaves it out of the order, so items are ranked
+by what sets them apart; each card still says how much lower to buy for it (Wait, or under).
+
+| Signal                                  | On when                                                                                                                                                  |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Line rising / falling (warning)         | The median 12-week change of the item's line (5+ items; else the whole group) is +10 % or more / -10 % or less                                           |
+| Leads its line                          | The item's 12-week change is 15 points or more above its line's                                                                                          |
+| Lags a rising line                      | The line is rising and the item is 15 points or more under it                                                                                            |
+| Sales picking up / slowing (warning)    | Sales in the last 30 days are 1.5x or more / 0.6x or less the monthly rate of the 90 days before (10+ sales; sales collected for 120+ days)              |
+| Quick rise                              | The last 14 days' price is 20 % or more above the 60 days before                                                                                         |
+| Out of print / Reprint coming (warning) | An admin marked the item not to be made again / a reprint expected, from the day given (none: always); unmarked, a plug-in may guess (`reprintHints`)    |
+| Strong / weak for its age               | The item's last 90 days are 20 points above / under similar items' at the same age since release (3+ items; day 120 to 3 years; real release dates only) |
+
+Facts, not tested: the lowest ask on the same site as the prices, 15-50 % under the recent price
+(another site's cheapest listing, or one under half the price, is too often something else), and
+a shop buy price (買取, last 30 days) at 80 % of the recent price or more.
+
+Signal plug-ins add an admin's own strategies (e.g. a PSA 10 under twice the raw price), tested
+the same way ([Collectors](collectors.md#signal-plug-ins)). An unproven one an admin picks shows
+as the admin's pick: its items come after the proven ones, under their own heading, tagged so. We
+recommend sticking to proven signals.
+
+### Tests
+
+Each signal is tested on its group's whole history after every collect: every week from 120 days
+after an item's first sale, the numbers from the prices up to that day; a signal counts on the
+first day of each stretch it is on and is checked against the typical price 90 days later. Buying
+on any of those days is the comparison. A signal is proven with 10 or more checks and a share
+higher 90 days later 5 points or more above any day's (a warning: 5 points or more under). Only
+proven signals rank items (the sum of their edges, warnings counting against); the others are
+shown as not proven.
+
+A long rise in the history flatters signals that follow a rise (line rising, leads its line):
+re-testing after every collect lets a signal that stops working stop ranking items.
+
+Saved in the app setting `opportunities` (today's numbers per item and every group's tests).

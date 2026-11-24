@@ -20,10 +20,11 @@ this order the first time.
 
 Rules the code computes from, each stated once (`rules/`):
 
-| Rules                                    | What it holds                                                                        |
-| ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| [Values and confidence](rules/values.md) | How a value is made, its confidence, the totals and profit, the box view, the chart  |
-| [Buy timing](rules/buy-timing.md)        | The numbers saved daily, the buy zones, the verdict, the new-release wait, the tests |
+| Rules                                    | What it holds                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [Values and confidence](rules/values.md) | How a value is made, its confidence, the totals and profit, the box view, the chart                    |
+| [Buy timing](rules/buy-timing.md)        | The numbers saved daily, the buy zones, the verdict, the new-release wait, the tests                   |
+| [Opportunities](rules/opportunities.md)  | Signals and their tests, the order of the lists, deal ways, popular, the buy plan, spread, box opening |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 
