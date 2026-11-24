@@ -85,8 +85,8 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-function run() {
-  return spawnSync('bash', [SCRIPT, 'server-host', backups], {
+function run(script = SCRIPT) {
+  return spawnSync('bash', [script, 'server-host', backups], {
     encoding: 'utf8',
     env: {
       PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
@@ -193,16 +193,123 @@ describe('the analysis copy', () => {
     run();
     expect(mark()).toBe('old');
     const later = new Date(Date.now() + 60_000);
-    // The sales go first and commit never comes: it stops at the missing table.
+    // The sales go first and commit never comes: it stops at the table with no such column.
     writeFileSync(
       join(backups, 'tora-2026-11-06.db.gz'),
-      database('new', `${SOLD} drop table supply;`),
+      database('new', `${SOLD} drop table supply; create table supply (other text);`),
     );
     utimesSync(join(backups, 'tora-2026-11-06.db.gz'), later, later);
     run();
     expect(mark()).toBe('old');
     expect(log()).toContain('analysis copy NOT refreshed');
     expect(readdirSync(join(dir, 'analysis'))).toEqual(['tora.db']);
+  });
+
+  it('is published from a backup older than the scrub file: a table not there yet is left out', () => {
+    // The server's backup before a migration this folder already has: two tables the scrub names
+    // (one statement on one line, one over two lines) are not in it. The statements after each
+    // of them still run.
+    writeFileSync(
+      join(backups, 'tora-2026-11-06.db.gz'),
+      database(
+        'new',
+        `${SOLD} drop table not_item_marks; drop table wish_levels;
+         insert into sale_coverage values ('ebay'), ('mercari');
+         insert into product_sources (source, title) values ('ebay', 'kept from AI'), ('mercari', 'fine');`,
+      ),
+    );
+    expect(run().status).toBe(0);
+    expect(mark()).toBe('new');
+    expect(sold()).toEqual(['mercari']);
+    const db = new DatabaseSync(analysis, { readOnly: true });
+    expect(db.prepare('select source from sale_coverage').all()).toEqual([{ source: 'mercari' }]);
+    expect(db.prepare('select source, title from product_sources order by source').all()).toEqual([
+      { source: 'ebay', title: null },
+      { source: 'mercari', title: 'fine' },
+    ]);
+    db.close();
+    expect(log()).toContain('no table not_item_marks in this backup yet');
+    expect(log()).toContain('no table wish_levels in this backup yet');
+    expect(log()).toContain('analysis copy refreshed');
+  });
+
+  // The script beside a made-up scrub file (it reads the one in its own folder).
+  const scriptWith = (scrub: string) => {
+    mkdirSync(join(dir, 'ops'));
+    writeFileSync(join(dir, 'ops', 'copy-backups.sh'), readFileSync(SCRIPT));
+    writeFileSync(join(dir, 'ops', 'scrub-analysis.sql'), scrub);
+    return join(dir, 'ops', 'copy-backups.sh');
+  };
+  const HIDDEN = `begin;
+create temp table hidden as select key from sources where json_extract(info, '$.noAi');`;
+
+  it('refuses a scrub file with text after a semicolon (the next statement would go with it)', () => {
+    const script = scriptWith(`${HIDDEN}
+delete from not_item_marks where source in hidden; -- a new table
+delete from price_observations where source in hidden;
+drop table hidden;
+commit;
+`);
+    writeFileSync(
+      join(backups, 'tora-2026-11-06.db.gz'),
+      database('new', `${SOLD} drop table not_item_marks;`),
+    );
+    run(script);
+    expect(existsSync(analysis)).toBe(false);
+    expect(log()).toContain('text after a semicolon');
+    expect(log()).toContain('analysis copy NOT refreshed');
+  });
+
+  it('leaves out only the plain shapes: any other statement is kept and run', () => {
+    const script = scriptWith(`${HIDDEN}
+delete from hidden where key = 'mercari';
+delete from main.price_observations where source in hidden;
+update or replace supply set source = source where source in hidden;
+delete from not_item_marks where source in hidden;
+drop table hidden;
+commit;
+`);
+    writeFileSync(
+      join(backups, 'tora-2026-11-06.db.gz'),
+      database('new', `${SOLD} drop table not_item_marks;`),
+    );
+    expect(run(script).status).toBe(0);
+    expect(sold()).toEqual(['mercari']);
+    // A table the file made itself is there: its statement ran too.
+    expect(log()).not.toContain('no table hidden');
+    expect(log()).not.toContain('no table or ');
+    expect(log()).not.toContain('mainprice_observations');
+    expect(log()).toContain('no table not_item_marks in this backup yet');
+  });
+
+  it('a statement of another shape on a missing table fails the scrub', () => {
+    const script = scriptWith(`${HIDDEN}
+delete from main.not_item_marks where source in hidden;
+drop table hidden;
+commit;
+`);
+    writeFileSync(
+      join(backups, 'tora-2026-11-06.db.gz'),
+      database('new', `${SOLD} drop table not_item_marks;`),
+    );
+    run(script);
+    expect(existsSync(analysis)).toBe(false);
+    expect(log()).toContain('analysis copy NOT refreshed');
+  });
+
+  it('is not published when a table a kept statement reads is missing', () => {
+    writeFileSync(join(backups, 'tora-2026-11-05.db.gz'), database('old', SOLD));
+    run();
+    const later = new Date(Date.now() + 60_000);
+    // No registry of sources: which ones are kept from AI cannot be known.
+    writeFileSync(
+      join(backups, 'tora-2026-11-06.db.gz'),
+      database('new', `${SOLD} drop table sources;`),
+    );
+    utimesSync(join(backups, 'tora-2026-11-06.db.gz'), later, later);
+    run();
+    expect(mark()).toBe('old');
+    expect(log()).toContain('analysis copy NOT refreshed');
   });
 
   it('is not published when it fails its integrity check', () => {

@@ -63,6 +63,48 @@ notify() {
   [ -n "$hook" ] || { echo "TORA_WATCH_DISCORD not set: not told"; return 1; }
   curl -fsS -m 30 -H 'content-type: application/json' -d "{\"content\":\"$1\"}" "$hook" >/dev/null
 }
+# The scrub's statements for a database: all of them, except a delete or update whose own table the
+# database does not have (this folder's scrub file can be newer than the server's backup: a table
+# added here and not yet there holds nothing to take out). Each one left out is named in the log.
+# Only the plain shapes `delete from <name>` and `update <name> set` can be left out; any other
+# statement is kept, so a table it misses still fails the scrub, and the copy is not published. A
+# line with text after a semicolon is refused: two statements would be read as one.
+scrub_for() {
+  local have
+  have="$(sqlite3 -readonly "$1" "select name from sqlite_master where type = 'table'" | tr '\n' ' ')" ||
+    return 1
+  awk -v have="$have" '
+    BEGIN { n = split(have, t, " "); for (i = 1; i <= n; i++) has[tolower(t[i])] = 1 }
+    {
+      stmt = stmt $0 "\n"
+      if ($0 ~ /^[ \t]*--/ || $0 ~ /^[ \t]*$/) next
+      if ($0 ~ /;[ \t]*[^ \t]/) {
+        print "scrub: text after a semicolon, not run: " $0 > "/dev/stderr"
+        bad = 1
+        exit 1
+      }
+      if (!started) {
+        started = 1
+        table = ""
+        # A table the file makes itself (`hidden`) is there for the statements after it.
+        if ($1 == "create" && ($2 == "temp" || $2 == "temporary") && $3 == "table") has[tolower($4)] = 1
+        if ($1 == "create" && $2 == "table") has[tolower($3)] = 1
+        if ($1 == "delete" && $2 == "from") table = $3
+        else if ($1 == "update" && $3 == "set") table = $2
+        sub(/;$/, "", table)
+        if (table !~ /^[a-z_][a-z0-9_]*$/) table = ""
+      }
+      if ($0 ~ /;[ \t]*$/) {
+        if (table != "" && !(table in has))
+          print "scrub: no table " table " in this backup yet, its statement left out" > "/dev/stderr"
+        else printf "%s", stmt
+        stmt = ""
+        started = 0
+      }
+    }
+    END { if (bad) exit 1; printf "%s", stmt }
+  ' "$(dirname "$SELF")/scrub-analysis.sql"
+}
 watch_server() {
   local url token down="$STATE_DIR/server-down" now since
   url="$(env_value TORA_STATUS_URL)"
@@ -115,7 +157,7 @@ if [ -n "$newest" ] && [ "$newest" -nt "$ANALYSIS" ]; then
   part="$ANALYSIS.part.$$"
   rm -f "$part" "$part-journal"
   if gunzip -c "$newest" >"$part" &&
-    sqlite3 -bail "$part" <"$(dirname "$SELF")/scrub-analysis.sql" &&
+    scrub_for "$part" | sqlite3 -bail "$part" &&
     [ "$(sqlite3 -readonly "$part" 'pragma integrity_check')" = ok ]; then
     mv "$part" "$ANALYSIS"
     echo "analysis copy refreshed"
