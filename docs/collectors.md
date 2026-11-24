@@ -145,8 +145,9 @@ interface Collector {
 
 For each collector, `pnpm collect`:
 
-1. **Matches**: for owned (or opened) items it `supports` that have no listing on it yet, calls
-   `findCandidates` (up to 50 items per run). Candidates appear under **Actions** and the item
+1. **Matches**: for items someone holds or watches, or in a ranking's top, that it `supports`
+   and that have no listing on it yet, calls `findCandidates`
+   ([how many a run](rules/collectors.md#what-is-read)). Candidates appear under **Actions** and the item
    page's Price sources; the user confirms one or pastes a link (read with `links`).
 2. **Collects**: for every confirmed listing, calls `collect`, which saves prices through
    `ctx.save` and returns where it stopped.
@@ -268,13 +269,15 @@ Tests for a job plug-in replace the global `fetch` with one that fails, so a req
 
 Always fetch through `ctx.http` (`PoliteHttp`), never `fetch` directly:
 
-- 2-5 s between requests (a plug-in can only slow it down, with `http: { minDelayMs }`; do so when
-  the site's robots file asks for a longer delay, as one shop plug-in does with 30 s), a request
-  cap per run (500 by default, `http: { maxRequests }`); what is left waits for the next run;
-- retries with backoff on server errors (3 by default; `http: { retries: 0 }` for an API whose
-  server errors mean "slow down", which then stop the source like a refusal);
+- a wait between requests that a plug-in can only make longer (`http: { minDelayMs }`; do so
+  when the site's robots file asks for a longer delay), and a request cap per run
+  (`http: { maxRequests }`); what is left waits for the next run;
+- retries with backoff on server errors (`http: { retries: 0 }` for a service whose server errors
+  mean "slow down"; the plug-in then raises `BlockedError` itself, since without retries a server
+  error is an ordinary error);
 - stops the source for the run on 403, 429 or a captcha page (`BlockedError`): never work around a
   block;
+- the numbers, and what follows a refusal: [the collecting rules](rules/collectors.md);
 - `ctx.http.json`, `text`, `postJson`, `bytes`.
 
 Collectors run one after another, each with its own client: different sites never slow each

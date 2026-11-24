@@ -734,3 +734,21 @@ night's numbers, so a failed collect sends none. A Good price with little data i
 watch's "Alert on Good price even with limited data" is off. Tora remembers each watch's state:
 an item that slips out of its zone and back within 14 days does not alert twice; changing a
 watch's condition or target starts over.
+
+<a id="core-7"></a>
+
+## Core section 7: Collector rules (as written 2026-10-09, the 30 seconds added 2026-11-24)
+
+A record. Today's rules: [docs/rules/collectors.md](rules/collectors.md). Where the text below
+differs, the rules file is right: searches, set-aside listings and rankings are read too, not only
+active listings; the health flags compare 7 days with the 30 before and look at listings and
+sources, not at items.
+
+- Only fetch for products with active `product_sources`. Never crawl whole sites.
+- Runs from the home PC only. Polite: 2-5 s random delay between requests (a plug-in may wait longer, never less; the identity shop for games waits the 30 s its robots file asks, S36 step A0), per-run request cap, daily schedule with jitter, normal browser headers, retry with backoff on 5xx.
+- On 403/429 or captcha: stop that source for the run, mark run `blocked`, do not retry aggressively.
+- Dedupe by `source` + `external_ref`.
+- Store raw payloads so matching logic can be improved and re-applied later.
+- Parsing must be covered by fixture tests (saved responses) so site changes show up as test failures.
+- Health: a run returning 0 observations for products that previously had data, or medians moving > 50 % day over day, is flagged in Settings.
+- A failing collector must never corrupt data; it only makes values stale.

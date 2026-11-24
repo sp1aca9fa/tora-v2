@@ -14,9 +14,9 @@ bugs cost a few wrong days; a leak between accounts cannot be recomputed away.
 
 ## Rules files
 
-- Public: `CLAUDE.md`, `requirements.md` Core (rules 5 and 7 for data and collectors), and
+- Public: `CLAUDE.md`, `requirements.md` Core (rule 5 for data), and
   `docs/rules/` (one file per concern: `values.md` for valuation, `buy-timing.md`, `opportunities.md`,
-  `sources-markets.md`, `alerts.md`).
+  `sources-markets.md`, `alerts.md`, `collectors.md`).
 - Private: `collectors/ops/claude-rules.md` (read it if it exists; its hard rules never break).
 
 ## Risk class

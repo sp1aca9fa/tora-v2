@@ -2,7 +2,8 @@
 
 Collectors run only on the home PC (WSL2 or Linux, a residential connection), at a polite pace,
 and write straight to the database. Never on Vercel or CI: the CLI refuses when `VERCEL` or `CI` is
-set.
+set. The rules they follow (what is read, the pace, refusals, the schedule):
+[the collecting rules](rules/collectors.md).
 
 ## `pnpm collect`
 

@@ -364,14 +364,7 @@ Moved to [docs/rules/values.md](docs/rules/values.md) (2026-11-24): the one home
 
 ## 7. Collector rules (all sources)
 
-- Only fetch for products with active `product_sources`. Never crawl whole sites.
-- Runs from the home PC only. Polite: 2-5 s random delay between requests (a plug-in may wait longer, never less; the identity shop for games waits the 30 s its robots file asks, S36 step A0), per-run request cap, daily schedule with jitter, normal browser headers, retry with backoff on 5xx.
-- On 403/429 or captcha: stop that source for the run, mark run `blocked`, do not retry aggressively.
-- Dedupe by `source` + `external_ref`.
-- Store raw payloads so matching logic can be improved and re-applied later.
-- Parsing must be covered by fixture tests (saved responses) so site changes show up as test failures.
-- Health: a run returning 0 observations for products that previously had data, or medians moving > 50 % day over day, is flagged in Settings.
-- A failing collector must never corrupt data; it only makes values stale.
+Moved to [docs/rules/collectors.md](docs/rules/collectors.md) (2026-11-24): the one home of what a collect reads, its pace and caps, what happens when a site refuses, when the collect runs, the daytime reads and what is kept. The health flags are in [docs/rules/alerts.md](docs/rules/alerts.md#shown-in-settings-only). This section as first written is kept as a record in [docs/history.md](docs/history.md#core-7); nothing is built from it.
 
 UI principles (all screens):
 - Calm by default: few numbers, details on demand. Show data freshness and confidence wherever a market value appears.
