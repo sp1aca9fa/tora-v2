@@ -226,6 +226,24 @@ describe('query_sql on a database holding a noAi source', () => {
         },
         { key: 'currency', value: 'JPY' },
       ]);
+      // Two levels of a wish: one naming the source on a day, one only the other source.
+      const day = (sources: string[]) => ({
+        day: '2026-10-09',
+        level: 1000,
+        n: 10,
+        window: 30,
+        sources,
+      });
+      await db.insert(schema.wishLevels).values([
+        {
+          productId,
+          bucket: 'a',
+          series: [day(['ebay', 'mercari'])],
+          inputsHash: 'h',
+          computedAt: at,
+        },
+        { productId, bucket: 'b', series: [day(['mercari'])], inputsHash: 'h', computedAt: at },
+      ] as never);
     });
 
     it('keeps them out of query_sql', async () => {
@@ -248,6 +266,7 @@ describe('query_sql on a database holding a noAi source', () => {
       expect(await rows("select quality from sources where key = 'ebay'")).toEqual([
         { quality: null },
       ]);
+      expect(await rows('select bucket from wish_levels')).toEqual([{ bucket: 'b' }]);
       expect(await rows("select quality from sources where key = 'mercari'")).toEqual([
         { quality: null },
       ]);
@@ -272,6 +291,8 @@ describe('query_sql on a database holding a noAi source', () => {
       expect(await all('alert_log')).not.toContain('ebay');
       expect(await all('bucket_values')).not.toContain('ebay');
       expect(await all('item_sales')).not.toContain('ebay');
+      expect(await all('wish_levels')).not.toContain('ebay');
+      expect(await all('wish_levels')).toContain('mercari');
       // A saved opportunity on that source goes with its counts; the other source's stays.
       const [saved] = (
         await db.$client.execute("select value from app_settings where key = 'opportunities'")
@@ -316,8 +337,11 @@ describe('query_sql on a database holding a noAi source', () => {
     }
     // Hide lots by day and any other setting from Claude's tool; the scrub takes out what names such a source.
     const toolOnly = ['portfolio_charts', 'app_settings'];
+    // Tables whose rows naming such a source go whole, the others kept as they are.
+    const rowsOnly = ['wish_levels'];
     for (const table of REBUILT_TABLES.filter((t) => !toolOnly.includes(t))) {
-      expect(scrub, table).toContain(`update ${table} set`);
+      if (rowsOnly.includes(table)) expect(scrub, table).toContain(`delete from ${table}\n  where`);
+      else expect(scrub, table).toContain(`update ${table} set`);
     }
   });
 

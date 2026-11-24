@@ -9,6 +9,7 @@ import {
   type ConsoleRow,
   type EffectiveRules,
   type ItemRulesRow,
+  type Condition,
   consoleKey,
   consoleOf,
   effectiveRules,
@@ -290,6 +291,12 @@ export interface WishSale {
   excluded: boolean;
   excludedReason: string | null;
   ruleMark: string | null;
+  /** The units were not reported (`price_observations.quantity_inferred`). */
+  quantityInferred: boolean;
+  currency: string | null;
+  updatedAt: string;
+  /** The row's raw answer, with `withRaw` only. */
+  raw?: unknown;
   /**
    * A boxed wish's sale dropped by a "not the item" mark on the boxed item: who made it (null: no
    * user kept). Unset for every other row.
@@ -302,6 +309,8 @@ export interface WishSalesOptions {
   since?: string;
   /** Excluded sales too (the registration check shows what was dropped); kept only by default. */
   withExcluded?: boolean;
+  /** The raw answers too (the level reads who paid the shipping from them, W14). */
+  withRaw?: boolean;
 }
 
 /**
@@ -318,29 +327,9 @@ export async function wishSales(
   const { from, rules } = await rowsItemOf(db, productId);
   const o = priceObservations;
   const rows = await db
-    .select({
-      id: o.id,
-      productId: o.productId,
-      source: o.source,
-      externalRef: o.externalRef,
-      title: o.title,
-      url: o.url,
-      bucket: o.bucket,
-      priceBase: o.priceBase,
-      observedAt: o.observedAt,
-      excluded: o.excluded,
-      excludedReason: o.excludedReason,
-      ruleMark: o.ruleMark,
-    })
+    .select(saleColumns(options))
     .from(o)
-    .where(
-      and(
-        eq(o.productId, from),
-        eq(o.observationType, 'sold'),
-        options.withExcluded ? undefined : eq(o.excluded, false),
-        options.since ? gte(o.observedAt, options.since) : undefined,
-      ),
-    );
+    .where(and(eq(o.productId, from), salesWhere(options)));
   if (!rules) return rows;
   // A boxed wisher's "not the item" on a sale is a mark on the boxed item (`not_item_marks` with
   // the boxed id, fix C7): the sale is dropped for the boxed item only, its stored row untouched.
@@ -352,7 +341,50 @@ export async function wishSales(
     })
     .from(notItemMarks)
     .where(eq(notItemMarks.productId, productId));
-  const marked = new Map(marks.map((m) => [`${m.source}|${m.ref}`, m.userId]));
+  return boxedSales(
+    rows,
+    rules,
+    new Map(marks.map((m) => [`${m.source}|${m.ref}`, m.userId])),
+    options,
+  );
+}
+
+const saleColumns = (options: WishSalesOptions) => {
+  const o = priceObservations;
+  return {
+    id: o.id,
+    productId: o.productId,
+    source: o.source,
+    externalRef: o.externalRef,
+    title: o.title,
+    url: o.url,
+    bucket: o.bucket,
+    priceBase: o.priceBase,
+    observedAt: o.observedAt,
+    excluded: o.excluded,
+    excludedReason: o.excludedReason,
+    ruleMark: o.ruleMark,
+    quantityInferred: o.quantityInferred,
+    currency: o.currency,
+    updatedAt: o.updatedAt,
+    ...(options.withRaw ? { raw: o.raw } : {}),
+  };
+};
+
+const salesWhere = (options: WishSalesOptions) =>
+  and(
+    eq(priceObservations.observationType, 'sold'),
+    options.withExcluded ? undefined : eq(priceObservations.excluded, false),
+    options.since ? gte(priceObservations.observedAt, options.since) : undefined,
+  );
+
+/** A boxed item's sales from its plain item's rows: its rules' titles, its "not the item" marks. */
+function boxedSales(
+  rows: readonly WishSale[],
+  rules: EffectiveRules,
+  marked: ReadonlyMap<string, string | null>,
+  options: WishSalesOptions,
+): WishSale[] {
   return rows.flatMap((r) => {
     if (failsRules({ title: r.title, category: null }, rules, r.source)) return [];
     const key = `${r.source}|${r.externalRef}`;
@@ -361,6 +393,66 @@ export async function wishSales(
       ? [{ ...r, excluded: true, excludedReason: 'manual' as const, markedBy: marked.get(key)! }]
       : [];
   });
+}
+
+/** A wished item as `wishSalesMany` reads it: whose rows, and a boxed item's own rules. */
+export interface WishRowsOf {
+  productId: string;
+  /** The item whose rows are read (a boxed item's plain item; else itself). */
+  from: string;
+  /** A boxed item's effective rules (its titles filter the plain item's rows); null: not boxed. */
+  boxedRules: EffectiveRules | null;
+}
+
+/**
+ * `wishSales` for many items at once (S19: batched by item list, never one read per wish): the sold
+ * rows of every `from` in chunks, and the boxed items' "not the item" marks in chunks, filtered as
+ * `wishSales` does. By `productId`; an item with no rows reads empty.
+ */
+export async function wishSalesMany(
+  db: Pick<Db, 'select'>,
+  items: readonly WishRowsOf[],
+  options: WishSalesOptions = {},
+): Promise<Map<string, WishSale[]>> {
+  const o = priceObservations;
+  const byFrom = new Map<string, WishSale[]>();
+  const froms = [...new Set(items.map((i) => i.from))];
+  for (let i = 0; i < froms.length; i += IDS_PER_READ)
+    for (const r of await db
+      .select(saleColumns(options))
+      .from(o)
+      .where(and(inArray(o.productId, froms.slice(i, i + IDS_PER_READ)), salesWhere(options))))
+      byFrom.set(r.productId, [...(byFrom.get(r.productId) ?? []), r]);
+  const boxed = [...new Set(items.filter((i) => i.boxedRules).map((i) => i.productId))];
+  const marks = new Map<string, Map<string, string | null>>();
+  for (let i = 0; i < boxed.length; i += IDS_PER_READ)
+    for (const m of await db
+      .select({
+        productId: notItemMarks.productId,
+        source: notItemMarks.source,
+        ref: notItemMarks.externalRef,
+        userId: notItemMarks.userId,
+      })
+      .from(notItemMarks)
+      .where(inArray(notItemMarks.productId, boxed.slice(i, i + IDS_PER_READ))))
+      marks.set(
+        m.productId,
+        (marks.get(m.productId) ?? new Map<string, string | null>()).set(
+          `${m.source}|${m.ref}`,
+          m.userId,
+        ),
+      );
+  const out = new Map<string, WishSale[]>();
+  for (const item of items) {
+    const rows = byFrom.get(item.from) ?? [];
+    out.set(
+      item.productId,
+      item.boxedRules
+        ? boxedSales(rows, item.boxedRules, marks.get(item.productId) ?? new Map(), options)
+        : rows,
+    );
+  }
+  return out;
 }
 
 /** One stored supply row's search listings as a wish reads them. */
@@ -445,6 +537,14 @@ export interface GameWishInput {
   watch: WatchInput;
 }
 
+/**
+ * The condition a game wish gets when none is given (S36 Terms "Condition"): no noticeable damage,
+ * bucket `cond:good`. A wish with no condition would have the empty bucket, which no sale has, so it
+ * would never get a level (fix round 1, item 0).
+ */
+export const DEFAULT_GAME_CONDITION: Condition = 'no_noticeable_damage';
+const DEFAULT_GAME_BUCKET = 'cond:good';
+
 /** The console row a typed console names (key, name or alias), or null. */
 export function findConsole(text: string, consoles: readonly ConsoleRow[]): ConsoleRow | null {
   const key = consoleOf(text, consoles) ?? consoleKey(text);
@@ -494,13 +594,38 @@ export async function addGameWish(
           edition,
         });
     const target = input.boxed ? await boxedOf(tx, userId, plain, row.key) : plain;
+    const given = input.watch.condition != null;
+    if (!given) await goodFromEmpty(tx, userId, target.id);
     // A game wished again keeps its stored target and note unless new ones were typed (fix 2).
-    const watch = await addWatchOf(tx, userId, target, input.watch, { keepUntyped: true });
+    const watch = await addWatchOf(
+      tx,
+      userId,
+      target,
+      { ...input.watch, condition: input.watch.condition ?? DEFAULT_GAME_CONDITION },
+      { keepUntyped: true },
+    );
     return { watch, product: target, plain };
   });
   // Its deep reads (S36 B3), once the wish is stored.
   await queueWishReadsSafely(db, made.product.id);
   return made;
+}
+
+/**
+ * A person's earlier wish on the item with the empty bucket (made before a game wish had a default
+ * condition) becomes the `cond:good` wish, so adding the game again leaves one wish, not two (fix
+ * round 1, item 0); its target and note then follow `keepUntyped`. Left alone when the person already
+ * has a `cond:good` watch on the item. A new bucket starts its alerts afresh, as `updateWatch` does.
+ */
+async function goodFromEmpty(tx: Tx, userId: string, productId: string): Promise<void> {
+  const mine = (bucket: string) =>
+    and(eq(watches.userId, userId), eq(watches.productId, productId), eq(watches.bucket, bucket));
+  const [good] = await tx.select({ id: watches.id }).from(watches).where(mine(DEFAULT_GAME_BUCKET));
+  if (good) return;
+  await tx
+    .update(watches)
+    .set({ condition: DEFAULT_GAME_CONDITION, bucket: DEFAULT_GAME_BUCKET, alertState: null })
+    .where(mine(''));
 }
 
 /**

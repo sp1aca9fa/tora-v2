@@ -1,4 +1,5 @@
 import type {
+  AddedCost,
   CatalogSetEntry,
   CodeMeaning,
   EffectiveRules,
@@ -265,6 +266,15 @@ export interface Collector {
    * parsed), for the game rules (S36 A1). Sources without it are never judged by item rules.
    */
   saleText?(sale: { title: string | null; raw: unknown }): SaleText;
+  /**
+   * What a buyer adds to this source's prices, for its sales and its listings (S36 Terms "As paid",
+   * C1): `included`, `per_row` (each row's `raw.shipping`: `included`, `buyer` with
+   * `raw.shippingAmount`, or `unknown`) or `unknown`. Not declared: unknown, so its sales stay out of a
+   * wish's level until a shipping sample is recorded (`addedCostSampled`); a passing sample makes it
+   * `per_row` with a row that does not tell counted as included. `raw.shipping` is the one payer field:
+   * the level reads it (`rowShipping` in @tora/core) and so does the stored shipping sample.
+   */
+  addedCost?: AddedCost;
   /**
    * Keys of its state (`CollectResult.state`) the runner keeps as stored when it handed the plug-in a
    * game's search with the rules laid over it (S36 A1): what a narrowed search would teach it (e.g.

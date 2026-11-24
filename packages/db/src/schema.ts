@@ -10,6 +10,7 @@ import {
   HOLDING_EVENT_TYPES,
   HOLDING_STATUSES,
   ITEM_CHECK_BY,
+  ITEM_FACT_KINDS,
   ITEM_CHECK_KINDS,
   ITEM_CHECK_OUTCOMES,
   OBSERVATION_TYPES,
@@ -18,11 +19,17 @@ import {
   SALE_SPAN_HOWS,
   SET_TYPES,
   USER_ROLES,
+  WISH_ESTIMATE_BASES,
   newId,
   toLocalIso,
   type AlertState,
   type ItemCheckBy,
   type JobResult,
+  type ItemFactKind,
+  type LevelDay,
+  type WishEstimateBasis,
+  type WishRecord,
+  type WishRisk,
   type ItemCheckKind,
   type ItemCheckOutcome,
   type Names,
@@ -1591,6 +1598,91 @@ export const marketState = sqliteTable('market_state', {
     .$defaultFn(() => toLocalIso()),
 });
 
+/**
+ * A game item's daily levels in one bucket (S36 Terms "Level", "Record"; W14): one row per item and
+ * bucket some confirmed wish needs, rebuilt by the collect's closing step when `inputs_hash` changes
+ * (`refreshWishLevels`). Levels are per item, never per person.
+ */
+export const wishLevels = sqliteTable(
+  'wish_levels',
+  {
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    bucket: text('bucket').notNull(),
+    /** Per day, oldest first: the level or null, the count, the window and the sources counted. */
+    series: text('series', { mode: 'json' }).notNull().$type<LevelDay[]>(),
+    /** The record (null: no day counts yet). */
+    record: text('record', { mode: 'json' }).$type<WishRecord | null>(),
+    /** The day the game's age runs from (Terms "Young game"; null: not known). */
+    bornOn: text('born_on'),
+    inputsHash: text('inputs_hash').notNull(),
+    computedAt: text('computed_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.productId, t.bucket] })],
+);
+
+/**
+ * A person's estimate on their wish (spec W15): a range, roughly when, named risks, what it rests on
+ * and sources. Per user; a new estimate is a new row (past ones stay).
+ */
+export const wishEstimates = sqliteTable(
+  'wish_estimates',
+  {
+    id: id(),
+    watchId: text('watch_id')
+      .notNull()
+      .references(() => watches.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    low: integer('low').notNull(),
+    high: integer('high').notNull(),
+    currency: text('currency').notNull(),
+    /** Roughly when, as a month `YYYY-MM`. */
+    settleBy: text('settle_by'),
+    risks: text('risks', { mode: 'json' }).notNull().$type<{ kind: WishRisk; text?: string }[]>(),
+    basis: text('basis', { enum: WISH_ESTIMATE_BASES }).$type<WishEstimateBasis>(),
+    sources: text('sources', { mode: 'json' }).notNull().$type<string[]>(),
+    enteredAt: text('entered_at')
+      .notNull()
+      .$defaultFn(() => toLocalIso()),
+  },
+  (t) => [
+    check('wish_estimates_range_check', sql`${t.low} > 0 AND ${t.high} >= ${t.low}`),
+    check('wish_estimates_basis_check', oneOf(t.basis, WISH_ESTIMATE_BASES)),
+    index('wish_estimates_watch_idx').on(t.watchId, t.enteredAt),
+    index('wish_estimates_user_idx').on(t.userId),
+  ],
+);
+
+/**
+ * A dated fact a person recorded about an item (spec W15), shared per item: a re-release, a port, a
+ * price cut. A later row may withdraw an earlier one (`withdraws_id`).
+ */
+export const itemFacts = sqliteTable(
+  'item_facts',
+  {
+    id: id(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    day: text('day').notNull(),
+    kind: text('kind', { enum: ITEM_FACT_KINDS }).notNull().$type<ItemFactKind>(),
+    text: text('text'),
+    sourceUrl: text('source_url'),
+    withdrawsId: text('withdraws_id'),
+    recordedBy: text('recorded_by').references(() => users.id, { onDelete: 'set null' }),
+    recordedAt: text('recorded_at')
+      .notNull()
+      .$defaultFn(() => toLocalIso()),
+  },
+  (t) => [
+    check('item_facts_kind_check', oneOf(t.kind, ITEM_FACT_KINDS)),
+    index('item_facts_product_idx').on(t.productId, t.day),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1630,3 +1722,6 @@ export type NotItemMark = typeof notItemMarks.$inferSelect;
 export type SaleSpan = typeof saleSpans.$inferSelect;
 export type MarketJobRow = typeof marketJobs.$inferSelect;
 export type MarketStateRow = typeof marketState.$inferSelect;
+export type WishLevelRow = typeof wishLevels.$inferSelect;
+export type WishEstimate = typeof wishEstimates.$inferSelect;
+export type ItemFact = typeof itemFacts.$inferSelect;

@@ -58,6 +58,8 @@ import {
   productSources,
   saleCoverage,
   saleSpans,
+  itemFacts,
+  wishLevels,
   products,
   sourceCandidates,
   sourceWarningDismissals,
@@ -1131,6 +1133,11 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
     await tx.delete(itemRules).where(eq(itemRules.productId, fromId));
   }
   await moveMarketJobs(tx, fromId, intoId);
+  // Levels are rebuilt from the rows (W14): the duplicate's go, and the target's, so the next
+  // collect computes the merged item's again from all its sales.
+  await tx
+    .delete(wishLevels)
+    .where(inArray(wishLevels.productId, intoId === null ? [fromId] : [fromId, intoId]));
   const [fromState] = await tx
     .select({ id: itemRuleState.productId })
     .from(itemRuleState)
@@ -1142,8 +1149,10 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
     await tx.delete(notItemMarks).where(eq(notItemMarks.productId, fromId));
     await tx.delete(saleCoverage).where(eq(saleCoverage.productId, fromId));
     await tx.delete(saleSpans).where(eq(saleSpans.productId, fromId));
+    await tx.delete(itemFacts).where(eq(itemFacts.productId, fromId));
     return;
   }
+  await tx.update(itemFacts).set({ productId: intoId }).where(eq(itemFacts.productId, fromId));
   await tx
     .update(itemRuleState)
     .set({ appliedHash: null })

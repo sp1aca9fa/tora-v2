@@ -32,6 +32,10 @@ delete from market_state where source in hidden;
 delete from item_checks where source in hidden;
 update item_checks set counts = null, note = null where source = '' and exists (select 1 from hidden);
 update item_rule_state set held = null where held is not null and exists (select 1 from hidden);
+-- A game wish's levels (W14) mix several sources' sales and name them per day: a row naming such a
+-- source goes whole (a source marked noAi stays in it until the next nightly refresh).
+delete from wish_levels
+  where exists (select 1 from hidden where instr(wish_levels.series, '"' || hidden.key || '"'));
 
 update item_sales set sales = json_set(sales,
     '$.n', json((select json_group_object(n.key, json(n.value))

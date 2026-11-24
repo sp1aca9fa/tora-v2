@@ -33,3 +33,4 @@ export * from './data-check';
 export * from './game-rules';
 export * from './market-ceiling';
 export * from './deep-read';
+export * from './wish-level';

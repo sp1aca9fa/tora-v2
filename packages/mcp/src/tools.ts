@@ -806,6 +806,9 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
   ),
   // Why an item's rules are held may quote what they would drop at a source (S36 A1).
   item_rule_state: { held: () => 'null' },
+  // A game wish's levels (W14) are sale prices of several sources together and name them per day;
+  // a row naming such a source goes whole (ROW_FILTERS), the others are read as they are.
+  wish_levels: {},
   // Sent messages may quote a price or ask of any source, and failure cards (kind admin) name the
   // sources and quote their errors: only kinds that never do keep their text.
   alert_log: {
@@ -840,6 +843,12 @@ const ROW_FILTERS: Record<string, (l: string) => string> = {
   // Valued from those sources' sales: the whole value is theirs.
   bucket_values: (l) => `coalesce(json_extract(value, '$.valuation.source'), '') not in (${l})`,
   item_checks: (l) => `source not in (${l})`,
+  // A source marked noAi stays named in a level's days until the next nightly refresh drops it.
+  wish_levels: (l) =>
+    `not (${l
+      .split(', ')
+      .map((k) => `instr(series, '"' || ${k} || '"')`)
+      .join(' or ')})`,
 };
 
 /** Settings readable through `query_sql`; any other's value is left out (a new one holds nothing). */
@@ -884,6 +893,7 @@ export const SOURCE_FREE_TABLES = [
   'import_rows',
   'import_runs',
   'import_uploads',
+  'item_facts',
   'item_rules',
   'login_attempts',
   'lottery_marks',
@@ -899,6 +909,8 @@ export const SOURCE_FREE_TABLES = [
   'user_devices',
   'users',
   'watches',
+  // A person's estimates on their wishes (W15), as they typed them.
+  'wish_estimates',
 ];
 /** Every table the guards of `query_sql` know, for that test. */
 export const SORTED_TABLES = () => [

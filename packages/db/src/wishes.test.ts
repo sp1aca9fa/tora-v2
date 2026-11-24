@@ -304,8 +304,10 @@ describe('adding', () => {
       'Alpha Station',
       'jp',
       'software',
-      '',
+      'cond:good',
     ]);
+    // A game wish with no condition is in no noticeable damage (fix round 1, item 0).
+    expect(w.condition).toBe('no_noticeable_damage');
     expect(await getItemRules(db, g.id)).toMatchObject({
       console: 'alpha',
       edition: 'Deluxe',
@@ -720,13 +722,65 @@ describe('fix round 2', () => {
       db,
       ann.id,
       { productId: first.product.id },
-      { targetPriceBase: null },
+      { condition: 'no_noticeable_damage', targetPriceBase: null },
     );
     expect([cleared.id, cleared.targetPriceBase, cleared.note]).toEqual([
       first.watch.id,
       null,
       null,
     ]);
+  });
+
+  it('a game wish has a condition: the default, the one given, an old empty one taken over', async () => {
+    const given = await addGameWish(db, ann.id, {
+      name: 'Moon Rover',
+      console: 'alpha',
+      watch: { condition: 'like_new' },
+    });
+    expect([given.watch.condition, given.watch.bucket]).toEqual(['like_new', 'cond:like_new']);
+    // A wish stored before the default (empty bucket) becomes the cond:good wish when the game is
+    // added again: one wish, its target and note kept (fix round 1, item 0).
+    const { watch: old } = await addWatch(
+      db,
+      ann.id,
+      { productId: given.product.id },
+      { targetPriceBase: 3000, note: 'any copy' },
+    );
+    expect(old.bucket).toBe('');
+    const again = await addGameWish(db, ann.id, {
+      name: 'Moon Rover',
+      console: 'alpha',
+      reuse: given.product.id,
+      watch: {},
+    });
+    expect(again.watch.id).toBe(old.id);
+    expect([again.watch.bucket, again.watch.targetPriceBase, again.watch.note]).toEqual([
+      'cond:good',
+      3000,
+      'any copy',
+    ]);
+    const mine = await db.select().from(watches).where(eq(watches.userId, ann.id));
+    expect(mine.map((w) => w.bucket).toSorted()).toEqual(['cond:good', 'cond:like_new']);
+    // With a cond:good wish there already, an empty one is left as it is.
+    const { watch: empty } = await addWatch(db, ann.id, { productId: given.product.id }, {});
+    await addGameWish(db, ann.id, {
+      name: 'Moon Rover',
+      console: 'alpha',
+      reuse: given.product.id,
+      watch: {},
+    });
+    const [left] = await db.select().from(watches).where(eq(watches.id, empty.id));
+    expect(left!.bucket).toBe('');
+    // Bob's empty wish on the item is not touched by Ann's add.
+    const { watch: bobs } = await addWatch(db, bob.id, { productId: given.product.id }, {});
+    await addGameWish(db, ann.id, {
+      name: 'Moon Rover',
+      console: 'alpha',
+      reuse: given.product.id,
+      watch: {},
+    });
+    const [kept] = await db.select().from(watches).where(eq(watches.id, bobs.id));
+    expect(kept!.bucket).toBe('');
   });
 
   it("undoes a plain wish's hand exclusion on the check page", async () => {

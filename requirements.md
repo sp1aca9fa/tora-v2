@@ -1251,8 +1251,9 @@ keeps what the Watchlist does today (S9's zone, target and alerts), unchanged.
   the page says so. Otherwise there is no level: the page shows the lowest, the highest and the count of the clean sales of the last 90 days, and
   from which day they are whole. The level is per bucket, as the replay measured it; pooling the used
   buckets is measured at the rerun (step D).
-- Covered day, per source: a day whose night read that source for the item, from the item's first nightly
-  collect on; a day a later read-back reached past (A3, a tracked game's weekly read); or a day inside the
+- Covered day, per source: a day whose night read that source for the item (the collect that runs just after
+  that day ends: it carries the next day's date and has read the sales up to then, so a collect dated D
+  covers D-1, and the newest day a level can have is yesterday), from the item's first nightly collect on; a day a later read-back reached past (A3, a tracked game's weekly read); or a day inside the
   span of a finished deep read (B3). A deep read's span runs to the day before its first page was read (a
   read over several days sees the newest sales only on its first day; the nights cover the days since), from
   the date it was asked to reach when it read 4 weeks past that date, and otherwise (the pages ran out

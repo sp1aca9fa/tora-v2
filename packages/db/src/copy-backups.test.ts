@@ -52,6 +52,7 @@ const SCHEMA = `
   create table market_state (source text);
   create table item_checks (source text, counts text, note text);
   create table item_rule_state (held text);
+  create table wish_levels (series text, record text);
   create table item_sales (sales text);
   create table bucket_values (value text);
   create table product_sources (source text, recent_sales text, state text, failure text,

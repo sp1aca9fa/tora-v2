@@ -306,6 +306,17 @@ const inMarket = (s: SourceInfo, market: string | null | undefined) =>
   !market || s.market === market;
 
 /**
+ * The keys of the sources of a market (default: the primary one, the install's home market; no
+ * market set: every source). S36 Terms "Level": "from every source of the home market".
+ */
+export function marketSourceKeys(
+  registry: SourceRegistry,
+  market: string | null | undefined = registry.markets?.primary,
+): string[] {
+  return registry.sources.filter((s) => inMarket(s, market)).map((s) => s.key);
+}
+
+/**
  * Sources valued for a class in a market (default: the primary one), best first: references,
  * then supporting ones, each in the class's order (the admin's, else the plug-ins' priority).
  */

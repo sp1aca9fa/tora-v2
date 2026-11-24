@@ -27,6 +27,13 @@ export function nextDay(day: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** The calendar day before `day`. */
+export function prevDay(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Ranges sorted and merged: overlapping ones and ones that touch (one ends the day before the next
  * starts) become one. Ranges that are not valid (a bad day, from after to) are left out.
@@ -210,7 +217,27 @@ export async function dropSpans(
   return gone.length;
 }
 
-/** The covered days of an item at a source within `[from, to]`, as merged ranges (nights and spans). */
+/**
+ * The covered days of an item at a source (S36 Terms "Covered day"): the one reading of its nights
+ * and spans as "days whose sales were read". A night is stamped with the day its collect ran, just
+ * after midnight, having read the sales up to then: "a collect dated D covers D-1, and the newest day
+ * a level can have is yesterday". So each night range moves back one day; spans already name the days
+ * they read ("to the day before its first page was read") and stay as they are. Joined. Stored nights
+ * keep their stamps (`addNight` and the runner's `coversDay(read, today)` mean "the collect ran that
+ * day"). Invalid ranges are left out.
+ */
+export function coveredOf(
+  nights: readonly DayRange[],
+  spans: readonly DayRange[] = [],
+): DayRange[] {
+  const read = mergeRanges(nights).map(([from, to]): DayRange => [prevDay(from), prevDay(to)]);
+  return mergeRanges([...read, ...spans]);
+}
+
+/**
+ * The nights (as stamped: the days the collect ran) and spans of an item at a source within
+ * `[from, to]`, as merged ranges. Not the covered days of the level: those are `coveredOf`.
+ */
 export async function coveredRanges(
   db: Pick<Db, 'select'>,
   productId: string,

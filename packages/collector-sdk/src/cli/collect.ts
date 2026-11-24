@@ -56,6 +56,7 @@ import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
 import { applyItemRules } from '../game-rules';
 import { dropUncoveredSpans } from '../job-search';
+import { refreshWishLevels } from '../wish-levels';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
 import { type SourceResult, offEverywhere, refusedResult, runFailed } from './collect-plan';
@@ -455,6 +456,16 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
     }
   } catch (error) {
     log(`self-check: stopped (${errorText(error)})`);
+  }
+  // Game wishes' levels (S36 Terms "Level", W14): rebuilt where their sales, covered days, rules or
+  // added-cost settings changed since the last run. No request.
+  try {
+    const levels = await refreshWishLevels(db, collectors);
+    log(
+      `wish levels: ${levels.written} rebuilt, ${levels.unchanged} unchanged, ${levels.removed} removed`,
+    );
+  } catch (error) {
+    log(`wish levels: stopped (${errorText(error)})`);
   }
   // Items without a catalog set: linked when sure, suggested on Actions when not (S9).
   const sets = await linkSets(db);

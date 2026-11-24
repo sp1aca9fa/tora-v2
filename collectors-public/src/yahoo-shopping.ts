@@ -248,6 +248,8 @@ export function yahooShopping(clientId: string): Collector {
     // The API allows one request a second; the SDK never goes under 2 s anyway. No retry on a server
     // error: the API's limited state answers 500, and a refusal is never retried around.
     http: { minDelayMs: 1_100, retries: 0 },
+    // What a buyer adds (S36 C1): free shipping only when the hit says so (`shipping` per copy).
+    addedCost: { sales: 'unknown', listings: 'per_row' },
     linksByCode: true,
     // Game items of the home market (Japan); a game with no region is judged by its JAN alone.
     supports: (p: Product) => isGameItem(p) && (p.region == null || p.region === 'jp'),
