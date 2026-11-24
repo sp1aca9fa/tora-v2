@@ -17,7 +17,8 @@ In **Settings > Admin preferences > Markets**, the admin picks:
 
 Each compared market shows its reference source's price for the item (else a supporting
 source's), converted to the base currency. Markets are told apart by their sources' market, not
-their currency: two markets may share one (France and Germany both in euros).
+their currency: two markets may share one (France and Germany both in euros). How that one price
+is picked: [the rules](rules/sources-markets.md#markets-and-the-compared-price).
 
 **Graded cards need a source that prices them.** A lot is valued only from prices in its own
 condition. If the primary market's sources price ungraded cards only (Cardmarket's price guide,
@@ -83,8 +84,9 @@ Rules for a rate plug-in:
 
 - **Daily rates**; working days are enough (the app uses the last rate on or before a date).
 - **The direction**: `rate` is units of `to` per unit of `from`. The app asks for the pair it needs.
-- **History**: the first run asks for about a year back (item pages compare the last year); later
-  runs ask from the last stored day.
+- **History**: the first run asks for a little over a year back (item pages compare the last
+  year; the number is in [the rules](rules/sources-markets.md#currency-and-rates)); later runs ask
+  from the last stored day.
 - **A free source whose terms allow it**, fetched through `http` (the polite client).
 - **Declare the currencies** it covers: Settings offers it only for currencies it lists together
   with the base.

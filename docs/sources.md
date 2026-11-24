@@ -35,11 +35,15 @@ below. So the plug-in author is responsible for declaring the truth, and the adm
 ## The quality gate: trust is earned
 
 After each collect, each **supporting** source's sales are compared with its market's reference's
-on the same items and conditions (the last 90 days, 3+ sales on each side):
+on the same items and conditions:
 
-- on **10 or more** items in common, a median gap **over 15%** means it disagrees: it is valued as
-  comparison only until it agrees again, admins get a notice, and Settings shows the gap;
+- when enough can be compared and its prices stray too far, it disagrees: it is valued as
+  comparison only until it agrees again, admins get a notice, and Settings shows how far above or
+  below the reference it runs;
 - with fewer items in common it is **unverified** and keeps its role.
+
+What is compared, how many are needed and how far is too far:
+[the quality gate's rules](rules/sources-markets.md#the-quality-gate).
 
 Example: a flea market's card sales ran about 15% below the reference card shop's, so it became
 comparison only for cards, while for sealed product it agreed and kept supporting.
@@ -72,8 +76,8 @@ new source until its numbers look right: start every new source as comparison.
 Each market has an **identity page** per item type (**Settings > Admin preferences > Identity**):
 the source whose product page says exactly what an item is, used to find the same item on other
 sites. It need not be the price reference. Items without one show under **Actions** (items
-other than cards and sealed only above an amount the admin sets on the same page, ¥3,000 by
-default, in the base currency).
+other than cards and sealed only above an amount the admin sets on the same page, in the base
+currency; its default is in [the rules](rules/sources-markets.md#identity-links)).
 
 A good identity page:
 
