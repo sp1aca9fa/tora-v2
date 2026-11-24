@@ -9,6 +9,8 @@ import {
   asPaid,
   atOrBetter,
   failsRules,
+  validCopy,
+  wishCost,
 } from '@tora/core';
 import type { AskStatus } from './ask-check';
 import { type DayRange, coversDay } from './sale-coverage';
@@ -208,12 +210,6 @@ export function wishCopies(input: WishCopiesInput): WishCopies {
     if (covered === null || covered <= r.day) kept.push(...copies(newestRun(r.rows), false));
   };
 
-  const counted = (price: number, paid: Paid) => (paid.known ? paid.amount : price);
-  // The cheapest checked copy: from the reads dated N only (fix round 2, item 4).
-  const pool: WishCheapest[] = [];
-  const offer = (source: string, price: number, paid: Paid) =>
-    pool.push({ source, day: n!, price, paid, counted: counted(price, paid) });
-
   const shop: WishShopView[] = reads(input.shopRows, shopItem).map((r) => {
     const { source, day, rows: dayRows, current } = r;
     const inCondition = dayRows.filter((x) => better(x.bucket));
@@ -221,7 +217,6 @@ export function wishCopies(input: WishCopiesInput): WishCopies {
     const entries = inCondition
       .flatMap(shopEntries)
       .toSorted((a, b) => a.price - b.price || (a.kind === 'own' ? -1 : 1));
-    if (current) for (const e of entries) offer(source, e.price, e.paid);
     // An alert's shop copy is the wished item's own entry, read by its checked link there (plan
     // 9.D): a boxed wish's plain item's rows are the page's labeled fall-back only.
     if (shopItem === productId && status(source) === 'checked') {
@@ -300,8 +295,6 @@ export function wishCopies(input: WishCopiesInput): WishCopies {
       all.length,
     );
     const checked = status(source) === 'checked';
-    // Every stored copy counts for the cheapest, not only the ones listed.
-    if (current && checked && !checkNeeded) for (const c of all) offer(source, c.price, c.paid);
     if (checked)
       toNight(from, r, (rows, isTonight) =>
         (isTonight ? all : copiesOf(rows.filter((x) => better(x.bucket)))).map((c) => ({
@@ -335,11 +328,24 @@ export function wishCopies(input: WishCopiesInput): WishCopies {
     };
   });
 
-  // The lowest counted price; on a tie the known one as paid first.
+  // The cheapest checked copy (S36 C4, spec W16b): the cheapest copy an alert may name tonight
+  // (every stored one, not only the ones listed), so the page, the card and the alert agree; while
+  // check needed, the shop's only, as no search copy is shown. The lowest counted price; on a tie
+  // the known one as paid first. A copy the alert step would not read (`validCopy`: a price of 0, a
+  // paid amount of 0) is never the cheapest.
   const cheapest =
-    pool.toSorted(
-      (a, b) => a.counted - b.counted || Number(b.paid.known) - Number(a.paid.known),
-    )[0] ?? null;
+    tonight
+      .filter((c) => validCopy(c) && (c.run || !checkNeeded))
+      .map((c): WishCheapest => ({
+        source: c.source,
+        day: n!,
+        price: c.price,
+        paid: c.paid,
+        counted: wishCost(c),
+      }))
+      .toSorted(
+        (a, b) => a.counted - b.counted || Number(b.paid.known) - Number(a.paid.known),
+      )[0] ?? null;
   return {
     shop,
     sources: checkNeeded ? [] : searched,

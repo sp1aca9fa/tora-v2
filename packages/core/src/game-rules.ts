@@ -246,6 +246,33 @@ function compact(text: string): string {
   return normalizeTitle(text).replace(/ /g, '');
 }
 
+/**
+ * The stored search with a game's rules laid over it, for one run (S36 A1, A2): the console's
+ * category at `source` when the search has none, and the required words added to its keywords (each
+ * once). The excluded words are not put in: a plug-in's own filter would store such a sale excluded
+ * with no rules mark, never restored when the word goes or the switch is off; the marks exclude them
+ * (`markNewSales`). A search without keywords is left as it is: the words narrow a search, they never
+ * start one. Returns the stored object itself when nothing changes, so a caller can tell. The wish
+ * page's saved-search helper shows the same search (S36 C4).
+ */
+export function overlayQuery<Q extends { keywords?: string[]; categoryId?: string }>(
+  query: Q,
+  rules: Pick<EffectiveRules, 'required' | 'categories'>,
+  source: string,
+): Q {
+  const keywords = query.keywords ?? [];
+  if (!keywords.length) return query;
+  const have = compact(keywords.join(' '));
+  const required = rules.required.filter((w) => !have.includes(compact(w)));
+  const category = query.categoryId ? null : (rules.categories[source] ?? null);
+  if (!required.length && !category) return query;
+  return {
+    ...query,
+    keywords: [...keywords, ...required],
+    ...(category && { categoryId: category }),
+  };
+}
+
 /** A title naming a box (S36 B1: "boxed", a copy with its box). Matched on the title without spaces. */
 const BOXED =
   /箱付|箱つき|箱あり|箱有|箱説付|箱説つき|箱説あり|箱説有|箱・説明書付|箱、説明書付|箱説明書付|外箱付|元箱付|完品|cib|completeinbox/;

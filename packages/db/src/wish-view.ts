@@ -20,24 +20,29 @@ import {
   WISH_ESTIMATE_BASES,
   WISH_CONDITIONS,
   WISH_RISKS,
+  WISH_TRIAL_NIGHTS,
   addDays,
   atOrBetter,
   baseCurrency,
+  categorySearchUrl,
   changeOver,
   conditionBucket,
   effectiveRules,
   identitySources,
   localDate,
+  overlayQuery,
   sourceInfo,
   toLocalIso,
+  wishInAt,
   youngGame,
 } from '@tora/core';
 import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm';
 import type { Db } from './client';
 import { type AskStatus, askChecks } from './ask-check';
-import { listConsoles } from './consoles';
+import { consolePlugins, listConsoles } from './consoles';
 import { DomainError } from './mutations';
 import { loadSourceRegistry } from './registry';
+import { gameRulesOn } from './rule-marks';
 import { type DayRange, coveredOf, mergeRanges } from './sale-coverage';
 import {
   type Product,
@@ -64,6 +69,7 @@ import {
   type DayStock,
   type SupplyRead,
   type WishCopies,
+  type WishCopiesInput,
   paidOf,
   shopEntries,
   shopStock,
@@ -163,6 +169,23 @@ export interface WishShopView {
  * The cheapest checked copy (the facts line and the Wishlist's card), from copies dated N only
  * (fix round 2, item 4): never an older read's.
  */
+/** The saved-search helper for one marketplace link (S36 C4): text to copy, saved nowhere. */
+export interface WishHelper {
+  source: string;
+  /** The search as the collect sends it: the stored keywords with the item's rules laid over. */
+  words: string[];
+  /** The stored search's excluded words and, with the game rules on, the item's. */
+  excluded: string[];
+  /** The category the search is sent with; null: none. */
+  categoryId: string | null;
+  /** The source's own search for that category (the plug-in's link); null: none declared. */
+  categoryUrl: string | null;
+  /** The person's price, on the listed price; null: no price set. */
+  cap: number | null;
+  /** The source's listings may add shipping: not every stored copy there is known free of it. */
+  plusShipping: boolean;
+}
+
 export interface WishCheapest {
   source: string;
   /** N, the last run's day. */
@@ -300,6 +323,20 @@ export interface WishView {
   facts: WishComputedFact[];
   recorded: WishRecordedFact[];
   history: WishHistoryLine[];
+  /** Why check needed (S36 C3 "with its reason"): the rules held back, or the sales not checked. */
+  checkWhy: 'held' | 'unchecked' | null;
+  /**
+   * "In on N of the last M nights" (S36 C3; detail only, confirmed with a price, at least one night
+   * counted; else null).
+   */
+  trial: { in: number; counted: number } | null;
+  /**
+   * Confirmed with a price, but no source with checked listings read the item in the page's window
+   * (no night counted): no alert can come yet (fix round 1, item 3; detail only, else false).
+   */
+  listingsUnread: boolean;
+  /** One per marketplace link with a stored search (detail only; else empty). */
+  helper: WishHelper[];
   /** The alert step's copies (`alerts` only; else null). */
   alert: Pick<WishCopies, 'tonight' | 'kept' | 'read' | 'shopSeen'> | null;
 }
@@ -436,6 +473,16 @@ async function rowsBefore(
   return out;
 }
 
+const free = (paid: Paid, price: number) => paid.known && paid.amount === price;
+
+const strings = (x: unknown): x is string[] =>
+  Array.isArray(x) && x.every((w) => typeof w === 'string');
+/** A stored search the helper can show: keywords (and excluded words, if any) as lists of words. */
+const wellFormed = (q: { keywords?: unknown; excludeKeywords?: unknown; categoryId?: unknown }) =>
+  strings(q.keywords) &&
+  (q.excludeKeywords === undefined || q.excludeKeywords === null || strings(q.excludeKeywords)) &&
+  (q.categoryId === undefined || q.categoryId === null || typeof q.categoryId === 'string');
+
 /** The latest value per day, then changeOver (exact day 28 before: W14's rule). */
 function seriesChange(points: readonly { day: string; value: number }[]): LevelChange | null {
   const byDay = new Map<string, number>();
@@ -496,6 +543,10 @@ export async function wishViews(
         facts: [],
         recorded: [],
         history: [],
+        checkWhy: null,
+        trial: null,
+        listingsUnread: false,
+        helper: [],
         alert: null,
       });
   if (!games.length) return out;
@@ -505,7 +556,7 @@ export async function wishViews(
     const rules = states.get(r.product.id)!.rules;
     return !!rules?.boxed && !!rules.boxedOf;
   });
-  const consoles = boxed.length ? await listConsoles(db) : [];
+  const consoles = boxed.length || options.detail ? await listConsoles(db) : [];
   const rowsOf = new Map(
     games.map((r) => {
       const rules = states.get(r.product.id)!.rules;
@@ -527,88 +578,91 @@ export async function wishViews(
   // Levels per bucket: a wish with no condition (bucket '') has none (fix round 1, item 8).
   const leveled = games.filter((r) => r.watch.bucket !== '');
 
-  const [registry, checks, levels, shown, supplyRows, marks, buyRows, links, coverage] =
-    await Promise.all([
-      loadSourceRegistry(db),
-      askChecks(
-        db,
-        games.map((r) => r.product),
-      ),
-      wishLevelsOf(
-        db,
-        leveled.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket })),
-      ),
-      wishRecordShown(db),
-      // No run in the last days: the list has no copy of N to show, and reads none.
-      since === null
-        ? []
-        : inParts(readIds, (part) =>
-            db
-              .select(SUPPLY_READ)
-              .from(supply)
-              .where(and(inArray(supply.productId, part), gte(supply.day, since))),
-          ),
-      inParts(readIds, (part) =>
-        db
-          .select({
-            productId: notItemMarks.productId,
-            source: notItemMarks.source,
-            ref: notItemMarks.externalRef,
-          })
-          .from(notItemMarks)
-          .where(inArray(notItemMarks.productId, part)),
-      ),
-      // The buyback bound (the page only): kept rows only, never one marked excluded (item 5).
-      options.detail
-        ? inParts(ids, (part) =>
-            db
-              .select({
-                productId: priceObservations.productId,
-                source: priceObservations.source,
-                price: priceObservations.priceBase,
-                at: priceObservations.observedAt,
-              })
-              .from(priceObservations)
-              .where(
-                and(
-                  inArray(priceObservations.productId, part),
-                  eq(priceObservations.observationType, 'buylist'),
-                  eq(priceObservations.excluded, false),
-                  gte(priceObservations.observedAt, addDays(today, -WISH_VIEW_DAYS)),
-                ),
-              ),
-          )
-        : [],
-      // Every link of the items: their facts (list price, product code).
-      inParts(readIds, (part) =>
-        db
-          .select({
-            productId: productSources.productId,
-            source: productSources.source,
-            externalId: productSources.externalId,
-            facts: productSources.facts,
-            active: productSources.active,
-          })
-          .from(productSources)
-          .where(inArray(productSources.productId, part)),
-      ),
-      // The nights each source read each item (the page and the alert step: "read on N", the
-      // history).
-      options.detail || options.alerts
-        ? inParts(readIds, (part) =>
-            db
-              .select({
-                productId: saleCoverage.productId,
-                source: saleCoverage.source,
-                nights: saleCoverage.nights,
-              })
-              .from(saleCoverage)
-              .where(inArray(saleCoverage.productId, part)),
-          )
-        : [],
-    ]);
-  const base = baseCurrency(registry);
+  // The registry first: the buyback read takes only the identity shops' rows (the bound reads no
+  // other source's), so it does not read every observation of every wished item.
+  const registry = await loadSourceRegistry(db);
   const shopKeys = new Set(identitySources(registry, 'game'));
+  const [checks, levels, shown, supplyRows, marks, buyRows, links, coverage] = await Promise.all([
+    askChecks(
+      db,
+      games.map((r) => r.product),
+    ),
+    wishLevelsOf(
+      db,
+      leveled.map((r) => ({ productId: r.product.id, bucket: r.watch.bucket })),
+    ),
+    wishRecordShown(db),
+    // No run in the last days: the list has no copy of N to show, and reads none.
+    since === null
+      ? []
+      : inParts(readIds, (part) =>
+          db
+            .select(SUPPLY_READ)
+            .from(supply)
+            .where(and(inArray(supply.productId, part), gte(supply.day, since))),
+        ),
+    inParts(readIds, (part) =>
+      db
+        .select({
+          productId: notItemMarks.productId,
+          source: notItemMarks.source,
+          ref: notItemMarks.externalRef,
+        })
+        .from(notItemMarks)
+        .where(inArray(notItemMarks.productId, part)),
+    ),
+    // The buyback bound (the page only): kept rows only, never one marked excluded (item 5).
+    options.detail && shopKeys.size
+      ? inParts(ids, (part) =>
+          db
+            .select({
+              productId: priceObservations.productId,
+              source: priceObservations.source,
+              price: priceObservations.priceBase,
+              at: priceObservations.observedAt,
+            })
+            .from(priceObservations)
+            .where(
+              and(
+                inArray(priceObservations.productId, part),
+                inArray(priceObservations.source, [...shopKeys]),
+                eq(priceObservations.observationType, 'buylist'),
+                eq(priceObservations.excluded, false),
+                gte(priceObservations.observedAt, addDays(today, -WISH_VIEW_DAYS)),
+              ),
+            ),
+        )
+      : [],
+    // Every link of the items: their facts (list price, product code).
+    inParts(readIds, (part) =>
+      db
+        .select({
+          productId: productSources.productId,
+          source: productSources.source,
+          externalId: productSources.externalId,
+          facts: productSources.facts,
+          active: productSources.active,
+          query: productSources.query,
+        })
+        .from(productSources)
+        .where(inArray(productSources.productId, part)),
+    ),
+    // The nights each source read each item (the page and the alert step: "read on N", the
+    // history).
+    options.detail || options.alerts
+      ? inParts(readIds, (part) =>
+          db
+            .select({
+              productId: saleCoverage.productId,
+              source: saleCoverage.source,
+              nights: saleCoverage.nights,
+            })
+            .from(saleCoverage)
+            .where(inArray(saleCoverage.productId, part)),
+        )
+      : [],
+  ]);
+  const base = baseCurrency(registry);
   const isShop = (r: SupplyRead) => shopKeys.has(r.source) || isShopOffers(r.offers);
   const rowsByItem = new Map<string, SupplyRead[]>();
   const before =
@@ -624,6 +678,9 @@ export async function wishViews(
   const nightsOf = new Map(coverage.map((c) => [`${c.productId}|${c.source}`, c.nights ?? []]));
 
   let detail: Awaited<ReturnType<typeof detailOf>> | null = null;
+  const [rulesOn, plugins] = options.detail
+    ? await Promise.all([gameRulesOn(db), consolePlugins(db)])
+    : [false, null];
   if (options.detail) {
     const fromIds = new Set([...rowsOf.values()].map((v) => v.from));
     detail = await detailOf(
@@ -661,7 +718,7 @@ export async function wishViews(
         return { source, day, rows: all.filter((r) => r.day === day), all };
       });
     };
-    const { shop, sources, cheapest, ...alert } = wishCopies({
+    const input: WishCopiesInput = {
       productId: product.id,
       from,
       rules,
@@ -674,7 +731,74 @@ export async function wishViews(
       nightsOf: (item, source) => nightsOf.get(`${item}|${source}`) ?? [],
       isMarked,
       status: (source) => checks.status({ productId: product.id, source }),
-    });
+    };
+    const { shop, sources, cheapest, ...alert } = wishCopies(input);
+    const price =
+      watch.targetPriceBase !== null && watch.targetPriceBase > 0 ? watch.targetPriceBase : null;
+
+    // In on N of the last M read nights (S36 C3): each day back from N run as its own night over
+    // the rows stored up to it, with the alert's selection (`wishCopies`) and its test (`wishInAt`).
+    // A day no checked source read is no night; the rows reach back `WISH_VIEW_DAYS` days only.
+    // No night counted: no trial ("0 of the last 0 nights" says nothing); with no checked link
+    // either, the page says no alert can come yet (`listingsUnread`).
+    let trial: WishView['trial'] = null;
+    let listingsUnread = false;
+    if (options.detail && state === 'confirmed' && lastRun && since && price !== null) {
+      trial = { in: 0, counted: 0 };
+      for (let d = lastRun; d >= since && trial.counted < WISH_TRIAL_NIGHTS; d = addDays(d, -1)) {
+        const upTo = (list: SupplyRead[]) => list.filter((r) => r.day <= d);
+        const night = wishCopies({
+          ...input,
+          lastRun: d,
+          shopRows: upTo(shopRows),
+          searchRows: upTo(searchRows),
+        });
+        if (!night.read.length) continue;
+        trial.counted++;
+        if (wishInAt([...night.tonight, ...night.kept], price)) trial.in++;
+      }
+      if (trial.counted === 0) {
+        trial = null;
+        // A checked link that found nothing stores no row, so no night counts, yet an alert can
+        // come the night it finds a copy: "no alert can come yet" only when no link is checked.
+        listingsUnread = !wishLinks.some(
+          (l) => checks.status({ productId: product.id, source: l.source }) === 'checked',
+        );
+      }
+    }
+
+    // The saved-search helper (S36 C4): the wished item's own marketplace links with a stored
+    // search, sent as the collect sends it (`overlayQuery`, only with the game rules on). A link
+    // with no stored search uses its plug-in's default, which only the collector knows: not shown.
+    const helper: WishHelper[] = [];
+    if (options.detail) {
+      const own = effectiveRules(product, states.get(product.id)!.rules, consoles);
+      for (const l of ownLinks) {
+        const q = l.query;
+        if (shopKeys.has(l.source) || !q?.keywords?.length) continue;
+        // A stored search of another shape (hand-edited, an old format) is left out, never thrown on:
+        // the page and the morning summary read this (fix round 1, item 1).
+        if (!wellFormed(q)) continue;
+        const sent = rulesOn ? overlayQuery(q, own, l.source) : q;
+        const offers = (rowsByItem.get(product.id) ?? [])
+          .filter((r) => r.source === l.source)
+          .flatMap((r) => supplyOffers(r) ?? []);
+        helper.push({
+          source: l.source,
+          words: sent.keywords ?? [],
+          excluded: [...new Set([...(q.excludeKeywords ?? []), ...(rulesOn ? own.excluded : [])])],
+          categoryId: sent.categoryId ?? null,
+          categoryUrl: sent.categoryId
+            ? categorySearchUrl(plugins?.categoryUrls, l.source, sent.categoryId)
+            : null,
+          cap: price,
+          // Free only when every stored copy there is known to be paid at its listed price.
+          plusShipping:
+            !offers.length ||
+            offers.some((o) => !free(paidOf(o.priceBase, o.shipping), o.priceBase)),
+        });
+      }
+    }
 
     const stored: WishLevel | undefined = wanted
       ? levels.get(`${product.id}|${wanted}`)
@@ -860,6 +984,11 @@ export async function wishViews(
       facts,
       recorded,
       history,
+      checkWhy:
+        state === 'check_needed' ? (states.get(product.id)!.held ? 'held' : 'unchecked') : null,
+      trial,
+      listingsUnread,
+      helper,
       alert: options.alerts ? alert : null,
     });
   }

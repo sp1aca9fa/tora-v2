@@ -67,6 +67,8 @@ import {
 import { productsWithBrokenListings, quietSources } from './sources';
 import { MARKET_ALERT_ACTIONS } from './market-jobs';
 import { getUserById } from './users';
+import { type WishTold, wishEvents, wishSummary } from './wish-summary';
+import { wishViews } from './wish-view';
 import { latestSignals } from './signals';
 import { askChecks } from './ask-check';
 import { currentSupply, lowestAsk } from './supply';
@@ -1399,6 +1401,9 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
   // Sharp drops already shown: person -> item and condition -> day.
   const dropsShown =
     (await readSetting<Record<string, Record<string, string>>>(db, 'alertDrops')) ?? {};
+  // Game wishes' events already told: person -> wish -> keys (`wish-summary.ts`).
+  const wishShown = (await readSetting<Record<string, WishTold>>(db, WISH_SHOWN_KEY)) ?? {};
+  const wishBefore = JSON.stringify(wishShown);
   const base = await appUrl(db);
   let sent = 0;
   const people = await db.select().from(users).where(isNull(users.disabledAt));
@@ -1478,9 +1483,30 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
         role: 'warning',
       });
     }
+    // Game wishes (S36 C3, C4), for people with buy alerts on (the spec's "Assumed"). An error there
+    // leaves out only this person's wish part (fix round 1, item 1): the rest of their summary goes
+    // as before the part existed, their wish memory stays as it was, the others go on. No wish part
+    // and nothing thrown (buy alerts off, no game wish left): the memory goes, so an event that
+    // ended meanwhile is told again (item 7).
+    let wish: Awaited<ReturnType<typeof wishPart>> = null;
+    let wishFailed = false;
+    if (prefs.buy) {
+      try {
+        wish = await wishPart(db, user, t, wishShown[user.id] ?? {}, now, base);
+      } catch (error) {
+        wishFailed = true;
+        ctx.log?.(`alerts: a person's wishes left out of the summary: ${errorText(error)}`);
+      }
+    }
+    if (wish) {
+      if (Object.keys(wish.told).length) wishShown[user.id] = wish.told;
+      else delete wishShown[user.id];
+      if (wish.card) cards.push(wish.card);
+    } else if (!wishFailed) delete wishShown[user.id];
     if (cards.length === 0) continue;
     const delivered = await sendToUser(db, user.id, lines('summary', t.summaryTitle!, cards), ctx);
     if (delivered === 0) continue;
+    if (wish?.card) wishShown[user.id] = wish.withNew;
     sent += delivered;
     state[user.id] = toLocalIso(now);
     if (drops.length) {
@@ -1497,7 +1523,64 @@ export async function sendSummaries(db: Db, ctx: AlertContext, now = new Date())
   }
   await saveSetting(db, 'alertSummaries', state);
   await saveSetting(db, 'alertDrops', dropsShown);
+  if (JSON.stringify(wishShown) !== wishBefore) await saveSetting(db, WISH_SHOWN_KEY, wishShown);
   return sent;
+}
+
+const WISH_SHOWN_KEY = 'alertWishShown';
+/** How long a fact recorded on a wished game is news for the summary (S36 C3; to start). */
+const WISH_FACT_NEWS_MS = 3 * 86_400_000;
+
+/**
+ * A person's "Wishes" card: one line per game wish with something new (its name, the condition
+ * when the item has several wishes, the new events, the link to its page). `told` is the memory
+ * pruned to what is still true; `withNew` the memory once this card is delivered.
+ */
+async function wishPart(
+  db: Db,
+  user: User,
+  t: AlertTexts,
+  told: WishTold,
+  now: Date,
+  base: string | null,
+) {
+  // One small read first: a person with no wish on a game item reads nothing more (fix round 1,
+  // item 2); a game item can still turn out not a game (its rules), which the view tells.
+  const ids = (
+    await db
+      .select({ id: watches.id })
+      .from(watches)
+      .innerJoin(products, eq(products.id, watches.productId))
+      .where(and(eq(watches.userId, user.id), eq(products.category, 'game')))
+  ).map((r) => r.id);
+  if (!ids.length) return null;
+  const views = [...(await wishViews(db, user.id, ids, { now, detail: true })).values()];
+  if (!views.some((v) => v.state !== 'not_game')) return null;
+  const [money, registry] = await Promise.all([moneyFor(db, user), loadSourceRegistry(db)]);
+  const label = new Map(registry.sources.map((s) => [s.key, s.label] as const));
+  // A recorded fact is news for 3 days and told once in them (the memory's key), whatever became of
+  // the summaries in between: one that failed or left the wishes out does not lose it.
+  const since = toLocalIso(new Date(now.getTime() - WISH_FACT_NEWS_MS));
+  const part = wishSummary(views, told, (v) =>
+    wishEvents(v, since, t, money, (s) => label.get(s) ?? s),
+  );
+  const card = part.lines.length
+    ? {
+        title: t.summaryWishes ?? 'Wishes:',
+        text: part.lines
+          .map(({ view, texts }) => {
+            const several = views.filter((v) => v.product.id === view.product.id).length > 1;
+            const name =
+              view.product.name +
+              (several && view.watch.bucket ? ` (${conditionWords(view.watch.bucket)})` : '');
+            const url = linkUrl(base, `/watchlist/${view.watch.id}`);
+            return `${name}: ${texts.join('; ')}` + (url ? `\n${url}` : '');
+          })
+          .join('\n'),
+        role: 'info' as NoticeRole,
+      }
+    : null;
+  return { card, told: part.told, withNew: part.withNew };
 }
 
 /**

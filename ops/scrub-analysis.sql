@@ -82,6 +82,9 @@ update app_settings set value = json_set(value, '$.items', (select json_group_ar
 -- prices; a card or sealed watch's memory (zone, target) stays.
 update watches set alert_state = json_remove(alert_state, '$.wish')
   where json_extract(alert_state, '$.wish') is not null and exists (select 1 from hidden);
+-- The morning summary's memory of game wishes' events (S36 C3) keys them by source; it goes whole.
+delete from app_settings
+  where key = 'alertWishShown' and exists (select 1 from hidden);
 
 -- Messages and logs name sources and quote their errors.
 update activity set detail = '{}'

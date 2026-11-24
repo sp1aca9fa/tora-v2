@@ -9,6 +9,7 @@ import {
   parseWishState,
   restartWish,
   stepWish,
+  wishInAt,
 } from './wish-alert';
 
 // Made-up copies: `a1` at market-a for 9,500 is copy('marketa', 'a1', 9500).
@@ -428,5 +429,23 @@ describe('restartWish, mergeDelivered, parseWishState', () => {
       { ...state, runs: { s: 3 } },
     ])
       expect(parseWishState(bad)).toBe('invalid');
+  });
+});
+
+describe('wishInAt (the page\'s "in on N nights", S36 C3)', () => {
+  it('reads a night in exactly as stepWish does, on the same copies', () => {
+    const unknown = { known: false as const, amount: null };
+    const cases: WishNightCopy[][] = [
+      [],
+      [copy('marketa', 'a1', 10_000)],
+      [copy('marketa', 'a1', 10_001)],
+      [copy('marketa', 'a1', 9000, { paid: { known: true, amount: 10_500 } })],
+      [copy('marketa', 'a1', 9900, { paid: unknown })],
+      [copy('marketa', 'a1', 0), copy('marketa', 'a2', -5)],
+      [copy('marketa', 'a1', 9000, { paid: { known: true, amount: 0 } })],
+      [copy('marketa', 'a1', 9000, { tonight: false })],
+    ];
+    for (const copies of cases)
+      expect(wishInAt(copies, 10_000)).toBe(stepWish(null, night(1, copies))!.state.in);
   });
 });

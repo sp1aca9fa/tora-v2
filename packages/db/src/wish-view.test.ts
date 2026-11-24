@@ -294,6 +294,49 @@ describe('wishView: buyable tonight', () => {
     expect(card.cheapest).toBeNull();
   });
 
+  it('a boxed wish with no shop link: the page, the card and the alert never take the plain shop copy (W16b)', async () => {
+    const plain = (await gameWish()).product;
+    const { watch, product: boxed } = await addGameWish(db, ann.id, {
+      name: 'Star Rover',
+      console: 'alpha',
+      reuse: plain.id,
+      boxed: true,
+      watch: { targetPriceBase: 3000 },
+    });
+    await saveSupply(db, [
+      // The plain item's loose copy at the shop (its fall-back listing on the page).
+      row(plain.id, 'shop', 'cond:good', NIGHT, [offer('p', 2000, { own: 'own', stock: 1 })]),
+      row(plain.id, 'marketa', 'cond:good', NIGHT, [
+        offer('boxed', 3500, { title: 'Star Rover boxed', shipping: 'included' }),
+      ]),
+    ]);
+    const page = (await wishView(db, ann.id, watch.id, { now: NOW }))!;
+    const card = (await wishViews(db, ann.id, [watch.id], { now: NOW })).get(watch.id)!;
+    const alert = (await wishViews(db, ann.id, [watch.id], { now: NOW, alerts: true })).get(
+      watch.id,
+    )!.alert!;
+    // The shop's plain copy shows on the page, but no alert may name it.
+    expect(page.shop[0]!.entries.map((e) => e.price)).toEqual([2000]);
+    expect(alert.tonight.some((c) => c.source === 'shop')).toBe(false);
+    const costs = alert.tonight.map((c) => (c.paid.known ? c.paid.amount : c.price));
+    const cheapest = costs.length ? Math.min(...costs) : null;
+    expect(page.cheapest?.counted ?? null).toBe(cheapest);
+    expect(card.cheapest?.counted ?? null).toBe(cheapest);
+    expect(page.cheapest?.counted).not.toBe(2000);
+    expect(boxed.id).not.toBe(plain.id);
+  });
+
+  it('an old shop row with an ask and no entries is no cheapest checked copy (W16b)', async () => {
+    const { watch, product } = await gameWish();
+    await saveSupply(db, [
+      row(product.id, 'shop', 'cond:good', NIGHT, null, { lowestAskBase: 1500 }),
+    ]);
+    const page = (await wishView(db, ann.id, watch.id, { now: NOW }))!;
+    const card = (await wishViews(db, ann.id, [watch.id], { now: NOW })).get(watch.id)!;
+    expect(page.shop[0]!.entries.map((e) => e.price)).toEqual([1500]);
+    expect([page.cheapest, card.cheapest]).toEqual([null, null]);
+  });
+
   it('with no run recorded, nothing reads as N: copies under their day, no cheapest', async () => {
     await db.delete(collectorRuns);
     const { watch, product } = await gameWish();

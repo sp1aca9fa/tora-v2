@@ -14,7 +14,7 @@ import {
   failsRules,
   isGameItem,
   noAiSources,
-  normalizeTitle,
+  overlayQuery,
   rulesHash,
   toLocalIso,
 } from '@tora/core';
@@ -23,7 +23,6 @@ import {
   type RuleChanges,
   type RuleHold,
   type RuleSaleRow,
-  type SourceQuery,
   RULE_MARK_PREFIX,
   confirmationsMany,
   dismissedExclusions,
@@ -41,33 +40,8 @@ import {
 import { protectedBy } from './recheck';
 import type { Collector, PriceInput } from './types';
 
-const compact = (text: string) => normalizeTitle(text).replace(/ /g, '');
-
-/**
- * The stored search with a game's rules laid over it, for one run (S36 A1, A2): the console's
- * category at `source` when the search has none, and the required words added to its keywords (each
- * once). The excluded words are not put in: a plug-in's own filter would store such a sale excluded
- * with no rules mark, never restored when the word goes or the switch is off; the marks exclude them
- * (`markNewSales`). A search without keywords is left as it is: the words narrow a search, they never
- * start one. Returns the stored object itself when nothing changes, so a caller can tell.
- */
-export function overlayQuery(
-  query: SourceQuery,
-  rules: EffectiveRules,
-  source: string,
-): SourceQuery {
-  const keywords = query.keywords ?? [];
-  if (!keywords.length) return query;
-  const have = compact(keywords.join(' '));
-  const required = rules.required.filter((w) => !have.includes(compact(w)));
-  const category = query.categoryId ? null : (rules.categories[source] ?? null);
-  if (!required.length && !category) return query;
-  return {
-    ...query,
-    keywords: [...keywords, ...required],
-    ...(category && { categoryId: category }),
-  };
-}
+/** The stored search with a game's rules laid over it (S36 A1, A2): `overlayQuery` in `@tora/core`. */
+export { overlayQuery };
 
 /**
  * The hash an item's stored sales were judged under (`item_rule_state.applied_hash`, S36 A1): each

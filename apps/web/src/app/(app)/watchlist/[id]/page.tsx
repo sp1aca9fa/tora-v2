@@ -1,4 +1,10 @@
-import { type LevelChange, type Paid, localDate } from '@tora/core';
+import {
+  type LevelChange,
+  type Paid,
+  WISH_TRIAL_NIGHTS,
+  localDate,
+  parseWishState,
+} from '@tora/core';
 import {
   type WishCopy,
   type WishEstimateView,
@@ -262,9 +268,84 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
     </div>,
   );
 
+  // The alert in words (S36 C3): why none comes, or what it counts; and how often the wish was in.
+  const target = v.watch.targetPriceBase;
+  const unreadable = parseWishState(v.watch.alertState?.wish) === 'invalid';
+  const alertWords = [
+    target === null && t('noPriceAlert'),
+    v.checkWhy && t('checkAlert', { why: t(`checkWhy.${v.checkWhy}`) }),
+    // An alert will come: said too, with whether a copy was there at the last read; none can while
+    // no source's listings are checked.
+    target !== null &&
+      !v.checkWhy &&
+      !unreadable &&
+      t(
+        v.listingsUnread
+          ? 'alertUnread'
+          : v.cheapest && v.cheapest.counted <= target
+            ? 'alertOnOne'
+            : 'alertOnNone',
+      ),
+    v.needsCondition && t('anyCondition'),
+    unreadable && t('invalidState'),
+  ].filter((x): x is string => !!x);
+  const trial =
+    v.trial &&
+    t(v.trial.counted < WISH_TRIAL_NIGHTS ? 'trialSoFar' : 'trial', {
+      in: v.trial.in,
+      counted: v.trial.counted,
+    });
+  const term = (label: string, value: React.ReactNode) => (
+    <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="break-words">{value}</dd>
+    </div>
+  );
+  // The saved-search helper (S36 C4), behind an expander: the search as sent, to copy.
+  const helper = v.helper.length > 0 && (
+    <details className="text-sm">
+      <summary className="min-h-8 cursor-pointer text-muted-foreground">{t('helper')}</summary>
+      <p className="max-w-prose text-xs text-muted-foreground">{t('helperNote')}</p>
+      {v.helper.map((h) => (
+        <div key={h.source} className="mt-2 space-y-0.5">
+          <h3 className="font-medium">{sourceLabel(h.source)}</h3>
+          <dl className="space-y-0.5">
+            {term(t('helperWords'), <span className="select-all">{h.words.join(' ')}</span>)}
+            {h.excluded.length > 0 &&
+              term(t('helperExcluded'), <span className="select-all">{h.excluded.join(' ')}</span>)}
+            {h.categoryId !== null &&
+              term(
+                t('helperCategory'),
+                h.categoryUrl ? (
+                  <a href={h.categoryUrl} target="_blank" rel="noreferrer" className="underline">
+                    {t('helperCategoryLink')}
+                  </a>
+                ) : (
+                  t('helperCategoryId', { id: h.categoryId })
+                ),
+              )}
+            {h.cap !== null &&
+              term(
+                t('helperCap'),
+                h.plusShipping ? t('helperCapShipping', { amount: money(h.cap) }) : money(h.cap),
+              )}
+          </dl>
+        </div>
+      ))}
+    </details>
+  );
   const price = section(
     t('settings'),
-    <PriceForms wishId={v.watch.id} target={v.watch.targetPriceBase} bucket={v.watch.bucket} />,
+    <>
+      {alertWords.map((w) => (
+        <p key={w} className="max-w-prose text-sm">
+          {w}
+        </p>
+      ))}
+      <PriceForms wishId={v.watch.id} target={v.watch.targetPriceBase} bucket={v.watch.bucket} />
+      {trial && <p className="max-w-prose text-sm tabular-nums">{trial}</p>}
+      {helper}
+    </>,
   );
 
   // The facts line (item 12): what is known, no verdict and no color; unknown parts left out. The

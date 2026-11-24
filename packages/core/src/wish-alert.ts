@@ -8,6 +8,14 @@ import type { Paid } from './wish-level';
 export const WISH_QUIET_NIGHTS = 14;
 /** "A copy 3 % or more below the reference alerts again" (S36 C3, "to start"). */
 export const WISH_AGAIN_SHARE = 0.03;
+/** The morning summary tells a level move of 5 % or more over 4 weeks (S36 C3, "to start"). */
+export const WISH_LEVEL_MOVE = 0.05;
+/** The morning summary tells a buyback price move of 10 % or more (S36 C3, "to start"). */
+export const WISH_BUYBACK_MOVE = 0.1;
+/** The summary points to the saved-search helper when the cheapest copy is 10 % or less above the price (S36 C4, "to start"). */
+export const WISH_POINTER_SHARE = 0.1;
+/** The wish page's "in on N of the last M nights" counts up to 30 read nights (S36 C3, "to start"). */
+export const WISH_TRIAL_NIGHTS = 30;
 /** `cost * 100 <= reference * 97`: the 3 % test in integers. */
 const AGAIN = 100 - Math.round(WISH_AGAIN_SHARE * 100);
 
@@ -119,6 +127,20 @@ const FRESH: WishAlertState = {
 };
 
 const positive = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0;
+/**
+ * A copy the step reads: a positive price, and a paid amount that is unknown or positive. The wish
+ * page's cheapest copy uses the same test, so a copy no alert can name is never shown as cheapest.
+ */
+export const validCopy = (c: Pick<WishNightCopy, 'price' | 'paid'>) =>
+  positive(c.price) && (!c.paid.known || positive(c.paid.amount));
+
+/**
+ * Whether a night's copies (tonight's and the kept ones) put the wish in at `price`: the same test
+ * `stepWish` makes (S36 C3), so the page's "in on N of the last M nights" counts what the alert would.
+ */
+export const wishInAt = (copies: readonly Pick<WishNightCopy, 'price' | 'paid'>[], price: number) =>
+  copies.some((c) => validCopy(c) && wishCost(c) <= price);
+
 const sourceOf = (key: string) => key.split('|')[0]!;
 const byCost = (a: WishKeyedCopy, b: WishKeyedCopy) =>
   a.cost - b.cost || Number(b.paid.known) - Number(a.paid.known) || (a.key < b.key ? -1 : 1);
@@ -143,9 +165,7 @@ export function stepWish(
   const wasIn = sentTonight || was.in;
   const ref = sentTonight ? s.reference : was.reference;
   const read = new Set(input.read);
-  const valid = input.copies.filter(
-    (c) => positive(c.price) && (!c.paid.known || positive(c.paid.amount)),
-  );
+  const valid = input.copies.filter(validCopy);
 
   // A shop entry's run starts the first read night it is there and ends a read night its source
   // stored it in no condition (fix round 1, item 3: a condition saved away and back, or a mark
@@ -188,7 +208,7 @@ export function stepWish(
   const all = valid.map((c): WishKeyedCopy => ({ ...c, key: keyOf(c), cost: wishCost(c) }));
   const tonight = all.filter((c) => c.tonight).toSorted(byCost);
 
-  const isIn = !input.checkNeeded && all.some((c) => c.cost <= price);
+  const isIn = !input.checkNeeded && wishInAt(all, price);
   // Kept copies hold a wish in (a source not read is no way out), but cannot turn it in: from out,
   // the night the copy is read is the out-to-in one.
   const keptIn = isIn && !wasIn && !tonight.some((x) => x.cost <= price);

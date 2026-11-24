@@ -225,6 +225,8 @@ describe('query_sql on a database holding a noAi source', () => {
           },
         },
         { key: 'currency', value: 'JPY' },
+        // The summary's memory of game wishes' events, keyed by source.
+        { key: 'alertWishShown', value: { u: { w: ['buyback:ebay:down'] } } },
       ]);
       // Two levels of a wish: one naming the source on a day, one only the other source.
       const day = (sources: string[]) => ({
@@ -317,6 +319,7 @@ describe('query_sql on a database holding a noAi source', () => {
         { source: 'mercari', buylist: null },
       ]);
       expect(await all('app_settings')).not.toContain('ebay');
+      expect(await all('app_settings')).not.toContain('alertWishShown');
       // A wish's alert memory goes; the zone's stays.
       const [watch] = (await db.$client.execute('select alert_state from watches')).rows;
       expect(JSON.parse(String(watch!.alert_state))).toEqual({
@@ -377,7 +380,13 @@ describe('query_sql on a database holding a noAi source', () => {
     await db
       .insert(schema.watches)
       .values({ userId, productId, bucket: 'raw:A', alertState: memory });
+    const told = { u: { w: ['buyback:mercari:down'] } };
+    await db.insert(schema.appSettings).values({ key: 'alertWishShown', value: told });
     await db.$client.executeMultiple(await scrubScript());
+    const [setting] = (
+      await db.$client.execute("select value from app_settings where key = 'alertWishShown'")
+    ).rows;
+    expect(JSON.parse(String(setting!.value))).toEqual(told);
     const [entry] = (await db.$client.execute('select detail from activity')).rows;
     expect(entry!.detail).toBe(JSON.stringify({ sources: ['x'] }));
     const [watch] = (await db.$client.execute('select alert_state from watches')).rows;
