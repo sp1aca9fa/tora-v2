@@ -26,6 +26,7 @@ Rules the code computes from, each stated once (`rules/`):
 | [Buy timing](rules/buy-timing.md)                         | The numbers saved daily, the buy zones, the verdict, the new-release wait, the tests                   |
 | [Opportunities](rules/opportunities.md)                   | Signals and their tests, the order of the lists, deal ways, popular, the buy plan, spread, box opening |
 | [Sources, markets and currency](rules/sources-markets.md) | The valuation order, the quality gate, identity links, the compared price, rates                       |
+| [Alerts and the self check](rules/alerts.md)              | Each message, who gets it, when it repeats; the Settings flags; the self check of sales                |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 
