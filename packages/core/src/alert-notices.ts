@@ -780,6 +780,64 @@ export function buyNotice(t: NoticeTexts, items: BuyAlertData[]): Notice {
   };
 }
 
+/** A game wish's alert (S36 C3): the copy at or under the person's price, in money already. */
+export interface WishAlertData {
+  name: string;
+  /** The listing's title, its price as paid (or the stored one, plus shipping) and who sells it. */
+  copy: { title: string; price: string; seller: string };
+  plusShipping: boolean;
+  /** The person's price. */
+  target: string;
+  /**
+   * The only copy of tonight at or under the price: the next price up (null: none). Each price
+   * below is the stored one; `plusShipping`: the buyer pays a cost not known on top.
+   */
+  only: { next: { price: string; plusShipping: boolean } | null } | null;
+  /** Up to 3 of tonight's cheapest; `distinct`: every seller is known and each is listed once. */
+  sellers: { price: string; seller: string; plusShipping: boolean }[];
+  distinct: boolean;
+  url: string | null;
+}
+
+export function wishNotice(t: NoticeTexts, items: WishAlertData[]): Notice {
+  // Another copy's price marked like the alerted one when shipping is on top (fix round 1, item 9).
+  const priced = (p: { price: string; plusShipping: boolean }) =>
+    p.plusShipping
+      ? fillText(t.wishPricePlusShipping ?? '{price} plus shipping', { price: p.price })
+      : p.price;
+  return {
+    kind: 'buy',
+    head: t.wishTitle ?? 'Tora: a wish at your price',
+    urlText: t.storeOpen ?? 'link',
+    cards: items.map((i) => {
+      const list = i.sellers.map((s) => `${priced(s)} (${s.seller})`).join(', ');
+      const lines = [
+        fillText(t.wishCopy ?? '{title}: {price} from {seller}', i.copy),
+        i.plusShipping ? (t.wishPlusShipping ?? 'Plus shipping.') : null,
+        i.only
+          ? i.only.next
+            ? fillText(t.wishOnly ?? 'The only one at or under {target}; next up: {next}.', {
+                target: i.target,
+                next: priced(i.only.next),
+              })
+            : fillText(t.wishOnlyAlone ?? 'The only one at or under {target}.', {
+                target: i.target,
+              })
+          : null,
+        i.sellers.length > 1
+          ? fillText(
+              i.distinct
+                ? (t.wishSellers ?? 'Cheapest from different sellers: {list}')
+                : (t.wishCheapest ?? 'Cheapest: {list}'),
+              { list },
+            )
+          : null,
+      ];
+      return { title: i.name, body: lines.filter(Boolean).join('\n'), url: i.url, role: 'good' };
+    }),
+  };
+}
+
 // ---- Examples for the previews ----
 
 /** Each kind with example data, in the person's texts (the previews on the settings page). */

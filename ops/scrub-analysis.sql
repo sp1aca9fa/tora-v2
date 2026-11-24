@@ -78,6 +78,11 @@ update app_settings set value = json_set(value, '$.items', (select json_group_ar
     where coalesce(json_extract(e.value, '$.source'), '') not in hidden))
   where key = 'opportunities' and exists (select 1 from hidden h where instr(value, '"' || h.key || '"'));
 
+-- A game wish's alert memory (S36 C3) keys the copies sent by source, listing and seller with their
+-- prices; a card or sealed watch's memory (zone, target) stays.
+update watches set alert_state = json_remove(alert_state, '$.wish')
+  where json_extract(alert_state, '$.wish') is not null and exists (select 1 from hidden);
+
 -- Messages and logs name sources and quote their errors.
 update activity set detail = '{}'
   where kind in ('collect', 'check', 'admin') and exists (select 1 from hidden);

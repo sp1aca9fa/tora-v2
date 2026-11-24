@@ -818,6 +818,9 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
   activity: {
     detail: () => `case when kind in ('collect', 'check', 'admin') then null else detail end`,
   },
+  // A game wish's alert memory (S36 C3) keys the copies sent by source, listing and seller and keeps
+  // their prices: it is left out; a card or sealed watch's memory (zone, target) holds no source's.
+  watches: { alert_state: () => `json_remove(alert_state, '$.wish')` },
   // Gap and bias come from a source's prices, and another source's row may be compared against it.
   sources: {
     quality: (l) =>
@@ -908,7 +911,6 @@ export const SOURCE_FREE_TABLES = [
   'suggestions',
   'user_devices',
   'users',
-  'watches',
   // A person's estimates on their wishes (W15), as they typed them.
   'wish_estimates',
 ];

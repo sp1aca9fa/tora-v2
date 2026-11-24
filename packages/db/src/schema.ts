@@ -938,10 +938,14 @@ export const watches = sqliteTable(
     note: text('note'),
     /** Buy zone alerts even when the signal has little data (S9 part 5). */
     alertLimited: integer('alert_limited', { mode: 'boolean' }).notNull().default(true),
-    /** What the alerts remember (S9 part 5): the buy zone's and the target's. */
+    /**
+     * What the alerts remember (S9 part 5): the buy zone's and the target's; a game wish's own
+     * (S36 C3, read through `parseWishState`: a stored one that is not valid stays as it is).
+     */
     alertState: text('alert_state', { mode: 'json' }).$type<{
       zone?: AlertState;
       target?: AlertState;
+      wish?: unknown;
     }>(),
     ...timestamps,
   },

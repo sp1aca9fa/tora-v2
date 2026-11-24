@@ -49,6 +49,8 @@ export * from './item-rules';
 export * from './rule-marks';
 export * from './wishes';
 export * from './wish-view';
+export * from './wish-copies';
+export * from './wish-alerts';
 export * from './wish-check';
 export * from './ask-check';
 export * from './sale-coverage';

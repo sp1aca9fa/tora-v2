@@ -40,7 +40,7 @@ import {
   watches,
 } from './schema';
 import { type SupplyOffer, searchOffers } from './supply';
-import { type WatchInput, addWatchOf } from './watches';
+import { type WatchInput, addWatchOf, savedAlertState, writeWatch } from './watches';
 
 // ---------------------------------------------------------------------------------------------
 // Check needed
@@ -622,10 +622,11 @@ async function goodFromEmpty(tx: Tx, userId: string, productId: string): Promise
     and(eq(watches.userId, userId), eq(watches.productId, productId), eq(watches.bucket, bucket));
   const [good] = await tx.select({ id: watches.id }).from(watches).where(mine(DEFAULT_GAME_BUCKET));
   if (good) return;
-  await tx
-    .update(watches)
-    .set({ condition: DEFAULT_GAME_CONDITION, bucket: DEFAULT_GAME_BUCKET, alertState: null })
-    .where(mine(''));
+  await writeWatch(tx, mine('')!, (w) => ({
+    condition: DEFAULT_GAME_CONDITION,
+    bucket: DEFAULT_GAME_BUCKET,
+    alertState: savedAlertState(w.alertState, true, false),
+  }));
 }
 
 /**

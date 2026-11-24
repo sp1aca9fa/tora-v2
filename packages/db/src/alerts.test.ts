@@ -440,7 +440,7 @@ it("keeps a watch's alert memory until a channel took the alert; asks under half
   expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
 });
 
-it("sends no target alert on a game's unverified ask, and keeps a page-linked shop's (S36 A2)", async () => {
+it('sends no zone or target alert for a game, unverified or checked: its own alerts do (S36 C3)', async () => {
   await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
   const day = '2026-11-01';
   const now = new Date(`${day}T12:00:00Z`);
@@ -476,10 +476,8 @@ it("sends no target alert on a game's unverified ask, and keeps a page-linked sh
   };
   await watched('Search Game');
   expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
-  // Out of the target (its asks are all unverified), remembered as a game's state.
-  expect((await db.select().from(watches))[0]!.alertState).toEqual({
-    target: { on: false, checked: true },
-  });
+  // Nothing stepped: the state stays as it was.
+  expect((await db.select().from(watches))[0]!.alertState).toBeNull();
 
   const withShop = await watched('Shop Game');
   await db.insert(productSources).values({
@@ -496,12 +494,13 @@ it("sends no target alert on a game's unverified ask, and keeps a page-linked sh
     lowestAskBase: 8_000,
     fetchedAt: `${day}T03:00:00`,
   });
-  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 1, alerts: 1 });
-  // The checked ask, not the cheaper unverified one beside it.
-  expect(sent.map((s) => s.text)).toEqual(['-# buy\nShop Game\nask ¥8,000 SNKRDUNK under ¥9,000']);
+  // A checked ask under the target: still nothing (S36 C3: a game wish alerts on its copies).
+  expect(await sendWatchAlerts(db, ctx, now)).toEqual({ sent: 0, alerts: 0 });
+  expect(sent).toEqual([]);
+  expect((await db.select().from(watches)).map((w) => w.alertState)).toEqual([null, null]);
 });
 
-it("forgets a game's target state from before unverified asks stopped counting; cards and sealed keep theirs (S36 A2)", async () => {
+it("leaves a game's zone and target state as it was; cards and sealed step as before (S36 C3)", async () => {
   await addDiscordChannel(db, member, HOOK, SECRET, fakeFetch);
   // Made-up items, each found by a saved search at the same marketplace, target 9,000.
   const items = {
@@ -558,8 +557,7 @@ it("forgets a game's target state from before unverified asks stopped counting; 
     );
 
   // Day 1: every ask is the marketplace's, under the target. Cards and sealed stay on (no alert,
-  // the state untouched); the games' asks are unverified, so they are out of the target, and the
-  // plain game's old state is read as none.
+  // the state untouched); the games are not stepped at all.
   await asks('2026-11-01', 5_000);
   expect(await sendWatchAlerts(db, ctx, new Date('2026-11-01T12:00:00Z'))).toEqual({
     sent: 0,
@@ -568,13 +566,12 @@ it("forgets a game's target state from before unverified asks stopped counting; 
   expect(await states()).toEqual({
     Card: before,
     Box: before,
-    Game: { target: { on: false, checked: true } },
-    Flagged: { target: { on: false, offSince: '2026-11-01', sent: '2026-10-20', checked: true } },
+    Game: before,
+    Flagged: flagged,
   });
 
-  // Day 2: a shop's own page shows the games under the target. The plain game alerts at once (its
-  // old state neither blocks nor quiets it); "Flagged" is still in its 14 days. Cards and sealed:
-  // an ask over the target turns them off, with no new field.
+  // Day 2: a shop's own page shows the games under the target: still nothing for them. Cards and
+  // sealed: an ask over the target turns them off, with no new field.
   for (const name of ['Game', 'Flagged']) {
     await db.insert(productSources).values({
       productId: ids[name]!.productId,
@@ -595,16 +592,16 @@ it("forgets a game's target state from before unverified asks stopped counting; 
     })),
   );
   expect(await sendWatchAlerts(db, ctx, new Date('2026-11-02T12:00:00Z'))).toEqual({
-    sent: 1,
-    alerts: 1,
+    sent: 0,
+    alerts: 0,
   });
-  expect(sent.map((s) => s.text)).toEqual(['-# buy\nGame\nask ¥8,000 SNKRDUNK under ¥9,000']);
+  expect(sent).toEqual([]);
   const off = { target: { on: false, offSince: '2026-11-02', sent: '2026-10-20' } };
   expect(await states()).toEqual({
     Card: off,
     Box: off,
-    Game: { target: { on: true, sent: '2026-11-02', checked: true } },
-    Flagged: { target: { on: true, sent: '2026-10-20', checked: true } },
+    Game: before,
+    Flagged: flagged,
   });
 });
 

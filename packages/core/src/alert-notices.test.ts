@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type Notice,
   type StorePostData,
+  type WishAlertData,
   discordPayloads,
   fillText,
   noticeExamples,
@@ -10,6 +11,7 @@ import {
   storeStartsExample,
   storeStartsNotice,
   telegramHtml,
+  wishNotice,
 } from './alert-notices';
 import { toLocalIso } from './time';
 
@@ -290,5 +292,47 @@ describe('a sale started notice (S29)', () => {
     expect(n.cards[0]!.sections![0]!.entries[0]!.sub).toBe('Snow set');
     const none = storeNotice({}, [{ ...post, products: [], url: null, comment: false }], null);
     expect(none.cards[0]!.sections![0]!.entries[0]!.sub).toBeNull();
+  });
+});
+
+describe('a wish notice (S36 C3)', () => {
+  const item = (over: Partial<WishAlertData> = {}): WishAlertData => ({
+    name: 'Star Rover',
+    copy: { title: 'Star Rover a1', price: '¥9,500', seller: 'Market A, seller-a1' },
+    plusShipping: false,
+    target: '¥10,000',
+    only: null,
+    sellers: [],
+    distinct: true,
+    url: null,
+    ...over,
+  });
+  const t = { wishPricePlusShipping: '{price} + shipping' };
+
+  it('marks a buyer-paid next-up price and seller entry like the alerted copy', () => {
+    const only = wishNotice(t, [
+      item({ only: { next: { price: '¥10,500', plusShipping: true } } }),
+    ]);
+    expect(only.cards[0]!.body).toContain('next up: ¥10,500 + shipping.');
+    const sellers = wishNotice(t, [
+      item({
+        sellers: [
+          { price: '¥9,500', seller: 'Market A, seller-a1', plusShipping: false },
+          { price: '¥9,700', seller: 'Market B, seller-b1', plusShipping: true },
+        ],
+      }),
+    ]);
+    expect(sellers.cards[0]!.body).toContain(
+      '¥9,500 (Market A, seller-a1), ¥9,700 + shipping (Market B, seller-b1)',
+    );
+    // Paid as stored: no mark, and without a text the English one.
+    const plain = wishNotice({}, [
+      item({ only: { next: { price: '¥10,500', plusShipping: false } } }),
+    ]);
+    expect(plain.cards[0]!.body).toContain('next up: ¥10,500.');
+    const fallback = wishNotice({}, [
+      item({ only: { next: { price: '¥10,500', plusShipping: true } } }),
+    ]);
+    expect(fallback.cards[0]!.body).toContain('next up: ¥10,500 plus shipping.');
   });
 });

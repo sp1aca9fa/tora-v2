@@ -11,7 +11,6 @@ import {
   type LevelChange,
   type LevelDay,
   type Paid,
-  type PaidRule,
   type SaleSpanHow,
   type SpanWhy,
   type WishEstimateBasis,
@@ -22,26 +21,24 @@ import {
   WISH_CONDITIONS,
   WISH_RISKS,
   addDays,
-  asPaid,
   atOrBetter,
   baseCurrency,
   changeOver,
   conditionBucket,
   effectiveRules,
-  failsRules,
   identitySources,
   localDate,
   sourceInfo,
   toLocalIso,
   youngGame,
 } from '@tora/core';
-import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm';
 import type { Db } from './client';
 import { type AskStatus, askChecks } from './ask-check';
 import { listConsoles } from './consoles';
 import { DomainError } from './mutations';
 import { loadSourceRegistry } from './registry';
-import { type DayRange, coveredOf, coversDay, mergeRanges } from './sale-coverage';
+import { type DayRange, coveredOf, mergeRanges } from './sale-coverage';
 import {
   type Product,
   type User,
@@ -61,13 +58,20 @@ import {
   wishEstimates,
 } from './schema';
 import { type StoredListPrice, sourceFacts } from './source-facts';
-import { type SupplyOffer, isShopOffers, supplyOffers } from './supply';
+import { isShopOffers, supplyOffers } from './supply';
 import { updateWatch } from './watches';
+import {
+  type DayStock,
+  type SupplyRead,
+  type WishCopies,
+  paidOf,
+  shopEntries,
+  shopStock,
+  wishCopies,
+} from './wish-copies';
 import { type WishLevel, wishLevelsOf, wishRecordShown } from './wish-levels';
 import { type WishState, wishStates } from './wishes';
 
-/** Copies listed per search-based source (spec W15: "the cheapest 3 to 5 ... (to start: 5)"). */
-export const WISH_COPIES = 5;
 /** "Near the low so far": the level within this share of the record (spec W15: "3 %, to start"). */
 export const NEAR_RECORD_SHARE = 0.03;
 /** Facts about stock: this many read nights running (spec W15: "5 or more nights running"). */
@@ -81,16 +85,6 @@ export const LAST_NIGHT_DAYS = 7;
  * start"); from it on, a night not run today is shown by its date.
  */
 export const NIGHT_CUTOFF_HOUR = 6;
-
-/**
- * How a listing's price as paid is read (S36 Terms "As paid", C1). The plug-ins' `addedCost`
- * declarations are not reachable from the app, so a listing counts as paid only when its own row
- * says the seller pays shipping; a buyer-paid or unstated shipping is not known ("plus shipping").
- */
-const LISTING_RULE: PaidRule = { rule: 'per_row', unstated: 'unknown' };
-
-const paidOf = (price: number, shipping: SupplyOffer['shipping'] | null | undefined): Paid =>
-  asPaid({ price, shipping: shipping ?? 'unknown' }, LISTING_RULE);
 
 /** One listing buyable now, as a wish shows it. */
 export interface WishCopy {
@@ -306,6 +300,8 @@ export interface WishView {
   facts: WishComputedFact[];
   recorded: WishRecordedFact[];
   history: WishHistoryLine[];
+  /** The alert step's copies (`alerts` only; else null). */
+  alert: Pick<WishCopies, 'tonight' | 'kept' | 'read' | 'shopSeen'> | null;
 }
 
 export interface WishViewOptions {
@@ -314,6 +310,11 @@ export interface WishViewOptions {
   detail?: boolean;
   /** The signed-in person's role, for `mayDelete` (admins may take back any fact). */
   role?: User['role'];
+  /**
+   * The closing step's read (S36 C3): the list's, with the nights each source read and, for a
+   * linked source with no row dated N, its rows before N (`alert`).
+   */
+  alerts?: boolean;
 }
 
 const IDS_PER_READ = 500;
@@ -374,71 +375,6 @@ const monthEnd = (month: string) => addDays(`${addDays(`${month}-28`, 4).slice(0
 const dayLevels = (series: readonly LevelDay[]): DayLevel[] =>
   series.map((d) => ({ day: d.day, level: d.level, window: d.window }));
 
-/** A row's stock on one read day: in, out, or the row does not tell. */
-type DayStock = 'in' | 'out' | 'unknown';
-
-interface SupplyRead {
-  productId: string;
-  source: string;
-  bucket: string | null;
-  day: string;
-  lowestAskBase: number | null;
-  listings: number | null;
-  listingsCapped: boolean | number | null;
-  offers: unknown;
-  url: string | null;
-  /** When its run started: every row one run stored for an item and source carries the same. */
-  fetchedAt: string;
-}
-
-function shopEntries(row: SupplyRead): WishShopEntry[] {
-  const bucket = row.bucket ?? '';
-  const offers = supplyOffers(row);
-  if (offers && offers.length)
-    return offers.map((o) => ({
-      bucket,
-      kind: o.own ?? null,
-      price: o.priceBase,
-      paid: paidOf(o.priceBase, o.shipping),
-      stock: o.stock ?? null,
-      count: o.count ?? null,
-      condition: o.condition ?? null,
-      seller: o.seller ?? null,
-      url: o.url,
-    }));
-  if (row.lowestAskBase === null) return [];
-  // An ask stored without its entries (before S36): whose copy it is is not said.
-  return [
-    {
-      bucket,
-      kind: null,
-      price: row.lowestAskBase,
-      paid: paidOf(row.lowestAskBase, null),
-      stock: null,
-      count: null,
-      condition: null,
-      seller: null,
-      url: row.url,
-    },
-  ];
-}
-
-/**
- * The shop's own copy on one read day, over its rows in the wish's condition or a better one: in
- * when one has an own entry; out when none does and each is either the stated "out of stock" (no
- * ask, no entries) or lists only outside sellers; not told when a row has an ask with no entries.
- */
-function shopStock(rows: readonly SupplyRead[]): DayStock {
-  if (!rows.length) return 'unknown';
-  let told = true;
-  for (const r of rows) {
-    const offers = supplyOffers(r);
-    if (offers?.some((o) => o.own === 'own')) return 'in';
-    if (!offers && r.lowestAskBase !== null) told = false;
-  }
-  return told ? 'out' : 'unknown';
-}
-
 /** The run of `out` days ending at the latest read day (days not read are not in the list). */
 function outRun(days: readonly { day: string; is: DayStock }[]): { nights: number; since: string } {
   let nights = 0;
@@ -449,6 +385,55 @@ function outRun(days: readonly { day: string; is: DayStock }[]): { nights: numbe
     since = d.day;
   }
   return { nights, since };
+}
+
+const SUPPLY_READ = {
+  productId: supply.productId,
+  source: supply.source,
+  bucket: supply.bucket,
+  day: supply.day,
+  lowestAskBase: supply.lowestAskBase,
+  listings: supply.listings,
+  listingsCapped: supply.listingsCapped,
+  offers: supply.offers,
+  url: supply.url,
+  fetchedAt: supply.fetchedAt,
+};
+
+/**
+ * The alert step's earlier rows (plan 9.A, 9.H): a source not read on N keeps its last read's
+ * copies, so an item's linked source with no row dated N is read back to `WISH_VIEW_DAYS` before
+ * N (most nights every source has one, and nothing is read).
+ */
+async function rowsBefore(
+  db: Db,
+  night: string,
+  ofNight: readonly SupplyRead[],
+  links: readonly { productId: string; source: string; active: boolean }[],
+): Promise<SupplyRead[]> {
+  const read = new Set(ofNight.map((r) => `${r.productId}|${r.source}`));
+  const bySource = new Map<string, string[]>();
+  for (const l of links)
+    if (l.active && !read.has(`${l.productId}|${l.source}`))
+      bySource.set(l.source, [...(bySource.get(l.source) ?? []), l.productId]);
+  const out: SupplyRead[] = [];
+  for (const [source, items] of bySource)
+    out.push(
+      ...(await inParts(items, (part) =>
+        db
+          .select(SUPPLY_READ)
+          .from(supply)
+          .where(
+            and(
+              inArray(supply.productId, part),
+              eq(supply.source, source),
+              gte(supply.day, addDays(night, -WISH_VIEW_DAYS)),
+              lt(supply.day, night),
+            ),
+          ),
+      )),
+    );
+  return out;
 }
 
 /** The latest value per day, then changeOver (exact day 28 before: W14's rule). */
@@ -511,6 +496,7 @@ export async function wishViews(
         facts: [],
         recorded: [],
         history: [],
+        alert: null,
       });
   if (!games.length) return out;
 
@@ -558,18 +544,7 @@ export async function wishViews(
         ? []
         : inParts(readIds, (part) =>
             db
-              .select({
-                productId: supply.productId,
-                source: supply.source,
-                bucket: supply.bucket,
-                day: supply.day,
-                lowestAskBase: supply.lowestAskBase,
-                listings: supply.listings,
-                listingsCapped: supply.listingsCapped,
-                offers: supply.offers,
-                url: supply.url,
-                fetchedAt: supply.fetchedAt,
-              })
+              .select(SUPPLY_READ)
               .from(supply)
               .where(and(inArray(supply.productId, part), gte(supply.day, since))),
           ),
@@ -617,8 +592,9 @@ export async function wishViews(
           .from(productSources)
           .where(inArray(productSources.productId, part)),
       ),
-      // The nights each source read each item (the page only: "read on N" and the history).
-      options.detail
+      // The nights each source read each item (the page and the alert step: "read on N", the
+      // history).
+      options.detail || options.alerts
         ? inParts(readIds, (part) =>
             db
               .select({
@@ -635,7 +611,11 @@ export async function wishViews(
   const shopKeys = new Set(identitySources(registry, 'game'));
   const isShop = (r: SupplyRead) => shopKeys.has(r.source) || isShopOffers(r.offers);
   const rowsByItem = new Map<string, SupplyRead[]>();
-  for (const r of supplyRows)
+  const before =
+    options.alerts && !options.detail && lastRun !== null
+      ? await rowsBefore(db, lastRun, supplyRows, links)
+      : [];
+  for (const r of [...supplyRows, ...before])
     rowsByItem.set(r.productId, [...(rowsByItem.get(r.productId) ?? []), r]);
   const marked = new Set(marks.map((m) => `${m.productId}|${m.source}|${m.ref}`));
   const linksByItem = new Map<string, typeof links>();
@@ -681,131 +661,20 @@ export async function wishViews(
         return { source, day, rows: all.filter((r) => r.day === day), all };
       });
     };
-    // The read per source (fix round 2, items 2 and 3): a source is listed only when it stores
-    // asks for the item (a row in the window), so a sales-only source never is. Read on N (its
-    // stored nights for the rows' item hold N, as stamped, or a row is dated N): N's rows, and with
-    // nothing in the condition "none found", never older copies. Not read on N: its newest earlier
-    // day's rows, shown under that date.
-    const reads = (list: SupplyRead[], item: string) => {
-      const bySource = new Map<string, SupplyRead[]>();
-      for (const r of list) bySource.set(r.source, [...(bySource.get(r.source) ?? []), r]);
-      return [...bySource].flatMap(([source, all]) => {
-        const n = lastRun;
-        if (
-          n !== null &&
-          (all.some((r) => r.day === n) || coversDay(nightsOf.get(`${item}|${source}`) ?? [], n))
-        ) {
-          // Two reads the same day (the nightly, then a "collect now"): only the newer one's rows.
-          // A read rewrites only the conditions it found, so an older row of the day can hold a
-          // copy the newer read no longer saw.
-          const ofN = all.filter((r) => r.day === n);
-          const newest = ofN.reduce((at, r) => (r.fetchedAt > at ? r.fetchedAt : at), '');
-          return [
-            { source, day: n, rows: ofN.filter((r) => r.fetchedAt === newest), current: true },
-          ];
-        }
-        const earlier = all.filter((r) => n === null || r.day < n);
-        const day = earlier.reduce((d, r) => (r.day > d ? r.day : d), '');
-        return earlier.length
-          ? [{ source, day, rows: earlier.filter((r) => r.day === day), current: false }]
-          : [];
-      });
-    };
-    const counted = (price: number, paid: Paid) => (paid.known ? paid.amount : price);
-    // The cheapest checked copy: from the reads dated N only (fix round 2, item 4).
-    const pool: WishCheapest[] = [];
-    const offer = (source: string, price: number, paid: Paid) =>
-      pool.push({ source, day: lastRun!, price, paid, counted: counted(price, paid) });
-
-    const shop: WishShopView[] = reads(shopRows, shopItem).map(
-      ({ source, day, rows: dayRows, current }) => {
-        const inCondition = dayRows.filter((r) => better(r.bucket));
-        const stock = shopStock(inCondition);
-        const entries = inCondition
-          .flatMap(shopEntries)
-          .toSorted((a, b) => a.price - b.price || (a.kind === 'own' ? -1 : 1));
-        if (current) for (const e of entries) offer(source, e.price, e.paid);
-        return {
-          source,
-          day,
-          current,
-          none: current && !inCondition.length,
-          entries,
-          outOfStock: inCondition.length ? stock === 'out' : null,
-        };
-      },
-    );
-
-    // The shop is listed once: a source of its block is not listed again as a search.
-    const inShop = new Set(shop.map((s) => s.source));
-    const sources: WishSourceView[] =
-      state === 'check_needed'
-        ? []
-        : reads(
-            searchRows.filter((r) => !inShop.has(r.source)),
-            from,
-          ).map(({ source, day, rows: dayRows, current }) => {
-            const status = checks.status({ productId: product.id, source });
-            const pass = (o: SupplyOffer) =>
-              !isMarked(source, o.ref) &&
-              !(rules && failsRules({ title: o.title, category: null }, rules, source));
-            const copiesOf = (list: SupplyRead[]) => {
-              const seen = new Set<string>();
-              return list
-                .flatMap((r) =>
-                  (supplyOffers(r) ?? [])
-                    .filter((o) => !o.own && pass(o))
-                    .map((o): WishCopy => ({
-                      ref: o.ref,
-                      title: o.title,
-                      url: o.url,
-                      seller: o.seller,
-                      bucket: r.bucket ?? '',
-                      price: o.priceBase,
-                      paid: paidOf(o.priceBase, o.shipping),
-                    })),
-                )
-                .filter((c) => !seen.has(c.ref) && !!seen.add(c.ref))
-                .toSorted((a, b) => a.price - b.price);
-            };
-            const inCondition = dayRows.filter((r) => better(r.bucket));
-            const all = copiesOf(inCondition);
-            // A row stores its cheapest listings only; its count may be larger. The stored
-            // listings marked "not the item" (or failing the item's rules) are not counted (item 4).
-            const count = Math.max(
-              inCondition.reduce((n, r) => {
-                const offers = supplyOffers(r) ?? [];
-                const dropped = offers.filter((o) => !o.own && !pass(o)).length;
-                return n + Math.max(Math.max(r.listings ?? 0, offers.length) - dropped, 0);
-              }, 0),
-              all.length,
-            );
-            const checked = status === 'checked';
-            // Every stored copy counts for the cheapest, not only the ones listed.
-            if (current && checked) for (const c of all) offer(source, c.price, c.paid);
-            return {
-              source,
-              day,
-              current,
-              none: current && count === 0,
-              status: checked ? 'checked' : 'unverified',
-              copies: checked ? all.slice(0, WISH_COPIES) : [],
-              count,
-              capped: inCondition.some((r) => !!r.listingsCapped),
-              unverifiedPrice: checked ? null : (all[0]?.price ?? null),
-              apart: checked
-                ? copiesOf(
-                    dayRows.filter((r) => !better(r.bucket) && !atOrBetter(r.bucket, 'cond:fair')),
-                  ).slice(0, WISH_COPIES)
-                : [],
-            };
-          });
-
-    // The lowest counted price; on a tie the known one as paid first.
-    const cheapest =
-      pool.toSorted(
-        (a, b) => a.counted - b.counted || Number(b.paid.known) - Number(a.paid.known),
-      )[0] ?? null;
+    const { shop, sources, cheapest, ...alert } = wishCopies({
+      productId: product.id,
+      from,
+      rules,
+      wanted,
+      lastRun,
+      checkNeeded: state === 'check_needed',
+      shopItem,
+      shopRows,
+      searchRows,
+      nightsOf: (item, source) => nightsOf.get(`${item}|${source}`) ?? [],
+      isMarked,
+      status: (source) => checks.status({ productId: product.id, source }),
+    });
 
     const stored: WishLevel | undefined = wanted
       ? levels.get(`${product.id}|${wanted}`)
@@ -991,6 +860,7 @@ export async function wishViews(
       facts,
       recorded,
       history,
+      alert: options.alerts ? alert : null,
     });
   }
   return out;

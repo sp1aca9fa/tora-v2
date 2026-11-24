@@ -2,7 +2,8 @@
 //   after-run --since <time> [--collect-exit N] [--backup-exit N] [--log <collect.log>]
 //       Run by scripts/collect-cron.sh after the collect and the backup: records a step that
 //       stopped before it could record itself and sends failures to admins at once, then the
-//       watched items' buy zone and target alerts (S9 part 5; from today's numbers only).
+//       watched items' buy zone and target alerts (S9 part 5; from today's numbers only), each
+//       printed, then the game wishes' alerts (S36 C3). Exits 1 when one person's wishes failed.
 //   update --from <rev> --to <rev> [--failed <step> | --waiting pending|unknown] [--retry]
 //       Run by a server's update script: logs the update, a failure to admins (step ci: GitHub
 //       CI failed, uncommitted: refused; the server stayed on <from>); --waiting: the server has
@@ -33,13 +34,13 @@ import {
   alertServerUpdate,
   checkMissedRuns,
   sendSummaries,
-  sendWatchAlerts,
   stoppedReason,
 } from '../alerts';
 import { createDb } from '../client';
 import { resetDataCheck, watchDataCheck } from '../data-check';
 import { dbConfigFromEnv, findRepoRoot, loadRootEnv } from '../env';
 import { loadTimeZone } from '../registry';
+import { nightAlerts } from '../wish-alerts';
 
 loadRootEnv();
 const secret = process.env.AUTH_SECRET?.trim();
@@ -118,8 +119,30 @@ if (command === 'after-run') {
   console.log(`alerts: ${failures} failure message(s) sent (${localDate()})`);
   const market = await alertMarketRefusals(db, ctx);
   if (market) console.log(`alerts: ${market} daytime reads message(s) sent`);
-  const buy = await sendWatchAlerts(db, ctx);
-  console.log(`alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`);
+  // The watched items' line is printed before the wishes' pass starts, so a wait or a crash there
+  // still leaves it in the log (fix round 1, item 8). A person whose wishes failed is logged and
+  // counted, the others go on; the exit is then non-zero as a crash's was (the watched items'
+  // pass has no other rule), so the collect script's log still says "alerts failed".
+  const { wish } = await nightAlerts(db, ctx, new Date(), {
+    afterBuy: (buy) =>
+      console.log(
+        `alerts: ${buy.alerts} buy alert(s) for watched items, ${buy.sent} message(s) sent`,
+      ),
+  });
+  if (wish.status === 'busy') console.log('wish alerts: skipped, another pass running');
+  else {
+    const more = [
+      wish.lost && `${wish.lost} state write(s) lost`,
+      wish.invalid && `${wish.invalid} wish state(s) not valid, skipped`,
+      wish.skipped && `${wish.skipped} wish(es) saved during the pass, left to the next`,
+      wish.failed && `${wish.failed} person(s) failed, see above`,
+      wish.status === 'lease_lost' && 'stopped: another pass took over',
+    ].filter(Boolean);
+    console.log(
+      `wish alerts: ${wish.alerts} alert(s) for wishes, ${wish.sent} message(s) sent${more.map((m) => `, ${m}`).join('')}`,
+    );
+    if (wish.failed) process.exitCode = 1;
+  }
 } else if (command === 'update') {
   // Run by a server's update script after an update (or a failed one), or while one waits for CI.
   const waiting = values.waiting ?? null;

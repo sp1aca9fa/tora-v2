@@ -1,5 +1,5 @@
-import { deriveBucket, productClass } from '@tora/core';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { deriveBucket, parseWishState, productClass, restartWish } from '@tora/core';
+import { type SQL, and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError, type ProductRef, resolveProductRef } from './mutations';
 import { type Product, type Watch, products, watches } from './schema';
@@ -63,7 +63,7 @@ export async function addWatch(
  * a target or note left empty keeps the stored one instead of clearing it.
  */
 export async function addWatchOf(
-  db: Pick<Db, 'insert'>,
+  db: Pick<Db, 'insert' | 'select' | 'update'>,
   userId: string,
   product: Product,
   input: WatchInput,
@@ -71,6 +71,16 @@ export async function addWatchOf(
 ): Promise<Watch> {
   const values = fields(product, input);
   const keep = options.keepUntyped;
+  const [stored] = await db
+    .select({ price: watches.targetPriceBase })
+    .from(watches)
+    .where(
+      and(
+        eq(watches.userId, userId),
+        eq(watches.productId, product.id),
+        eq(watches.bucket, values.bucket),
+      ),
+    );
   const [watch] = await db
     .insert(watches)
     .values({ userId, productId: product.id, ...values })
@@ -86,7 +96,17 @@ export async function addWatchOf(
       },
     })
     .returning();
-  return watch!;
+  // Wished again at another price: a game wish's alerts start afresh (S36 C3); a card's memory
+  // stays as an upsert has always left it.
+  if (!stored || stored.price === watch!.targetPriceBase) return watch!;
+  return (
+    (await writeWatch(db, eq(watches.id, watch!.id), (w) => {
+      const wish = parseWishState(w.alertState?.wish);
+      return wish && wish !== 'invalid'
+        ? { alertState: { ...w.alertState, wish: restartWish(wish) } }
+        : null;
+    })) ?? watch!
+  );
 }
 
 /** Changes a watch's condition, target or note. */
@@ -116,20 +136,71 @@ export async function updateWatch(
       );
     if (taken) throw new DomainError('duplicate_watch');
   }
-  // A new condition or target starts its alerts afresh (S9 part 5).
-  const state = row.watch.alertState ?? {};
-  const alertState =
-    values.bucket !== row.watch.bucket
-      ? null
-      : values.targetPriceBase !== row.watch.targetPriceBase
-        ? { zone: state.zone }
-        : state;
-  const [watch] = await db
-    .update(watches)
-    .set({ ...values, alertState })
-    .where(eq(watches.id, watchId))
-    .returning();
-  return watch!;
+  const watch = await writeWatch(
+    db,
+    and(eq(watches.id, watchId), eq(watches.userId, userId))!,
+    (w) => ({
+      ...values,
+      alertState: savedAlertState(
+        w.alertState,
+        values.bucket !== w.bucket,
+        values.targetPriceBase !== w.targetPriceBase,
+      ),
+    }),
+  );
+  if (!watch) throw new DomainError('not_found');
+  return watch;
+}
+
+/**
+ * A watch's alert memory after a save: a new condition starts its alerts afresh and a new target
+ * its target part (S9 part 5); a game wish's part restarts on either and keeps the copies it
+ * alerted (S36 C3, `restartWish`). A stored wish part that is not a valid one stays as it is.
+ */
+export function savedAlertState(
+  state: Watch['alertState'],
+  bucketChanged: boolean,
+  priceChanged: boolean,
+): Watch['alertState'] {
+  // Nothing restarts: the memory as stored, a NULL as the empty one, as before the wish's part came
+  // (a card or sealed watch's stored text stays what it was). The closing step's compare-and-set
+  // misses on that rewrite and writes its step again on the fresh text (`wish-alerts.ts`).
+  const stored = state ?? {};
+  if (!bucketChanged && !priceChanged) return stored;
+  const parsed = parseWishState(stored.wish);
+  const wish =
+    parsed === null ? undefined : parsed === 'invalid' ? stored.wish : restartWish(parsed);
+  if (bucketChanged) return wish === undefined ? null : { wish };
+  return wish === undefined ? { zone: stored.zone } : { zone: stored.zone, wish };
+}
+
+/**
+ * Writes one watch by compare-and-set on its stored alert memory (S36 C3): the closing step writing
+ * between the read and the write makes this read and compute again, 3 tries, then an error (a save
+ * never silently drops the step's write, nor the step the save's). `next` gives the fields to set
+ * (null: nothing to write); null when no row matches `where`.
+ */
+export async function writeWatch(
+  db: Pick<Db, 'select' | 'update'>,
+  where: SQL,
+  next: (watch: Watch) => Partial<Watch> | null,
+): Promise<Watch | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const [row] = await db
+      .select({ watch: watches, raw: sql<string | null>`${watches.alertState}` })
+      .from(watches)
+      .where(where);
+    if (!row) return null;
+    const set = next(row.watch);
+    if (!set) return row.watch;
+    const [written] = await db
+      .update(watches)
+      .set(set)
+      .where(and(eq(watches.id, row.watch.id), sql`${watches.alertState} IS ${row.raw}`))
+      .returning();
+    if (written) return written;
+  }
+  throw new Error('watch_save_raced');
 }
 
 export async function removeWatch(db: Db, userId: string, watchId: string): Promise<boolean> {

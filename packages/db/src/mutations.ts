@@ -19,6 +19,8 @@ import {
   itemTypeOf,
   isGameItem,
   LOAD_JOB_KIND,
+  mergeWishMemory,
+  parseWishState,
   resolveTaxonomy,
   kindsForSetType,
   orderSourceOf,
@@ -1261,6 +1263,23 @@ export async function mergeProducts(
           .update(wishEstimates)
           .set({ watchId: kept })
           .where(eq(wishEstimates.watchId, w.id));
+        // A game wish's memory of the copies sent joins the kept wish's, so the kept item, now
+        // reading the dropped one's links, does not alert them again (fix round 1, item 7). A
+        // stored part that is not a valid one is left as it is; a card's memory is not touched.
+        const dropped = parseWishState(w.alertState?.wish);
+        if (dropped && dropped !== 'invalid') {
+          const [into] = await tx
+            .select({ alertState: watches.alertState })
+            .from(watches)
+            .where(eq(watches.id, kept));
+          const mine = parseWishState(into?.alertState?.wish);
+          if (mine !== 'invalid') {
+            await tx
+              .update(watches)
+              .set({ alertState: { ...into?.alertState, wish: mergeWishMemory(mine, dropped) } })
+              .where(eq(watches.id, kept));
+          }
+        }
         await tx.delete(watches).where(eq(watches.id, w.id));
       } else {
         await tx.update(watches).set({ productId: intoId }).where(eq(watches.id, w.id));

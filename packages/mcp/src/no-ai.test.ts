@@ -244,6 +244,16 @@ describe('query_sql on a database holding a noAi source', () => {
         },
         { productId, bucket: 'b', series: [day(['mercari'])], inputsHash: 'h', computedAt: at },
       ] as never);
+      // A wish's alert memory keys a copy sent by its source and listing (S36 C3), beside a zone.
+      await db.insert(schema.watches).values({
+        userId,
+        productId,
+        bucket: 'raw:A',
+        alertState: {
+          zone: { zone: 'buy', since: at } as never,
+          wish: { alerted: { 'ebay|e1': 5000 }, runs: { 'ebay|e1': '2026-10-09' } },
+        },
+      });
     });
 
     it('keeps them out of query_sql', async () => {
@@ -276,6 +286,11 @@ describe('query_sql on a database holding a noAi source', () => {
           { key: 'opportunities', value: null },
         ]),
       );
+      // A wish's alert memory is left out; the zone's stays.
+      const [watch] = await rows('select alert_state from watches');
+      expect(JSON.parse(String(watch!.alert_state))).toEqual({
+        zone: { zone: 'buy', since: at },
+      });
     });
 
     it('takes them out of the analysis copy (ops/scrub-analysis.sql)', async () => {
@@ -302,6 +317,11 @@ describe('query_sql on a database holding a noAi source', () => {
         { source: 'mercari', buylist: null },
       ]);
       expect(await all('app_settings')).not.toContain('ebay');
+      // A wish's alert memory goes; the zone's stays.
+      const [watch] = (await db.$client.execute('select alert_state from watches')).rows;
+      expect(JSON.parse(String(watch!.alert_state))).toEqual({
+        zone: { zone: 'buy', since: at },
+      });
       // The packed sales keep the other source's prices, and its daily counts.
       const [packed] = (await db.$client.execute('select sales from item_sales')).rows;
       const sales = JSON.parse(String(packed!.sales));
@@ -353,9 +373,15 @@ describe('query_sql on a database holding a noAi source', () => {
       detail: { sources: ['x'] },
       occurredAt: at,
     });
+    const memory = { wish: { alerted: { 'mercari|m1': 1000 } } };
+    await db
+      .insert(schema.watches)
+      .values({ userId, productId, bucket: 'raw:A', alertState: memory });
     await db.$client.executeMultiple(await scrubScript());
     const [entry] = (await db.$client.execute('select detail from activity')).rows;
     expect(entry!.detail).toBe(JSON.stringify({ sources: ['x'] }));
+    const [watch] = (await db.$client.execute('select alert_state from watches')).rows;
+    expect(JSON.parse(String(watch!.alert_state))).toEqual(memory);
   });
 
   describe("Tora's self check", () => {
