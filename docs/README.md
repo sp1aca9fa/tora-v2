@@ -13,6 +13,7 @@ this order the first time.
 | [Running collectors](running.md)      | `pnpm collect`, the daily schedule, many collectors, logs, imports, the data review  |
 | [Languages](languages.md)             | The app's two languages and adding a new one                                         |
 | [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
+| [A home server](home-server.md)       | Running everything on one small machine at home: services, updates, off-box copies   |
 | [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
 | [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
 | [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |
@@ -30,6 +31,18 @@ Rules the code computes from, each stated once (`rules/`):
 | [Collecting](rules/collectors.md)                         | What a collect reads, the pace and caps, refusals, the schedule, the daytime reads                     |
 | [The data model](rules/data-model.md)                     | The rules every table follows, what is one person's or shared, collected prices, lots, the tables      |
 | [Accounts and access](rules/accounts.md)                  | Signing in, devices and sessions, lockout, roles, setup links, the account download, secrets           |
+
+Records and development:
+
+| File                               | What it holds                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| [Requirements](../requirements.md) | The goal, the example scenarios, the stack, and one line per build phase              |
+| [Decision log](decisions.md)       | Dated decisions with their reasons, in date order; a record, not where rules live     |
+| [Build history](history.md)        | Each phase's chapter as asked and built, and the older texts the rules files replaced |
+| [Agents](agents.md)                | How Claude Code agents build and review changes here (profile for the shared agents)  |
+| [CI](ci.md)                        | What the checks on every push run                                                     |
+| [Spec template](spec-template.md)  | The form of a task's spec                                                             |
+| [UX review](ux-review.md)          | What the review of a changed page looks for                                           |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

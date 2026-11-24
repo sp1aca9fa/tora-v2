@@ -6,7 +6,7 @@
 
 ## Rests on
 
-<requirements.md sections and docs, by heading; don't copy them>
+<rules files (`docs/rules/`), requirements.md sections and docs, by heading; don't copy them>
 
 ## Pages touched
 

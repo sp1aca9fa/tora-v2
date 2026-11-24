@@ -5,13 +5,16 @@ in the private `collectors/` submodule, loaded through `CLAUDE.local.md` when it
 
 ## Reading protocol (every session)
 
-1. `requirements.md`: Core fully, then only the current session (the first one not marked done in
-   the Status table). Finished phases' full chapters are in `docs/history.md`; read them only
-   when needed.
-2. The private notes' to-do list and `actions.md`, when the private submodule is checked out (the
+1. `requirements.md`: Core and the Status table; the chapter still in it (the phase whose checks
+   are not done) when the work is on that phase.
+2. The rules file of each concern the task touches (`docs/rules/`, listed in `docs/README.md`):
+   the one home of that concern's rules and numbers. `docs/history.md` (every phase's chapter)
+   and `docs/decisions.md` are records: read them for why something is so, never to build from.
+3. The private notes' to-do list and `actions.md`, when the private submodule is checked out (the
    owner may have written answers into it).
 
-If a request conflicts with the requirements, point out the conflict and ask before proceeding.
+If a request conflicts with the requirements or a rules file, point out the conflict and ask
+before proceeding. A change to a rule or a number is made in its rules file in the same task.
 
 ## Decisions
 
@@ -23,7 +26,7 @@ If a request conflicts with the requirements, point out the conflict and ask bef
 - Production data changes only when they serve the request; give the owner the command, never run
   it.
 - New decisions go in the log that fits; mixed ones are split (the generic part in the public
-  "Decision log", specifics in the private notes).
+  "Decision log", `docs/decisions.md`, specifics in the private notes).
 
 ## Hard rules
 

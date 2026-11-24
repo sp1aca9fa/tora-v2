@@ -4,6 +4,7 @@ node_modules/
 packages/db/drizzle/
 requirements.md
 docs/history.md
+docs/decisions.md
 collectors/
 # Generated catalog data and local test installs
 collectors-public/catalog/data/
