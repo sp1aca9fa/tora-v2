@@ -1,6 +1,7 @@
 import {
   type CollectorRunStatus,
   baseCurrency,
+  identitySources,
   inAppZone,
   isGameItem,
   localDate,
@@ -20,8 +21,10 @@ import {
   finishRun,
   LISTING_BROKEN_NIGHTS,
   LISTING_RETRY_DAYS,
+  linkSource,
   listingsToCollect,
   reactivateListing,
+  repointCodeLink,
   recordListingFailure,
   recordListingRetry,
   keptSalesSince,
@@ -43,6 +46,8 @@ import {
   saveCandidates,
   saveSourceFacts,
   saveSupply,
+  storedJan,
+  storedJans,
   suggestFromKnownProducts,
   startRun,
   syncProductDetails,
@@ -127,6 +132,8 @@ export function pace(collector: Collector, options?: PoliteHttpOptions): PoliteH
     minDelayMs,
     maxDelayMs,
     ...(own.maxRequests !== undefined && { maxRequests: own.maxRequests }),
+    // Only fewer retries than the default (an API whose server error is its refusal: none).
+    ...(own.retries !== undefined && { retries: Math.min(3, Math.max(0, own.retries)) }),
     ...options,
   };
 }
@@ -174,6 +181,9 @@ export async function runCollector(
       (await listProductSources(db, productId))
         .filter((s) => s.active)
         .map((s) => ({ source: s.source, title: s.title })),
+    // S36 B5: the identity shop's JAN (A5) in this source's market, read only.
+    productCode: (product) =>
+      storedJan(db, product.id, identitySources(registry, 'game', info?.market ?? undefined)),
   };
   const runId = await startRun(db, collector.source, { exclusive: options.exclusive });
   const clock = awakeClock();
@@ -217,6 +227,72 @@ export async function runCollector(
         await createQuerySource(db, product.id, collector.source, query);
         summary.candidates++;
         log(`search set up for "${product.name}": ${(query.keywords ?? []).join(' ')}`);
+      }
+    } else if (!options.collectOnly && collector.linksByCode) {
+      // A source linked by the item's own product code (S36 B5): the candidate the plug-in reads
+      // from stored facts (no request) is the link, made at once with no person's confirmation. Only
+      // items with no row at the source at all: one a person unlinked, or set aside, stays as it is.
+      // Items the source does not handle are left out before any cap (as in the match step below,
+      // with its limit): otherwise the oldest cards took every slot and no newer game was linked.
+      const unlinked = (
+        await productsWithoutSource(db, collector.source, {
+          productId: options.productId,
+          limit: 10_000,
+        })
+      ).filter((p) => collector.supports(p));
+      // Active links follow a code that changed (a corrected code at the identity shop, or its page
+      // relinked): the same row takes the new code, its rows under the old one stay as history.
+      const linked = (
+        await listingsToCollect(db, collector.source, { productId: options.productId }, now)
+      ).filter(({ source: l }) => l.active);
+      // Every item's code in one read (per 500 items), not one read per item each night.
+      const codes = await storedJans(
+        db,
+        [...new Set([...unlinked.map((p) => p.id), ...linked.map((r) => r.product.id)])],
+        identitySources(registry, 'game', info?.market ?? undefined),
+      );
+      const byCode: CollectorContext = {
+        ...ctx,
+        productCode: async (product) =>
+          codes.has(product.id) ? codes.get(product.id)! : (ctx.productCode?.(product) ?? null),
+      };
+      for (const product of unlinked) {
+        try {
+          const [code] = await collector.findCandidates(product, byCode);
+          if (!code) continue;
+          await linkSource(db, product.id, {
+            source: collector.source,
+            externalId: code.externalId,
+            url: code.url ?? null,
+            title: code.title,
+          });
+          summary.candidates++;
+          log(`linked "${product.name}" by its product code`);
+        } catch (e) {
+          if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          fail(`match ${product.name}`, e);
+        }
+      }
+      for (const { source: link, product } of linked) {
+        try {
+          // No code now (none stored, or the identity pages disagree): the link is left, and the
+          // plug-in's collect stores nothing for it.
+          const [code] = await collector.findCandidates(product, byCode);
+          if (!code || code.externalId === link.externalId) continue;
+          const moved = await repointCodeLink(db, link, {
+            externalId: code.externalId,
+            title: code.title,
+            url: code.url ?? null,
+          });
+          log(
+            moved
+              ? `"${product.name}" follows its new product code`
+              : `"${product.name}": its product code changed, but another row of it holds the new one; left as it is`,
+          );
+        } catch (e) {
+          if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          fail(`match ${product.name}`, e);
+        }
       }
     } else if (!options.collectOnly) {
       // Items the source does not handle are left out before the cap: otherwise the oldest of

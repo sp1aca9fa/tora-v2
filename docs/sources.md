@@ -122,7 +122,7 @@ secondary US):
 Three Japanese TCG shops were added later (private plug-ins): their asking prices, what is in stock
 and their buy-back prices, plus identity pages for shops with one page per card.
 
-Only TCGCSV, eBay and Cardmarket are public (`collectors-public/`); the others are private plug-ins.
+Only TCGCSV, eBay, Cardmarket and Yahoo! Shopping are public (`collectors-public/`); the others are private plug-ins.
 
 - **TCGCSV**: TCGplayer's catalog and daily market prices as public files, for Japanese and English
   Pokemon cards and sealed product. TCGplayer prices ungraded cards only.
@@ -137,3 +137,39 @@ Only TCGCSV, eBay and Cardmarket are public (`collectors-public/`); the others a
   Its market is `eu` (Europe). Off unless `ENABLE_CARDMARKET=1` is in the home PC's `.env`, since
   it would otherwise search every English card each night. Its identity link is TCGdex's card
   link (`https://api.tcgdex.net/v2/en/cards/swsh7-215`).
+- **Yahoo! Shopping (official API)**: see the section below.
+
+## Yahoo! Shopping (official API)
+
+What it adds: for game items of the Japan market, the cheapest new and used copies in stock across
+the shops of Yahoo! JAPAN Shopping, found by the game's JAN (the product code the identity shop's
+page shows). New and used copies are two rows; used copies have no condition grade, so they are
+shown apart from graded copies. When no new copy is in stock, the game is marked as no
+longer sold new. A game whose identity page showed no JAN is not searched (never by name). Each
+game costs two requests a night, at most one a second. The API is free.
+
+Getting a Client ID:
+
+1. Sign in with a Yahoo! JAPAN ID (make one if needed).
+2. Register an application at https://e.developer.yahoo.co.jp/register. The application type is
+   your choice there (the API reference does not name one). Choose the shopping API for the
+   application when registering it.
+3. Copy its **Client ID** from the application's page on the developer dashboard.
+
+If the collectors page shows the error "the Yahoo! JAPAN application lacks the shopping API", the
+shopping API must be added on the application's page at the developer site.
+
+In the server's `.env` (in the Tora folder), add this line, replacing `<<YOUR_CLIENT_ID>>` with the
+Client ID from step 3:
+
+```sh
+YAHOO_SHOPPING_CLIENT_ID=<<YOUR_CLIENT_ID>>
+```
+
+The next nightly collect picks it up and the source appears under Settings > Collectors. To turn it
+off, remove the line: the source stays listed in Settings with its links, nothing more is read, and
+its last prices stop showing as for sale after 3 days. The Client ID is a secret: Tora sends it only
+to the API and keeps it out of the database and the logs. Read the API's terms before turning it on: they do not say clearly
+whether search results may be stored, and Tora stores the prices it reads. Its data may be given
+to AI models (not `noAi`); wherever its prices are shown, the credit "Web Services by Yahoo! JAPAN"
+links to https://developer.yahoo.co.jp/sitemap/.

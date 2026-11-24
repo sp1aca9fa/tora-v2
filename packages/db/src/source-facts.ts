@@ -7,7 +7,7 @@
 // while that is empty, never over one already there, and only once the day has come (on or before
 // today in the app's zone): a pre-order's announced date stays in the facts alone, follows a delay
 // there, and fills the item the night it has passed (S9 "New release: wait" counts from it).
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { productSources, products } from './schema';
 
@@ -31,6 +31,12 @@ export interface SourceFactsInput {
   /** EAN-13 or EAN-8, check digit verified. */
   jan: string | null;
   maker: string | null;
+  /**
+   * Whether a new copy is still sold (S36 B5): `false` when tonight's search of new copies in stock
+   * found none, `true` when it found one; null or left out: not read (every source but the shopping
+   * search). The day it was read is the facts' `seenAt`.
+   */
+  soldNew?: boolean | null;
 }
 
 /** A stored list price: `seenAt`, the last read whose page showed it; null when stored without one. */
@@ -44,8 +50,10 @@ export interface StoredListPrice extends ListPrice {
  * its list price, the item's facts did not change); a field shown tonight replaces it. The list price
  * carries its own `seenAt`, kept with it, so one kept from months ago never looks seen tonight.
  */
-export interface SourceFacts extends Omit<SourceFactsInput, 'listPrice'> {
+export interface SourceFacts extends Omit<SourceFactsInput, 'listPrice' | 'soldNew'> {
   listPrice: StoredListPrice | null;
+  /** Only when a source read it: the facts of every other source keep their shape. */
+  soldNew?: boolean;
   seenAt: string;
 }
 
@@ -78,6 +86,7 @@ export function sourceFacts(stored: unknown): SourceFacts | null {
         : null,
     jan: str(f.jan),
     maker: str(f.maker),
+    ...(typeof f.soldNew === 'boolean' && { soldNew: f.soldNew }),
     seenAt: str(f.seenAt) ?? '',
   };
 }
@@ -89,13 +98,16 @@ export function mergeFacts(
   seenAt: string,
 ): SourceFacts {
   const was = sourceFacts(stored);
-  return {
+  const merged: SourceFacts = {
     releaseDate: tonight.releaseDate ?? was?.releaseDate ?? null,
     listPrice: tonight.listPrice ? { ...tonight.listPrice, seenAt } : (was?.listPrice ?? null),
     jan: tonight.jan ?? was?.jan ?? null,
     maker: tonight.maker ?? was?.maker ?? null,
     seenAt,
   };
+  const soldNew = tonight.soldNew ?? was?.soldNew;
+  if (typeof soldNew === 'boolean') merged.soldNew = soldNew;
+  return merged;
 }
 
 /**
@@ -133,4 +145,78 @@ export async function saveSourceFacts(
       .returning({ id: products.id });
     return { releaseDateFilled: filled.length > 0 };
   });
+}
+
+/**
+ * The product code (JAN) an item's active links at `sources` stored (S36 A5, read by the shopping
+ * search, B5); null when none stored one, and null when they disagree (two pages of two games:
+ * never a guess between them). Read only. A link set aside or unlinked is not read: its page may
+ * have been another item's.
+ */
+export async function storedJan(
+  db: Pick<Db, 'select'>,
+  productId: string,
+  sources: readonly string[],
+): Promise<string | null> {
+  return (await storedJans(db, [productId], sources)).get(productId) ?? null;
+}
+
+/**
+ * `storedJan` for many items in one read per 500 items (the nightly linking step, S36 B5): every
+ * item asked is in the answer, null when it has no code or its links disagree.
+ */
+export async function storedJans(
+  db: Pick<Db, 'select'>,
+  productIds: readonly string[],
+  sources: readonly string[],
+): Promise<Map<string, string | null>> {
+  const codes = new Map<string, Set<string>>(productIds.map((id) => [id, new Set()]));
+  const ids = [...codes.keys()];
+  for (let i = 0; sources.length && i < ids.length; i += 500) {
+    const rows = await db
+      .select({ productId: productSources.productId, facts: productSources.facts })
+      .from(productSources)
+      .where(
+        and(
+          inArray(productSources.productId, ids.slice(i, i + 500)),
+          eq(productSources.active, true),
+          inArray(productSources.source, [...sources]),
+        ),
+      );
+    for (const r of rows) {
+      const jan = sourceFacts(r.facts)?.jan;
+      if (jan) codes.get(r.productId)?.add(jan);
+    }
+  }
+  return new Map(ids.map((id) => [id, codes.get(id)!.size === 1 ? [...codes.get(id)!][0]! : null]));
+}
+
+/**
+ * Points an item's active code link at its new code (S36 B5: the identity shop's JAN changed):
+ * the same row, so the source's rows stored under the old code stay as its history. False, and
+ * nothing changed, when the link is not active any more or another row of the item at this source
+ * already holds the code (a link a person unlinked stays as they left it).
+ */
+export async function repointCodeLink(
+  db: Pick<Db, 'select' | 'update'>,
+  link: { id: string; productId: string; source: string },
+  code: { externalId: string; title: string; url: string | null },
+): Promise<boolean> {
+  const [taken] = await db
+    .select({ id: productSources.id })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, link.productId),
+        eq(productSources.source, link.source),
+        eq(productSources.externalId, code.externalId),
+      ),
+    );
+  if (taken) return false;
+  const moved = await db
+    .update(productSources)
+    .set({ externalId: code.externalId, title: code.title, url: code.url })
+    .where(and(eq(productSources.id, link.id), eq(productSources.active, true)))
+    .returning({ id: productSources.id });
+  return moved.length > 0;
 }

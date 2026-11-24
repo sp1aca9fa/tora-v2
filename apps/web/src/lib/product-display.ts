@@ -78,6 +78,8 @@ const CONDITION_OF_BUCKET: Record<string, string> = {
   'cond:like_new': 'condition.like_new',
   'cond:good': 'condition.no_noticeable_damage',
   'cond:fair': 'conditionPool.fair',
+  // A source's used copies with no grade stated; no watch or holding has this bucket.
+  'cond:used': 'conditionPool.used',
 };
 
 /**

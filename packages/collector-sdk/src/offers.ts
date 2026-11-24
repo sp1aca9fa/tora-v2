@@ -89,8 +89,9 @@ export function supplyWithOffers(
 }
 
 /**
- * A found listing as stored, once its price is in the base currency. Shipping stays `unknown`: the
- * source's payer id is kept as given, and which id means "the seller pays" is not known yet.
+ * A found listing as stored, once its price is in the base currency. Shipping is what the plug-in
+ * states per listing, else `unknown`: the source's payer id is kept as given, and which id means
+ * "the seller pays" is not known yet.
  */
 export function storedOffer(l: FoundListing, priceBase: number): SupplyOffer {
   return {
@@ -102,7 +103,7 @@ export function storedOffer(l: FoundListing, priceBase: number): SupplyOffer {
     currency: l.currency,
     seller: l.seller,
     category: l.category,
-    shipping: 'unknown',
+    shipping: l.shipping ?? 'unknown',
     shippingPayerId: l.shippingPayerId,
     // The identity shop's fields (S36 A6), only on its entries: the marketplaces' rows stay as they were.
     ...(l.own && {

@@ -1,0 +1,70 @@
+{
+  "totalResultsAvailable": 3,
+  "totalResultsReturned": 3,
+  "firstResultsPosition": 1,
+  "request": { "query": "" },
+  "hits": [
+    {
+      "index": 1,
+      "name": "Hero Quest Alpha edition (new)",
+      "description": "A made-up game.",
+      "url": "https://store.example/shop-b/item-2.html",
+      "inStock": true,
+      "code": "shop-b_item-2",
+      "condition": "new",
+      "imageId": "shop-b_item-2",
+      "image": { "small": "https://img.example/s.jpg", "medium": "https://img.example/m.jpg" },
+      "review": { "rate": 4.5, "count": 12, "url": "https://review.example/2" },
+      "affiliateRate": 1.0,
+      "price": 4980,
+      "premiumPrice": 4980,
+      "premiumPriceStatus": false,
+      "premiumDiscountRate": null,
+      "premiumDiscountType": null,
+      "priceLabel": { "taxable": true, "defaultPrice": 5980, "discountedPrice": null },
+      "point": { "amount": 49, "times": 1, "premiumAmount": 49, "premiumTimes": 1 },
+      "shipping": { "code": 2, "name": "送料無料" },
+      "genreCategory": { "id": 2512, "name": "Software", "depth": 3 },
+      "parentGenreCategories": [{ "depth": 1, "id": 2511, "name": "Games" }],
+      "brand": { "id": 100, "name": "Maker A" },
+      "parentBrands": [],
+      "janCode": "2012345678903",
+      "payment": "",
+      "releaseDate": 1700000000,
+      "seller": {
+        "sellerId": "shop-b",
+        "name": "Shop B",
+        "url": "https://store.example/shop-b/",
+        "isBestSeller": false,
+        "review": { "rate": 4.6, "count": 300 },
+        "imageId": "shop-b"
+      },
+      "delivery": { "area": "13", "deadLine": 12, "day": 1 }
+    },
+    {
+      "index": 2,
+      "name": "Hero Quest Alpha edition",
+      "url": "https://store.example/shop-a/item-1.html",
+      "inStock": true,
+      "code": "shop-a_item-1",
+      "condition": "new",
+      "price": 4500,
+      "shipping": { "code": 1, "name": "" },
+      "janCode": "2012345678903",
+      "seller": { "sellerId": "shop-a", "name": "Shop A" },
+      "somethingNew": { "nested": [1, 2, 3] }
+    },
+    {
+      "index": 3,
+      "name": "Hero Quest Alpha edition, free over 5,000 yen",
+      "url": "https://store.example/shop-c/item-3.html",
+      "inStock": true,
+      "code": "shop-c_item-3",
+      "condition": "new",
+      "price": 5200,
+      "shipping": { "code": 3, "name": "条件付き送料無料" },
+      "janCode": "2012345678903",
+      "seller": { "sellerId": "shop-c", "name": "Shop C" }
+    }
+  ]
+}

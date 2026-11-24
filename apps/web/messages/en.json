@@ -614,7 +614,8 @@
     "poor": "Poor"
   },
   "conditionPool": {
-    "fair": "Minor damage or worse"
+    "fair": "Minor damage or worse",
+    "used": "Used, grade not stated"
   },
   "packaging": {
     "sealed_shrink": "Sealed (shrink)",

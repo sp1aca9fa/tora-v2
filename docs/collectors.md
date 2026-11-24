@@ -118,6 +118,7 @@ per shop purchases come from that is not a price source (`shopOnly`).
 | `shopOnly`                | A shop purchases come from, not a price source                                                                                                                                 |
 | `noAi`                    | Its terms forbid giving its data to AI models: left out of the data review and MCP tools                                                                                       |
 | `detailsDays`             | Listing details (`raw.ids`, `raw.listings`) dropped after this many days; the day's price stays                                                                                |
+| `credit`                  | `{ text, url }`: an attribution line its terms require wherever its data is shown (e.g. an API's "Web Services by" credit)                                                     |
 
 The roles are suggestions: the admin sets them in Settings. Suggest **comparison** for a new
 source until its numbers have been checked.
@@ -128,10 +129,11 @@ source until its numbers have been checked.
 interface Collector {
   source: string; // = SourceInfo.key
   label: string;
-  http?: { minDelayMs?; maxDelayMs?; maxRequests? }; // this site's pace (only slower)
+  http?: { minDelayMs?; maxDelayMs?; maxRequests?; retries? }; // this site's pace (only slower)
   supports(product): boolean; // which items it handles
   findCandidates(product, ctx): Promise<FoundCandidate[]>;
   defaultQuery?(product): SourceQuery | null; // search-based sources only
+  linksByCode?: boolean; // linked by the item's product code (see "Code-linked sources")
   queryVersion?: number;
   historyPhase?: boolean; // older history in a second pass (see "Long histories")
   collect(link, product, ctx, heldBuckets?): Promise<CollectResult>;
@@ -224,6 +226,19 @@ the user can tune it in the app. Raise `queryVersion` when you change `defaultQu
 made earlier are regenerated, ones the user edited are kept. A search source filters what it finds
 (bundles, parts, other editions) and declares no `identity` or `links`.
 
+### Code-linked sources
+
+A source searched by the item's product code (a JAN, read from what the identity shop's page
+stored) sets `linksByCode: true`. Its `findCandidates` reads the code with `ctx.productCode(product)`
+(no request; null when no identity page stored one) and returns it as the one candidate, or nothing.
+The runner links it at once, with no candidate to confirm, and only for items with no row at the
+source at all: a link a person unlinked stays unlinked. When the stored code changes later (the
+identity page shows a corrected one), the runner moves the active link to the new code; `collect`
+compares `ctx.productCode(product)` with the link's id itself and stores nothing on a mismatch or
+when no code is stored any more. Its `collect` returns its own supply rows;
+each row's `offers` are the copies it kept (`ref`, `title`, `url`, `price`, `currency`, `seller`,
+and `shipping`: `included` only when the source says shipping is free, else `unknown`).
+
 ### `productDetails(title, product)`
 
 Optional: details read from a confirmed listing's title (set code, card number, rarity, picture),
@@ -256,7 +271,8 @@ Always fetch through `ctx.http` (`PoliteHttp`), never `fetch` directly:
 - 2-5 s between requests (a plug-in can only slow it down, with `http: { minDelayMs }`; do so when
   the site's robots file asks for a longer delay, as one shop plug-in does with 30 s), a request
   cap per run (500 by default, `http: { maxRequests }`); what is left waits for the next run;
-- retries with backoff on server errors;
+- retries with backoff on server errors (3 by default; `http: { retries: 0 }` for an API whose
+  server errors mean "slow down", which then stop the source like a refusal);
 - stops the source for the run on 403, 429 or a captcha page (`BlockedError`): never work around a
   block;
 - `ctx.http.json`, `text`, `postJson`, `bytes`.

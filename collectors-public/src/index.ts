@@ -7,15 +7,20 @@ import { pullRateSuggestions } from './pull-rates';
 import { slabCheap } from './signals';
 import { tcgcsv } from './tcgcsv';
 import { tcgdex } from './tcgdex';
+import { yahooShopping, yahooShoppingSource } from './yahoo-shopping';
 
 const hasEbayKeys = !!(process.env.EBAY_CLIENT_ID && process.env.EBAY_CLIENT_SECRET);
+// A secret: handed to the plug-in only, never stored, logged or printed.
+const yahooShoppingId = process.env.YAHOO_SHOPPING_CLIENT_ID?.trim() || null;
 
 // Collectors safe to publish: public APIs only. eBay needs a keyset (EBAY_CLIENT_ID / _SECRET);
-// Cardmarket is switched on by ENABLE_CARDMARKET=1 (for a European market).
+// Cardmarket is switched on by ENABLE_CARDMARKET=1 (for a European market); Yahoo! Shopping (new and
+// used game copies by JAN, S36 B5) needs YAHOO_SHOPPING_CLIENT_ID.
 export const collectors: Collector[] = [
   tcgcsv,
   ...(hasEbayKeys ? [ebayCollector] : []),
   ...(process.env.ENABLE_CARDMARKET === '1' ? [tcgdex] : []),
+  ...(yahooShoppingId ? [yahooShopping(yahooShoppingId)] : []),
 ];
 export const rates: RateSource[] = [frankfurter];
 // Community pull rates for the box opening value (S20).
@@ -90,4 +95,6 @@ export const sources: SourceInfo[] = [
   ...(hasEbayKeys ? [ebay] : []),
   // Only when switched on: otherwise its market would show in Settings without prices.
   ...(process.env.ENABLE_CARDMARKET === '1' ? [cardmarket] : []),
+  // Only with its Client ID, like its collector.
+  ...(yahooShoppingId ? [yahooShoppingSource] : []),
 ];

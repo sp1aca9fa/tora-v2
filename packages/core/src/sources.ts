@@ -86,6 +86,11 @@ export interface SourceInfo {
    * `raw.listings`) are dropped after this many days; the day's aggregate stays.
    */
   detailsDays?: number;
+  /**
+   * A credit line its terms require wherever its data is shown (e.g. an API's attribution): the
+   * text as given, unchanged, and the link it must point to.
+   */
+  credit?: { text: string; url: string };
 }
 
 /** Sources whose data may not reach an AI model. */

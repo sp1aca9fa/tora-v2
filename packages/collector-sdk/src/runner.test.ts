@@ -23,6 +23,9 @@ import {
   productsWithBrokenListings,
   rejectCandidate,
   saveItemRules,
+  saveSourceFacts,
+  storedJan,
+  storedJans,
   saveTaxonomy,
   schema,
   unlinkSource,
@@ -1075,4 +1078,191 @@ it("stores a job's rows as the nightly save does (one save path, S36 B4)", async
   expect(stored.map((r) => r.externalRef)).toEqual(['job|1', 'night|1']);
   expect(same[0]).toEqual(same[1]);
   expect(same[0]).toMatchObject({ observedAt: '2026-10-01T12:00:00.000+09:00', priceBase: 12_340 });
+});
+
+describe('a source linked by the product code (linksByCode)', () => {
+  const facts = (jan: string) => ({ releaseDate: null, listPrice: null, jan, maker: null });
+  async function game(name: string, jan: string | null, source = 'shop') {
+    const p = await createProduct(db, userId, { category: 'game', kind: 'software', name });
+    await addWatch(db, userId, { productId: p.id }, {});
+    const link = await linkSource(db, p.id, { source, externalId: `S-${name}` });
+    if (jan)
+      await saveSourceFacts(
+        db,
+        { id: link.id, productId: p.id, facts: null },
+        facts(jan),
+        '2026-10-01T03:00:00.000+09:00',
+        '2026-10-01',
+      );
+    return { product: p, link };
+  }
+  const byCode = (asked: string[]): Collector => ({
+    source: 'codes',
+    label: 'Codes',
+    linksByCode: true,
+    supports: (p) => p.category === 'game',
+    findCandidates: async (product, ctx) => {
+      const code = await ctx.productCode?.(product);
+      asked.push(product.name);
+      return code ? [{ externalId: code, title: `JAN ${code}`, url: null, score: 1 }] : [];
+    },
+    collect: async () => ({ state: null, complete: true }),
+  });
+  beforeEach(async () => {
+    await saveSourceInfos(db, [
+      { key: 'shop', label: 'Shop', market: 'jp', currency: 'JPY', identity: ['game'] },
+      { key: 'other', label: 'Other', market: 'jp', currency: 'JPY' },
+      { key: 'codes', label: 'Codes', market: 'jp', currency: 'JPY' },
+    ]);
+  });
+
+  it('links an item by the code its identity shop stored, at once; none without a code', async () => {
+    const withCode = await game('Hero Quest', '2012345678903');
+    const without = await game('Other Quest', null);
+    // A code stored by a source that is not the identity shop is not read.
+    const elsewhere = await game('Third Quest', '2098765432103', 'other');
+    const asked: string[] = [];
+    const summary = await runCollector(db, byCode(asked), quiet);
+    expect(summary.candidates).toBe(1);
+    expect(
+      (await listProductSources(db, withCode.product.id)).find((l) => l.source === 'codes'),
+    ).toMatchObject({ externalId: '2012345678903', active: true });
+    for (const p of [without.product, elsewhere.product])
+      expect((await listProductSources(db, p.id)).some((l) => l.source === 'codes')).toBe(false);
+    // Nothing waits for a person.
+    expect(await listPendingCandidates(db, userId)).toEqual([]);
+    expect(asked.sort()).toEqual(['Hero Quest', 'Other Quest', 'Third Quest']);
+  });
+
+  it('never links again an item a person unlinked at the source', async () => {
+    const { product } = await game('Hero Quest', '2012345678903');
+    await runCollector(db, byCode([]), quiet);
+    const mine = (await listProductSources(db, product.id)).find((l) => l.source === 'codes')!;
+    await unlinkSource(db, mine.id);
+    const asked: string[] = [];
+    await runCollector(db, byCode(asked), quiet);
+    expect(asked).toEqual([]);
+    const rows = (await listProductSources(db, product.id)).filter((l) => l.source === 'codes');
+    expect(rows.map((l) => l.active)).toEqual([false]);
+  });
+
+  it('the stored code: active links only; null when the links disagree (S36 B5 fix 4)', async () => {
+    const { product, link } = await game('Hero Quest', '2012345678903');
+    expect(await storedJan(db, product.id, ['shop'])).toBe('2012345678903');
+    expect(await storedJan(db, product.id, ['other'])).toBeNull();
+    expect(await storedJan(db, product.id, [])).toBeNull();
+    const second = await linkSource(db, product.id, { source: 'other', externalId: 'O-1' });
+    const store = (jan: string) =>
+      saveSourceFacts(
+        db,
+        { id: second.id, productId: product.id, facts: null },
+        facts(jan),
+        '2026-10-01T03:00:00.000+09:00',
+        '2026-10-01',
+      );
+    // The same code on both pages: that code.
+    await store('2012345678903');
+    expect(await storedJan(db, product.id, ['other', 'shop'])).toBe('2012345678903');
+    // Two codes: never a guess between two games, in either order of the sources.
+    await store('2098765432103');
+    expect(await storedJan(db, product.id, ['other', 'shop'])).toBeNull();
+    expect(await storedJan(db, product.id, ['shop', 'other'])).toBeNull();
+    const other = await game('Other Quest', '2098765432103');
+    expect(await storedJans(db, [product.id, other.product.id, 'none'], ['shop', 'other'])).toEqual(
+      new Map([
+        [product.id, null],
+        [other.product.id, '2098765432103'],
+        ['none', null],
+      ]),
+    );
+    await unlinkSource(db, second.id);
+    expect(await storedJan(db, product.id, ['shop', 'other'])).toBe('2012345678903');
+    await unlinkSource(db, link.id);
+    expect(await storedJan(db, product.id, ['shop'])).toBeNull();
+  });
+
+  /** `db` with its reads of stored facts counted (the code reads select `facts`). */
+  function counting() {
+    const count = { reads: 0 };
+    const counted = new Proxy(db, {
+      get(target, key) {
+        if (key === 'select')
+          return (fields?: Record<string, unknown>) => {
+            if (fields && 'facts' in fields) count.reads++;
+            return target.select(fields as never);
+          };
+        const value = Reflect.get(target, key, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    return { counted, count };
+  }
+
+  it('links a game behind 600 older cards in one night, with one read of the codes', async () => {
+    const cards = Array.from({ length: 600 }, (_, i) => ({
+      id: `card-${String(i).padStart(3, '0')}`,
+      category: 'tcg',
+      kind: 'single_card',
+      name: `Card ${i}`,
+      createdAt: '2000-01-01T00:00:00.000Z',
+    }));
+    await db.insert(schema.products).values(cards);
+    await db
+      .insert(schema.watches)
+      .values(cards.map((c) => ({ userId, productId: c.id, bucket: '' })));
+    const first = await game('Hero Quest', '2012345678903');
+    const { counted, count } = counting();
+    await runCollector(counted, byCode([]), { ...quiet, matchOnly: true });
+    expect(
+      (await listProductSources(db, first.product.id)).find((l) => l.source === 'codes'),
+    ).toMatchObject({ externalId: '2012345678903', active: true });
+    expect(count.reads).toBe(1);
+    // More games, linked and not: still one read.
+    await game('Other Quest', '2098765432103');
+    await game('Third Quest', '2055555555558');
+    count.reads = 0;
+    const summary = await runCollector(counted, byCode([]), { ...quiet, matchOnly: true });
+    expect(summary.candidates).toBe(2);
+    expect(count.reads).toBe(1);
+  });
+
+  it('an active link follows a changed code; an unlinked one and one with no code now stay', async () => {
+    const changed = await game('Hero Quest', '2012345678903');
+    const unlinked = await game('Other Quest', '2012345678903');
+    const lost = await game('Third Quest', '2098765432103');
+    await runCollector(db, byCode([]), { ...quiet, matchOnly: true });
+    const codesOf = async (id: string) =>
+      (await listProductSources(db, id)).filter((l) => l.source === 'codes');
+    const [before] = await codesOf(changed.product.id);
+    const [mine] = await codesOf(unlinked.product.id);
+    await unlinkSource(db, mine!.id);
+    const recode = (link: { id: string; productId: string }, jan: string) =>
+      saveSourceFacts(
+        db,
+        { id: link.id, productId: link.productId, facts: null },
+        facts(jan),
+        '2026-10-02T03:00:00.000+09:00',
+        '2026-10-02',
+      );
+    await recode(changed.link, '2055555555558');
+    await recode(unlinked.link, '2055555555558');
+    // The identity page unlinked: no code now.
+    await unlinkSource(db, lost.link.id);
+    await runCollector(db, byCode([]), { ...quiet, matchOnly: true });
+    // The same row, so the rows stored under the old code stay its history.
+    expect(await codesOf(changed.product.id)).toEqual([
+      expect.objectContaining({
+        id: before!.id,
+        externalId: '2055555555558',
+        title: 'JAN 2055555555558',
+        active: true,
+      }),
+    ]);
+    expect(await codesOf(unlinked.product.id)).toEqual([
+      expect.objectContaining({ id: mine!.id, externalId: '2012345678903', active: false }),
+    ]);
+    expect(await codesOf(lost.product.id)).toEqual([
+      expect.objectContaining({ externalId: '2098765432103', active: true }),
+    ]);
+  });
 });

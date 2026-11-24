@@ -46,6 +46,11 @@ export interface CollectorContext {
   /** The product's active listings on other sources (e.g. TCGplayer's English title). */
   linkedListings?: (productId: string) => Promise<{ source: string; title: string | null }[]>;
   /**
+   * A game item's product code (JAN) as its identity shop's active link in this source's market
+   * stored it (S36 A5, `product_sources.facts.jan`); null when none is stored. Read only (S36 B5).
+   */
+  productCode?: (product: Product) => Promise<string | null>;
+  /**
    * The item's kept sales in the source's own market since `since` (ms), in the source's currency,
    * for judging far prices against its own history (S30). One packed row read per item. Empty when
    * they cannot be compared: the source declares no market, or its currency is not the base.
@@ -202,6 +207,11 @@ export interface FoundListing {
    * means "the seller pays" is not known yet, so it is kept as given and never read as either.
    */
   shippingPayerId: string | null;
+  /**
+   * Who pays shipping, only when the source states it per listing (S36 C1); left out: `unknown`.
+   * Never inferred from `shippingPayerId`.
+   */
+  shipping?: 'included' | 'buyer' | 'unknown';
   /** The identity shop's entries only (`SupplyOffer.own`, S36 A6): its own copy or an outside seller. */
   own?: 'own' | 'outside';
   /** The shop's own copy: how many it has, when shown; null: not shown. */
@@ -221,7 +231,14 @@ export interface Collector {
    * This site's pace and request cap per run (default 2-5 s between requests, 500 requests). A
    * plug-in can only slow down: requests are never closer than 2 s.
    */
-  http?: Pick<PoliteHttpOptions, 'minDelayMs' | 'maxDelayMs' | 'maxRequests'>;
+  http?: Pick<PoliteHttpOptions, 'minDelayMs' | 'maxDelayMs' | 'maxRequests' | 'retries'>;
+  /**
+   * Its link is the item's own product code read from stored facts (S36 B5: the JAN), not a search:
+   * for items with no row at the source, `findCandidates` returns the code without any request (or
+   * nothing) and the runner links the first at once, with no person's confirmation and no
+   * look-alike's listing offered first.
+   */
+  linksByCode?: boolean;
   /** Whether this source can price the product (e.g. SNKRDUNK: TCG only). */
   supports(product: Product): boolean;
   /** Searches the site for listings that may be this product, best first, with a 0-1 score. */
