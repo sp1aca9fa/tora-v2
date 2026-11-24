@@ -862,3 +862,19 @@ Lot rules:
 
 ### login_attempts (auth lockout)
 - `ip_hash`, `username_hash`, `attempted_at`, `success`. Old rows may be pruned (not domain data; excluded from export).
+
+<a id="core-3-auth"></a>
+
+## Core section 3: the sign-in lines (as written 2026-10-09)
+
+A record. Today's rules: [docs/rules/accounts.md](rules/accounts.md). Since these lines were written:
+accounts are also made from one-time setup links in the app (2026-10-20); the page says only "Login
+failed" (2026-10-30); three routes for machines take their own secret instead of a session; a session
+ends after 400 days without use.
+
+- **Auth** (app is on the public internet):
+  - Accounts have a username, a password (scrypt hash) and a TOTP authenticator secret (encrypted at rest), plus one-time backup codes. No public sign-up: accounts are created and managed with a CLI on the home PC (`pnpm user ...`).
+  - Login = username + password, then a 6-digit authenticator code (or a backup code). Every new device login needs both steps.
+  - **At most 2 active devices per user.** Each successful login registers a device; a third login is refused. Revoking a device (Settings, or CLI) frees its slot. Signing out revokes the current device.
+  - Sessions do not expire: the cookie (signed, httpOnly, Secure, SameSite=Lax) is renewed automatically on use (browsers cap cookie lifetime at ~400 days). A revoked device, password change or 2FA reset ends its sessions.
+  - Failed attempts are counted in the DB per IP and per username, with temporary lockout. Every page and API route requires a session except the login pages and static assets.

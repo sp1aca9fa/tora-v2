@@ -90,4 +90,5 @@ the spreadsheet import in [Running collectors](running.md#imports) for bringing 
 An **empty** account can load the JSON file on the same page, from this install or another one
 with the same base currency and version: its items, lots, history, manual prices, watchlist and
 imports come back. Items the install does not have are added, and their prices come with the next
-collect. An account that already has data cannot load one.
+collect. An account that already has data cannot load one. Exactly what a file holds and what a
+load refuses: [the account download](rules/accounts.md#the-account-download).

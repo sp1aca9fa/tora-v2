@@ -59,7 +59,8 @@ After editing `packages/db/src/schema.ts`: `pnpm db:generate`, then `pnpm db:mig
 
 `AUTH_SECRET` signs sessions and encrypts the authenticator secrets that `pnpm user` writes (and
 the alert channels), which is why the home PC and Vercel must share it. Changing it signs everyone out and needs
-`pnpm user reset-2fa` for every account.
+`pnpm user reset-2fa` for every account. Everything it breaks:
+[the rules on secrets](rules/accounts.md#secrets).
 
 ## 2. Database (Turso)
 
@@ -140,6 +141,9 @@ app). Each account sees only its own collection; the catalog and market data are
 - Sessions last while used. Revoking the device, changing the password or resetting 2FA ends them.
 - Lockout: 5 failures per IP per 15 min, 10 per username per hour, 50 overall per hour.
 - Without `AUTH_SECRET` only the sign-in page is served.
+
+The full rules (what counts toward a lockout, what ends a session, setup links, roles):
+[Accounts and access](rules/accounts.md).
 
 A demo account shows the app without anyone's collection: `pnpm user create demo`, then
 `pnpm demo demo` fills it with sample lots (run it again to reset; only accounts named `demo*` are

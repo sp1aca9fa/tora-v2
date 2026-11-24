@@ -7,7 +7,8 @@ every table follows. This file is the one home of these rules. The columns thems
 
 Not here: how a value is made ([Values](values.md)); roles, rates and the base currency
 ([Sources and markets](sources-markets.md)); what a collect reads and keeps
-([Collecting](collectors.md)); sign-in, devices and who may see what (requirements section 3).
+([Collecting](collectors.md)); sign-in, devices and who may see what
+([Accounts and access](accounts.md)).
 
 ## General rules
 

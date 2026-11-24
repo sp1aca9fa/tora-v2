@@ -257,12 +257,7 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
   - The owner's install: one home server runs everything (the app, the database file, the collect, the backups, their timers), reached from outside through a tunnel ([docs/home-server.md](docs/home-server.md)).
   - The other way ([docs/setup.md](docs/setup.md)): the app on a hosted platform with a hosted database. Collectors still run only on a home machine (a residential connection is needed; never on a hosted platform or in CI) and write to the database `DATABASE_URL` names.
   - What reads no site (values, buy timing, the backup, the alerts) runs right after the collect on the same machine. The app runs its own morning check; a hosted app is called once a day for it.
-- **Auth** (app is on the public internet):
-  - Accounts have a username, a password (scrypt hash) and a TOTP authenticator secret (encrypted at rest), plus one-time backup codes. No public sign-up: accounts are created and managed with a CLI on the home PC (`pnpm user ...`).
-  - Login = username + password, then a 6-digit authenticator code (or a backup code). Every new device login needs both steps.
-  - **At most 2 active devices per user.** Each successful login registers a device; a third login is refused. Revoking a device (Settings, or CLI) frees its slot. Signing out revokes the current device.
-  - Sessions do not expire: the cookie (signed, httpOnly, Secure, SameSite=Lax) is renewed automatically on use (browsers cap cookie lifetime at ~400 days). A revoked device, password change or 2FA reset ends its sessions.
-  - Failed attempts are counted in the DB per IP and per username, with temporary lockout. Every page and API route requires a session except the login pages and static assets.
+- **Accounts and access**: a name, a password and an authenticator code to sign in, at most 2 devices per account, no public sign-up, every page and action behind a session. The rules and their numbers: [docs/rules/accounts.md](docs/rules/accounts.md). These lines as first written are a record in [docs/history.md](docs/history.md#core-3-auth).
 - Phone use is first-class: registration flows must be mobile-first. Add a PWA manifest so it can be added to the home screen.
 - Scheduling: the home server starts `scripts/collect-cron.sh` every hour; the script runs the collect at most once a day, after a random wait ([docs/rules/collectors.md](docs/rules/collectors.md#when-the-collect-runs)).
 
