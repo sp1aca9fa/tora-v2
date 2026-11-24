@@ -213,8 +213,9 @@ GM_xmlhttpRequest({
     posts: readPosts(),
   }),
 });
-// Read again in a while, at a person's pace (a page every minute or two).
-setTimeout(() => location.reload(), 90_000);
+// Read again in a while (a page every 3 to 5 minutes). A real feed also waits longer after a page
+// with no posts ("Reading sites politely" below) and asks for the working hours first (above).
+setTimeout(() => location.reload(), (180 + Math.random() * 120) * 1000);
 ```
 
 Even when the page shows no post, push (an empty list is the heartbeat), so a page that stops
@@ -251,6 +252,15 @@ The settings are on the Stores page, next to the feed's state.
 
 ## Reading sites politely
 
-Read only what the site lets visitors read, at a person's pace (a reload every minute or two).
+Read only what the site lets visitors read, and ask little of it: a page every 3 to 5 minutes for
+the whole feed (not per board or per tab), only what changed opened (a thread whose reply count went
+up), and working hours set. A page every 40 seconds with many reply loads got one browser refused;
+no pace is known to be safe. Choose a silence alert well above the pace (15 minutes or more).
+
 A page that checks for bots is not to be worked around: read it from your own browser while you
 have it open, as a userscript does, or not at all.
+
+When the site refuses (a 403, or a page with no posts but a pinned one), do not keep reloading it:
+wait longer after each such page, then try only every few hours, every board of that site together,
+until it shows its posts again. Count what the feed asks for per day, so a refusal can be compared
+with the pace before it. A block is not to be got around (another address, a VPN).
