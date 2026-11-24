@@ -14,7 +14,8 @@ bugs cost a few wrong days; a leak between accounts cannot be recomputed away.
 
 ## Rules files
 
-- Public: `CLAUDE.md`, and `requirements.md` Core (rules 5-7 for data, valuation and collectors).
+- Public: `CLAUDE.md`, `requirements.md` Core (rules 5 and 7 for data and collectors), and
+  `docs/rules/` (one file per concern: `values.md` for valuation).
 - Private: `collectors/ops/claude-rules.md` (read it if it exists; its hard rules never break).
 
 ## Risk class

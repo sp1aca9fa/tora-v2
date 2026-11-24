@@ -18,6 +18,12 @@ this order the first time.
 | [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |
 | [Store notices](store-feeds.md)       | Posts about cards on sale in stores near you: store lists, feeds, the notices        |
 
+Rules the code computes from, each stated once (`rules/`):
+
+| Rules                                    | What it holds                                                                       |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| [Values and confidence](rules/values.md) | How a value is made, its confidence, the totals and profit, the box view, the chart |
+
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 
 ## How Tora fits together

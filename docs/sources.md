@@ -12,18 +12,18 @@ type:
 | Role           | Meaning                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Reference**  | The trusted source for that item type. Valued first; in the secondary market, its price is the one compared. |
-| **Supporting** | Used when the reference has too few sales (fewer than 3 in the windows the value tries).                     |
+| **Supporting** | Used when the reference has too few sales (see [Values](rules/values.md)).                                   |
 | **Comparison** | Shown on the item page's Price sources, never counted.                                                       |
 | **Off**        | Not used for that item type.                                                                                 |
 
 Sources sharing a role are tried in the order shown (arrows in Settings; the reference marked
 green). A role change rebuilds the values and their history right after.
 
-**How a value is made.** The median of the reference's sales in the lot's bucket over 30 days,
-widened to 90 / 180 / 365 when there are fewer than 3; else a supporting source's; else a shop's
-asking price in the same condition (at most 30 days old); else the retail price. Only the primary
-market's sources count. Sales far from the rest (outliers) are left out and listed on the item
-page.
+**How a value is made.** The median of the reference's recent sales in the lot's bucket; else a
+supporting source's; else a shop's asking price in the same condition; else the retail price. Only
+the primary market's sources count. Sales far from the rest (outliers) are left out and listed on the item
+page. The steps, their windows and numbers, and what counts as an outlier are in
+[Values and confidence](rules/values.md), their one home.
 
 ## Tora does not judge a site
 

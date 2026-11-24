@@ -360,22 +360,7 @@ Lot rules:
 
 ## 6. Valuation rules
 
-**Buckets** (the condition dimension prices are compared on):
-- Raw cards: `raw:S`, `raw:A`, `raw:B`, `raw:C`, `raw:D`
-- Graded cards: `graded:<GRADER>:<grade>` e.g. `graded:PSA:10`
-- Sealed (TCG sealed kinds): by packaging_state, e.g. `sealed:shrink`, `sealed:no_shrink`, `sealed:box_opened_contents_sealed`
-- Items (everything else): `cond:new` (new_unused), `cond:like_new`, `cond:good` (no_noticeable_damage), `cond:fair` (minor_damage, damaged, poor)
-- Each collector maps its source's condition labels to these buckets (mapping table in the collector, unit-tested).
-
-**Value of a holding** = value of one unit in its bucket x quantity:
-1. Manual price for that product+bucket, if set.
-2. Else median of `sold` observations in the bucket over the last 30 days; widen to 90, then 180 days if fewer than 3 samples. Drop outliers with IQR before the median.
-3. Fallback chain by source: SNKRDUNK -> Mercari -> 駿河屋 (used/new store price) -> retail price -> none.
-4. Every value carries: source, sample size, age of newest sample, confidence (high: >= 5 samples within 30 days; medium: >= 3 within 180; low: otherwise).
-5. Next to the value, always show the **last real sale** in the bucket (price, source, time, trend vs the median) and a per-source summary (last sale, median, sample count), so sources can be compared and direction judged. Totals and P/L use the median (robust to one odd sale). Collectors also store each listing's newest trades as seen on the site (`product_sources.recent_sales`, refreshed every run, times may be approximate) so the last sale is at most ~1 day old.
-- Buylist (買取) prices are shown separately as "instant sell floor", never used as market value.
-
-**Box view**: paid (cost) | value as received (bucket from the box's packaging_state at acquisition) | current value of pulls | net = pulls value - cost.
+Moved to [docs/rules/values.md](docs/rules/values.md) (2026-11-24): the one home of how a value is made (which prices count, the steps and windows, similar conditions, outliers, confidence), what shows beside it (last sale, per source, the instant sell floor), the totals and the profit, the box view, value over time and the saved values. This section as first written is kept as a record in [docs/history.md](docs/history.md#core-6); nothing is built from it.
 
 ## 7. Collector rules (all sources)
 

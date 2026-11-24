@@ -455,3 +455,26 @@ Added at the user's request (2026-10-19). People post on community boards when c
 - Replies and product names (user, 2026-10-21; migration 0051): replies under a post (a line forming, sold out) are often folded. The feed may send each reply with the post it answers (`replyTo`), and the board's list of product codes when it changes. Tora keeps each reply's thread, gives a reply naming no store its post's stores, and sends replies at once to the people whose area holds the store, as "Comment to <store>" (also within the store's 30-minute quiet time). Notices (user: no translation, just decoding, no cost; the original when nothing decodes): the time, the store in bold, the products its codes stand for (a reply without any takes its post's), then the post as written, quoted; Discord Markdown and Telegram HTML, the post's own text escaped. Product codes: the board's list and the admins' (Stores > Codes, a Product tick); an admin's and emoji codes count anywhere, the board's one- and two-letter codes only among other codes and common words. The Posts list marks comments and shows the products.
 - Notices easier to read (user, 2026-10-21; migration 0052): the first layout was mostly bold. Now a small heading, then one card per post: on Discord an embed with a colored edge (orange a post, blue a comment), the store as its title (linked to the post), the products in italics, the post as written in a quote, the date and time ("10-21 18:00") under it; on Telegram the same in HTML without colors. Short English store labels (user: short names, not exact translations) for people reading another language than the stores' own, in notices and on the Posts list; stores added by hand show their names as written. Since 2026-10-23 a store list says the language its names are in and a store carries labels per language (`labels`, migration 0054), the English one for any language without its own.
 - Pictures (user, 2026-10-24; migration 0059): posters often attach a photo of the shelf. The feed may send a post's pictures with it (`images`, base64, up to 4, 8 MB each; JPEG, PNG, WebP or GIF, told from the bytes, anything else left out). Tora keeps them a week (then deletes them, at most once an hour as pushes come; the post stays), sends them after the notice's text (Discord: one message with the files; Telegram: a photo or an album), and shows them under the post on the Posts page (served by the app, behind sign-in). A picture that does not go never fails the notice. The feed shrinks them first (the reference userscript: 1600 px, JPEG), since every backup holds the week's pictures.
+
+<a id="core-6"></a>
+
+## Core section 6: Valuation rules (as written 2026-10-09 to 2026-10-12)
+
+A record, moved out of requirements.md on 2026-11-24 when [docs/rules/values.md](rules/values.md) became the home of these rules. It is not current: the year-long window, the pooling of similar conditions and the admin's source roles came later (Decision log, 2026-10-11 and after).
+
+**Buckets** (the condition dimension prices are compared on):
+- Raw cards: `raw:S`, `raw:A`, `raw:B`, `raw:C`, `raw:D`
+- Graded cards: `graded:<GRADER>:<grade>` e.g. `graded:PSA:10`
+- Sealed (TCG sealed kinds): by packaging_state, e.g. `sealed:shrink`, `sealed:no_shrink`, `sealed:box_opened_contents_sealed`
+- Items (everything else): `cond:new` (new_unused), `cond:like_new`, `cond:good` (no_noticeable_damage), `cond:fair` (minor_damage, damaged, poor)
+- Each collector maps its source's condition labels to these buckets (mapping table in the collector, unit-tested).
+
+**Value of a holding** = value of one unit in its bucket x quantity:
+1. Manual price for that product+bucket, if set.
+2. Else median of `sold` observations in the bucket over the last 30 days; widen to 90, then 180 days if fewer than 3 samples. Drop outliers with IQR before the median.
+3. Fallback chain by source: SNKRDUNK -> Mercari -> 駿河屋 (used/new store price) -> retail price -> none.
+4. Every value carries: source, sample size, age of newest sample, confidence (high: >= 5 samples within 30 days; medium: >= 3 within 180; low: otherwise).
+5. Next to the value, always show the **last real sale** in the bucket (price, source, time, trend vs the median) and a per-source summary (last sale, median, sample count), so sources can be compared and direction judged. Totals and P/L use the median (robust to one odd sale). Collectors also store each listing's newest trades as seen on the site (`product_sources.recent_sales`, refreshed every run, times may be approximate) so the last sale is at most ~1 day old.
+- Buylist (買取) prices are shown separately as "instant sell floor", never used as market value.
+
+**Box view**: paid (cost) | value as received (bucket from the box's packaging_state at acquisition) | current value of pulls | net = pulls value - cost.
