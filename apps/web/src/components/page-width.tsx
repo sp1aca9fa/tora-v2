@@ -23,6 +23,8 @@ const EXTRA_WIDE = [
   /^\/settings\/collectors$/,
   /^\/settings\/admin\/consoles$/,
   /^\/products\/[^/]+\/buy$/,
+  // A game wish's page: three columns on a full widescreen (fix round 1, item 11).
+  /^\/watchlist\/(?!strategy$|opening$|add$)[^/]+$/,
 ];
 
 /** Settings: wider than a reading column, not the whole screen (few cards, short forms). */

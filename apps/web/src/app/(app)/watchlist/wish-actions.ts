@@ -1,5 +1,6 @@
 'use server';
 
+import { type Condition, WISH_CONDITIONS } from '@tora/core';
 import {
   type BulkLine,
   type BulkResult,
@@ -21,7 +22,15 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { authed } from '@/lib/auth/guard';
-import { type FormState, optAmount, optText, parseForm, reqText, runDomain } from '@/lib/form';
+import {
+  type FormState,
+  optAmount,
+  optEnum,
+  optText,
+  parseForm,
+  reqText,
+  runDomain,
+} from '@/lib/form';
 
 // Adding game wishes and the registration check's actions (requirements S36 B1). Every action reads
 // the signed-in person here and checks the wish in `@tora/db` (`wishForAction`: the wish's owner, or
@@ -35,6 +44,8 @@ const gameSchema = z.object({
   region: optText,
   edition: optText,
   targetPriceBase: optAmount,
+  // The wish's condition (Terms "Condition"; good when not given).
+  condition: optEnum(WISH_CONDITIONS as [Condition, ...Condition[]]),
 });
 
 export interface GameState extends FormState {
@@ -66,7 +77,7 @@ export async function addGameWishAction(_prev: GameState, formData: FormData): P
       region: d.region ?? null,
       edition: d.edition ?? null,
       boxed,
-      watch: { targetPriceBase: d.targetPriceBase || null },
+      watch: { targetPriceBase: d.targetPriceBase || null, condition: d.condition },
     }),
   );
   if (!result.ok) return result.state;

@@ -1,5 +1,6 @@
 'use client';
 
+import { ITEM_CONDITION_BUCKETS, WISH_CONDITIONS } from '@tora/core';
 import { useTranslations } from 'next-intl';
 import { useActionState, useState } from 'react';
 import { Field } from '@/components/field';
@@ -8,8 +9,13 @@ import { useTaxonomy } from '@/components/taxonomy-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
+import { bucketLabel } from '@/lib/product-display';
 import { submitWith } from '@/lib/submit-form';
+
 import { type GameState, addGameWishAction } from '../wish-actions';
+
+/** Good (no noticeable damage) unless picked: `DEFAULT_GAME_CONDITION` in @tora/db. */
+const DEFAULT_GAME_CONDITION = 'no_noticeable_damage';
 
 export interface ConsoleChoice {
   key: string;
@@ -19,7 +25,8 @@ export interface ConsoleChoice {
 
 /**
  * One new game for the wishlist (S36 B1): its name, console (from the console table), region (Japan
- * unless picked), an optional edition and, for a console that allows it, boxed. Nothing is fetched:
+ * unless picked), an optional edition, the condition wanted (good unless picked) and, for a console
+ * that allows it, boxed. Nothing is fetched:
  * the check page shows what the next nightly read finds.
  */
 export function GameForm({ consoles }: { consoles: ConsoleChoice[] }) {
@@ -68,6 +75,19 @@ export function GameForm({ consoles }: { consoles: ConsoleChoice[] }) {
         </Field>
         <Field label={t('wish.game.edition')} htmlFor="g-edition" hint={t('wish.game.editionHint')}>
           <Input id="g-edition" name="edition" maxLength={80} autoComplete="off" />
+        </Field>
+        <Field
+          label={t('wish.game.condition')}
+          htmlFor="g-condition"
+          hint={t('wish.game.conditionHint')}
+        >
+          <NativeSelect id="g-condition" name="condition" defaultValue={DEFAULT_GAME_CONDITION}>
+            {WISH_CONDITIONS.map((c, i) => (
+              <option key={c} value={c}>
+                {bucketLabel(ITEM_CONDITION_BUCKETS[i]!, t)}
+              </option>
+            ))}
+          </NativeSelect>
         </Field>
         <Field label={t('watchlist.target')} htmlFor="g-target" hint={t('watchlist.targetHint')}>
           <Input id="g-target" name="targetPriceBase" inputMode="decimal" autoComplete="off" />

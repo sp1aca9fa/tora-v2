@@ -5,6 +5,7 @@ import { beforeEach, expect, it } from 'vitest';
 import { accountData } from './account-data';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
+import { wishEstimates } from './schema';
 import { DomainError, createProduct, deleteUnusedProduct, mergeProducts } from './mutations';
 import { productsToMatch, productsWithoutSource } from './sources';
 import { createUser } from './users';
@@ -112,13 +113,34 @@ it('has watched items matched and collected in their condition', async () => {
 it('keeps watches through a merge, and a watched item is never deleted as unused', async () => {
   const keep = await card('イーブイ');
   const dup = await card('イーブイ ');
-  await addWatch(db, uid, { productId: keep.id }, { grading: 'raw', rawGrade: 'A' });
-  await addWatch(db, uid, { productId: dup.id }, { grading: 'raw', rawGrade: 'A' });
+  const { watch: kept } = await addWatch(
+    db,
+    uid,
+    { productId: keep.id },
+    { grading: 'raw', rawGrade: 'A' },
+  );
+  const { watch: dropped } = await addWatch(
+    db,
+    uid,
+    { productId: dup.id },
+    { grading: 'raw', rawGrade: 'A' },
+  );
+  // The dropped watch's estimate (S36 C2) moves to the kept one.
+  await db.insert(wishEstimates).values({
+    watchId: dropped.id,
+    userId: uid,
+    low: 1,
+    high: 2,
+    currency: 'JPY',
+    risks: [],
+    sources: [],
+  });
   await addWatch(db, other, { productId: dup.id }, { grading: 'raw', rawGrade: 'A' });
   expect(await deleteUnusedProduct(db, dup.id)).toBe(false);
   await mergeProducts(db, { id: uid, role: 'admin' }, dup.id, keep.id);
   expect(await watchesOf(db, uid, keep.id)).toHaveLength(1);
   expect(await watchesOf(db, other, keep.id)).toHaveLength(1);
+  expect((await db.select().from(wishEstimates)).map((e) => e.watchId)).toEqual([kept.id]);
   const data = await accountData(db, other);
   expect(data.watches).toHaveLength(1);
   expect(data.items.map((i) => i.id)).toEqual([keep.id]);

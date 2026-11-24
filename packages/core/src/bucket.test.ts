@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { compareBucket, deriveBucket, gradedBucket, parseGrade } from './bucket';
+import {
+  ITEM_CONDITION_BUCKETS,
+  WISH_CONDITIONS,
+  atOrBetter,
+  compareBucket,
+  conditionBucket,
+  deriveBucket,
+  gradedBucket,
+  parseGrade,
+  wishConditionOf,
+} from './bucket';
 import { resolveTaxonomy } from './categories';
 
 describe('deriveBucket', () => {
@@ -104,5 +114,40 @@ describe('compareBucket', () => {
     const watch = 'watch/watch_condition';
     expect(compareBucket(watch, 'watch_condition:unworn', taxonomy)?.plain).toBe(true);
     expect(compareBucket(watch, 'watch_condition:good', taxonomy)?.plain).toBe(false);
+  });
+});
+
+describe('atOrBetter (S36 Terms "Condition")', () => {
+  it('orders the item buckets best first and takes the wanted one and better ones only', () => {
+    expect(ITEM_CONDITION_BUCKETS).toEqual(['cond:new', 'cond:like_new', 'cond:good', 'cond:fair']);
+    expect(atOrBetter('cond:good', 'cond:good')).toBe(true);
+    expect(atOrBetter('cond:new', 'cond:good')).toBe(true);
+    expect(atOrBetter('cond:like_new', 'cond:good')).toBe(true);
+    expect(atOrBetter('cond:fair', 'cond:good')).toBe(false);
+    expect(atOrBetter('cond:like_new', 'cond:new')).toBe(false);
+    expect(atOrBetter('cond:fair', 'cond:fair')).toBe(true);
+  });
+
+  it('never counts a copy of no bucket or grade not stated; any condition takes the four', () => {
+    expect(atOrBetter('cond:used', 'cond:fair')).toBe(false);
+    expect(atOrBetter('', 'cond:fair')).toBe(false);
+    expect(atOrBetter(null, '')).toBe(false);
+    expect(atOrBetter('cond:used', '')).toBe(false);
+    expect(atOrBetter('cond:fair', '')).toBe(true);
+    // A wanted bucket outside the order (a card grade) takes nothing.
+    expect(atOrBetter('cond:new', 'raw:A')).toBe(false);
+  });
+});
+
+describe('wishConditionOf (fix round 1, item 8)', () => {
+  it('shows a stored fair condition as the fair option and none for no condition', () => {
+    expect(WISH_CONDITIONS.map((c) => wishConditionOf(conditionBucket(c)))).toEqual(
+      WISH_CONDITIONS,
+    );
+    expect(wishConditionOf(conditionBucket('damaged'))).toBe('minor_damage');
+    expect(wishConditionOf(conditionBucket('poor'))).toBe('minor_damage');
+    expect(wishConditionOf('')).toBeNull();
+    expect(wishConditionOf(null)).toBeNull();
+    expect(wishConditionOf('cond:used')).toBeNull();
   });
 });

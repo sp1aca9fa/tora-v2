@@ -18,7 +18,7 @@ import {
   splitOff,
   submitGrading,
 } from './mutations';
-import { canceledOrders, purchaseLinks } from './schema';
+import { canceledOrders, purchaseLinks, users, watches, wishEstimates } from './schema';
 import { seedCollection } from './seed';
 import { linkSource } from './sources';
 import { lotteryMarksOf, setLotteryMark } from './stores';
@@ -68,7 +68,26 @@ beforeEach(async () => {
   });
   await returnGrading(db, owner, sent.id, { grader: GRADERS[0], grade: '10', occurredAt: AT });
   await setManualPrice(db, owner, product.id, 'raw:A', 1_500, 'by hand');
-  await addWatch(db, owner, { productId: product.id }, { targetPriceBase: 900, note: 'cheap' });
+  const { watch } = await addWatch(
+    db,
+    owner,
+    { productId: product.id },
+    { targetPriceBase: 900, note: 'cheap' },
+  );
+  // A wish's estimate (S36 C2), written as the page writes it.
+  await db.insert(wishEstimates).values({
+    watchId: watch.id,
+    userId: owner,
+    low: 800,
+    high: 1200,
+    currency: 'JPY',
+    settleBy: '2026-12',
+    risks: [{ kind: 'other', text: 'a reprint' }],
+    basis: 'research',
+    sources: ['https://example.test/a'],
+    enteredAt: AT,
+    bucket: 'cond:good',
+  });
   await linkSource(db, product.id, { source: 'mercari', externalId: 'm1', title: 'Card' });
   await setPreferences(db, owner, { amountsHidden: true } as never);
   return () => rm(dir, { recursive: true, force: true });
@@ -103,6 +122,7 @@ function comparable(file: Awaited<ReturnType<typeof accountData>>, otherInstall 
   name([
     ...file.manualPrices,
     ...file.watches,
+    ...file.wishEstimates,
     ...file.importRuns,
     ...file.purchaseLinks,
     ...file.canceledOrders,
@@ -118,7 +138,15 @@ it('loads a download into an empty account on the same install, everything back'
   const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
   const fresh = (await createUser(db, 'fresh', creds)).user.id;
   const result = await loadAccountData(db, fresh, file);
-  expect(result).toMatchObject({ itemsAdded: 0, lots: file.lots.length, watches: 1 });
+  expect(result).toMatchObject({
+    itemsAdded: 0,
+    lots: file.lots.length,
+    watches: 1,
+    wishEstimates: 1,
+  });
+  expect(file.wishEstimates).toMatchObject([
+    { low: 800, high: 1200, settleBy: '2026-12', bucket: 'cond:good' },
+  ]);
   expect(file.lots.length).toBeGreaterThan(5);
   expect(file.history.length).toBeGreaterThan(10);
   expect(comparable(await accountData(db, fresh))).toEqual(comparable(file));
@@ -243,4 +271,49 @@ it("never reaches into another person's lots or imports", async () => {
     false,
   );
   expect(mine.purchaseLinks).toMatchObject([{ holdingId: null, importRunId: null }]);
+});
+
+it("loads a wish's estimates onto the loaded wishes only, never another person's", async () => {
+  const other = (await createUser(db, 'other', creds)).user.id;
+  const [mine] = await db
+    .select()
+    .from(watches)
+    .where(sql`${watches.userId} = ${owner}`);
+  const { watch: theirs } = await addWatch(db, other, { productId: mine!.productId }, {});
+  const file = JSON.parse(JSON.stringify(await accountData(db, owner)));
+  file.wishEstimates.push({ ...file.wishEstimates[0], id: 'e-x', watchId: theirs.id });
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  expect(await loadAccountData(db, fresh, file)).toMatchObject({ wishEstimates: 1 });
+  const onTheirs = await db
+    .select()
+    .from(wishEstimates)
+    .where(sql`${wishEstimates.watchId} = ${theirs.id}`);
+  expect(onTheirs).toEqual([]);
+  const loaded = (await accountData(db, fresh)).wishEstimates;
+  const [freshWatch] = (await accountData(db, fresh)).watches;
+  expect(loaded.map((e) => [e.watchId, e.userId, e.bucket])).toEqual([
+    [freshWatch!.id, fresh, 'cond:good'],
+  ]);
+});
+
+it("deleting an account deletes its estimates; another person's stay", async () => {
+  // No account delete exists yet: a user row removed takes its wishes and estimates (cascade).
+  const fresh = (await createUser(db, 'fresh', creds)).user.id;
+  const [mine] = await db
+    .select()
+    .from(watches)
+    .where(sql`${watches.userId} = ${owner}`);
+  const { watch } = await addWatch(db, fresh, { productId: mine!.productId }, {});
+  await db.insert(wishEstimates).values({
+    watchId: watch.id,
+    userId: fresh,
+    low: 1,
+    high: 2,
+    currency: 'JPY',
+    risks: [],
+    sources: [],
+  });
+  await db.delete(users).where(sql`${users.id} = ${fresh}`);
+  const left = await db.select().from(wishEstimates);
+  expect(left.map((e) => e.userId)).toEqual([owner]);
 });

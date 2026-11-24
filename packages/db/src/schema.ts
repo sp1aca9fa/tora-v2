@@ -1647,6 +1647,11 @@ export const wishEstimates = sqliteTable(
     enteredAt: text('entered_at')
       .notNull()
       .$defaultFn(() => toLocalIso()),
+    /**
+     * The wish's bucket when the estimate was entered (migration 0074): its outcome is scored only
+     * against that bucket's level. Null: entered before it was stored (not known, never guessed).
+     */
+    bucket: text('bucket'),
   },
   (t) => [
     check('wish_estimates_range_check', sql`${t.low} > 0 AND ${t.high} >= ${t.low}`),

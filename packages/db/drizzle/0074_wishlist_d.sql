@@ -1,0 +1,1 @@
+ALTER TABLE `wish_estimates` ADD `bucket` text;

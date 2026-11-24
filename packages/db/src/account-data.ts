@@ -20,6 +20,7 @@ import {
   tcgSets,
   users,
   watches,
+  wishEstimates,
 } from './schema';
 import { portfolioValuation } from './valuation';
 
@@ -103,6 +104,12 @@ export async function accountData(db: Db, userId: string, now = new Date()) {
     history,
     manualPrices: manual,
     watches: watched,
+    // A game wish's estimates (S36 C2): the person's own, per wish.
+    wishEstimates: await db
+      .select()
+      .from(wishEstimates)
+      .where(eq(wishEstimates.userId, userId))
+      .orderBy(asc(wishEstimates.enteredAt)),
     listings,
     importRuns: await db.select().from(importRuns).where(eq(importRuns.userId, userId)),
     purchaseLinks: await db.select().from(purchaseLinks).where(eq(purchaseLinks.userId, userId)),
@@ -142,6 +149,7 @@ export interface AccountLoadResult {
   history: number;
   watches: number;
   manualPrices: number;
+  wishEstimates: number;
 }
 
 type Row = Record<string, unknown>;
@@ -198,6 +206,9 @@ export async function loadAccountData(
   const history = rowsOf(data, 'history').filter((e) => inFile(fileLots, e.holdingId));
   const manual = rowsOf(data, 'manualPrices');
   const watched = rowsOf(data, 'watches');
+  // An estimate belongs to one of the file's own wishes (never another person's on this install).
+  const fileWatches = new Set(watched.map((w) => w.id as string));
+  const estimates = rowsOf(data, 'wishEstimates').filter((e) => inFile(fileWatches, e.watchId));
   // Files saved before 2026-10-26 spell `cancelled` (the orders, an import's count).
   const runs = rowsOf(data, 'importRuns').map((r) => {
     const counts = r.counts as Record<string, number> | undefined;
@@ -215,7 +226,16 @@ export async function loadAccountData(
   // New ids for the person's rows; any string equal to an old one (a lot's box, a split's other
   // side in its history) is renamed with it.
   const ids = new Map<string, string>();
-  for (const r of [...lots, ...history, ...manual, ...watched, ...runs, ...links, ...canceled]) {
+  for (const r of [
+    ...lots,
+    ...history,
+    ...manual,
+    ...watched,
+    ...estimates,
+    ...runs,
+    ...links,
+    ...canceled,
+  ]) {
     ids.set(r.id as string, newId());
   }
   const rename = (value: unknown): unknown => {
@@ -345,6 +365,11 @@ export async function loadAccountData(
       );
       await insert(
         tx,
+        wishEstimates,
+        estimates.map((e) => own(wishEstimates, e)),
+      );
+      await insert(
+        tx,
         purchaseLinks,
         links.map((l) => own(purchaseLinks, l)),
         true,
@@ -387,5 +412,6 @@ export async function loadAccountData(
     history: history.length,
     watches: watched.length,
     manualPrices: manual.length,
+    wishEstimates: estimates.length,
   };
 }

@@ -118,3 +118,51 @@ export function compareBucket(
   const bucket = mainBucket ?? best;
   return bucket ? { bucket, plain: bucket === best } : null;
 }
+
+/**
+ * The item condition buckets, best first: the order of `CONDITIONS` mapped through the buckets
+ * above (requirements S36 Terms "Condition": "a wish's condition is one of Core 6's buckets for
+ * items (new, like new, good, fair) ... A better one is an earlier bucket in that order").
+ */
+export const ITEM_CONDITION_BUCKETS: readonly Bucket[] = [
+  ...new Set(Object.values(CONDITION_BUCKETS)),
+];
+
+/**
+ * Whether a copy in `bucket` is in the wanted condition or a better one (S36 Terms "Condition").
+ * Only the item condition buckets compare: a copy with no bucket, or one outside the order (a
+ * source's `cond:used`, grade not stated), is never "at or better", whatever is wanted. A wish of
+ * any condition (`wanted` '') takes every bucket of the order.
+ */
+export function atOrBetter(bucket: Bucket | null | undefined, wanted: Bucket): boolean {
+  const at = ITEM_CONDITION_BUCKETS.indexOf(bucket ?? '');
+  if (at < 0) return false;
+  if (!wanted) return true;
+  const want = ITEM_CONDITION_BUCKETS.indexOf(wanted);
+  return want >= 0 && at <= want;
+}
+
+/**
+ * The four conditions a game wish offers, best first (Terms "Condition": new, like new, good,
+ * fair): the first condition of each item bucket. A fair wish is stored as `minor_damage`, the best
+ * condition its bucket (`cond:fair`) holds.
+ */
+export const WISH_CONDITIONS: readonly Condition[] = [
+  'new_unused',
+  'like_new',
+  'no_noticeable_damage',
+  'minor_damage',
+];
+
+/** The bucket of an item condition (Core 6: damaged and poor share the fair bucket). */
+export const conditionBucket = (condition: Condition): Bucket => CONDITION_BUCKETS[condition];
+
+/**
+ * The wish condition a stored bucket shows as (fix round 1, item 8): the first condition of the
+ * bucket (a stored `damaged` or `poor` shows as fair); null for a bucket outside the four (none
+ * chosen, bucket '').
+ */
+export function wishConditionOf(bucket: Bucket | null | undefined): Condition | null {
+  const at = ITEM_CONDITION_BUCKETS.indexOf(bucket ?? '');
+  return at < 0 ? null : (WISH_CONDITIONS[at] ?? null);
+}

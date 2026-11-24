@@ -39,6 +39,15 @@ export interface PriceGuides {
   ask: number | null;
 }
 
+/** A dashed line at a price over the series (the wish page's record), with its legend text. */
+export interface PriceMark {
+  price: number;
+  /** On the line, beside the axis. */
+  title: string;
+  /** Under the chart. */
+  legend: string;
+}
+
 const ZONE_LINE = 'rgba(16,185,129,0.7)';
 const ZONE_FILL = 'rgba(16,185,129,0.12)';
 const ASK_COLOR = '#d97706';
@@ -53,6 +62,9 @@ export function PriceChart({
   defaultBucket,
   sourceLabels,
   guides,
+  marks,
+  summary,
+  hideBuckets = false,
   className = 'h-56',
 }: {
   points: PriceChartPoint[];
@@ -60,6 +72,12 @@ export function PriceChart({
   sourceLabels: Record<string, string>;
   /** Shown while the main condition (`defaultBucket`) is picked. */
   guides?: PriceGuides;
+  /** Lines at a price (none: none drawn). */
+  marks?: PriceMark[];
+  /** Replaces the "days with trades" line (the wish page's level counts days with a level). */
+  summary?: string;
+  /** No condition chips (a chart of one condition). */
+  hideBuckets?: boolean;
   /** The chart's height. */
   className?: string;
 }) {
@@ -135,6 +153,17 @@ export function PriceChart({
       );
       seriesBySource.set(source, series);
     }
+    const first = seriesBySource.values().next().value;
+    if (first)
+      for (const m of marks ?? [])
+        first.createPriceLine({
+          price: m.price,
+          color: ASK_COLOR,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: !amountsHidden,
+          title: amountsHidden ? '' : m.title,
+        });
     const days = points
       .filter((p) => p.bucket === bucket)
       .map((p) => p.day)
@@ -192,7 +221,7 @@ export function PriceChart({
     });
     return () => chart.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points, bucket, hidden, theme, sources, amountsHidden, money, locale, shownGuides]);
+  }, [points, bucket, hidden, theme, sources, amountsHidden, money, locale, shownGuides, marks]);
 
   if (points.length === 0) return <p className="text-sm text-muted-foreground">{t('noHistory')}</p>;
   const estimatedDays = new Set(visible.filter((p) => p.estimated > 0).map((p) => p.day));
@@ -200,7 +229,11 @@ export function PriceChart({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t('bucket')}>
+      <div
+        className={cn('flex flex-wrap gap-1.5', hideBuckets && 'hidden')}
+        role="radiogroup"
+        aria-label={t('bucket')}
+      >
         {buckets.map((b) => (
           <button
             key={b}
@@ -250,7 +283,7 @@ export function PriceChart({
         <span className="text-muted-foreground">
           {hover
             ? hover.day
-            : t('daysWithTrades', { count: new Set(visible.map((p) => p.day)).size })}
+            : (summary ?? t('daysWithTrades', { count: new Set(visible.map((p) => p.day)).size }))}
           {hover && estimatedDays.has(hover.day) && (
             <span className="text-amber-700 dark:text-amber-400"> · {t('estimatedDay')}</span>
           )}
@@ -262,6 +295,20 @@ export function PriceChart({
         </p>
       )}
       <div ref={el} className={cn('w-full', className)} role="img" aria-label={t('chartLabel')} />
+      {!!marks?.length && (
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {marks.map((m) => (
+            <li key={m.legend} className="inline-flex items-center gap-1.5">
+              <span
+                className="w-4 border-t border-dashed"
+                style={{ borderColor: ASK_COLOR }}
+                aria-hidden
+              />
+              {m.legend}
+            </li>
+          ))}
+        </ul>
+      )}
       {shownGuides && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {shownGuides.zoneTop !== null && (

@@ -190,6 +190,20 @@ describe('refreshWishLevels (S36 Terms "Level", W14)', () => {
     expect(await wishRecordShown(db)).toBe(false);
   });
 
+  it('stores no level for a wish with no condition, and removes the one it had (item 8)', async () => {
+    const { product, watch } = await wish();
+    await sold(product.id, watch.bucket, steps(12));
+    await covered(product.id, 'marketa', '2026-01-01');
+    expect((await run()).written).toBe(1);
+    await db
+      .update(schema.watches)
+      .set({ condition: null, bucket: '' })
+      .where(eq(schema.watches.id, watch.id));
+    expect(await run()).toEqual({ written: 0, unchanged: 0, removed: 1 });
+    expect(await levelOf(product.id, '')).toBeUndefined();
+    expect(await levelOf(product.id, watch.bucket)).toBeUndefined();
+  });
+
   it('leaves out unknown added cost, other markets, other buckets and unreported units', async () => {
     const { product, watch } = await wish();
     await sold(product.id, watch.bucket, steps(9));

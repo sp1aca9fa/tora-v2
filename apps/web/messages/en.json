@@ -2052,7 +2052,9 @@
       "boxedHint": "Tora reads the loose game's sales and listings and keeps those whose title names a box.",
       "submit": "Add to wishlist",
       "found": "This game is already in Tora: add that one?",
-      "newHint": "Only for another game of the same name: Tora then reads its sales apart."
+      "newHint": "Only for another game of the same name: Tora then reads its sales apart.",
+      "condition": "Condition",
+      "conditionHint": "The condition you want to buy it in: its prices and level follow this condition."
     },
     "bulk": {
       "intro": "One game per line, written as name | console. Nothing is added until you confirm.",
@@ -2075,7 +2077,8 @@
       "result": "{ok, plural, one {# game added} other {# games added}}, {failed} not added.",
       "added": "Added",
       "done": "Back to the wishlist",
-      "changed": "The list changed: preview it again before adding."
+      "changed": "The list changed: preview it again before adding.",
+      "conditionNote": "Every game is added in good condition (no noticeable damage); change it on its page."
     },
     "check": {
       "title": "Check what Tora found",
@@ -2135,7 +2138,191 @@
       "wouldDropped": "Would be dropped ({count})",
       "showAll": "Show all {count}"
     },
-    "needsCheck": "Needs its check first"
+    "needsCheck": "Needs its check first",
+    "page": {
+      "title": "Wish",
+      "back": "Back to the wishlist",
+      "itemPage": "Item page",
+      "line": {
+        "cheapest": "Cheapest checked copy {amount} at {source}",
+        "cheapestOld": "Cheapest checked copy {amount} at {source}, as of {date}",
+        "noCopy": "no checked copy last night",
+        "noCopyOld": "no checked copy as of {date}",
+        "noCopyNone": "no checked copy",
+        "level": "level {amount}",
+        "price": "your price {amount}"
+      },
+      "checkNeeded": "Check what Tora found for this game first. Until then only the shop's copies show: no level, no marketplace copies, and estimates are not compared with a level.",
+      "checkWhat": "The check: you look through the sales and listings Tora found and confirm they are this game. It takes about a minute.",
+      "copies": "Buyable now",
+      "lastRead": "last read {date}",
+      "noneFound": "none found last night",
+      "noneFoundOn": "none found on {date}",
+      "noNight": "No nightly read in the last 7 days.",
+      "staleNight": "Copies as of the last nightly read, {date}.",
+      "noCopies": "No copy in this condition or better.",
+      "moreCopies": "{count, plural, one {# more copy} other {# more copies}} not listed here, dearer",
+      "showMore": "Show {count, plural, one {# more copy} other {# more copies}}",
+      "showMoreCapped": "Show at least {count} more copies",
+      "untitled": "Listing at {source}",
+      "plusShipping": "{amount} plus shipping",
+      "stock": "{count, plural, one {# in stock} other {# in stock}}",
+      "outOfStock": "Out of stock at the shop.",
+      "outside": "Other sellers on {shop}'s site",
+      "apart": "{label}: {count, plural, one {# copy} other {# copies}}, shown apart",
+      "settings": "Your price and condition",
+      "price": "Your price (per copy)",
+      "priceHint": "Empty: no price set.",
+      "conditionHint": "The level, copies and price follow it; your price is kept.",
+      "save": "Save",
+      "chooseCondition": "Choose a condition",
+      "saved": "Saved.",
+      "changeText": "{amount} ({share}) since {from}",
+      "level": {
+        "title": "Level",
+        "sub": "A quarter of recent sales were at or under this.",
+        "notYet": "The level is computed after the next nightly read.",
+        "needsCondition": "A level needs a condition: choose one under Your price and condition.",
+        "basis": "{count, plural, one {# sale} other {# sales}} over {window} days, to {date}",
+        "rule": "The level is the price a quarter of the sales were at or under, as paid, over the last 30 days (90 days when the 30 hold under 10 sales). Only sources whose days are all read and whose shipping is known count.",
+        "change": "Over 4 weeks: {change}",
+        "noChange": "No change over 4 weeks yet: there is no level 4 weeks back.",
+        "record": "Lowest level so far {amount}, on {date}",
+        "recordShort": "Lowest so far",
+        "nearLow": "near the low so far",
+        "young": "A young game ({days, plural, one {# day} other {# days}} since release): its prices often still move.",
+        "days": "{count, plural, one {# day with a level} other {# days with a level}}",
+        "how": "How this is computed",
+        "counted": "Counted: {list}.",
+        "left": {
+          "hole": "{source} left out: some days in the window are not read yet.",
+          "cost_unknown": "{source} left out: its shipping cost is not known yet."
+        },
+        "rowsUnknown": "{source}: {count, plural, one {# sale} other {# sales}} left out, their shipping not stated.",
+        "tooFew": "No level yet: {count, plural, =0 {no sale} one {only # sale} other {only # sales}} in 90 days, at least 10 needed.",
+        "hole": "No level yet: some days are not read yet. A level can be computed from {date}.",
+        "holeNoDay": "No level yet: some days are not read yet.",
+        "costUnknown": "No level yet: sale prices at these sources do not tell the shipping yet.",
+        "range90": "Last 90 days: {count, plural, one {# sale} other {# sales}} as paid, from {low} to {high}.",
+        "noPaid": "Sale prices at these sources do not tell the shipping yet, so no price is shown."
+      },
+      "bounds": {
+        "title": "Limits",
+        "none": "No shop buying price, new copy or list price known yet.",
+        "buybackLabel": "Shop buys at",
+        "newCopyLabel": "New copy from",
+        "listLabel": "List price",
+        "buyback": "{source}, {date}",
+        "newCopy": "{source}, {date}",
+        "list": {
+          "included": "{source}, tax included",
+          "excluded": "{source}, before tax",
+          "unknown": "{source}"
+        },
+        "seen": "seen {date}"
+      },
+      "estimates": "Estimates",
+      "noEstimates": "No estimate yet.",
+      "estimate": {
+        "label": "estimate",
+        "range": "{low} to {high}",
+        "by": "by {month}",
+        "entered": "by {name}, {date}",
+        "open": "Add an estimate",
+        "low": "Low",
+        "high": "High",
+        "when": "Roughly when",
+        "whenHint": "Optional: the month the level should be in this range.",
+        "risks": "Risks",
+        "riskOther": "Other risk, in a few words",
+        "basis": "Based on",
+        "basisNone": "Not said",
+        "sources": "Sources",
+        "sourcesHint": "Optional: one link or note per line.",
+        "add": "Add estimate"
+      },
+      "risk": {
+        "rerelease": "Re-release likely",
+        "not_sold_new": "No longer sold new",
+        "limited": "Limited edition",
+        "other": "Other"
+      },
+      "basis": {
+        "own_history": "The game's own history",
+        "kind": "Games of its kind",
+        "outside": "Outside cases",
+        "research": "Research"
+      },
+      "outcome": {
+        "pending": "Its month has not ended yet.",
+        "noMonth": "No month given, so nothing to compare.",
+        "noLevel": "No level on that day.",
+        "currency": "In another currency than the level, so not compared.",
+        "otherCondition": "Made for {condition}: not compared with this condition's level.",
+        "otherConditionOld": "Made for an earlier condition: not compared.",
+        "inside": "On {date} the level was {level}: inside your range",
+        "under": "On {date} the level was {level}: under your range",
+        "over": "On {date} the level was {level}: over your range"
+      },
+      "someone": "someone",
+      "facts": "Facts",
+      "noFacts": "No facts yet.",
+      "recordedBy": "recorded by {name}, {date}",
+      "fact": {
+        "buybackChange": "Buyback at {source} over 4 weeks: {change}.",
+        "shopOut": "Out of stock at {source} for {nights} read nights running, since {since}.",
+        "noNewCopy": "No new copy found for {nights} read nights running, since {since}.",
+        "source": "source",
+        "delete": "Delete",
+        "open": "Record a fact",
+        "day": "Date",
+        "kind": "Kind",
+        "text": "What happened",
+        "link": "Source link",
+        "add": "Record fact"
+      },
+      "factKind": {
+        "rerelease": "Re-release",
+        "port": "Port to another console",
+        "price_cut": "Price cut",
+        "not_sold_new": "No longer sold new",
+        "digital_sale": "Digital sale",
+        "other": "Other"
+      },
+      "history": "Sales history read",
+      "noHistory": "No day read yet.",
+      "empty": "Nothing recorded yet",
+      "emptyText": "No estimate, fact, limit or sales history yet.",
+      "historyLine": "from {date}, {count, plural, one {# day} other {# days}}",
+      "historyNone": "no day yet",
+      "range": "{from} to {to}",
+      "how": {
+        "night": "Nightly reads",
+        "readback": "Read back",
+        "deep": "Deep read",
+        "load": "Loaded"
+      },
+      "job": {
+        "running": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} is running",
+        "several_days": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} is running over several days",
+        "waiting": "{kind, select, deep {the 12-month read is waiting to start} readback {read weekly, the next read is waiting} other {a load is waiting to start}}",
+        "asked_again": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} was asked for again",
+        "stopped": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} stopped"
+      },
+      "card": {
+        "cheapest": "Cheapest checked copy {amount}",
+        "cheapestOld": "Cheapest checked copy {amount}, as of {date}",
+        "level": "Level {amount}",
+        "noLevel": "No level yet",
+        "noCopy": "No checked copy",
+        "noCopyLast": "No checked copy last night",
+        "noCopyOld": "No checked copy as of {date}",
+        "noPrice": "No price set",
+        "price": "Your price {target}",
+        "under": "At or under your price ({target})",
+        "over": "Cheapest copy {amount} over your price ({target})"
+      }
+    }
   },
   "opportunities": {
     "title": "Opportunities",

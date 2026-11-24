@@ -69,6 +69,7 @@ import {
   signals,
   supply,
   watches,
+  wishEstimates,
 } from './schema';
 
 export type DomainErrorCode =
@@ -1246,14 +1247,20 @@ export async function mergeProducts(
       .update(manualPrices)
       .set({ productId: intoId })
       .where(eq(manualPrices.productId, fromId));
-    // A watch the target already has (same person and condition) is dropped.
+    // A watch the target already has (same person and condition) is dropped; its estimates (S36
+    // C2, the person's own) move to the kept watch first, so none is lost.
     const intoWatches = await tx
-      .select({ userId: watches.userId, bucket: watches.bucket })
+      .select({ id: watches.id, userId: watches.userId, bucket: watches.bucket })
       .from(watches)
       .where(eq(watches.productId, intoId));
-    const watched = new Set(intoWatches.map((w) => `${w.userId}|${w.bucket}`));
+    const watched = new Map(intoWatches.map((w) => [`${w.userId}|${w.bucket}`, w.id]));
     for (const w of await tx.select().from(watches).where(eq(watches.productId, fromId))) {
-      if (watched.has(`${w.userId}|${w.bucket}`)) {
+      const kept = watched.get(`${w.userId}|${w.bucket}`);
+      if (kept) {
+        await tx
+          .update(wishEstimates)
+          .set({ watchId: kept })
+          .where(eq(wishEstimates.watchId, w.id));
         await tx.delete(watches).where(eq(watches.id, w.id));
       } else {
         await tx.update(watches).set({ productId: intoId }).where(eq(watches.id, w.id));

@@ -61,6 +61,7 @@ export function BulkForm({ max }: { max: number }) {
   return (
     <form onSubmit={submitWith(action)} className="space-y-4">
       <p className="text-sm text-muted-foreground">{t('intro')}</p>
+      <p className="text-xs text-muted-foreground">{t('conditionNote')}</p>
       <div
         className={cn(
           'grid items-start gap-4',

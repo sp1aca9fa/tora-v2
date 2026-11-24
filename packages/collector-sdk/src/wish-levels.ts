@@ -76,7 +76,11 @@ export async function refreshWishLevels(
   // Every read below is batched by item list (S19): a fixed number of reads a night, not per wish.
   const items = await itemsOf(db, [...new Set(wanted.map((w) => w.productId))]);
   const states = await wishStates(db, items);
-  const confirmed = wanted.filter((w) => states.get(w.productId)?.state === 'confirmed');
+  // A wish with no condition (bucket '') has no level and no reason stored: a level needs a
+  // condition (Terms "Condition"; fix round 1, item 8). Its row, if any, is removed below.
+  const confirmed = wanted.filter(
+    (w) => w.bucket !== '' && states.get(w.productId)?.state === 'confirmed',
+  );
   const keep = new Set<string>();
 
   if (confirmed.length) {
