@@ -894,6 +894,50 @@ describe('the daytime job runner (S36 B4)', () => {
     expect(spansOfB.map((s) => s.jobId)).toEqual([jobB.id]);
   });
 
+  it("a tracked game's weekly read ends with a read-back span; a monthly page with none (F7)", async () => {
+    await ensureMarketState(db, 'marketa');
+    const jobs = [];
+    for (const [name, kind] of [
+      ['Game W', 'tracked_weekly'],
+      ['Game M', 'monthly'],
+    ] as const) {
+      const g = await game(name);
+      await createQuerySource(db, g.id, 'marketa', { keywords: [name] });
+      jobs.push(await queueMarketJob(db, { source: 'marketa', productId: g.id, kind }));
+    }
+    const once = plugin(async (j, ctx) => {
+      await ctx.http.json(`https://marketa.test/search?q=${encodeURIComponent(ctx.product!.name)}`);
+      return {
+        rows: [
+          {
+            productId: j.productId!,
+            source: 'marketa',
+            observationType: 'sold' as const,
+            bucket: 'used',
+            price: 1000,
+            currency: 'JPY',
+            observedAt: '2026-11-01T12:00:00.000+09:00',
+            fetchedAt: ctx.now.toISOString(),
+            externalRef: `${ctx.product!.name}-1`,
+          },
+        ],
+        cursor: null,
+        done: true,
+        oldestReached: '2026-06-01',
+        search: { key: `k-${ctx.product!.name}`, day: '2026-11-01' },
+      };
+    });
+    at('2026-11-24T12:00:00+09:00');
+    await run({ ...once, jobKinds: ['tracked_weekly', 'monthly'] });
+    expect((await Promise.all(jobs.map((j) => jobRow(j.id)))).map((j) => j.status)).toEqual([
+      'done',
+      'done',
+    ]);
+    expect((await db.select().from(saleSpans)).map((s) => [s.jobId, s.how])).toEqual([
+      [jobs[0]!.id, 'readback'],
+    ]);
+  });
+
   it("a finished deep read keeps the search the plug-in was given as its result's read", async () => {
     const { g, job } = await setup();
     await createQuerySource(db, g.id, 'marketa', { keywords: ['Game A', 'Gold'], categoryId: '7' });

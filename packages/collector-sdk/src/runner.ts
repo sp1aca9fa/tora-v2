@@ -51,6 +51,7 @@ import {
   suggestFromKnownProducts,
   startRun,
   syncProductDetails,
+  trackedSkips,
   updateSourceProgress,
 } from '@tora/db';
 import {
@@ -220,6 +221,7 @@ export async function runCollector(
       // unlinked source stays off).
       for (const product of await productsWithoutSource(db, collector.source, {
         productId: options.productId,
+        trackedGames: true,
       })) {
         if (!collector.supports(product)) continue;
         const query = collector.defaultQuery(product);
@@ -304,7 +306,7 @@ export async function runCollector(
         : new Set<string>();
       const lookAlikes = new Map();
       const toMatch = (
-        await productsToMatch(db, collector.source, { productId: options.productId })
+        await productsToMatch(db, collector.source, { productId: options.productId, now })
       )
         .filter((p) => collector.supports(p) && !searched.has(p.id))
         .slice(0, MATCH_PER_RUN);
@@ -344,12 +346,15 @@ export async function runCollector(
     }
     if (!options.matchOnly) {
       const today = localDate(now);
-      const all = await listingsToCollect(
-        db,
-        collector.source,
-        { productId: options.productId },
-        now,
-      );
+      // S36 step D: a tracked game no one holds or wishes is left out, but on its slot night at the
+      // identity shop (its marketplace reads are jobs under the daily ceiling). Game items only. A
+      // one-item run ("collect now") reads the item it was asked for (fix round 1, F6).
+      const skips = options.productId
+        ? new Set<string>()
+        : await trackedSkips(db, collector.source, now);
+      const all = (
+        await listingsToCollect(db, collector.source, { productId: options.productId }, now)
+      ).filter(({ product }) => !skips.has(product.id));
       // A page that answered "gone" today is asked again tomorrow (counted once a night anyway).
       const goneToday = ({ source: l }: (typeof all)[number]) => l.failure?.day === today;
       const sources = options.skipCollectedToday
@@ -519,19 +524,8 @@ export async function runCollector(
               )),
             imageUrl: result.imageUrl,
           });
-          // S36 Terms "Covered day": the night this source was read for a game. Games only (cards and
-          // sealed have no coverage); a failed or skipped link records nothing. A failure to record is
-          // logged and does not fail the link (its data is saved).
-          const read = nightsRead ? (nights.get(product.id) ?? []) : undefined;
           // S36 Terms "Game": what the game-only writes below are limited to (not the rules' switch).
           const game = isGameItem(product, { gameRules: switches.get(product.id) ?? null });
-          if (game && !(read && coversDay(read, today))) {
-            try {
-              nights.set(product.id, await addNight(db, product.id, collector.source, today, read));
-            } catch (e) {
-              log(`collect "${product.name}": read night not recorded: ${errorText(e)}`);
-            }
-          }
           // A game's listings (S36 A2, A4): with the rules on and not held, its rows come from the
           // listings the plug-in found, filtered here; otherwise (a held item, the switch off, not a
           // game, a plug-in that reports no listings) the plug-in's own rows are stored as given.
@@ -567,6 +561,18 @@ export async function runCollector(
               });
             }
             await saveSupply(db, rows);
+          }
+          // S36 Terms "Covered day": the night this source was read for a game, recorded only once
+          // the link's rows are saved (a save that throws records none). Games only (cards and
+          // sealed have no coverage); a failed or skipped link records nothing. A failure to record
+          // is logged and does not fail the link (its data is saved).
+          const read = nightsRead ? (nights.get(product.id) ?? []) : undefined;
+          if (game && !(read && coversDay(read, today))) {
+            try {
+              nights.set(product.id, await addNight(db, product.id, collector.source, today, read));
+            } catch (e) {
+              log(`collect "${product.name}": read night not recorded: ${errorText(e)}`);
+            }
           }
           // S36 A5: what the pages show beside the prices, and the item's release date while it has
           // none and the date has come (`today`, the app's zone), for a game item only (the shop is the identity source of sealed products too). A

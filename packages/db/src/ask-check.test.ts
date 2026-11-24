@@ -10,7 +10,7 @@ import { confirmations, currentRules, recordItemCheck, saveItemRules } from './i
 import { migrateDb } from './migrate';
 import { createProduct } from './mutations';
 import { refreshOpportunities } from './opportunities';
-import { priceObservations, productSources, products } from './schema';
+import { priceObservations, productSources, products, trackedGames } from './schema';
 import { refreshSignals } from './signals';
 import { saveSupply } from './supply';
 import { createUser } from './users';
@@ -347,6 +347,22 @@ describe('readers', () => {
     expect(askOf(s.id)).toBe(600);
     expect(askOf(onlySearch.id)).toBeNull();
     expect(askOf(withShop.id)).toBe(800);
+  });
+
+  it('opportunities leave out a tracked game no one holds or wishes (S36 step D)', async () => {
+    const plain = await game('Plain');
+    const tracked = await game('Tracked');
+    const wished = await game('Tracked and wished');
+    for (const p of [plain, tracked, wished]) {
+      await sales(p.id, 40, 10_000, 'market');
+      await link(p.id, 'market', 'search');
+      if (p !== plain) await db.insert(trackedGames).values({ productId: p.id, shopSlot: 0 });
+    }
+    await addWatch(db, uid, { productId: wished.id }, {});
+    const ids = (await refreshOpportunities(db, NOW, false)).items.map((o) => o.productId);
+    expect(ids).toContain(plain.id);
+    expect(ids).toContain(wished.id);
+    expect(ids).not.toContain(tracked.id);
   });
 
   it("opportunities: a game's unverified ask is dropped before the under-value test", async () => {

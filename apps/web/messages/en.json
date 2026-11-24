@@ -489,6 +489,10 @@
       "consoles": {
         "title": "Consoles",
         "info": "The consoles games are matched to, with their category per marketplace."
+      },
+      "tracked": {
+        "title": "Tracked games",
+        "info": "Console games read before anyone wishes for them."
       }
     },
     "adminInfo": "Only admins see these settings. They apply to every account on this app.",
@@ -2003,7 +2007,11 @@
       "marketRefused": "Extra reads refused by a marketplace: fewer a day after a 3-day wait",
       "marketStopped": "Extra reads stopped: a marketplace refused at 25 a day",
       "marketRestarted": "Extra reads restarted at 25 a day",
-      "marketJobsFailed": "Extra reads could not run"
+      "marketJobsFailed": "Extra reads could not run",
+      "trackedAdded": "Tracked games added",
+      "trackedRemoved": "Tracked game removed",
+      "trackedOnPc": "Tracked game: on PC mark",
+      "trackedRest": "Tracked games: the rest's monthly pages switched"
     },
     "role": {
       "admin": "admin",
@@ -2165,6 +2173,9 @@
     "page": {
       "title": "Wish",
       "back": "Back to the wishlist",
+      "shopPending": "The shop's page for this game is not confirmed: {count, plural, one {# candidate} other {# candidates}} to check. Its prices, list price and release date are read once you confirm one.",
+      "shopNone": "No page at the shop is linked to this game yet. Tora looks for one at the nightly collect; you can also link it yourself.",
+      "shopLink": "Open the item's sources",
       "itemPage": "Item page",
       "line": {
         "cheapest": "Cheapest checked copy {amount} at {source}",
@@ -2366,6 +2377,20 @@
         "price": "Your price {target}",
         "under": "At or under your price ({target})",
         "over": "Cheapest copy {amount} over your price ({target})"
+      },
+      "kinds": {
+        "open": "Games of its kind",
+        "kind": "Tracked games of {console} by the same maker or in the same series.",
+        "console": "Tracked games of {console} only: this game has no maker or series.",
+        "unknown": "Its console is not known, so there are no games of its kind.",
+        "none": "No tracked games of its kind yet.",
+        "noLevels": "None of them has a level yet: a level exists only for a game someone wished and checked.",
+        "condition": "Levels in {condition}, after release; % of the list price.",
+        "name": "Game",
+        "released": "Released",
+        "list": "List price",
+        "months": "{months} months ({count})",
+        "ofList": "{share} of list"
       }
     }
   },
@@ -3270,5 +3295,71 @@
       "sort": "The order is a whole number from 0 to 9999.",
       "missing": "That console was already deleted."
     }
+  },
+  "tracked": {
+    "info": "Console games read before anyone wishes for them, so their history is there when someone does. They belong to no one and show in no portfolio or wishlist.",
+    "more": "How they are read",
+    "moreText": "The chosen set is read weekly at each marketplace (a read back 2 weeks) and at the identity shop on its night (a seventh of the set each night). The rest gets one page a month at one marketplace, only while its switch is on. A game someone wishes for is read as a wish, every night, and stays tracked. All reads count against each marketplace's number a day.",
+    "moreShop": "The identity shop's prices are read once you confirm the game's shop page (on the item's page).",
+    "totals": "{count, plural, one {# tracked game} other {# tracked games}}",
+    "weekly": "Weekly reads",
+    "weeklyNeed": "{source}: needs {atLeast, select, yes {at least } other {}}{need} requests a day; its number is {perDay} a day ({used} used today)",
+    "overNumber": "More than the marketplace's number a day: some reads will wait.",
+    "noWeekly": "No marketplace reads tracked games weekly yet.",
+    "nightly": "Nightly collect",
+    "nightlyMinutes": "{source}: about {minutes} {minutes, plural, one {minute} other {minutes}} more a night ({games, plural, one {# game} other {# games}} on their night)",
+    "nightlyUnknown": "{source}: not measured yet ({games, plural, one {# game} other {# games}} on their night)",
+    "nightlyToConfirm": "{count, plural, one {# more game is} other {# more games are}} read once {count, plural, one {its} other {their}} shop page is confirmed.",
+    "noShop": "No identity shop for games in the primary market.",
+    "rest": "The rest's monthly pages",
+    "restRule": "Turn on only after the chosen set has run a month with no refusal from a marketplace.",
+    "restFailed": "Not saved. Try again.",
+    "on": "On",
+    "off": "Off",
+    "add": "Add games",
+    "tier": "Read as",
+    "tierName": {
+      "chosen": "Chosen set (weekly)",
+      "rest": "Rest (monthly)"
+    },
+    "tierHint": {
+      "chosen": "Read every week.",
+      "rest": "One page a month, only while the switch is on."
+    },
+    "trackedAlready": "tracked already",
+    "confirm": "Track {count, plural, one {# game} other {# games}}",
+    "added": "Tracked",
+    "addedReused": "Tracked (item in Tora)",
+    "already": "Tracked already",
+    "addMore": "Add more",
+    "error": {
+      "invalid_input": "Not a plain game (cards and sealed items cannot be tracked)",
+      "not_found": "Item not found"
+    },
+    "console": "Console",
+    "name": "Game",
+    "since": "Since",
+    "lastWeekly": "Last weekly read",
+    "onPc": "On PC",
+    "shop": "Shop page",
+    "shopLinked": "linked",
+    "shopToCheck": "{count} to check",
+    "shopNone": "not found yet",
+    "shopRest": "not read (rest)",
+    "noneYet": "none yet",
+    "monthlyOnly": "monthly only",
+    "unknownConsole": "Unknown console",
+    "wished": "Wished",
+    "wishedInfo": "Someone wishes for it: it is read as a wish, every night, and stays tracked.",
+    "empty": "No tracked games yet. Paste some in the form.",
+    "filter": "Filter by console",
+    "filterAll": "All ({count})",
+    "markPc": "Mark on PC",
+    "pcDay": "On PC since",
+    "save": "Save",
+    "clearPc": "Clear on PC",
+    "remove": "Remove",
+    "removeConfirm": "Stop tracking {name}? The item and its history stay; it is no longer read unless someone holds or wishes for it.",
+    "removeFailed": "Not removed. Try again."
   }
 }

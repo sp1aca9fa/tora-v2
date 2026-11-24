@@ -8,6 +8,7 @@ import {
   MARKET_PER_DAY,
   MARKET_WAIT_MS,
   type JobResult,
+  LOAD_JOB_KIND,
   type MarketJobKind,
   type MarketStopReason,
   type SourceInfo,
@@ -15,6 +16,7 @@ import {
   afterRefusal,
   insideHours,
   isGameItem,
+  isSpanJobKind,
   jobPace,
   localDate,
   marketsInUse,
@@ -451,7 +453,9 @@ export async function runMarketJobs(
         throw e;
       }
       const merged = found ? mergeFindings(target.result, found, result.search, read) : undefined;
-      if (merged && result.done && (kind === 'deep' || kind === 'readback'))
+      // A job of a span kind ends with its span (a tracked game's weekly read as a read-back, S36 step
+      // D, W17); a monthly page has none; a load is never run.
+      if (merged && result.done && isSpanJobKind(kind) && kind !== LOAD_JOB_KIND)
         return (await finishJob(
           db,
           jobId,

@@ -683,6 +683,33 @@ async function newGame(
   return product;
 }
 
+/**
+ * A pasted line's plain game item, in the caller's transaction (S36 step D reuses W9's add): the
+ * look-alike chosen (a plain game of this console, `reusable`), else a new game item with its rules
+ * row (the console's name as its platform, the region Japan). No watch, no holding.
+ */
+export async function plainGameFor(
+  tx: Tx,
+  userId: string,
+  line: { name: string; console: string; reuse: string | null },
+): Promise<{ product: Product; reused: boolean }> {
+  const consoles = await listConsoles(tx);
+  const row = findConsole(line.console, consoles);
+  if (!row) throw new DomainError('invalid_input');
+  if (line.reuse)
+    return { product: await reusable(tx, line.reuse, row.key, consoles, false), reused: true };
+  const name = line.name.trim();
+  if (!name || name.length > 200) throw new DomainError('invalid_input');
+  const product = await newGame(tx, userId, {
+    name,
+    platform: consoleName(row),
+    region: DEFAULT_GAME_REGION,
+    console: row.key,
+    edition: null,
+  });
+  return { product, reused: false };
+}
+
 /** The plain item's boxed item, reused when one exists, else created with its rules row. */
 async function boxedOf(tx: Tx, userId: string, plain: Product, console: string): Promise<Product> {
   const [have] = await tx
@@ -779,13 +806,14 @@ export interface BulkLine {
 export function parseBulk(
   text: string,
   consoles: readonly ConsoleRow[],
+  max = BULK_MAX,
 ): { lines: Omit<BulkLine, 'lookAlikes'>[]; tooMany: boolean } {
   const raw = String(text ?? '')
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean);
   const seen = new Set<string>();
-  const lines = raw.slice(0, BULK_MAX).map((l, i) => {
+  const lines = raw.slice(0, max).map((l, i) => {
     const at = l.lastIndexOf('|');
     const name = at >= 0 ? l.slice(0, at).trim() : l;
     const consoleText = at >= 0 ? l.slice(at + 1).trim() : '';
@@ -812,21 +840,23 @@ export function parseBulk(
       error,
     };
   });
-  return { lines, tooMany: raw.length > BULK_MAX };
+  return { lines, tooMany: raw.length > max };
 }
 
 /**
  * The preview of a paste (S36 B1): per line what would happen, with the look-alike items already in
  * Tora (S36 spec Assumed: same console and a name equal after normalizing, the item's name or its
- * alias; boxed items are never offered). Reads only; writes nothing.
+ * alias; boxed items are never offered). Reads only; writes nothing. `max`: the lines one paste
+ * may hold (the tracked games' paste allows 100).
  */
 export async function previewBulk(
   db: Pick<Db, 'select'>,
   userId: string,
   text: string,
+  max = BULK_MAX,
 ): Promise<{ lines: BulkLine[]; tooMany: boolean }> {
   const consoles = await listConsoles(db);
-  const { lines, tooMany } = parseBulk(text, consoles);
+  const { lines, tooMany } = parseBulk(text, consoles, max);
   const found = await lookAlikesOf(
     db,
     userId,

@@ -53,6 +53,7 @@ import {
   itemRules,
   manualPrices,
   marketJobs,
+  trackedGames,
   notItemMarks,
   priceObservations,
   productImages,
@@ -1113,6 +1114,35 @@ async function moveMarketJobs(tx: Tx, fromId: string, intoId: string | null): Pr
 }
 
 /**
+ * A tracked game's row (S36 step D; spec wishlist-tracked W17) when item `fromId` is merged into
+ * `intoId`, or deleted (`intoId` null): the target keeps its own live row (tier, slot, on-PC mark), or
+ * gains the duplicate's; a `removed` row (fix round 1, F1) never overwrites a live one, and a live
+ * duplicate's row replaces a `removed` target row; a `removed` duplicate's row is dropped when the
+ * target has none. Deleted, the row goes with the item.
+ */
+async function moveTrackedGame(tx: Tx, fromId: string, intoId: string | null): Promise<void> {
+  const tierOf = async (id: string) =>
+    (
+      await tx
+        .select({ tier: trackedGames.tier })
+        .from(trackedGames)
+        .where(eq(trackedGames.productId, id))
+    )[0]?.tier;
+  const from = await tierOf(fromId);
+  if (!from) return;
+  const own = intoId === null ? undefined : await tierOf(intoId);
+  const replace = own === 'removed' && from !== 'removed';
+  // A `removed` mark never moves onto an item with no row: the target is read as it was.
+  if (intoId !== null && (replace || (!own && from !== 'removed'))) {
+    if (replace) await tx.delete(trackedGames).where(eq(trackedGames.productId, intoId));
+    await tx
+      .update(trackedGames)
+      .set({ productId: intoId })
+      .where(eq(trackedGames.productId, fromId));
+  } else await tx.delete(trackedGames).where(eq(trackedGames.productId, fromId));
+}
+
+/**
  * A game's rule and coverage rows (S36) when item `fromId` is merged into `intoId`, or deleted (`intoId`
  * null). Merge: checks, "not the item" marks (one the target has is dropped), covered nights (the
  * union) and spans move over. The item's rules stay the target's when it has a row; when it has none,
@@ -1136,6 +1166,7 @@ async function moveGameRows(tx: Tx, fromId: string, intoId: string | null): Prom
     await tx.delete(itemRules).where(eq(itemRules.productId, fromId));
   }
   await moveMarketJobs(tx, fromId, intoId);
+  await moveTrackedGame(tx, fromId, intoId);
   // Levels are rebuilt from the rows (W14): the duplicate's go, and the target's, so the next
   // collect computes the merged item's again from all its sales.
   await tx

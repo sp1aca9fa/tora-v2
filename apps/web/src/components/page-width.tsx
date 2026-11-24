@@ -22,6 +22,8 @@ const EXTRA_WIDE = [
   /^\/spread$/,
   /^\/settings\/collectors$/,
   /^\/settings\/admin\/consoles$/,
+  // Tracked games: totals, table and add form in three columns (spec wishlist-tracked W18).
+  /^\/settings\/admin\/tracked$/,
   /^\/products\/[^/]+\/buy$/,
   // A game wish's page: three columns on a full widescreen (fix round 1, item 11).
   /^\/watchlist\/(?!strategy$|opening$|add$)[^/]+$/,

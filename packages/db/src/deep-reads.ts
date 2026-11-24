@@ -14,9 +14,11 @@ import {
   type SpanWhy,
   addDays,
   isGameItem,
+  isSpanJobKind,
   jobSpan,
   localDate,
   newId,
+  spanHowOf,
   toLocalIso,
   wantedFromOf,
 } from '@tora/core';
@@ -124,7 +126,8 @@ async function wishRowsItem(db: Pick<Db, 'select'>, productId: string): Promise<
   return p && isGameItem(p, await getItemRules(db, from)) ? from : null;
 }
 
-const activeLink = (source: string, productId: string) =>
+/** SQL: the item has an active search at the source. */
+export const activeLink = (source: string, productId: string) =>
   sql`EXISTS (SELECT 1 FROM product_sources WHERE product_id = ${productId} AND source = ${source}
     AND external_id = ${QUERY_SOURCE_ID} AND active = 1)`;
 
@@ -156,7 +159,8 @@ export async function forgetReads(tx: Tx, productId: string, source: string): Pr
       and(
         eq(marketJobs.productId, productId),
         eq(marketJobs.source, source),
-        inArray(marketJobs.kind, ['deep', 'readback']),
+        // A tracked game's reads read the same search (S36 step D, W17).
+        inArray(marketJobs.kind, ['deep', 'readback', 'tracked_weekly', 'monthly']),
         inArray(marketJobs.status, ['waiting', 'running']),
       ),
     );
@@ -225,7 +229,7 @@ async function queueReadback(db: Db, source: string, productId: string, today: s
   return rows.length;
 }
 
-const sourcesWith = (kinds: Record<string, MarketJobKind[]>, kind: MarketJobKind) =>
+export const sourcesWith = (kinds: Record<string, MarketJobKind[]>, kind: MarketJobKind) =>
   Object.entries(kinds)
     .filter(([, k]) => k.includes(kind))
     .map(([s]) => s);
@@ -402,9 +406,6 @@ export function mergeFindings(
   };
 }
 
-const isSpanKind = (kind: string): kind is SpanJobKind =>
-  kind === 'deep' || kind === 'readback' || kind === LOAD_JOB_KIND;
-
 /**
  * Ends a running job (S36 Terms "Covered day"; plan section 4): in one transaction its status, its
  * result and its span, written only when the job was still running (so one span per job at most).
@@ -426,7 +427,7 @@ export async function finishJob(
     const r = step.result;
     let result: JobResult = r;
     let span: { from: string; to: string } | null = null;
-    if (job.productId && isSpanKind(job.kind)) {
+    if (job.productId && isSpanJobKind(job.kind)) {
       const still = await refsElsewhere(tx, job.source, job.productId, [
         ...(r.elsewhere ?? []),
         ...(r.undoneHere ?? []),
@@ -475,7 +476,7 @@ export async function finishJob(
         productId: job.productId,
         source: job.source,
         ...span,
-        how: job.kind as SpanJobKind,
+        how: spanHowOf(job.kind as SpanJobKind),
         jobId,
       });
     return result;

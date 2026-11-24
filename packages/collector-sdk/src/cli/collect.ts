@@ -35,6 +35,7 @@ import {
   saveUsage,
   loadTimeZone,
   loadSourceRegistry,
+  queueTrackedReads,
   queueWeeklyReads,
   saveJobKinds,
 } from '@tora/db';
@@ -424,6 +425,13 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
     log(`deep reads: ${reads.queued} job(s) queued, ${reads.stopped} stopped`);
   } catch (error) {
     log(`deep reads: not queued (${errorText(error)})`);
+  }
+  // The tracked games' weekly reads and the rest's monthly pages (S36 step D): after wishes' jobs.
+  try {
+    const reads = await queueTrackedReads(db, new Date());
+    log(`tracked reads: ${reads.queued} job(s) queued, ${reads.stopped} stopped`);
+  } catch (error) {
+    log(`tracked reads: not queued (${errorText(error)})`);
   }
   // Each item's packed sales, which the pages and the steps below read (the days changed by this
   // run and the lot sizes; everything once a week).

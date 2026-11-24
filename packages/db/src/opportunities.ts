@@ -50,6 +50,7 @@ import { refreshItemSales } from './item-sales';
 import { type RankView, latestRanks, rankingLabels } from './rankings';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { productLines, releaseDates, similarKey } from './release';
+import { trackedOnlyGames } from './sources';
 import { type Product, type User, holdings, priceObservations, products, watches } from './schema';
 import { dailySeries, latestSignals, pickSeries } from './signals';
 import { askChecks } from './ask-check';
@@ -129,7 +130,9 @@ export async function refreshOpportunities(
   // The daily prices come from the packed item sales: any days still marked are updated first.
   await refreshItemSales(db, { marksOnly: true });
   const today = localDate(now);
-  const all = await db.select().from(products);
+  // Tracked games that nobody holds, wishes or ranks are on no deals list (S36 step D).
+  const tracked = await trackedOnlyGames(db);
+  const all = (await db.select().from(products)).filter((p) => !tracked.has(p.id));
   const [series, lines, released, registry] = await Promise.all([
     dailySeries(
       db,

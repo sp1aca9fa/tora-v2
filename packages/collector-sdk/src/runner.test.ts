@@ -28,7 +28,9 @@ import {
   storedJans,
   saveTaxonomy,
   schema,
+  trackGame,
   unlinkSource,
+  untrackGame,
 } from '@tora/db';
 import { resolveTaxonomy } from '@tora/core';
 import { migrateDb } from '@tora/db/migrate';
@@ -968,6 +970,187 @@ it('records the night a source was read for a game, not for a failed link or a c
   expect(rows.map((r) => [r.productId, r.source, r.nights])).toEqual([
     [ok.id, 'fake', [['2026-11-10', '2026-11-10']]],
   ]);
+});
+
+it("records a game's night only once its rows are saved: a save that throws records none", async () => {
+  const g = await createProduct(db, userId, {
+    category: 'game',
+    kind: 'software',
+    name: 'Hero Quest',
+    platform: 'Alpha',
+  });
+  await linkSource(db, g.id, { source: 'fake', externalId: 'G1' });
+  // A listing in a currency with no rate: converting it throws, so nothing of the link is stored.
+  const supply = [{ bucket: 'cond:good', lowestAsk: 50, currency: 'XQZ', listings: 1 }];
+  const summary = await runCollector(
+    db,
+    fakeCollector({
+      supports: () => true,
+      collect: async () => ({ state: null, complete: true, supply }),
+    }),
+    { ...quiet, collectOnly: true, now: new Date('2026-11-10T03:00:00.000Z') },
+  );
+  expect(summary.errors.length).toBe(1);
+  expect(await db.select().from(schema.saleCoverage)).toEqual([]);
+});
+
+it('a tracked game no one holds or wishes: read at the identity shop on its slot night only; cards and sealed as before', async () => {
+  await saveSourceInfos(db, [
+    {
+      key: 'fake',
+      market: 'jp',
+      label: 'Fake',
+      priority: 10,
+      roles: { game: 'reference' },
+      identity: ['game'],
+    },
+    { key: 'other', market: 'jp', label: 'Other', priority: 20, roles: { game: 'supporting' } },
+  ]);
+  const { product: sealed } = await box();
+  const card = await createProduct(db, userId, {
+    category: 'tcg',
+    kind: 'single',
+    name: 'Hero Card',
+  });
+  const game = (name: string) =>
+    createProduct(db, userId, { category: 'game', kind: 'software', name, platform: 'Alpha' });
+  const [onSlot, offSlot, wished] = [
+    await game('On slot'),
+    await game('Off slot'),
+    await game('Wished'),
+  ];
+  // 2026-11-10 is slot 5 (days since the epoch, mod 7).
+  for (const [p, slot] of [
+    [onSlot, 5],
+    [offSlot, 6],
+    [wished, 6],
+  ] as const)
+    await db.insert(schema.trackedGames).values({ productId: p.id, shopSlot: slot });
+  await addWatch(db, userId, { productId: wished.id }, {});
+  for (const source of ['fake', 'other'])
+    for (const p of [sealed, card, onSlot, offSlot, wished])
+      await linkSource(db, p.id, { source, externalId: `${source}-${p.id}` });
+  const read = async (source: string) => {
+    const got: string[] = [];
+    await runCollector(
+      db,
+      fakeCollector({
+        source,
+        supports: () => true,
+        collect: async (_link, product) => (
+          got.push(product.name),
+          { state: null, complete: true }
+        ),
+      }),
+      { ...quiet, collectOnly: true, now: new Date('2026-11-10T12:00:00.000Z') },
+    );
+    return got.sort();
+  };
+  expect(await read('fake')).toEqual(['BP BOX', 'Hero Card', 'On slot', 'Wished']);
+  expect(await read('other')).toEqual(['BP BOX', 'Hero Card', 'Wished']);
+});
+
+it('a removed tracked game: no search made, read nowhere at night; wished, read every night; tracked again (F1)', async () => {
+  await saveSourceInfos(db, [
+    {
+      key: 'fake',
+      market: 'jp',
+      label: 'Fake',
+      priority: 10,
+      roles: { game: 'reference' },
+      identity: ['game'],
+    },
+    { key: 'other', market: 'jp', label: 'Other', priority: 20, roles: { game: 'supporting' } },
+  ]);
+  const admin = (
+    await createUser(
+      db,
+      'root',
+      { passwordHash: 'x', totpSecretEnc: 'y', backupCodeHashes: [] },
+      'admin',
+    )
+  ).user.id;
+  const game = (name: string) =>
+    createProduct(db, userId, { category: 'game', kind: 'software', name, platform: 'Alpha' });
+  const [removed, unsearched] = [await game('Removed'), await game('Unsearched')];
+  for (const p of [removed, unsearched]) {
+    await trackGame(db, admin, p.id);
+    // 2026-11-10 is slot 5 (days since the epoch, mod 7): its old slot night.
+    await db
+      .update(schema.trackedGames)
+      .set({ shopSlot: 5 })
+      .where(eq(schema.trackedGames.productId, p.id));
+  }
+  await linkSource(db, removed.id, { source: 'fake', externalId: 'fake-removed' });
+  await createQuerySource(db, removed.id, 'other', { keywords: ['Removed'] });
+  for (const p of [removed, unsearched]) await untrackGame(db, admin, p.id);
+  const read = async (source: string, extra: Partial<Collector> = {}) => {
+    const got: string[] = [];
+    await runCollector(
+      db,
+      fakeCollector({
+        source,
+        supports: () => true,
+        findCandidates: async () => [],
+        collect: async (_link, product) => (
+          got.push(product.name),
+          { state: null, complete: true }
+        ),
+        ...extra,
+      }),
+      { ...quiet, now: new Date('2026-11-10T12:00:00.000Z') },
+    );
+    return got.sort();
+  };
+  const auto = { defaultQuery: (p: { name: string }) => ({ keywords: [p.name] }) };
+  expect(await read('fake')).toEqual([]);
+  expect(await read('other', auto)).toEqual([]);
+  const searches = await db
+    .select()
+    .from(schema.productSources)
+    .where(eq(schema.productSources.productId, unsearched.id));
+  expect(searches).toEqual([]);
+  // Wished: read as any wish, every night.
+  await addWatch(db, userId, { productId: removed.id }, {});
+  expect(await read('fake')).toEqual(['Removed']);
+  expect(await read('other', auto)).toEqual(['Removed']);
+  // Tracked again: live.
+  await db.delete(schema.watches).where(eq(schema.watches.productId, removed.id));
+  expect(await trackGame(db, admin, removed.id)).toBe(true);
+  const [row] = await db
+    .select()
+    .from(schema.trackedGames)
+    .where(eq(schema.trackedGames.productId, removed.id));
+  expect(row!.tier).toBe('chosen');
+});
+
+it('a one-item run ("collect now") reads a tracked-only game off its slot night (F6)', async () => {
+  const g = await createProduct(db, userId, {
+    category: 'game',
+    kind: 'software',
+    name: 'Off slot',
+    platform: 'Alpha',
+  });
+  // 2026-11-10 is slot 5; this game's slot is 6.
+  await db.insert(schema.trackedGames).values({ productId: g.id, shopSlot: 6 });
+  await linkSource(db, g.id, { source: 'fake', externalId: 'G1' });
+  const got: string[] = [];
+  const run = (productId?: string) =>
+    runCollector(
+      db,
+      fakeCollector({
+        supports: () => true,
+        collect: async (_link, product) => (
+          got.push(product.name),
+          { state: null, complete: true }
+        ),
+      }),
+      { ...quiet, collectOnly: true, productId, now: new Date('2026-11-10T12:00:00.000Z') },
+    );
+  await run();
+  expect(got).toEqual([]);
+  await run(g.id);
+  expect(got).toEqual(['Off slot']);
 });
 
 it("an auto search renewed in a nightly run leaves only that run's night (fix round 2, item 2)", async () => {

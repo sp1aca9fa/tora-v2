@@ -383,6 +383,20 @@ describe('finishJob', () => {
     expect((await jobsOf(g.id))[0]).toMatchObject({ status: 'done', oldestReached: '2025-10-31' });
   });
 
+  it("writes a tracked game's weekly read as a read-back span; a monthly page writes none", async () => {
+    const g = await game('Game A');
+    const job = await running(g.id, 'tracked_weekly', '2026-11-17');
+    const step = { oldestReached: '2026-11-03', result: { firstDay: '2026-12-01', added: 4 } };
+    expect(await finishJob(db, job.id, step, NOW)).toMatchObject({
+      span: { from: '2026-11-17', to: '2026-11-30' },
+    });
+    const month = await running(g.id, 'monthly', '');
+    expect(await finishJob(db, month.id, step, NOW)).not.toHaveProperty('span');
+    expect((await spans()).map((s) => [s.fromDay, s.toDay, s.how, s.jobId])).toEqual([
+      ['2026-11-17', '2026-11-30', 'readback', job.id],
+    ]);
+  });
+
   it('writes none while a sale it would keep is still elsewhere, checked again at the end', async () => {
     const g = await game('Game A');
     const look = await game('Game A Look-alike');

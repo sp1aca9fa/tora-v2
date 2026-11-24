@@ -20,6 +20,8 @@ import {
   SET_TYPES,
   USER_ROLES,
   WISH_ESTIMATE_BASES,
+  TRACKED_STORED_TIERS,
+  type TrackedStoredTier,
   newId,
   toLocalIso,
   type AlertState,
@@ -1692,6 +1694,40 @@ export const itemFacts = sqliteTable(
   ],
 );
 
+/**
+ * A tracked game (S36 step D; spec wishlist-tracked W17): a console game read before anyone wishes
+ * for it. Install data: no person's (no user id beyond who added it, nothing in account downloads),
+ * an ordinary game item with no watch and no holding. A merge keeps or gives the target the row.
+ */
+export const trackedGames = sqliteTable(
+  'tracked_games',
+  {
+    productId: text('product_id')
+      .primaryKey()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    /** `removed`: no longer tracked, kept as a mark (fix round 1, F1; core `TRACKED_STORED_TIERS`). */
+    tier: text('tier', { enum: TRACKED_STORED_TIERS })
+      .notNull()
+      .default('chosen')
+      .$type<TrackedStoredTier>(),
+    /** Now on PC too: it stays tracked, marked (S36 step D). */
+    onPc: integer('on_pc', { mode: 'boolean' }).notNull().default(false),
+    /** The day it came to PC, as the admin gave it. */
+    onPcAt: text('on_pc_at'),
+    addedBy: text('added_by').references(() => users.id, { onDelete: 'set null' }),
+    addedAt: text('added_at')
+      .notNull()
+      .$defaultFn(() => toLocalIso()),
+    /** The night (0 to 6) the identity shop reads it and its weekly reads are queued. */
+    shopSlot: integer('shop_slot').notNull(),
+  },
+  (t) => [
+    check('tracked_games_tier_check', oneOf(t.tier, TRACKED_STORED_TIERS)),
+    check('tracked_games_slot_check', sql`${t.shopSlot} BETWEEN 0 AND 6`),
+    index('tracked_games_slot_idx').on(t.tier, t.shopSlot),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type PurchaseLink = typeof purchaseLinks.$inferSelect;
 export type ImportRun = typeof importRuns.$inferSelect;
@@ -1734,3 +1770,4 @@ export type MarketStateRow = typeof marketState.$inferSelect;
 export type WishLevelRow = typeof wishLevels.$inferSelect;
 export type WishEstimate = typeof wishEstimates.$inferSelect;
 export type ItemFact = typeof itemFacts.$inferSelect;
+export type TrackedGame = typeof trackedGames.$inferSelect;

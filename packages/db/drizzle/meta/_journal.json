@@ -526,6 +526,13 @@
       "when": 1795493736103,
       "tag": "0074_wishlist_d",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "6",
+      "when": 1795513099019,
+      "tag": "0075_wishlist_e",
+      "breakpoints": true
     }
   ]
 }

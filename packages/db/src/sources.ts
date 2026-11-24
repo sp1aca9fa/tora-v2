@@ -10,6 +10,9 @@ import {
   conditionListOf,
   baseCurrency,
   identityMinCostFor,
+  localDate,
+  slotOfDay,
+  type TrackedStoredTier,
 } from '@tora/core';
 import {
   and,
@@ -58,6 +61,7 @@ import {
   productSources,
   products,
   sourceCandidates,
+  trackedGames,
   sourceWarningDismissals,
   watches,
 } from './schema';
@@ -71,6 +75,66 @@ export async function userHoldsProduct(db: Db, userId: string, productId: string
     .from(holdings)
     .where(and(eq(holdings.userId, userId), eq(holdings.productId, productId)));
   return (row?.n ?? 0) > 0;
+}
+
+/**
+ * Whether the person watches the item, or a boxed item made from it (S36 B1: a boxed wish reads its
+ * plain item's searches). A wish is on an item its person does not hold, so its links are theirs to
+ * manage as a holder's are: without this no one could confirm a wished game's page at the shop.
+ */
+export async function userWatchesProduct(db: Db, userId: string, productId: string) {
+  const rows = await db
+    .select({ id: watches.id })
+    .from(watches)
+    .leftJoin(itemRules, eq(itemRules.productId, watches.productId))
+    .where(
+      and(
+        eq(watches.userId, userId),
+        or(eq(watches.productId, productId), eq(itemRules.boxedOf, productId)),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
+
+/**
+ * An item's page at the game identity shops (S36 A5, A6): linked (an active link), else how many
+ * candidates wait for a person, else none. The shop's prices and facts are read only once linked.
+ */
+export async function gameShopPage(
+  db: Db,
+  productId: string,
+): Promise<{ state: 'linked' | 'pending' | 'none'; pending: number }> {
+  const registry = await loadSourceRegistry(db);
+  const second = registry.markets?.secondary;
+  const shops = [registry.markets?.primary, ...(second ? [second] : [])].flatMap((m) =>
+    identitySources(registry, 'game', m),
+  );
+  if (!shops.length) return { state: 'none', pending: 0 };
+  const [link] = await db
+    .select({ id: productSources.id })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, productId),
+        inArray(productSources.source, shops),
+        eq(productSources.active, true),
+      ),
+    )
+    .limit(1);
+  if (link) return { state: 'linked', pending: 0 };
+  const [row] = await db
+    .select({ n: count() })
+    .from(sourceCandidates)
+    .where(
+      and(
+        eq(sourceCandidates.productId, productId),
+        inArray(sourceCandidates.source, shops),
+        eq(sourceCandidates.status, 'pending'),
+      ),
+    );
+  const pending = row?.n ?? 0;
+  return { state: pending ? 'pending' : 'none', pending };
 }
 
 export async function listProductSources(db: Db, productId: string) {
@@ -358,6 +422,53 @@ async function trackedProductIds(db: Db): Promise<Set<string>> {
   return ids;
 }
 
+/**
+ * Tracked games no one holds, watches or ranks (S36 step D; spec wishlist-tracked W17): read lightly,
+ * by their slot and their jobs, never by the nightly collect as a held or wished item is. A tracked
+ * game held or wished is read as any such item, so it is not in this map. A `removed` row is in it
+ * (fix round 1, F1): no longer tracked, but still left out of the nightly collect, so removing a game
+ * does not start its nightly reads; the callers that count tracked games take live tiers only.
+ */
+export async function trackedOnlyGames(
+  db: Db,
+): Promise<Map<string, { tier: TrackedStoredTier; slot: number }>> {
+  const rows = await db.select().from(trackedGames);
+  if (!rows.length) return new Map();
+  const tracked = await trackedProductIds(db);
+  return new Map(
+    rows
+      .filter((r) => !tracked.has(r.productId))
+      .map((r) => [r.productId, { tier: r.tier, slot: r.shopSlot }]),
+  );
+}
+
+/** Whether `source` is a game identity source in the install's markets (the identity shop). */
+async function gameIdentity(db: Db, source: string): Promise<boolean> {
+  const registry = await loadSourceRegistry(db);
+  const second = registry.markets?.secondary;
+  const markets = [registry.markets?.primary, ...(second ? [second] : [])];
+  return markets.some((m) => identitySources(registry, 'game', m).includes(source));
+}
+
+/**
+ * The items whose links the nightly collect of `source` leaves out tonight (S36 step D; spec
+ * wishlist-tracked W17): every tracked-only game, except a chosen one at the game identity source on
+ * the night of its slot (a seventh of the set each night, `slotOfDay` of tonight in the app's zone).
+ * Their marketplace history comes from their jobs, under the daily ceiling. Holds game items only,
+ * so a source's cards and sealed items are collected exactly as before.
+ */
+export async function trackedSkips(db: Db, source: string, now: Date): Promise<Set<string>> {
+  const only = await trackedOnlyGames(db);
+  if (!only.size) return new Set();
+  const identity = await gameIdentity(db, source);
+  const tonight = slotOfDay(localDate(now));
+  return new Set(
+    [...only]
+      .filter(([, t]) => !(identity && t.tier === 'chosen' && t.slot === tonight))
+      .map(([id]) => id),
+  );
+}
+
 /** Every boxed item with its plain item (S36 B1; a few rows: wished boxed games). */
 async function boxedPairs(db: Pick<Db, 'select'>): Promise<{ boxed: string; plain: string }[]> {
   const rows = await db
@@ -403,7 +514,7 @@ export async function markSearched(
 export async function productsToMatch(
   db: Db,
   source: string,
-  filter: { productId?: string; limit?: number } = {},
+  filter: { productId?: string; limit?: number; now?: Date } = {},
 ): Promise<Product[]> {
   // Set by set on indexes (not a lookup per product): tracked, minus linked or with suggestions.
   const tracked = await trackedProductIds(db);
@@ -419,17 +530,24 @@ export async function productsToMatch(
   // A boxed item has no search of its own (S36 B1, fix C3): its sales and listings are its plain
   // item's. Only the identity shop, which has a page for the complete copy, is asked to match it.
   const boxed = (await boxedPairs(db)).map((r) => r.boxed);
-  if (boxed.length) {
-    const registry = await loadSourceRegistry(db);
-    const second = registry.markets?.secondary;
-    const markets = [registry.markets?.primary, ...(second ? [second] : [])];
-    const identity = markets.some((m) => identitySources(registry, 'game', m).includes(source));
-    if (!identity) for (const id of boxed) skip.add(id);
-  }
-  const ids = [...tracked].filter(
-    (id) => !skip.has(id) && (!filter.productId || id === filter.productId),
-  );
-  return productsByIds(db, ids, filter.limit ?? 10_000);
+  if (boxed.length && !(await gameIdentity(db, source))) for (const id of boxed) skip.add(id);
+  // A chosen tracked game is matched at the identity shop only, on its slot night (a seventh a night),
+  // for its prices (S36 step D, W17); its marketplace searches need no request (`productsWithoutSource`).
+  // People's items come first, in their own order (oldest first), and the slot games only fill what
+  // is left: the runner keeps the first `MATCH_PER_RUN` (fix round 1, F4).
+  const keep = (id: string) => !skip.has(id) && (!filter.productId || id === filter.productId);
+  const limit = filter.limit ?? 10_000;
+  const people = await productsByIds(db, [...tracked].filter(keep), limit);
+  const only = await trackedOnlyGames(db);
+  const tonight = slotOfDay(localDate(filter.now ?? new Date()));
+  if (!only.size || people.length >= limit || !(await gameIdentity(db, source))) return people;
+  // A one-item run ("collect now") asks the shop on any night: an admin looking for the page to confirm.
+  const slot = [...only]
+    .filter(
+      ([id, t]) => t.tier === 'chosen' && (!!filter.productId || t.slot === tonight) && keep(id),
+    )
+    .map(([id]) => id);
+  return [...people, ...(await productsByIds(db, slot, limit - people.length))];
 }
 
 export interface CandidateInput {
@@ -1084,9 +1202,18 @@ export const QUERY_SOURCE_ID = 'search';
 export async function productsWithoutSource(
   db: Db,
   source: string,
-  filter: { productId?: string; limit?: number } = {},
+  filter: { productId?: string; limit?: number; trackedGames?: boolean } = {},
 ): Promise<Product[]> {
   const tracked = await trackedProductIds(db);
+  // A search-based source's searches are made for tracked games too (S36 step D, W17): no request,
+  // and their reads are jobs under the daily ceiling.
+  // A removed one gets none (fix round 1, F1).
+  if (filter.trackedGames)
+    for (const r of await db
+      .select({ id: trackedGames.productId })
+      .from(trackedGames)
+      .where(ne(trackedGames.tier, 'removed')))
+      tracked.add(r.id);
   const listed = await db
     .selectDistinct({ id: productSources.productId })
     .from(productSources)

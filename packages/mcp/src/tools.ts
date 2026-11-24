@@ -909,6 +909,8 @@ export const SOURCE_FREE_TABLES = [
   'store_notices',
   'store_post_images',
   'suggestions',
+  // The games admins track ahead of any wish (S36 step D): items, tiers and slots, no source's data.
+  'tracked_games',
   'user_devices',
   'users',
   // A person's estimates on their wishes (W15), as they typed them.

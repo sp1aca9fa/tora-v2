@@ -35,3 +35,4 @@ export * from './market-ceiling';
 export * from './deep-read';
 export * from './wish-level';
 export * from './wish-alert';
+export * from './tracked-games';

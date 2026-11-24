@@ -13,6 +13,8 @@ export const DEEP_PAST_DAYS = 28;
 export const READBACK_DAYS = 42;
 /** Days a read-back reads past its wanted day, to start (S36 B3: "2 weeks"). */
 export const READBACK_PAST_DAYS = 14;
+/** Days a tracked game's weekly read reaches back, to start (S36 step D: "read back 2 weeks"). */
+export const TRACKED_WEEKLY_DAYS = 14;
 /** Days between two read-backs of an item, to start (S36 B3: "each week"). */
 export const READBACK_EVERY_DAYS = 7;
 /** Pages a job reads of one search at most (the saved snapshot's belt; the busiest game is ~107). */
@@ -29,8 +31,18 @@ export const JOB_PAST_DAYS = {
   deep: DEEP_PAST_DAYS,
   readback: READBACK_PAST_DAYS,
   load: DEEP_PAST_DAYS,
+  // A tracked game's weekly read is the read-back's reading with its own kind (S36 step D, W17).
+  tracked_weekly: READBACK_PAST_DAYS,
 } as const;
 export type SpanJobKind = keyof typeof JOB_PAST_DAYS;
+
+/** Whether a job of this kind ends with a span (`finishJob`). */
+export const isSpanJobKind = (kind: string): kind is SpanJobKind =>
+  Object.prototype.hasOwnProperty.call(JOB_PAST_DAYS, kind);
+
+/** How a span of a job of this kind is stored: a tracked game's weekly read is a read-back (W17). */
+export const spanHowOf = (kind: SpanJobKind): 'deep' | 'readback' | 'load' =>
+  kind === 'tracked_weekly' ? 'readback' : kind;
 
 /** Listings more than this many days older than their neighbors' median are strays (plan 10.2). */
 const STRAY_DAYS = 28;
@@ -88,10 +100,11 @@ export function addDays(day: string, n: number): string {
 
 /**
  * The oldest day a job asked on `day` wants: a deep read or a load the same day 12 months earlier
- * (29 February: the 28th), a read-back 42 days earlier.
+ * (29 February: the 28th), a read-back 42 days earlier, a tracked game's weekly read 14 days earlier.
  */
 export function wantedFromOf(kind: SpanJobKind, day: string): string {
   if (kind === 'readback') return addDays(day, -READBACK_DAYS);
+  if (kind === 'tracked_weekly') return addDays(day, -TRACKED_WEEKLY_DAYS);
   const back = `${Number(day.slice(0, 4)) - DEEP_READ_MONTHS / 12}${day.slice(4)}`;
   return addDays(back, 0).slice(5) === back.slice(5) ? back : `${back.slice(0, 8)}28`;
 }

@@ -3,6 +3,9 @@
 import { parseListingUrl } from '@tora/core';
 import {
   type SourceQuery,
+  linkPageAs,
+  managesLinkAt,
+  managesLinks,
   confirmCandidate,
   getObservation,
   reactivateSource,
@@ -14,7 +17,6 @@ import {
   canEditProduct,
   getProduct,
   itemWithListing,
-  linkSource,
   rejectCandidate,
   unlinkSource,
   userHoldsProduct,
@@ -25,10 +27,32 @@ import { authed } from '@/lib/auth/guard';
 import { getRegistry } from '@/lib/sources';
 import type { FormState } from '@/lib/form';
 
-/** Price sources belong to shared products; any user holding the product may manage them. */
+/**
+ * Price sources belong to shared products; any user holding the product may manage them: its
+ * searches, its references and which sales count.
+ */
 async function allowed(productId: string) {
   const { db, user } = await authed();
   return (await userHoldsProduct(db, user.id, productId)) ? db : null;
+}
+
+/**
+ * Which pages an item is linked to (`managesLinks`: a holder; anyone else only the item's page at a
+ * game identity shop, when they watch the item or are an admin of a tracked game). Everything else
+ * stays the holders' (`allowed`).
+ */
+async function allowedLink(
+  productId: string,
+  link: { source: string; externalId: string | null; query?: unknown },
+) {
+  const { db, user } = await authed();
+  return (await managesLinks(db, user.id, productId, link)) ? db : null;
+}
+
+/** The same for a write onto a place (a candidate confirmed or rejected): the row there decides. */
+async function allowedAt(productId: string, at: { source: string; externalId: string }) {
+  const { db, user } = await authed();
+  return (await managesLinkAt(db, user.id, productId, at)) ? db : null;
 }
 
 /**
@@ -46,7 +70,7 @@ async function mergeInstead(productId: string, link: { source: string; externalI
 export async function confirmCandidateAction(candidateId: string) {
   const { db } = await authed();
   const c = await getCandidate(db, candidateId);
-  if (c && (await allowed(c.productId))) {
+  if (c && (await allowedAt(c.productId, c))) {
     await mergeInstead(c.productId, c);
     await confirmCandidate(db, candidateId);
   }
@@ -56,14 +80,14 @@ export async function confirmCandidateAction(candidateId: string) {
 export async function rejectCandidateAction(candidateId: string) {
   const { db } = await authed();
   const c = await getCandidate(db, candidateId);
-  if (c && (await allowed(c.productId))) await rejectCandidate(db, candidateId);
+  if (c && (await allowedAt(c.productId, c))) await rejectCandidate(db, candidateId);
   revalidatePath('/', 'layout');
 }
 
 export async function unlinkSourceAction(sourceId: string) {
   const { db } = await authed();
   const s = await getProductSource(db, sourceId);
-  if (s && (await allowed(s.productId))) await unlinkSource(db, sourceId);
+  if (s && (await allowedLink(s.productId, s))) await unlinkSource(db, sourceId);
   revalidatePath(`/products/${s?.productId}`, 'layout');
 }
 
@@ -72,10 +96,13 @@ export async function linkUrlAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const db = await allowed(productId);
-  if (!db) return { error: 'not_found' };
+  const { db, user } = await authed();
   const registry = await getRegistry();
   const parsed = parseListingUrl(registry, String(formData.get('url') ?? ''));
+  // An address of a place this person has no say on (for one who does not hold the item: anything but
+  // its page at a game identity shop) is refused as an unknown item.
+  if (parsed && !(await managesLinkAt(db, user.id, productId, parsed)))
+    return { error: 'not_found' };
   if (!parsed) {
     return {
       error: 'badSourceUrl',
@@ -88,7 +115,7 @@ export async function linkUrlAction(
     };
   }
   await mergeInstead(productId, parsed);
-  await linkSource(db, productId, parsed);
+  if (!(await linkPageAs(db, user.id, productId, parsed))) return { error: 'not_found' };
   // Also the Actions page and the badges (a main source may be linked now).
   revalidatePath('/', 'layout');
   return {};
@@ -140,7 +167,7 @@ export async function updateQueryAction(
 export async function reactivateSourceAction(sourceId: string) {
   const { db } = await authed();
   const link = await getProductSource(db, sourceId);
-  if (link && (await allowed(link.productId))) await reactivateSource(db, sourceId);
+  if (link && (await allowedLink(link.productId, link))) await reactivateSource(db, sourceId);
   revalidatePath(`/products/${link?.productId}`, 'layout');
 }
 

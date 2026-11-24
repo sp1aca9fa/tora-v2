@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { atLeastAsBroad, jobSpan, readFrontier, readLimit, wantedFromOf } from './deep-read';
+import {
+  atLeastAsBroad,
+  isSpanJobKind,
+  jobSpan,
+  readFrontier,
+  readLimit,
+  spanHowOf,
+  wantedFromOf,
+} from './deep-read';
 
 // Expected days worked out by hand (calendar arithmetic), not from the code under test.
 describe('wantedFromOf and readLimit', () => {
@@ -8,6 +16,16 @@ describe('wantedFromOf and readLimit', () => {
     expect(wantedFromOf('load', '2028-02-29')).toBe('2027-02-28');
     expect(wantedFromOf('deep', '2027-03-01')).toBe('2026-03-01');
     expect(wantedFromOf('readback', '2026-12-01')).toBe('2026-10-20');
+  });
+
+  it("reaches 14 days back for a tracked game's weekly read and reads 2 weeks past it", () => {
+    expect(wantedFromOf('tracked_weekly', '2026-12-01')).toBe('2026-11-17');
+    expect(readLimit('tracked_weekly', '2026-11-17')).toBe('2026-11-03');
+    expect(spanHowOf('tracked_weekly')).toBe('readback');
+    expect(spanHowOf('deep')).toBe('deep');
+    expect(isSpanJobKind('tracked_weekly')).toBe(true);
+    expect(isSpanJobKind('monthly')).toBe(false);
+    expect(isSpanJobKind('toString')).toBe(false);
   });
 
   it('reads 4 weeks past it for a deep read, 2 for a read-back; unknown stays unknown', () => {

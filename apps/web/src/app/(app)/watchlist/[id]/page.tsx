@@ -1,4 +1,5 @@
 import {
+  KIND_CASE_MONTHS,
   type LevelChange,
   type Paid,
   WISH_TRIAL_NIGHTS,
@@ -12,6 +13,8 @@ import {
   type WishShopEntry,
   type WishSourceView,
   type WishView,
+  gameShopPage,
+  kindCases,
   wishView,
 } from '@tora/db';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
@@ -57,7 +60,8 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
     redirect(
       `/products/${v.product.id}/buy${v.watch.bucket ? `?condition=${encodeURIComponent(v.watch.bucket)}` : ''}`,
     );
-  const [tAll, t, money, sourceLabel, format, locale] = await Promise.all([
+  const [shopPage, tAll, t, money, sourceLabel, format, locale] = await Promise.all([
+    gameShopPage(db, v.product.id),
     getTranslations(),
     getTranslations('wish.page'),
     getMoney(),
@@ -399,6 +403,20 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
         </Link>
       </p>
       {factsLine}
+      {/* The shop's page is linked by a person: until then its prices and facts are not read. */}
+      {shopPage.state !== 'linked' && (
+        <p className="max-w-prose text-sm text-amber-700 dark:text-amber-300">
+          {shopPage.state === 'pending'
+            ? t('shopPending', { count: shopPage.pending })
+            : t('shopNone')}{' '}
+          <Link
+            href={`/products/${v.product.id}/details#sources`}
+            className="underline underline-offset-2"
+          >
+            {t('shopLink')}
+          </Link>
+        </p>
+      )}
     </header>
   );
 
@@ -426,12 +444,17 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
   // Nothing recorded at all: one card with the two "add" actions, not four empty ones (item 17).
   const empty =
     !v.estimates.length && !v.facts.length && !v.recorded.length && !hasBounds && !v.history.length;
+  // The estimate form's helper (spec wishlist-tracked, Cases): tracked games of its kind, read-only,
+  // in the wish's condition (good when it has none, said in the table's line).
+  const kindBucket = v.watch.bucket || 'cond:good';
+  const kinds = await kindCases(db, v.product.id, kindBucket);
   const addEstimate = (
     <details>
       <summary className="min-h-9 cursor-pointer text-sm font-medium text-primary">
         {t('estimate.open')}
       </summary>
-      <div className="mt-3">
+      <div className="mt-3 space-y-3">
+        {kindsTable(kinds, kindBucket, v.product.platform, { t, tAll, money, day, locale })}
         <EstimateForm wishId={v.watch.id} />
       </div>
     </details>
@@ -788,6 +811,100 @@ function boundsSection(
         <p className="text-sm text-muted-foreground">{t('bounds.none')}</p>
       )}
     </section>
+  );
+}
+
+/**
+ * "Games of its kind" (spec wishlist-tracked, Cases): the tracked games kindCases gives, with the
+ * basis said (same maker or series, or the console only) and a month's column only where at least
+ * one case has a level (none has one until someone wished and checked it: said in a line, never 0).
+ * No model, no prediction. The list price keeps its own currency.
+ */
+function kindsTable(
+  k: Awaited<ReturnType<typeof kindCases>>,
+  bucket: string,
+  platform: string | null,
+  {
+    t,
+    tAll,
+    money,
+    day,
+    locale,
+  }: Pick<Tools, 't' | 'money' | 'day' | 'locale'> & {
+    tAll: Awaited<ReturnType<typeof getTranslations>>;
+  },
+) {
+  const months = KIND_CASE_MONTHS.filter((m) => k.counts[m] > 0);
+  const console = platform ?? k.console ?? '';
+  const pct = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 });
+  return (
+    <details className="rounded-lg border px-3 py-2 text-sm">
+      <summary className="min-h-8 cursor-pointer font-medium">
+        {t('kinds.open')} ({k.cases.length})
+      </summary>
+      <div className="mt-2 space-y-2">
+        <p className="text-xs text-muted-foreground">
+          {k.basis === null ? t('kinds.unknown') : t(`kinds.${k.basis}`, { console })}
+        </p>
+        {k.basis !== null && !k.cases.length && (
+          <p className="text-xs text-muted-foreground">{t('kinds.none')}</p>
+        )}
+        {k.cases.length > 0 && !months.length && (
+          <p className="text-xs text-muted-foreground">{t('kinds.noLevels')}</p>
+        )}
+        {months.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {t('kinds.condition', { condition: bucketLabel(bucket, tAll) })}
+          </p>
+        )}
+        {k.cases.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-normal">{t('kinds.name')}</th>
+                  <th className="py-1 pr-3 font-normal">{t('kinds.released')}</th>
+                  <th className="py-1 pr-3 text-right font-normal">{t('kinds.list')}</th>
+                  {months.map((m) => (
+                    <th key={m} className="py-1 pr-3 text-right font-normal">
+                      {t('kinds.months', { months: m, count: k.counts[m] })}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {k.cases.map((c) => (
+                  <tr key={c.productId}>
+                    <td className="py-1 pr-3 break-words">{c.name}</td>
+                    <td className="py-1 pr-3 whitespace-nowrap">
+                      {c.releaseDate ? day(c.releaseDate) : '-'}
+                    </td>
+                    <td className="py-1 pr-3 text-right tabular-nums">
+                      {c.listPrice
+                        ? makeMoney({ base: c.listPrice.currency, locale })(c.listPrice.amount)
+                        : '-'}
+                    </td>
+                    {months.map((m) => {
+                      const at = c.at.find((a) => a.months === m);
+                      return (
+                        <td key={m} className="py-1 pr-3 text-right tabular-nums">
+                          {at?.level != null ? money(at.level) : '-'}
+                          {at?.ofList != null && (
+                            <span className="block text-muted-foreground">
+                              {t('kinds.ofList', { share: pct.format(at.ofList) })}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
