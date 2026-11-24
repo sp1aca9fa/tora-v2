@@ -117,9 +117,18 @@ from other addresses is refused once it has 10 failures within an hour.
 
 Runs on the machine holding the database, for one account: the one named when it starts, or the
 only one. Its tools read that account's lots, watches and reviews, and never data of sources kept
-from models. Its SQL tool reads the shared tables as they are. It must never return what is used
-to sign in or to reach a person (password and code hashes, authenticator secrets, tokens, channel
-targets). Whether it may read other accounts' lots is the owner's to decide; as built it can.
+from models.
+
+Its SQL tool reads the shared tables as they are, from the nightly analysis copy, or from the
+database file itself when the app runs on a local file. Whatever the query:
+
+- It only reads tables. It cannot read or write a file, read the database's raw pages, attach
+  another database or change anything.
+- It never gives what is used to sign in or to reach a person: password and backup code hashes,
+  authenticator secrets, the hashes of setup links, feed tokens and the lockout's addresses and
+  names, channel targets, the bot's token and the status token. These read as empty; the analysis
+  copy has them blanked as well.
+- Whether it may read other accounts' lots is the owner's to decide; as built it can.
 
 ## Numbers
 

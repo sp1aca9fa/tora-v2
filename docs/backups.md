@@ -17,7 +17,9 @@ It runs even when the collect failed, and only once a day (the day in the app's 
   Each backup reads every row once, well within Turso's free monthly reads.
 - **Analysis copy**: each run also unpacks the latest copy to `~/.local/share/tora/analysis/tora.db`
   (or `TORA_ANALYSIS_DB`) and takes out the data of sources kept from AI models
-  (`ops/scrub-analysis.sql`), keeping the old copy if that fails. When that file is newer than the
+  (`ops/scrub-analysis.sql`), keeping the old copy if that fails. The same step blanks everything
+  used to sign in or to reach a person
+  ([Accounts and access](rules/accounts.md#the-mcp-server)). When that file is newer than the
   backup (it names a table the server does not have yet), that table's statement is left out and
   named in the log; anything else missing still keeps the old copy. `ops/copy-backups.sh` needs
   `sqlite3` for it. Heavy questions read it instead of Turso: the MCP `query_sql` tool does,

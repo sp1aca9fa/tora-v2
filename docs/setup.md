@@ -193,6 +193,8 @@ For Claude Desktop, put the same command in `claude_desktop_config.json` (`"comm
 in WSL, `"command": "wsl"` and `pnpm ...` in `args`). Tools: `portfolio_summary`, `list_products`,
 `product_detail`, `price_history`, `sales`, `watchlist`, `opportunities`, `collector_status`, `review_queue`,
 `data_checks` (start here for "does anything look off?") and `query_sql` (one read-only SELECT).
+`query_sql` needs Node 24.14 or newer; on an older Node it answers with that message and the
+other tools work.
 
 ## Set catalogs
 

@@ -728,6 +728,16 @@ describe('query_sql on a database holding a noAi source', () => {
     ]);
     expect(await rows('select signals.day from signals')).toEqual([]);
     expect(await querySql(db, 'select * from main.price_observations')).toHaveProperty('error');
+    // A parameter token would swallow a comment opener and hide the prefix from the check.
+    for (const sql of [
+      'select $a(/*) as x, source from main.price_observations /**/',
+      "select @a(') as x, source from main/**/.price_observations /*'*/",
+      'select :a(--) as x, quote(data) as d from sqlite_dbpage',
+      // A closing parenthesis must not take the rest of the query out of the guards' reach.
+      "select 'x' as source, 0 as p) union all select source, price_base from price_observations where (1",
+    ]) {
+      expect(await querySql(db, sql), sql).toHaveProperty('error');
+    }
     expect(await querySql(db, 'select * from holding_values')).toHaveProperty('error');
   });
 

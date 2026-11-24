@@ -2,6 +2,7 @@
 -- analysis copy, before it replaces the old one (ops/copy-backups.sh, `refreshAnalysisCopy`). Scripts and direct
 -- reads use that copy without the guards of the MCP `query_sql` tool, so it must not hold them. Which items
 -- have a listing there stays (the source's name and the link, as `query_sql` shows them).
+-- It also blanks what signs a person in or reaches them, whatever the sources (the end of the file).
 -- A new table or column holding a source's data belongs here too: packages/mcp/src/no-ai.test.ts
 -- fails until every guarded table has its statement here.
 begin;
@@ -92,6 +93,15 @@ update activity set detail = '{}'
 update alert_log set text = ''
   where (kind is null or kind not in ('store', 'storeUnknown', 'feed', 'test'))
     and exists (select 1 from hidden);
+
+-- What signs a person in or reaches them is never in the copy, whatever the sources
+-- (docs/rules/accounts.md; the same columns `query_sql` reads as null, SECRET_COLUMNS).
+update users set password_hash = null, totp_secret_enc = null, backup_code_hashes = '[]';
+update account_setups set token_hash = 'gone:' || id, totp_secret_enc = null;
+update feed_tokens set token_hash = 'gone:' || user_id;
+update alert_channels set target_enc = '';
+update login_attempts set ip_hash = '', username_hash = null;
+delete from app_settings where key in ('telegramBot', 'statusToken');
 
 drop table hidden;
 commit;

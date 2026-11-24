@@ -176,7 +176,16 @@ it('unpacks the latest backup as the analysis copy, only when newer', async () =
   await backupDatabase(live, join(backups, backupName('2026-10-17')));
   expect(await refreshAnalysisCopy(backups, target)).toBe('2026-10-17');
   const copy = createDb({ url: `file:${target}` });
-  expect(await contents(copy)).toEqual(await contents(db));
+  // The same data, without what signs a person in (ops/scrub-analysis.sql).
+  const source = await contents(db);
+  expect(await contents(copy)).toEqual({
+    ...source,
+    users: source.users!.map((u) => ({
+      ...(u as object),
+      password_hash: null,
+      totp_secret_enc: null,
+    })),
+  });
   copy.$client.close();
   // Up to date: left alone.
   const before = (await stat(target)).mtimeMs;

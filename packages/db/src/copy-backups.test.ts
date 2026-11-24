@@ -60,6 +60,13 @@ const SCHEMA = `
   create table activity (kind text, detail text);
   create table alert_log (kind text, text text);
   create table app_settings (key text, value text);
+  create table watches (alert_state text);
+  create table users (id text, password_hash text, totp_secret_enc text,
+    backup_code_hashes text not null);
+  create table account_setups (id text, token_hash text not null unique, totp_secret_enc text);
+  create table feed_tokens (user_id text primary key, token_hash text not null);
+  create table alert_channels (id text, target_enc text not null);
+  create table login_attempts (ip_hash text not null, username_hash text);
 `;
 
 let dir: string;
@@ -186,6 +193,44 @@ describe('the analysis copy', () => {
     expect(run().status).toBe(0);
     expect(mark()).toBe('new');
     expect(sold()).toEqual(['mercari']);
+  });
+
+  it('is published without what signs a person in, with or without such a source', () => {
+    const ACCOUNTS = `insert into users values ('u', 'secret-1', 'secret-2', '["secret-3"]');
+      insert into account_setups values ('a', 'secret-4', 'secret-5'), ('b', 'secret-6', null);
+      insert into feed_tokens values ('u', 'secret-7');
+      insert into alert_channels values ('c', 'secret-8');
+      insert into login_attempts values ('secret-9', 'secret-10');
+      insert into app_settings values ('telegramBot', '{"tokenEnc":"secret-11"}'),
+        ('statusToken', '{"hash":"secret-12"}'), ('timeZone', '"Asia/Tokyo"');`;
+    for (const [day, sql] of [
+      ['2026-11-05', ACCOUNTS],
+      ['2026-11-06', `${SOLD} ${ACCOUNTS}`],
+    ] as const) {
+      const file = join(backups, `tora-${day}.db.gz`);
+      writeFileSync(file, database(day, sql));
+      // The second one is newer than the copy made from the first.
+      if (sql !== ACCOUNTS) {
+        const later = new Date(Date.now() + 60_000);
+        utimesSync(file, later, later);
+      }
+      expect(run().status).toBe(0);
+      expect(mark()).toBe(day);
+      // Every statement ran: none was left out for a table this schema lacks.
+      expect(/no table/.test(log())).toBe(false);
+      const db = new DatabaseSync(analysis, { readOnly: true });
+      const all = [
+        'users',
+        'account_setups',
+        'feed_tokens',
+        'alert_channels',
+        'login_attempts',
+        'app_settings',
+      ].map((table) => db.prepare(`select * from ${table}`).all());
+      db.close();
+      expect(all.map((rows) => rows.length)).toEqual([1, 2, 1, 1, 1, 1]);
+      expect(JSON.stringify(all)).not.toContain('secret-');
+    }
   });
 
   it('is not published when one statement fails partway', () => {

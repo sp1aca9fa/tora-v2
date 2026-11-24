@@ -836,8 +836,7 @@ const HIDDEN_COLUMNS: Record<string, Record<string, (l: string) => string>> = {
       `case when key = 'dataCheck' and (${l
         .split(', ')
         .map((k) => `instr(value, '"' || ${k} || '"')`)
-        .join(' or ')}) then null ` +
-      `when key in (${READABLE_SETTINGS.map((k) => `'${k}'`).join(', ')}) then value end`,
+        .join(' or ')}) then null ` + `else ${READABLE_VALUE} end`,
   },
 };
 
@@ -878,18 +877,34 @@ const READABLE_SETTINGS = [
   'timeZone',
   'valueSeriesBreak',
 ];
+/** A setting's value when its key is readable through `query_sql`, else null. */
+const READABLE_VALUE = `case when key in (${READABLE_SETTINGS.map((k) => `'${k}'`).join(', ')}) then value end`;
+
+/**
+ * Columns never returned, with or without a source kept from AI: what signs a person in or
+ * reaches them (docs/rules/accounts.md). Two guards, each enough alone for a plain read: the
+ * query reads these tables through a version with the columns as null (`withoutSources`), so
+ * `select *` still works, and the connection refuses any read of the real columns (`authorize`).
+ * The analysis copy has them blanked too (`ops/scrub-analysis.sql`).
+ */
+export const SECRET_COLUMNS: Record<string, string[]> = {
+  users: ['password_hash', 'totp_secret_enc', 'backup_code_hashes'],
+  account_setups: ['token_hash', 'totp_secret_enc'],
+  feed_tokens: ['token_hash'],
+  alert_channels: ['target_enc'],
+  login_attempts: ['ip_hash', 'username_hash'],
+};
+/** Settings holding a token: never readable (not in `READABLE_SETTINGS`), gone from the copy. */
+export const SECRET_SETTINGS = ['telegramBot', 'statusToken'];
 
 /**
  * Tables holding no data of any one source, read as they are. Every table is in one of the lists
  * (a test checks): a new one holding a source's data also goes in `ops/scrub-analysis.sql`.
  */
 export const SOURCE_FREE_TABLES = [
-  'account_setups',
-  'alert_channels',
   'canceled_orders',
   'consoles',
   'db_usage',
-  'feed_tokens',
   'fx_rates',
   'holding_events',
   'holdings',
@@ -898,7 +913,6 @@ export const SOURCE_FREE_TABLES = [
   'import_uploads',
   'item_facts',
   'item_rules',
-  'login_attempts',
   'lottery_marks',
   'manual_prices',
   'notice_messages',
@@ -912,7 +926,6 @@ export const SOURCE_FREE_TABLES = [
   // The games admins track ahead of any wish (S36 step D): items, tiers and slots, no source's data.
   'tracked_games',
   'user_devices',
-  'users',
   // A person's estimates on their wishes (W15), as they typed them.
   'wish_estimates',
 ];
@@ -921,14 +934,23 @@ export const SORTED_TABLES = () => [
   ...SALES_TABLES,
   ...Object.keys(PACKED_TABLES),
   ...Object.keys(HIDDEN_COLUMNS),
+  ...Object.keys(SECRET_COLUMNS),
   ...SOURCE_FREE_TABLES,
 ];
 
 /** Tables `withoutSources` rebuilds columns of: their column names are needed (`columns`). */
 export const REBUILT_TABLES = Object.keys(HIDDEN_COLUMNS);
+/** The same for the tables it rebuilds whatever the sources (secrets, settings holding a token). */
+export const ALWAYS_REBUILT_TABLES = [...Object.keys(SECRET_COLUMNS), 'app_settings'];
 
-/** The query as SQLite reads it, with its comments blanked (quoted text and names kept). */
-function withoutComments(text: string): string {
+/** Whether a query names a table (in its code, a comment or quoted text: the safe side). */
+const mentionsTable = (text: string, table: string) => new RegExp(`\\b${table}\\b`, 'i').test(text);
+
+/**
+ * The query as SQLite reads it, with its comments blanked (quoted text and names kept, or blanked
+ * too with `bare`).
+ */
+function withoutComments(text: string, bare = false): string {
   let out = '';
   let i = 0;
   while (i < text.length) {
@@ -950,7 +972,7 @@ function withoutComments(text: string): string {
         j += 1;
         break;
       }
-      out += text.slice(i, j);
+      out += bare ? ' ' : text.slice(i, j);
       i = j;
     } else if (text.startsWith('--', i)) {
       const end = text.indexOf('\n', i);
@@ -974,43 +996,90 @@ function withoutComments(text: string): string {
  * expression with each table's own name, which SQLite reads instead of the table everywhere in
  * the query. Only a schema prefix (`main.`) reaches the real table: refused, like the tables that
  * mix sources in a row. A query's own CTE named like a guarded table fails (a duplicate name).
- * `columns` lists the columns of the tables in `REBUILT_TABLES`.
+ * With no such source, the account tables and the settings are still read through a version
+ * without their secrets (`SECRET_COLUMNS`, `READABLE_SETTINGS`), and any other query is passed
+ * through. A parameter token outside quotes is refused in every case. `columns` lists the columns
+ * of the rebuilt tables the query names. The result must run as the whole statement: nested in
+ * another query, a closing parenthesis in it would take what follows out of the guards' reach.
+ * These text checks are the only guard of the sources' rows and of the settings (the connection's
+ * authorizer cannot tell a guard's read of a table from a direct one): never relax one because
+ * the authorizer exists. Only the secret columns have both.
  */
 export function withoutSources(
   text: string,
   sources: string[],
   columns: Record<string, string[]> = {},
 ): { sql: string } | { error: string } {
-  if (sources.length === 0) return { sql: text };
-  const mentions = (table: string) => new RegExp(`\\b${table}\\b`, 'i').test(text);
-  for (const [table, why] of Object.entries(PACKED_TABLES)) {
-    if (mentions(table)) return { error: `${table} ${why}` };
-  }
+  const mentions = (table: string) => mentionsTable(text, table);
   const code = withoutComments(text);
-  if (/(?:\b|["'`[])(?:main|temp)["'`\]]?\s*\./i.test(code)) {
-    return { error: 'Read tables by their plain name (no main. or temp. prefix).' };
+  // SQLite reads `$a(...)`, `:a(...)` and the like as one token, whatever is inside: a comment
+  // opener there would hide the rest of the query from the checks below. Nothing is ever bound.
+  if (/[?$@#:]/.test(withoutComments(text, true))) {
+    return { error: 'No parameters (?, $x, :x, @x, #x) outside quotes: write the values in.' };
   }
-  // Raw database pages and index samples would show every row.
+  // Raw database pages and index samples would show every row, the hidden columns too.
   if (/\bsqlite_(?:dbpage|stat\d)\b/i.test(code)) {
     return { error: 'sqlite_dbpage and sqlite_stat tables are not readable here.' };
   }
+  // A join's shared column (NATURAL, USING) is built without asking the connection whether it may
+  // be read: such joins are refused on the tables holding secrets, so both guards always apply.
+  if (
+    Object.keys(SECRET_COLUMNS).some(mentions) &&
+    /\b(?:natural|using)\b/i.test(withoutComments(text, true))
+  ) {
+    return { error: 'Join the account tables with ON (no NATURAL or USING).' };
+  }
+  if (sources.length === 0 && !ALWAYS_REBUILT_TABLES.some(mentions)) return { sql: text };
+  if (sources.length) {
+    for (const [table, why] of Object.entries(PACKED_TABLES)) {
+      if (mentions(table)) return { error: `${table} ${why}` };
+    }
+  }
+  if (/(?:\b|["'`[])(?:main|temp)["'`\]]?\s*\./i.test(code)) {
+    return { error: 'Read tables by their plain name (no main. or temp. prefix).' };
+  }
   const list = sources.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ');
   const guards: string[] = [];
-  for (const table of SALES_TABLES) {
-    if (!mentions(table)) continue;
-    guards.push(
-      `${table} as (select * from main.${table} where source is null or source not in (${list}))`,
-    );
-  }
-  for (const [table, hidden] of Object.entries(HIDDEN_COLUMNS)) {
+  const quoted = (n: string) => `"${n.replace(/"/g, '""')}"`;
+  // Whatever the sources: what signs a person in or reaches them reads as null.
+  for (const [table, secret] of Object.entries(SECRET_COLUMNS)) {
     if (!mentions(table)) continue;
     const names = columns[table] ?? [];
     if (!names.length) return { error: `${table} cannot be read now (its columns are unknown).` };
     const select = names
-      .map((n) => (hidden[n] ? `${hidden[n](list)} as "${n}"` : `"${n.replace(/"/g, '""')}"`))
+      .map((n) => (secret.includes(n) ? `null as ${quoted(n)}` : quoted(n)))
       .join(', ');
-    const where = ROW_FILTERS[table] ? ` where ${ROW_FILTERS[table](list)}` : '';
-    guards.push(`${table} as (select ${select} from main.${table}${where})`);
+    guards.push(`${table} as (select ${select} from main.${table})`);
+  }
+  if (sources.length === 0) {
+    // No source to hide: of the settings, still only the readable ones' values.
+    const names = columns.app_settings ?? [];
+    if (mentions('app_settings')) {
+      if (!names.length) {
+        return { error: 'app_settings cannot be read now (its columns are unknown).' };
+      }
+      const select = names
+        .map((n) => (n === 'value' ? `${READABLE_VALUE} as "value"` : quoted(n)))
+        .join(', ');
+      guards.push(`app_settings as (select ${select} from main.app_settings)`);
+    }
+  } else {
+    for (const table of SALES_TABLES) {
+      if (!mentions(table)) continue;
+      guards.push(
+        `${table} as (select * from main.${table} where source is null or source not in (${list}))`,
+      );
+    }
+    for (const [table, hidden] of Object.entries(HIDDEN_COLUMNS)) {
+      if (!mentions(table)) continue;
+      const names = columns[table] ?? [];
+      if (!names.length) return { error: `${table} cannot be read now (its columns are unknown).` };
+      const select = names
+        .map((n) => (hidden[n] ? `${hidden[n](list)} as "${n}"` : quoted(n)))
+        .join(', ');
+      const where = ROW_FILTERS[table] ? ` where ${ROW_FILTERS[table](list)}` : '';
+      guards.push(`${table} as (select ${select} from main.${table}${where})`);
+    }
   }
   if (!guards.length) return { sql: text };
   // A query with its own WITH list gets the guards first in it (they read no CTE).
@@ -1020,9 +1089,123 @@ export function withoutSources(
     : { sql: `with ${guards.join(', ')} ${text}` };
 }
 
+/** Pragmas a query may read as `pragma_x(...)`: the shape of a table, nothing of the file. */
+const READABLE_PRAGMAS = new Set([
+  'table_info',
+  'table_xinfo',
+  'table_list',
+  'index_list',
+  'index_info',
+  'index_xinfo',
+  'foreign_key_list',
+]);
+/** Functions refused by name, should the SQLite in use ever have them (Node's has no file ones). */
+const REFUSED_FUNCTIONS = new Set([
+  'load_extension',
+  'readfile',
+  'writefile',
+  'edit',
+  'fsdir',
+  'lsmode',
+]);
+
+type Sqlite = typeof import('node:sqlite');
+
 /**
- * One read-only SELECT (or WITH ... SELECT), run in a read transaction (writes fail) with a row
- * limit. Not scoped to the user: the database holds this household's data only.
+ * What a `query_sql` statement may do, asked by SQLite for every table, column, function and
+ * pragma the compiled query touches, whatever its text: read rows, call functions, recurse. A
+ * read of a secret column, raw pages, statistics, any other pragma, attaching a file and every
+ * kind of write are refused. One gap is known: the shared column of a NATURAL or USING join is
+ * not asked about, which is why `withoutSources` refuses those joins on the account tables.
+ */
+const authorizer =
+  ({ constants: c }: Sqlite) =>
+  (action: number, first: string | null, second: string | null): number => {
+    switch (action) {
+      case c.SQLITE_SELECT:
+      case c.SQLITE_RECURSIVE:
+        return c.SQLITE_OK;
+      case c.SQLITE_READ: {
+        const table = (first ?? '').toLowerCase();
+        const refused =
+          table === 'dbstat' ||
+          /^sqlite_(?:dbpage|stat\d|stmt)/.test(table) ||
+          SECRET_COLUMNS[table]?.includes((second ?? '').toLowerCase());
+        return refused ? c.SQLITE_DENY : c.SQLITE_OK;
+      }
+      case c.SQLITE_FUNCTION:
+        return REFUSED_FUNCTIONS.has((second ?? '').toLowerCase()) ? c.SQLITE_DENY : c.SQLITE_OK;
+      case c.SQLITE_PRAGMA:
+        return READABLE_PRAGMAS.has((first ?? '').toLowerCase()) ? c.SQLITE_OK : c.SQLITE_DENY;
+      default:
+        return c.SQLITE_DENY;
+    }
+  };
+
+/** A value as JSON can carry it: a blob as its size, a number too large for a double as text. */
+const plain = (value: unknown) =>
+  value instanceof Uint8Array
+    ? `(blob, ${value.byteLength} bytes)`
+    : typeof value === 'bigint'
+      ? Number.isSafeInteger(Number(value))
+        ? Number(value)
+        : String(value)
+      : value;
+
+/**
+ * One statement on its own connection to a database file, through Node's SQLite: opened
+ * read-only, with `authorizer` deciding what it may touch, and with no function that reads or
+ * writes a file (libSQL's has them). At most `limit` rows are read; the statement is not nested in
+ * another one (see `withoutSources`).
+ *
+ * Two SQLite libraries in one process do not see each other's locks on a file, and closing this
+ * connection drops the process's locks on it. That is safe while the rest of the process (libSQL)
+ * holds none when this runs: the database uses a rollback journal, not WAL (a test pins it), and
+ * the MCP server only reads, one statement at a time, with no transaction kept across an await.
+ */
+export async function readOnlyRows(file: string, sql: string, limit: number) {
+  let node: Sqlite;
+  try {
+    node = await import('node:sqlite');
+  } catch {
+    return { error: 'query_sql needs Node 24.14 or newer (its built-in SQLite).' };
+  }
+  if (typeof node.DatabaseSync.prototype.setAuthorizer !== 'function') {
+    return { error: 'query_sql needs Node 24.14 or newer (an authorizer on its SQLite).' };
+  }
+  let reader: InstanceType<Sqlite['DatabaseSync']> | undefined;
+  try {
+    reader = new node.DatabaseSync(file, { readOnly: true, timeout: 5000 });
+    reader.setAuthorizer(authorizer(node));
+    const statement = reader.prepare(sql);
+    statement.setReadBigInts(true);
+    // Rows by position: two columns of one name (`select *` over a join) would otherwise leave
+    // one value. The second is named `id:1`, the third `id:2`.
+    statement.setReturnArrays(true);
+    const names: string[] = [];
+    for (const { name } of statement.columns()) {
+      let unique = name;
+      for (let n = 1; names.includes(unique); n++) unique = `${name}:${n}`;
+      names.push(unique);
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (const row of statement.iterate() as Iterable<unknown[]>) {
+      rows.push(Object.fromEntries(names.map((c, i) => [c, plain(row[i])])));
+      if (rows.length >= limit) break;
+    }
+    return { columns: names, rows };
+  } catch (error) {
+    return { error: String(error) };
+  } finally {
+    reader?.close();
+  }
+}
+
+/**
+ * One read-only SELECT (or WITH ... SELECT) with a row limit. Not scoped to the user: the database
+ * holds this household's data only. What signs a person in or reaches them is never returned
+ * (`SECRET_COLUMNS`), nor anything of a source kept from AI (`withoutSources`). `db` gives the
+ * sources' list, the tables' columns and the file; the statement itself runs in `readOnlyRows`.
  */
 export async function querySql(db: Db, sql: string, limit = 200) {
   const text = sql.trim().replace(/;\s*$/, '');
@@ -1033,32 +1216,23 @@ export async function querySql(db: Db, sql: string, limit = 200) {
   // through a version of the table without it.
   const noAi = noAiSources(await loadSourceRegistry(db));
   const columns: Record<string, string[]> = {};
-  if (noAi.length) {
-    for (const table of REBUILT_TABLES) {
-      const rs = await db.$client.execute({
-        sql: 'select name from pragma_table_info(?)',
-        args: [table],
-      });
-      columns[table] = rs.rows.map((r) => String(r.name));
-    }
+  const rebuilt = new Set([...ALWAYS_REBUILT_TABLES, ...(noAi.length ? REBUILT_TABLES : [])]);
+  for (const table of rebuilt) {
+    if (!mentionsTable(text, table)) continue;
+    const rs = await db.$client.execute({
+      sql: 'select name from pragma_table_info(?)',
+      args: [table],
+    });
+    columns[table] = rs.rows.map((r) => String(r.name));
   }
   const guarded = withoutSources(text, noAi, columns);
   if ('error' in guarded) return guarded;
-  const tx = await db.$client.transaction('read');
-  try {
-    const rs = await tx.execute(
-      // The line break keeps a trailing -- comment from swallowing the closing parenthesis.
-      `select * from (${guarded.sql}\n) limit ${Math.min(Math.max(1, limit), 1000)}`,
-    );
-    return {
-      columns: rs.columns,
-      rows: rs.rows.map((r) => Object.fromEntries(rs.columns.map((c) => [c, r[c]]))),
-    };
-  } catch (error) {
-    return { error: String(error) };
-  } finally {
-    await tx.rollback().catch(() => {});
-  }
+  const main = await db.$client.execute(
+    "select file from pragma_database_list where name = 'main'",
+  );
+  const file = String(main.rows[0]?.file ?? '');
+  if (!file) return { error: 'query_sql reads a database file only.' };
+  return readOnlyRows(file, guarded.sql, Math.min(Math.max(1, limit), 1000));
 }
 
 /**
