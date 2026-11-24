@@ -168,19 +168,19 @@ share fires. With a usual of 2.5 % it would not (1.5 times is 3.75).
 
 Each is a choice.
 
-| Number                                   | Value                   | In the code                                 | Chosen                 |
-| ---------------------------------------- | ----------------------- | ------------------------------------------- | ---------------------- |
-| Nothing ran                              | 26 hours                | `MISSED_HOURS`                              | built 2026-10-16       |
-| Morning items, the summary: not again in | 20 hours                | `SUMMARY_GAP_HOURS`                         | built 2026-10-16       |
-| Quiet source                             | 3 days; 80 % of 7 to 14 | `QUIET_DAYS`, `USUAL_DAYS`                  | the owner, 2026-10-25  |
-| Read budget, pace from                   | 150 million; the 5th    | `DEFAULT_ROWS_READ_BUDGET`, `PACE_FROM_DAY` | built 2026-10-18       |
-| Watch alert again after                  | 14 days out             | `ALERT_QUIET_DAYS`                          | the owner, 2026-10-18  |
-| Asks left out of the target alert        | under half fair value   | `ASK_FLOOR`                                 | built 2026-10-31       |
-| Sharp drop                               | 15 %, 7 days, 14 days   | `SHARP_DROP_7D`, `ALERT_QUIET_DAYS`         | the owner, 2026-10-18  |
-| Failed sign-in                           | one in 15 minutes       | `LOGIN_ALERT_QUIET_MS`                      | the owner, 2026-10-30  |
-| History kept                             | 180 days                | `ALERT_LOG_DAYS`                            | the owner, 2026-10-24  |
-| Settings: not collected, median moved    | 3 days; 50 %, 7 and 30  | set in `collectorHealth`                    | decided 2026-10-09     |
-| Self check: every limit above            | as stated               | `DATA_CHECK`                                | 2026-11-07 (see below) |
+| Number                                   | Value                   | In the code                                                               | Chosen                 |
+| ---------------------------------------- | ----------------------- | ------------------------------------------------------------------------- | ---------------------- |
+| Nothing ran                              | 26 hours                | `MISSED_HOURS`                                                            | built 2026-10-16       |
+| Morning items, the summary: not again in | 20 hours                | `SUMMARY_GAP_HOURS`                                                       | built 2026-10-16       |
+| Quiet source                             | 3 days; 80 % of 7 to 14 | `QUIET_DAYS`, `USUAL_DAYS`                                                | the owner, 2026-10-25  |
+| Read budget, pace from                   | 150 million; the 5th    | `DEFAULT_ROWS_READ_BUDGET`, `PACE_FROM_DAY`                               | built 2026-10-18       |
+| Watch alert again after                  | 14 days out             | `ALERT_QUIET_DAYS`                                                        | the owner, 2026-10-18  |
+| Asks left out of the target alert        | under half fair value   | `ASK_FLOOR`                                                               | built 2026-10-31       |
+| Sharp drop                               | 15 %, 7 days, 14 days   | `SHARP_DROP_7D`, `ALERT_QUIET_DAYS`                                       | the owner, 2026-10-18  |
+| Failed sign-in                           | one in 15 minutes       | `LOGIN_ALERT_QUIET_MS`                                                    | the owner, 2026-10-30  |
+| History kept                             | 180 days                | `ALERT_LOG_DAYS`                                                          | the owner, 2026-10-24  |
+| Settings: not collected, median moved    | 3 days; 50 %, 7 and 30  | `HEALTH_STALE_DAYS`, `JUMP_SHARE`, `JUMP_RECENT_DAYS`, `JUMP_BEFORE_DAYS` | decided 2026-10-09     |
+| Self check: every limit above            | as stated               | `DATA_CHECK`                                                              | 2026-11-07 (see below) |
 
 The self check's limits: learning 14 nights, 1.5 times the usual far share, over 2 times apart with
 5 sales each and 10 items one way are the owner's proposal of 2026-11-07. The others were added

@@ -171,7 +171,7 @@ records.
 | Deeper quarter of the fall                | 8 items             | `LOW_DROP_QUARTER_MIN`                   | the owner, 2026-11-03, measured  |
 | Cheap and steady                          | 0.3, -2 %, 300 days | `CHEAP_YEAR`, `HELD_2W`, `YEAR_MIN_DAYS` | built 2026-10-28, measured       |
 | Default margin                            | 10 %                | `DEFAULT_MARGIN`                         | built 2026-10-17                 |
-| Limited data                              | under 3 sales       | set in `judge`                           | built 2026-10-17                 |
+| Limited data                              | under 3 sales       | `LIMITED_SALES`                          | built 2026-10-17                 |
 | Rule tests: signals shown from, margin    | 10, 5 points        | `RULE_TEST_MIN_SIGNALS`                  | the owner, 2026-10-18            |
 | A saved row, a listing report is used for | 3 days              | `SIGNAL_FRESH_DAYS`, `SUPPLY_FRESH_DAYS` | built 2026-10-16 and 10-17       |
 | Line suggestion                           | 20 and 10 points    | set in `suggestLines`                    | built 2026-10-18                 |

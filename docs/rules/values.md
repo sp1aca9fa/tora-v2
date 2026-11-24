@@ -173,16 +173,16 @@ rebuilds the values and their history.
 
 Each is a choice, not a standard, except the outlier rule (Tukey's fences, the usual one).
 
-| Number                         | Value                | In the code                 | Chosen                   |
-| ------------------------------ | -------------------- | --------------------------- | ------------------------ |
-| Sales a step needs             | 3                    | `MIN_SAMPLES`               | first design, 2026-10-09 |
-| Steps in the own bucket        | 30, 90, 180 days     | `WINDOWS`                   | first design, 2026-10-09 |
-| Longest look back              | 365 days             | `LONG_WINDOW`               | decision of 2026-10-11   |
-| Steps with similar conditions  | 180, 365 days        | set in `valueUnit`          | decision of 2026-10-11   |
-| Outliers                       | 1.5 x IQR, 4+ sales  | set in `withoutOutliers`    | built 2026-10-10         |
-| High confidence                | 5+ sales in 30 days  | set in `valueUnit`          | first design, 2026-10-09 |
-| Medium confidence              | 3+ sales in 180 days | set in `valueUnit`          | first design, 2026-10-09 |
-| A shop's asking price, at most | 30 days old          | `STORE_DAYS`                | built 2026-10-12         |
-| A buy-back price, at most      | 30 days old          | set in `buylistFloor`       | built 2026-10-10         |
-| A saved value is used for      | 3 days               | `BUCKET_VALUE_MAX_AGE_DAYS` | built 2026-10-12         |
-| The chart goes back at most    | 1,098 days           | `MAX_HISTORY_DAYS`          | built with the chart     |
+| Number                         | Value                | In the code                                     | Chosen                   |
+| ------------------------------ | -------------------- | ----------------------------------------------- | ------------------------ |
+| Sales a step needs             | 3                    | `MIN_SAMPLES`                                   | first design, 2026-10-09 |
+| Steps in the own bucket        | 30, 90, 180 days     | `WINDOWS`                                       | first design, 2026-10-09 |
+| Longest look back              | 365 days             | `LONG_WINDOW`                                   | decision of 2026-10-11   |
+| Steps with similar conditions  | 180, 365 days        | set in `valueUnit`                              | decision of 2026-10-11   |
+| Outliers                       | 1.5 x IQR, 4+ sales  | set in `withoutOutliers`                        | built 2026-10-10         |
+| High confidence                | 5+ sales in 30 days  | `HIGH_CONFIDENCE_SALES`, `HIGH_CONFIDENCE_DAYS` | first design, 2026-10-09 |
+| Medium confidence              | 3+ sales in 180 days | `MIN_SAMPLES`, `MEDIUM_CONFIDENCE_DAYS`         | first design, 2026-10-09 |
+| A shop's asking price, at most | 30 days old          | `STORE_DAYS`                                    | built 2026-10-12         |
+| A buy-back price, at most      | 30 days old          | set in `buylistFloor`                           | built 2026-10-10         |
+| A saved value is used for      | 3 days               | `BUCKET_VALUE_MAX_AGE_DAYS`                     | built 2026-10-12         |
+| The chart goes back at most    | 1,098 days           | `MAX_HISTORY_DAYS`                              | built with the chart     |
