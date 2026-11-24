@@ -10,6 +10,7 @@
 //
 // AUTH_SECRET in .env must equal the app's: it encrypts the authenticator secrets.
 import {
+  MIN_PASSWORD,
   encryptSecret,
   generateBackupCodes,
   generateTotpSecret,
@@ -34,8 +35,6 @@ import {
   setUserDisabled,
   updateCredentials,
 } from '../users';
-
-const MIN_PASSWORD = 12;
 
 loadRootEnv();
 const authSecret = process.env.AUTH_SECRET?.trim() ?? '';

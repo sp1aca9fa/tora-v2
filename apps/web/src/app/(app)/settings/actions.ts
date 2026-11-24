@@ -52,6 +52,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { cookies } from 'next/headers';
 import { isLocale } from '@/i18n/locale';
+import { OPENING_PACKS_MAX } from '@/lib/app-numbers';
 import { AMOUNTS_COOKIE } from '@/lib/amounts';
 import { authed } from '@/lib/auth/guard';
 import { type FormState, runDomain } from '@/lib/form';
@@ -456,7 +457,7 @@ export async function saveOpeningRatesAction(
   const code = input.code.normalize('NFKC').trim();
   if (!/^[A-Za-z0-9-]{1,12}$/.test(code)) return { error: 'code' };
   const packs = Number(input.packsPerBox);
-  if (!Number.isInteger(packs) || packs < 1 || packs > 100) return { error: 'packs' };
+  if (!Number.isInteger(packs) || packs < 1 || packs > OPENING_PACKS_MAX) return { error: 'packs' };
   const tiers = input.tiers
     .filter((t) => t.rarity.trim() || t.perBox.trim())
     .map((t) => ({

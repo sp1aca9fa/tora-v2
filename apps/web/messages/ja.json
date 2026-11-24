@@ -43,7 +43,7 @@
     "username": "ユーザー名",
     "continue": "次へ",
     "codeTitle": "認証コード",
-    "code": "6桁のコード",
+    "code": "[[totpDigits]]桁のコード",
     "codeHint": "認証アプリに表示されるコード。アプリを失くした場合はバックアップコードを入力してください。",
     "startOver": "最初からやり直す",
     "errors": {
@@ -310,15 +310,15 @@
     "logout": "ログアウト",
     "signedInAs": "{username} としてログイン中",
     "devices": "端末（{count}/{max}）",
-    "devicesInfo": "1つのアカウントでログインできる端末は2台までです。ログアウトまたは解除すると枠が空きます。新しい端末ではパスワードと認証コードが必要です。",
+    "devicesInfo": "1つのアカウントでログインできる端末は[[maxDevices]]台までです。ログアウトまたは解除すると枠が空きます。新しい端末ではパスワードと認証コードが必要です。",
     "thisDevice": "この端末",
     "deviceDates": "{since}から · 最終利用 {seen}",
     "revoke": "解除",
     "sourceCounts": "リンク {linked}件 · 確認待ち {pending}件",
     "lastRunCounts": "{requests}リクエスト · +{added}取引",
-    "stale": "3日以上収集されていません:",
+    "stale": "[[healthStaleDays]]日以上収集されていません:",
     "never": "未実行",
-    "jumps": "中央値が50%以上変動（直近7日 vs その前30日）:",
+    "jumps": "中央値が[[jumpPct]]%以上変動（直近[[jumpRecentDays]]日 vs その前[[jumpBeforeDays]]日）:",
     "recentRuns": "最近の実行",
     "section": {
       "account": {
@@ -493,7 +493,7 @@
     "noneSelected": "カードを1枚以上選んでください",
     "noneGraded": "カードのグレードを1つ以上選んでください",
     "noLinks": "リンクが見つかりません。",
-    "tooManyLinks": "一度に追加できるのは200件までです。",
+    "tooManyLinks": "一度に追加できるのは[[maxLinks]]件までです。",
     "nonePicked": "パネルを1つ以上選んでください。",
     "invalid_time_zone": "そのタイムゾーンは認識できません。",
     "duplicate_watch": "この状態ではすでにウォッチしています。",
@@ -603,7 +603,7 @@
     },
     "pasteUrl": "価格ソースの商品リンクを貼り付け({sources})",
     "link": "リンク",
-    "last30": "直近30日",
+    "last30": "直近[[priceStatsDays]]日",
     "median": "中央値",
     "trades": "取引数",
     "unmapped": "未分類",
@@ -678,8 +678,8 @@
       "low": "低"
     },
     "confidenceHint": {
-      "high": "直近30日に5件以上",
-      "medium": "直近180日に3件以上",
+      "high": "直近[[highConfidenceDays]]日に[[highConfidenceSales]]件以上",
+      "medium": "直近[[mediumConfidenceDays]]日に[[mediumConfidenceSales]]件以上",
       "low": "取引が少ない・古い、店頭価格、または定価"
     },
     "short": {
@@ -880,9 +880,9 @@
       "open": "インポートを開く",
       "error": {
         "sheetType": ".csv ファイルを選んでください（Excel：名前を付けて保存 > CSV）。",
-        "sheetTooBig": "ファイルが2MBを超えています。",
+        "sheetTooBig": "ファイルが[[sheetMaxMb]]MBを超えています。",
         "sheetNoHeader": "1行目に列名が必要です（少なくとも商品名。ダウンロードと同じ形式）。",
-        "sheetTooManyRows": "5,000行を超えています。ファイルを分けてください。"
+        "sheetTooManyRows": "[[sheetMaxRows]]行を超えています。ファイルを分けてください。"
       },
       "likely": "登録済みかもしれません",
       "addAnyway": "それでも追加",
@@ -943,11 +943,11 @@
     "editOrMerge": "編集・統合",
     "market": {
       "value": "相場",
-      "sales30": "30日間の取引",
-      "change4": "4週間",
-      "change12": "12週間",
-      "range": "180日の価格帯",
-      "rangeHint": "直近180日の日ごとの価格の中央の半分（下位4分の1から上位4分の1まで）。",
+      "sales30": "[[fairDays]]日間の取引",
+      "change4": "[[monthTrendWeeks]]週間",
+      "change12": "[[trendWeeks]]週間",
+      "range": "[[rangeDays]]日の価格帯",
+      "rangeHint": "直近[[rangeDays]]日の日ごとの価格の中央の半分（下位4分の1から上位4分の1まで）。",
       "condition": "{condition}の数値です。",
       "historyInfo": "直近1年の日ごとの取引価格の中央値（ソースごとに1本の線）。"
     }
@@ -1003,7 +1003,7 @@
     },
     "set": "カタログのセット: {name}（{code}）、{date}発売",
     "setBefore": "商品の記載: {name}（{code}）。発売日はセットから取ります。",
-    "line": "{line}に設定: 発売後3か月で{pct}と、似た商品（{groupPct}、{groupItems}件）とは違い、{line}の商品（{linePct}、{lineItems}件）に近い動きでした。"
+    "line": "{line}に設定: 発売後[[patternMonths]]か月で{pct}と、似た商品（{groupPct}、{groupItems}件）とは違い、{line}の商品（{linePct}、{lineItems}件）に近い動きでした。"
   },
   "compare": {
     "title": "{primary}と{secondary}の比較",
@@ -1127,7 +1127,7 @@
     "quality": {
       "agrees": "{reference}と一致:{pct}% {direction}、{count}アイテム",
       "disagrees": "{reference}より{pct}% {direction}({count}アイテム):比較のみ",
-      "unverified": "未確認:{reference}と共通のアイテム {count}件(10件必要)",
+      "unverified": "未確認:{reference}と共通のアイテム {count}件([[qualityMinPairs]]件必要)",
       "below": "低い",
       "above": "高い",
       "dismissed": "通知を非表示"
@@ -1218,7 +1218,7 @@
     "outside": "時間外は店舗ページに赤で表示され、管理者は1時間、または次の開始まで巡回できます（1回だけ：その後はいつもの時間に戻ります）。",
     "save": "保存",
     "saved": "保存しました。",
-    "invalid": "異なる2つの時刻と、0〜3600秒の遅れ（短い方を先に）を入れてください。"
+    "invalid": "異なる2つの時刻と、0〜[[maxTrackingDelay]]秒の遅れ（短い方を先に）を入れてください。"
   },
   "timeZone": {
     "title": "タイムゾーン",
@@ -1322,7 +1322,7 @@
     "written": "書き込み {written} 行（無料枠 {free} 行）",
     "budget": "管理者に通知する上限",
     "millions": "読み取り {m} 百万行",
-    "budgetInfo": "アプリの毎日のチェックが、今月この上限を超えたとき、またはこのペースで超えそうなとき（5日以降）に通知します。",
+    "budgetInfo": "アプリの毎日のチェックが、今月この上限を超えたとき、またはこのペースで超えそうなとき（[[paceFromDay]]日以降）に通知します。",
     "byOrigin": "発生元ごと",
     "byDay": "日ごと（UTC）",
     "readWritten": "読み取り {read}、書き込み {written}",
@@ -1403,7 +1403,7 @@
       "title": "アカウント",
       "create": "アカウントを作成します：パスワード、認証アプリのQRコード、バックアップコード。最初のアカウントは管理者です。",
       "list": "アカウントの一覧。",
-      "devices": "アカウントのログイン中の端末の一覧（最大2台）。",
+      "devices": "アカウントのログイン中の端末の一覧（最大[[maxDevices]]台）。",
       "revoke": "端末を1台、またはすべてログアウトさせます。",
       "password": "新しいパスワードを設定します。",
       "twoFactor": "スマホを紛失した場合：新しい認証キーとバックアップコード。",
@@ -1420,7 +1420,7 @@
     "alerts": {
       "title": "アラート",
       "afterRun": "記録の前に止まった収集やバックアップを記録し、失敗をすぐに管理者へ送ります。スケジュールが収集とバックアップのあとに実行します。",
-      "check": "アプリの朝のチェックを PC から実行します:「実行なし」のアラートと毎日のまとめ（1人につき20時間に1回まで）。"
+      "check": "アプリの朝のチェックを PC から実行します:「実行なし」のアラートと毎日のまとめ（1人につき[[summaryGapHours]]時間に1回まで）。"
     },
     "database": {
       "title": "データベースとClaude",
@@ -1501,8 +1501,8 @@
     "backupFailed": "Tora: バックアップに失敗しました: {error}",
     "noCollect": "Tora: {hours} 時間、収集が実行されていません（最後: {last}）。自宅PCは起動していますか？",
     "noBackup": "Tora: {hours} 時間、バックアップがありません（最後: {last}）。自宅PCは起動していますか？",
-    "dbBudget": "Tora: 今月、データベースの読み取りが {read} 百万行になりました。このペースでは月末に {projected} 百万行です（上限 {budget} 百万行、無料プラン 500 百万行）。設定 > 管理者設定 > データベース を確認してください。",
-    "sourceQuiet": "Tora: {sources} は直近3日分の収集で新しい販売が見つかりませんでした(普段は見つかります)。サイトが変わった可能性があります。収集ログを確認するか、掲載ページを開いてください(設定 > コレクター)。",
+    "dbBudget": "Tora: 今月、データベースの読み取りが {read} 百万行になりました。このペースでは月末に {projected} 百万行です（上限 {budget} 百万行、無料プラン [[freeReadMillions]] 百万行）。設定 > 管理者設定 > データベース を確認してください。",
+    "sourceQuiet": "Tora: {sources} は直近[[quietDays]]日分の収集で新しい販売が見つかりませんでした(普段は見つかります)。サイトが変わった可能性があります。収集ログを確認するか、掲載ページを開いてください(設定 > コレクター)。",
     "selfCheck": "Tora: 毎晩のセルフチェックで、保存された価格が収集した販売データと一致しなかったため、作り直しました: {items}。繰り返す場合は開発者に知らせてください。",
     "summaryTitle": "Tora: 今日のまとめ",
     "summaryImport": "{method}: {imported} 件追加、{existing} 件は登録済み、{skipped} 件は対象外、{problem} 件に問題",
@@ -1516,8 +1516,8 @@
     "buyZone": "{name}: 買い時、{price}（買いゾーン {zone}以下）。",
     "buyLimited": "データ不足。",
     "buyTarget": "{name}: {source}に{price}の出品、目標 {target}以下です。",
-    "summaryDrops": "急落（1週間で15%以上）:",
-    "summaryDrop": "{name}: {price}、7日間で{pct}",
+    "summaryDrops": "急落（1週間で[[sharpDropPct]]%以上）:",
+    "summaryDrop": "{name}: {price}、[[sharpDropDays]]日間で{pct}",
     "storePosts": "Tora:エリア内の店舗で販売情報",
     "storeLink": "Toraの店舗通知",
     "storeOpen": "投稿",
@@ -1538,7 +1538,7 @@
     "updateWaiting": "Tora: サーバーは 24 時間更新されておらず、{from}のまま動作しています。最新の{to}は GitHub の CI を待っています（{status}）。リポジトリの Actions タブを確認するか（CI が実行されないコミットは自動ではインストールされません）、サーバーで ops/update-server.sh を手動で実行してください。",
     "ciPending": "未完了または未開始",
     "ciUnknown": "GitHub から有効な応答がありません",
-    "listingsGone": "Tora: {count}件の掲載ページを外しました。サイトが3晩続けて「ページがない」と返しています。新しいページをリンクするまで、これらのアイテムの価格は取得されません（アクション）。",
+    "listingsGone": "Tora: {count}件の掲載ページを外しました。サイトが[[listingBrokenNights]]晩続けて「ページがない」と返しています。新しいページをリンクするまで、これらのアイテムの価格は取得されません（アクション）。",
     "listingGoneLine": "{source}: {name}（{error}）",
     "summaryGone": "新しいページのリンク待ちのアイテム: {count}件（以前のページは削除済み）"
   },
@@ -1590,7 +1590,7 @@
       "no_secret": "サーバーに AUTH_SECRET が設定されていません。"
     },
     "buy": "ウォッチ中の商品: 買い時、または目標以下の出品（毎晩の収集後すぐ）",
-    "drops": "所有・ウォッチ中の商品の急落、1週間で15%以上（朝のまとめ）",
+    "drops": "所有・ウォッチ中の商品の急落、1週間で[[sharpDropPct]]%以上（朝のまとめ）",
     "styleLink": "メッセージの見た目",
     "styleInfo": "すべての種類のメッセージを例で確認し、見た目と文言を変更。"
   },
@@ -1708,7 +1708,7 @@
       "rankings": "(サイトの人気一覧。新しい候補は同じ夜に収集)",
       "collectors": "(順番に。各サイトの応答次第)",
       "opening": "(各セット週1回)",
-      "closing": "(画像、ロット数:直近14日は毎晩・全体は毎週、価値履歴、買い時、ルール検証、狙い目)",
+      "closing": "(画像、ロット数:直近[[lotSizeRecentDays]]日は毎晩・全体は毎週、価値履歴、買い時、ルール検証、狙い目)",
       "backup": "(データベース全体、1日1回)",
       "alerts": "(管理者への失敗通知、買い時通知)"
     },
@@ -1727,7 +1727,7 @@
     "others": "その他のチェック",
     "other": {
       "morning": "朝のチェック:毎日{hour}(アプリの時刻)から、未実行の通知と毎日のまとめ。",
-      "feed": "店舗フィードのチェック:2分ごと(停止したフィード・掲示板を通知)。"
+      "feed": "店舗フィードのチェック:[[feedCheckMinutes]]分ごと(停止したフィード・掲示板を通知)。"
     },
     "underMinute": "1分未満",
     "minutes": "{m}分",
@@ -1775,7 +1775,7 @@
     "noCollect": "{hours} 時間、収集なし（最後 {last}）",
     "noBackup": "{hours} 時間、バックアップなし（最後 {last}）",
     "dbBudget": "データベース: 今月の読み取り {read} 百万行、このペースで {projected} 百万行（上限 {budget} 百万行）",
-    "sourceQuiet": "{sources}: 直近3日分の収集で新しい販売なし(普段はあり)",
+    "sourceQuiet": "{sources}: 直近[[quietDays]]日分の収集で新しい販売なし(普段はあり)",
     "selfCheck": "セルフチェック: 保存された価格が販売データと異なっていたため作り直しました（{items}）",
     "fromTo": "{from} から {to} へ",
     "none": "なし",
@@ -1835,7 +1835,7 @@
       "password": "パスワード",
       "2fa": "認証アプリ"
     },
-    "listingsGone": "{count}件の掲載ページを外しました: 3晩続けてページなし"
+    "listingsGone": "{count}件の掲載ページを外しました: [[listingBrokenNights]]晩続けてページなし"
   },
   "watchlist": {
     "intro": "買いたい商品を、欲しい状態で、今日の相場とともに一覧に。目標価格以下のものが先頭に来ます。",
@@ -1886,14 +1886,14 @@
     "askUnder": "出品 {amount}({pct}安い)",
     "buylistNear": "買取 {amount}",
     "notProven": "未実証",
-    "record": "90日後に上がっていたのは{checked}回中{higher}回({pct}、任意の日は{any})。",
+    "record": "[[opportunityDays]]日後に上がっていたのは{checked}回中{higher}回({pct}、任意の日は{any})。",
     "recordFew": "過去のシグナルが少なすぎて判断できません({checked}回)。",
     "recordsTitle": "シグナルと過去の実績",
-    "recordsIntro": "各シグナルをグループの過去の価格で検証:毎週、シグナルが出始めた日を90日後と比較。実証済み:10回以上の検証で、任意の日に買うより5ポイント以上良い(警告は悪い)。この履歴の大半は上昇相場で、上昇に乗るシグナルが良く見えやすいため、収集のたびに検証し直します。",
+    "recordsIntro": "各シグナルをグループの過去の価格で検証:毎週、シグナルが出始めた日を[[opportunityDays]]日後と比較。実証済み:[[provenMinChecks]]回以上の検証で、任意の日に買うより[[provenPoints]]ポイント以上良い(警告は悪い)。この履歴の大半は上昇相場で、上昇に乗るシグナルが良く見えやすいため、収集のたびに検証し直します。",
     "anyDay": "任意の日",
     "colSignal": "シグナル",
     "colChecked": "検証数",
-    "colHigher": "90日後に上昇",
+    "colHigher": "[[opportunityDays]]日後に上昇",
     "colChange": "典型的な変化",
     "proven": "実証済み",
     "warning": "警告",
@@ -1909,21 +1909,21 @@
       "weak_for_age": "発売からの時期の割に弱い"
     },
     "why": {
-      "line_rising": "シリーズ:12週間で{line}({items}商品)。",
-      "line_falling": "シリーズ:12週間で{line}({items}商品)。",
-      "leader": "この商品の12週間:{own}、シリーズ:{line}。",
-      "laggard": "この商品の12週間:{own}、シリーズ:{line}。",
-      "sales_up": "直近30日で{sales30}件、その前は月{before}件。",
-      "sales_down": "直近30日で{sales30}件、その前は月{before}件。",
-      "strong_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。",
-      "weak_for_age": "直近90日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。"
+      "line_rising": "シリーズ:[[trendWeeks]]週間で{line}({items}商品)。",
+      "line_falling": "シリーズ:[[trendWeeks]]週間で{line}({items}商品)。",
+      "leader": "この商品の[[trendWeeks]]週間:{own}、シリーズ:{line}。",
+      "laggard": "この商品の[[trendWeeks]]週間:{own}、シリーズ:{line}。",
+      "sales_up": "直近[[salesRecentDays]]日で{sales30}件、その前は月{before}件。",
+      "sales_down": "直近[[salesRecentDays]]日で{sales30}件、その前は月{before}件。",
+      "strong_for_age": "直近[[ageChangeDays]]日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。",
+      "weak_for_age": "直近[[ageChangeDays]]日:{change}、似た商品の発売{days}日目:{typical}({items}商品)。"
     },
     "rankLine": "{label}で{rank}位({move})",
     "rankNew": "新規",
     "rankSame": "1週間前と同じ",
     "rankUp": "1週間で{n}位上昇",
     "rankDown": "1週間で{n}位下降",
-    "popularIntro": "サイト自体のランキング({day}の収集時に取得)。上位30のうち誰も追跡していない商品は候補として追加され、ランキングにある間は価格を収集します。順位の変化がシグナルとして有効かは、十分な日数が貯まってから検証します。",
+    "popularIntro": "サイト自体のランキング({day}の収集時に取得)。上位[[candidateTop]]のうち誰も追跡していない商品は候補として追加され、ランキングにある間は価格を収集します。順位の変化がシグナルとして有効かは、十分な日数が貯まってから検証します。",
     "colWeek": "週",
     "candidate": "候補",
     "plan": {
@@ -1993,7 +1993,7 @@
     "calls": "{count, plural, =0 {買い時なし} other {買い時 #日}}",
     "paidUnder": "平均より{pct}%安い",
     "paidOver": "平均より{pct}%高い",
-    "after90": "90日後に値上がり {checked}回中{higher}回",
+    "after90": "[[patternDays]]日後に値上がり {checked}回中{higher}回",
     "marginLabel": "通常価格からの値引き",
     "use": "{type}に「{name}」を使う",
     "name": {
@@ -2004,9 +2004,9 @@
       "target": "目標価格のみ"
     },
     "about": {
-      "steady": "直近180日の安い方から4分の1の価格で買い時。履歴が少ない場合は通常価格の10%下。価格か相場全体が急落中、また新発売で似た商品が底値をつける時期より前は待ちます。",
+      "steady": "直近[[rangeDays]]日の安い方から4分の1の価格で買い時。履歴が少ない場合は通常価格の[[defaultMargin]]%下。価格か相場全体が急落中、また新発売で似た商品が底値をつける時期より前は待ちます。",
       "bargain": "直近1年の安い方から10分の1の価格のみ。判断は少なく、値引きは大きめ。価格か相場全体が急落中や新発売は待ちます。",
-      "margin": "通常価格（直近180日の中央値）の{margin}%下。価格か相場全体が急落中や新発売は待ちます。",
+      "margin": "通常価格（直近[[rangeDays]]日の中央値）の{margin}%下。価格か相場全体が急落中や新発売は待ちます。",
       "dip": "「安定」と同じですが、価格や相場全体が急落中や新発売でも警告付きで買い時と判断します。早く買えますが、底値前に買うことも。",
       "target": "ゾーンなし。ウォッチに設定した目標価格のみ。"
     },
@@ -2019,7 +2019,7 @@
     "exampleAbout": {
       "steady": "あるカードの1年: 大きな傾向はなく、途中で何度か下がります。",
       "fall": "あるBOXが数か月下がり続け、横ばいの後、回復し始めます。",
-      "new_set": "あるBOXの発売から: 発売直後の高値、最初の数か月の下落、その後の回復。「下落狙い」以外は発売後90日待ちます。"
+      "new_set": "あるBOXの発売から: 発売直後の高値、最初の数か月の下落、その後の回復。「下落狙い」以外は発売後[[newReleaseDays]]日待ちます。"
     }
   },
   "buy": {
@@ -2037,32 +2037,32 @@
     },
     "zone": "<n>{amount}</n>以下なら買い時",
     "basis": {
-      "quarter180": "直近180日の安い方から4分の1",
+      "quarter180": "直近[[rangeDays]]日の安い方から4分の1",
       "tenth365": "直近1年の安い方から10分の1",
       "margin": "通常価格 {usual} の{pct}%下",
-      "thin_margin": "通常価格の10%下（範囲を出すには履歴不足）"
+      "thin_margin": "通常価格の[[defaultMargin]]%下（範囲を出すには履歴不足）"
     },
     "loweredByPattern": "新セットのパターンで引き下げ（{pct}）。",
-    "falling": "急落中（2週間で{pct}）。落ち着くまで待ちましょう。",
-    "fallingDip": "まだ急落中（2週間で{pct}）。さらに下がる可能性があります。",
+    "falling": "急落中（[[fallWeeks]]週間で{pct}）。落ち着くまで待ちましょう。",
+    "fallingDip": "まだ急落中（[[fallWeeks]]週間で{pct}）。さらに下がる可能性があります。",
     "askInZone": "今、ゾーン内の出品があります。",
     "limited": "データ不足: {reasons}。",
     "limitedWhy": {
-      "few_sales": "30日間の取引が3件未満",
-      "short_range": "180日間で取引のある日が10日未満"
+      "few_sales": "[[fairDays]]日間の取引が[[limitedSales]]件未満",
+      "short_range": "[[rangeDays]]日間で取引のある日が[[rangeMinDays]]日未満"
     },
     "reason": {
-      "fair": "相場 <n>{amount}</n>（30日間で{count}件）",
-      "position": "直近180日のうち{pct}%の日の価格以下",
+      "fair": "相場 <n>{amount}</n>（[[fairDays]]日間で{count}件）",
+      "position": "直近[[rangeDays]]日のうち{pct}%の日の価格以下",
       "trend": "推移: {list}",
       "weeks": "{weeks}週間で{pct}",
       "ask": "最安出品 <n>{amount}</n>（相場比 {pct}）",
-      "pattern": "似た商品（{items}件{group}）は発売{days}日目からの90日で{pct}",
+      "pattern": "似た商品（{items}件{group}）は発売{days}日目からの[[patternDays]]日で{pct}",
       "noPattern": "新セットのパターン: この時期の価格がある似た商品がまだ足りません",
       "noRelease": "新セットのパターン: 発売日が不明（最初に収集した取引のみ）",
       "sep": "、",
-      "market": "似た商品（{items}件{group}）: 12週間で{pct}",
-      "noMarket": "似た商品: 相場を判断するには少なすぎます（5件必要）",
+      "market": "似た商品（{items}件{group}）: [[trendWeeks]]週間で{pct}",
+      "noMarket": "似た商品: 相場を判断するには少なすぎます（[[marketMinItems]]件必要）",
       "noAge": "発売日が不明",
       "age": "発売から{days}日",
       "ageFirstSale": "最初に収集した取引から{days}日（発売日が不明なため、新発売の待ちはありません）",
@@ -2070,8 +2070,8 @@
       "noLowAge": "1年目のデータがそろった似た商品が少なく、底値の時期を学べません: {wait}日目を使います",
       "pastFirstYear": "発売から1年以上: 新発売の待ちとパターンはありません"
     },
-    "marketFalling": "相場が下落中: 似た商品（{items}件{group}）が12週間で{pct}。落ち着くまで待ちましょう。",
-    "marketFallingDip": "相場はまだ下落中: 似た商品（{items}件{group}）が12週間で{pct}。さらに下がるかもしれません。",
+    "marketFalling": "相場が下落中: 似た商品（{items}件{group}）が[[trendWeeks]]週間で{pct}。落ち着くまで待ちましょう。",
+    "marketFallingDip": "相場はまだ下落中: 似た商品（{items}件{group}）が[[trendWeeks]]週間で{pct}。さらに下がるかもしれません。",
     "newRelease": "新発売（{days}日）: 似た商品（{items}件{group}）は発売{wait}日目ごろに1年目の底値をつけることが多いです。それまで待ちましょう。",
     "newReleaseDefault": "新発売（{days}日）: 新発売の商品は最初の数か月で下がることが多いです。{wait}日目まで待ちましょう（1年目のデータがそろった似た商品が少なく、時期を学べません）。",
     "newReleaseDip": "新発売（{days}日）: {wait}日目ごろまでは下がることが多いです。さらに下がるかもしれません。",
@@ -2087,21 +2087,21 @@
     },
     "chart": {
       "zone": "買いゾーン: {amount}以下",
-      "range": "通常の価格帯（180日）: {low} - {high}",
+      "range": "通常の価格帯（[[rangeDays]]日）: {low} - {high}",
       "ask": "最安出品: {amount}",
-      "lowShort": "180日 下",
-      "highShort": "180日 上",
+      "lowShort": "[[rangeDays]]日 下",
+      "highShort": "[[rangeDays]]日 上",
       "askShort": "出品"
     },
     "ruleTest": {
       "title": "ルールの検証",
       "about": "似た商品（{items}件{group}）の全期間の価格で{name}を検証。",
       "notYet": "次の収集後に計算されます。",
-      "few": "検証できる過去のシグナルがまだ足りません: 90日後の価格があるもの{count}件（{min}件必要）。",
+      "few": "検証できる過去のシグナルがまだ足りません: [[patternDays]]日後の価格があるもの{count}件（{min}件必要）。",
       "signals": "過去の買いシグナル（{count}件）",
-      "result": "90日後に上がっていたのは{checked}回中{higher}回（{pct}%）、典型的な変化 {change}",
+      "result": "[[patternDays]]日後に上がっていたのは{checked}回中{higher}回（{pct}%）、典型的な変化 {change}",
       "anyDay": "いつ買っても",
-      "anyResult": "90日後に上がっていたのは{pct}%、典型的な変化 {change}",
+      "anyResult": "[[patternDays]]日後に上がっていたのは{pct}%、典型的な変化 {change}",
       "better": "過去は、いつ買うよりも良い結果でした。",
       "worse": "過去は、いつ買うよりも悪い結果でした: ゾーンでは安く買えましたが、その後もしばらく下がることが多くありました。",
       "same": "過去は、いつ買ってもほぼ同じ結果でした。",
@@ -2116,7 +2116,7 @@
   },
   "setLines": {
     "title": "セットの種類",
-    "info": "フランチャイズの発売の中でのセットの位置づけ。グループの分析（新セットのパターン、新発売の待ち、相場）は、同じ種類の商品が十分（3件以上）あればその種類どうしで、なければグループ全体で比べます。日本のポケモンのセットは公式のセット名（拡張パック、強化拡張パック、ハイクラスパック、記念）から自動で決まり、その他は商品の編集ページで手動で設定します。",
+    "info": "フランチャイズの発売の中でのセットの位置づけ。グループの分析（新セットのパターン、新発売の待ち、相場）は、同じ種類の商品が十分（[[patternMinItems]]件以上）あればその種類どうしで、なければグループ全体で比べます。日本のポケモンのセットは公式のセット名（拡張パック、強化拡張パック、ハイクラスパック、記念）から自動で決まり、その他は商品の編集ページで手動で設定します。",
     "builtIn": "標準",
     "others": "その他の種類（1行に1つ）",
     "saved": "保存しました。"
@@ -2194,7 +2194,7 @@
     "cardsNotRead": "カード未読込",
     "error": {
       "code": "カード名にあるセットコードを入力してください(例:SV2a)。",
-      "packs": "1BOXのパック数:1から100の整数。",
+      "packs": "1BOXのパック数:1から[[openingPacksMax]]の整数。",
       "tiers": "各レアリティに英字(SAR、ARなど)と1BOXに入る数(3、0.2、1/6)が必要です。"
     }
   },
@@ -2250,7 +2250,7 @@
     "from": "開始",
     "to": "終了",
     "unknownAlerts": "Toraが知らない店舗・場所の投稿を通知(質問や雑談も含む)",
-    "feedAlertsInfo": "気付かない停止をなくすため、このPCでアプリが動いている間は2分ごとに確認します。1ページ分の新着が一度に来た場合(取りこぼしの可能性)は常に通知します。",
+    "feedAlertsInfo": "気付かない停止をなくすため、このPCでアプリが動いている間は[[feedCheckMinutes]]分ごとに確認します。1ページ分の新着が一度に来た場合(取りこぼしの可能性)は常に通知します。",
     "addTitle": "店舗・場所を追加",
     "addInfo": "Toraにリストがないチェーンやエリア用。場所(エリア名や絵文字と位置)はどの掲示板でも照合され、店舗はそのチェーンの掲示板でのみ照合されます。",
     "chain": "チェーン",
@@ -2271,7 +2271,7 @@
       "chain": "チェーンのキー:小文字の英字・数字・-・_。",
       "name": "名前を入力してください。",
       "location": "位置:緯度と経度の2つの数字。",
-      "glossary": "コードと意味を入力(コードは20文字まで)。"
+      "glossary": "コードと意味を入力(コードは[[glossaryCodeMax]]文字まで)。"
     },
     "places": "場所(エリア)",
     "allChains": "すべて {n}",
@@ -2334,7 +2334,7 @@
     "nowInfo": "今日の投稿をエリアごとに新しい順で表示します。開くと店舗ごとの投稿が見られます。",
     "noToday": "今日はまだこれらの店舗の投稿はありません。",
     "earlier": "それ以前(昨日): {n}エリア",
-    "byLocationInfo": "昨日(5:00)以降に投稿のあるエリアを近い順に、件数つきで表示します。選ぶとそのエリアの投稿を新しい順で表示します。",
+    "byLocationInfo": "昨日([[postDayStarts]])以降に投稿のあるエリアを近い順に、件数つきで表示します。選ぶとそのエリアの投稿を新しい順で表示します。",
     "otherBoards": "その他の掲示板",
     "allOfChain": "全店舗",
     "quietLocations": "昨日以降投稿のないエリア: {n}",
@@ -2350,7 +2350,7 @@
       "next": "次は {board}（あと {in}）",
       "reading": "{board} 読込中",
       "late": "{board} 遅延（予定 {time}）",
-      "quiet": "{boards}：10分以上投稿なし",
+      "quiet": "{boards}：[[silentMinutes]]分以上投稿なし",
       "silent": "{time} からフィード停止：通知も止まっています",
       "stopped": "停止中：巡回時間外",
       "starting": "開始中",
@@ -2365,12 +2365,12 @@
   },
   "accounts": {
     "newTitle": "新しいアカウント",
-    "newInfo": "アカウントと1回限りの設定リンク（24時間有効）を作ります。リンクを本人に送ると、本人の端末でパスワードを決め、認証アプリにToraを追加します。パスワードは管理者にも見えません。",
+    "newInfo": "アカウントと1回限りの設定リンク（[[setupLinkHours]]時間有効）を作ります。リンクを本人に送ると、本人の端末でパスワードを決め、認証アプリにToraを追加します。パスワードは管理者にも見えません。",
     "username": "ユーザー名",
-    "usernameRule": "3〜32文字：a-z, 0-9, . _ -",
+    "usernameRule": "[[usernameMin]]〜[[usernameMax]]文字：a-z, 0-9, . _ -",
     "asAdmin": "管理者",
     "create": "作成",
-    "yourCode": "あなたの6桁コード",
+    "yourCode": "あなたの[[totpDigits]]桁コード",
     "cancel": "キャンセル",
     "linkReady": "設定リンク（一度だけ表示、本人に送ってください）：",
     "linkInfo": "{until}まで1回だけ使えます。新しいリンクを作るとこれは無効になります。",
@@ -2399,7 +2399,7 @@
       "invalid": "コードが一致しません（各コードは1回だけ：次のコードを待ってください）。",
       "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
       "notConfigured": "ログインが設定されていません（AUTH_SECRETがありません）。",
-      "username": "ユーザー名：3〜32文字、a-z 0-9 . _ -",
+      "username": "ユーザー名：[[usernameMin]]〜[[usernameMax]]文字、a-z 0-9 . _ -",
       "taken": "このユーザー名は使われています。",
       "self": "自分のアカウントはできません。",
       "missing": "アカウントがありません。"
@@ -2418,14 +2418,14 @@
       "2fa": "新しい認証アプリにToraを追加してください（{username}）。"
     },
     "newPassword": "新しいパスワード",
-    "passwordRule": "12文字以上。",
+    "passwordRule": "[[minPassword]]文字以上。",
     "repeat": "もう一度",
     "currentCode": "認証アプリのコード",
     "currentCodeHint": "なくした場合はバックアップコードも使えます。",
     "currentPassword": "今のパスワード",
     "scanTitle": "認証アプリ",
     "scanInfo": "認証アプリ（Google Authenticator、1Passwordなど）で読み取るか、下のキーを入力し、表示されたコードを入れてください。",
-    "newCode": "6桁のコード",
+    "newCode": "[[totpDigits]]桁のコード",
     "save": "保存",
     "done": "完了しました。すべての端末がログアウトされました。もう一度ログインしてください。",
     "backupTitle": "バックアップコード",
@@ -2435,7 +2435,7 @@
       "expired": "このリンクは使えません（使用済み、期限切れ、または置き換え済み）。管理者に新しいリンクを頼んでください。",
       "locked": "試行回数が多すぎます。しばらくしてからお試しください。",
       "notConfigured": "ログインが設定されていません（AUTH_SECRETがありません）。",
-      "short": "パスワードは12文字以上必要です。",
+      "short": "パスワードは[[minPassword]]文字以上必要です。",
       "mismatch": "パスワードが一致しません。",
       "invalid": "一致しません。もう一度お試しください。",
       "newCode": "認証アプリのコードが一致しません（スマホの時刻が自動設定か確認してください）。"

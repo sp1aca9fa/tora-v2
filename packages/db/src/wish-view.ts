@@ -86,6 +86,8 @@ export const FACT_NIGHTS = 5;
 export const WISH_VIEW_DAYS = 35;
 /** How far back the last nightly read is looked for: none in these days, nothing is last night's. */
 export const LAST_NIGHT_DAYS = 7;
+/** Days a level's or buyback's change looks back (exact day: W14's rule). */
+export const WISH_CHANGE_DAYS = 28;
 /**
  * The run of yesterday still reads as "last night" until this local hour (fix round 2, item 1: "to
  * start"); from it on, a night not run today is shown by its date.
@@ -488,7 +490,7 @@ function seriesChange(points: readonly { day: string; value: number }[]): LevelC
   const byDay = new Map<string, number>();
   for (const p of points.toSorted((a, b) => (a.day < b.day ? -1 : 1))) byDay.set(p.day, p.value);
   const days = [...byDay].map(([day, level]): DayLevel => ({ day, level, window: 30 }));
-  return changeOver(days, 28);
+  return changeOver(days, WISH_CHANGE_DAYS);
 }
 
 /**
@@ -809,7 +811,7 @@ export async function wishViews(
       const record = shown ? stored.record : null;
       level = {
         current,
-        change: changeOver(dayLevels(stored.series), 28),
+        change: changeOver(dayLevels(stored.series), WISH_CHANGE_DAYS),
         record,
         nearLow:
           !!record &&

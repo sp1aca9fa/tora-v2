@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type LevelChange, type SourceInfo, type WishAlertState, toLocalIso } from '@tora/core';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readAlertTexts } from './alert-texts';
 import { recordActivity } from './activity';
 import { type AlertContext, addDiscordChannel, sendSummaries } from './alerts';
 import { type Db, createDb } from './client';
@@ -45,10 +45,10 @@ const SOURCES: SourceInfo[] = [
 ];
 const SECRET = 'test-secret-0123456789abcdef0123456789';
 const hook = (n: number) => `https://discord.com/api/webhooks/${300 + n}/fake`;
-// The app's own wording: the summary lines are read as the person gets them.
-const EN = JSON.parse(
-  readFileSync(new URL('../../../apps/web/messages/en.json', import.meta.url), 'utf8'),
-) as { alertText: Record<string, string> };
+// The app's own wording: the summary lines are read as the person gets them (numbers replaced).
+const EN = {
+  alertText: readAlertTexts('en', join(import.meta.dirname, '../../..')),
+};
 
 const DAYS = ['2026-06-15', '2026-06-16', '2026-06-17', '2026-06-18', '2026-06-19'];
 /** The summary's time: 08:00 in the app's zone, after the night's collect. */

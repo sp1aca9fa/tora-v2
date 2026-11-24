@@ -13,12 +13,12 @@ const DAY = 86_400_000;
 /** Trades this many days before or after count as "around the same time". */
 const REFERENCE_DAYS = 3;
 /** Trades checked every night; all of them once a week. */
-const RECENT_DAYS = 14;
+export const LOT_SIZE_RECENT_DAYS = 14;
 const FULL_EVERY = 7 * DAY;
 const FULL_KEY = 'lotSizesFullAt';
 
 /**
- * Estimated trades of the last `RECENT_DAYS` (their neighbours read with them), or all of them
+ * Estimated trades of the last `LOT_SIZE_RECENT_DAYS` (their neighbours read with them), or all of them
  * when asked or once a week (an older trade changes only when a sale near it changes).
  */
 export async function inferLotSizes(
@@ -29,8 +29,10 @@ export async function inferLotSizes(
   const [last] = await db.select().from(appSettings).where(eq(appSettings.key, FULL_KEY));
   const lastFull = typeof last?.value === 'string' ? Date.parse(last.value) : NaN;
   const full = !!options.full || !(now.getTime() - lastFull < FULL_EVERY);
-  const recentFrom = localDate(new Date(now.getTime() - RECENT_DAYS * DAY));
-  const readFrom = localDate(new Date(now.getTime() - (RECENT_DAYS + REFERENCE_DAYS + 1) * DAY));
+  const recentFrom = localDate(new Date(now.getTime() - LOT_SIZE_RECENT_DAYS * DAY));
+  const readFrom = localDate(
+    new Date(now.getTime() - (LOT_SIZE_RECENT_DAYS + REFERENCE_DAYS + 1) * DAY),
+  );
   const registry = await loadSourceRegistry(db);
   const sourceKeys = registry.sources.map((s) => s.key);
   const base = baseCurrency(registry);

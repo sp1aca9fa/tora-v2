@@ -3,7 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 export const TOTP_PERIOD_SECONDS = 30;
-const DIGITS = 6;
+export const TOTP_DIGITS = 6;
 
 export function base32Encode(bytes: Uint8Array): string {
   let bits = 0;
@@ -44,7 +44,7 @@ export function generateTotpSecret(): string {
   return base32Encode(randomBytes(20));
 }
 
-export function hotp(secret: Buffer, counter: number, digits = DIGITS): string {
+export function hotp(secret: Buffer, counter: number, digits = TOTP_DIGITS): string {
   const msg = Buffer.alloc(8);
   msg.writeBigUInt64BE(BigInt(counter));
   const mac = createHmac('sha1', secret).update(msg).digest();
@@ -89,7 +89,7 @@ export function otpauthUri(secretBase32: string, account: string, issuer = 'Tora
     secret: secretBase32,
     issuer,
     algorithm: 'SHA1',
-    digits: String(DIGITS),
+    digits: String(TOTP_DIGITS),
     period: String(TOTP_PERIOD_SECONDS),
   });
   return `otpauth://totp/${label}?${params.toString()}`;

@@ -3,11 +3,9 @@
 import { decodeText, parseCsv } from '@tora/core';
 import { type SheetEntry, type SheetMatch, applySheet, planSheet, readSheet } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { SHEET_MAX_BYTES as MAX_BYTES, SHEET_MAX_ROWS as MAX_ROWS } from '@/lib/app-numbers';
 import { authed } from '@/lib/auth/guard';
 import { sheetReader } from '@/lib/lot-sheet';
-
-const MAX_BYTES = 2 * 1024 * 1024;
-const MAX_ROWS = 5000;
 
 export type SheetError = 'sheetType' | 'sheetTooBig' | 'sheetNoHeader' | 'sheetTooManyRows';
 

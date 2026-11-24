@@ -39,10 +39,15 @@ export type PopularBy = (typeof POPULAR_BY)[number];
  */
 export const TRENDING_MIN = 10;
 export const TRENDING_RATIO = 1.5;
+/** Days of the sold count, the trending comparison's days before, and the year's count. */
+export const POPULAR_DAYS = 30;
+export const POPULAR_BEFORE_DAYS = 90;
+export const POPULAR_YEAR_DAYS = 365;
 
 export const sold30Of = (i: ItemTrades) => Object.values(i.sold30).reduce((a, b) => a + b, 0);
 /** The last 30 days against the monthly rate of the 90 before (sites followed 120+ days). */
-export const trendOf = (i: ItemTrades) => i.steady30 / Math.max(1, i.before90 / 3);
+export const trendOf = (i: ItemTrades) =>
+  i.steady30 / Math.max(1, i.before90 / (POPULAR_BEFORE_DAYS / POPULAR_DAYS));
 
 export async function refreshPopularity(
   db: Db,
@@ -50,7 +55,7 @@ export async function refreshPopularity(
   save = true,
 ): Promise<SavedPopularity> {
   const at = (days: number) => toLocalIso(new Date(now.getTime() - days * DAY));
-  const [d30, d120] = [at(30), at(120)];
+  const [d30, d120] = [at(POPULAR_DAYS), at(POPULAR_DAYS + POPULAR_BEFORE_DAYS)];
   const rows = await db
     .select({
       productId: priceObservations.productId,
@@ -65,7 +70,7 @@ export async function refreshPopularity(
       and(
         eq(priceObservations.observationType, 'sold'),
         eq(priceObservations.excluded, false),
-        gte(priceObservations.observedAt, at(365)),
+        gte(priceObservations.observedAt, at(POPULAR_YEAR_DAYS)),
       ),
     )
     .groupBy(priceObservations.productId, priceObservations.source);

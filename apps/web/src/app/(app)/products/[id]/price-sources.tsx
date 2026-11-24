@@ -27,6 +27,7 @@ import {
 } from './source-actions';
 import { setSourceWarningAction } from '../../actions/actions';
 import { getRegistry, marketLabels, sourceLabels } from '@/lib/sources';
+import { PRICE_STATS_DAYS } from '@/lib/app-numbers';
 import { getMoney } from '@/lib/money-server';
 import { bucketLabel } from '@/lib/product-display';
 
@@ -57,7 +58,7 @@ export async function PriceSources({
     getFormatter(),
     listProductSources(db, product.id),
     listPendingCandidates(db, product.id),
-    bucketStats(db, product.id, 30),
+    bucketStats(db, product.id, PRICE_STATS_DAYS),
     recentObservations(db, product.id, 60),
   ]);
   // Suggestions without a picture of their own (e.g. from a linked look-alike): show the stored

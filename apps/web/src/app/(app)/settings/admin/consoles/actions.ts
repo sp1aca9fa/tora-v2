@@ -11,6 +11,7 @@ import {
   setGameRules,
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
+import { CONSOLE_KEY_MAX, CONSOLE_SORT_MAX } from '@/lib/app-numbers';
 import { authed } from '@/lib/auth/guard';
 
 const PAGE = '/settings/admin/consoles';
@@ -39,13 +40,14 @@ export async function saveConsoleAction(
   if (user.role !== 'admin') return;
   if (!form || typeof form !== 'object') return { error: 'key' };
   const key = consoleKey(String(editing ?? form.key ?? ''));
-  if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(key)) return { error: 'key' };
+  if (!new RegExp(`^[a-z0-9][a-z0-9_-]{0,${CONSOLE_KEY_MAX - 1}}$`).test(key))
+    return { error: 'key' };
   const existing = (await listConsoles(db)).find((c) => c.key === key);
   if (editing === null && existing) return { error: 'exists' };
   if (editing !== null && !existing) return { error: 'key' };
   const sortText = String(form.sort ?? '').trim();
   const sort = sortText === '' ? 0 : Number(sortText);
-  if (!Number.isInteger(sort) || sort < 0 || sort > 9999) return { error: 'sort' };
+  if (!Number.isInteger(sort) || sort < 0 || sort > CONSOLE_SORT_MAX) return { error: 'sort' };
   const input = {
     key,
     names: form.names ?? {},

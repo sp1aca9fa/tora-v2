@@ -300,14 +300,18 @@ export async function restoreDatabase(
 const addDays = (day: string, n: number) =>
   new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
+/** Backups kept: every one of these last days, and the first of each of these last months. */
+export const BACKUP_KEEP_DAYS = 30;
+export const BACKUP_KEEP_MONTHS = 12;
+
 /**
  * The backups kept on `today`: the last 30 days, plus the first of each month for 12 months
  * (this month included).
  */
 export function backupsToKeep(days: string[], today: string): Set<string> {
-  const keep = new Set(days.filter((d) => d > addDays(today, -30) && d <= today));
+  const keep = new Set(days.filter((d) => d > addDays(today, -BACKUP_KEEP_DAYS) && d <= today));
   const [y, m] = today.split('-').map(Number) as [number, number];
-  const oldestMonth = new Date(Date.UTC(y, m - 12, 1)).toISOString().slice(0, 7);
+  const oldestMonth = new Date(Date.UTC(y, m - BACKUP_KEEP_MONTHS, 1)).toISOString().slice(0, 7);
   const firstOfMonth = new Map<string, string>();
   for (const d of [...days].sort()) {
     const month = d.slice(0, 7);

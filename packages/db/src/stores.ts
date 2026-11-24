@@ -938,7 +938,7 @@ export async function forgetBoard(db: Db, userId: string, key: string) {
 }
 
 /** Posts are kept this long (the page shows the latest; a post seen again later is new). */
-const KEEP_POSTS_DAYS = 30;
+export const KEEP_POSTS_DAYS = 30;
 const PRUNE_EVERY_MS = 60 * 60_000;
 let prunedAt = 0;
 

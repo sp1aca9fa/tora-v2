@@ -21,6 +21,8 @@ import { linkSource } from './sources';
 
 /** Ranked this high, an item nobody tracks becomes a candidate. */
 export const CANDIDATE_TOP = 60;
+/** Rankings this many days old or newer are shown. */
+export const RANKING_FRESH_DAYS = 3;
 /** A candidate is collected while it was in the top within this many days. */
 export const CANDIDATE_DAYS = 30;
 
@@ -248,7 +250,7 @@ export async function latestRanks(
         .orderBy(desc(rankings.day))),
     );
   }
-  const fresh = localDate(new Date(now.getTime() - 3 * DAY));
+  const fresh = localDate(new Date(now.getTime() - RANKING_FRESH_DAYS * DAY));
   const dayNumber = (d: string) => Date.parse(`${d}T00:00:00Z`) / DAY;
   for (const r of rows) {
     if (r.day < fresh) continue;
@@ -325,7 +327,7 @@ export async function rankingBoards(
   userId: string,
   now = new Date(),
 ): Promise<RankingBoard[]> {
-  const fresh = localDate(new Date(now.getTime() - 3 * DAY));
+  const fresh = localDate(new Date(now.getTime() - RANKING_FRESH_DAYS * DAY));
   const last = await db
     .select({ ranking: rankings.ranking, day: sql<string>`max(${rankings.day})` })
     .from(rankings)

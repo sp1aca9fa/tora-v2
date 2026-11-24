@@ -29,10 +29,25 @@ export function suggestedStrategy(itemType: string): StrategyChoice {
     : { strategy: 'margin', margin: DEFAULT_MARGIN };
 }
 
+/** Days of fair value and of the sales counted with it ("sales in 30 days"). */
+export const FAIR_DAYS = 30;
+/** Days of the usual price and range ("the last 180 days"). */
+export const RANGE_DAYS = 180;
 /** Days with sales needed in 180 days for a 180-day range, and in 365 days for a year's. */
 export const RANGE_MIN_DAYS = { 180: 10, 365: 20 } as const;
+/** The past year's cheapest share: the bargain zone and the lowest a wait price asks. */
+export const YEAR_LOW_SHARE = 0.1;
+/** Fewer sales than this in `FAIR_DAYS`: the verdict says its data is limited. */
+export const LIMITED_SALES = 3;
+/** Days of the trends: the fall (2 weeks), the month (4 weeks), the item's and market's (12 weeks). */
+export const FALL_DAYS = 14;
+export const MONTH_TREND_DAYS = 28;
+export const TREND_DAYS = 84;
 /** A fall this fast over 2 weeks (and still down over 4) means "wait". */
 export const FALLING_2W = -0.05;
+/** A pause in a fall: the last `HOLD_DAYS` days' median against the `HOLD_BEFORE_DAYS` before. */
+export const HOLD_DAYS = 14;
+export const HOLD_BEFORE_DAYS = 30;
 /**
  * Cheap and steadying (S27): the price in the cheapest 30 % of the past year's daily prices (from
  * 300+ days of prices), and its fall paused (the last 14 days' median at least -2 % against the 30
@@ -63,6 +78,7 @@ export const FULL_YEAR = { from: 30, to: 300 } as const;
 /** Alerts (S9 part 5): quiet days before the same alert again, and a sharp drop over 7 days. */
 export const ALERT_QUIET_DAYS = 14;
 export const SHARP_DROP_7D = -0.15;
+export const SHARP_DROP_DAYS = 7;
 /** Rule tests: past signals checked 90 days later needed before a result is shown. */
 export const RULE_TEST_MIN_SIGNALS = 10;
 
@@ -186,8 +202,8 @@ export function seriesStats(
       const d = dayNumber(p.day);
       return d <= end && d > end - days;
     });
-  const d30 = within(30);
-  const d180 = within(180);
+  const d30 = within(FAIR_DAYS);
+  const d180 = within(RANGE_DAYS);
   const d365 = within(365);
   const value =
     fair ?? median(d30.map((p) => p.price)) ?? median(within(90).map((p) => p.price)) ?? null;
@@ -202,12 +218,13 @@ export function seriesStats(
     usual180: d180.length >= 3 ? Math.round(median(p180)!) : null,
     q25d180: enough180 ? Math.round(quantile(p180, 0.25)!) : null,
     q75d180: enough180 ? Math.round(quantile(p180, 0.75)!) : null,
-    q10d365: d365.length >= RANGE_MIN_DAYS[365] ? Math.round(quantile(p365, 0.1)!) : null,
+    q10d365:
+      d365.length >= RANGE_MIN_DAYS[365] ? Math.round(quantile(p365, YEAR_LOW_SHARE)!) : null,
     cheaperThan180:
       value !== null && enough180 ? p180.filter((p) => p >= value).length / p180.length : null,
-    trend14: fittedChange(series, end, 14),
-    trend28: fittedChange(series, end, 28),
-    trend84: fittedChange(series, end, 84),
+    trend14: fittedChange(series, end, FALL_DAYS),
+    trend28: fittedChange(series, end, MONTH_TREND_DAYS),
+    trend84: fittedChange(series, end, TREND_DAYS),
     hold14: held(series, end),
     year365:
       value !== null &&
@@ -227,8 +244,8 @@ function held(series: DayPrice[], end: number): number | null {
         return d > end - from && d <= end - to;
       })
       .map((p) => p.price);
-  const recent = prices(14, 0);
-  const before = prices(44, 14);
+  const recent = prices(HOLD_DAYS, 0);
+  const before = prices(HOLD_DAYS + HOLD_BEFORE_DAYS, HOLD_DAYS);
   return recent.length >= 2 && before.length >= 2 ? median(recent)! / median(before)! - 1 : null;
 }
 
@@ -434,7 +451,7 @@ export function judge(stats: SignalStats, choice: StrategyChoice): Judgement {
   const marketFalling = !!stats.market && stats.market.change84 < MARKET_FALLING_12W;
   const steady = cheapSteady(stats.year365, stats.hold14);
   const limited: Judgement['limited'] = [];
-  if (stats.sales30 < 3) limited.push('few_sales');
+  if (stats.sales30 < LIMITED_SALES) limited.push('few_sales');
   if (stats.q25d180 === null) limited.push('short_range');
   const askInZone = zone.top !== null && stats.ask !== null && stats.ask <= zone.top;
   const waitDays = stats.lowAge?.age ?? NEW_RELEASE_DAYS;
@@ -643,7 +660,7 @@ export function strategyOf(
 export function marketTrend(series: DayPrice[][], asOf: string): SignalStats['market'] {
   const end = dayNumber(asOf);
   const changes = series
-    .map((s) => fittedChange(s, end, 84))
+    .map((s) => fittedChange(s, end, TREND_DAYS))
     .filter((c): c is number => c !== null);
   if (changes.length < MARKET_MIN_ITEMS) return null;
   return { items: changes.length, change84: median(changes)! };

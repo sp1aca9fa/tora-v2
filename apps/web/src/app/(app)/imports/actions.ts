@@ -15,6 +15,7 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { MAX_LINKS } from '@/lib/app-numbers';
 import { authed } from '@/lib/auth/guard';
 import { type FormState, runDomain } from '@/lib/form';
 
@@ -143,7 +144,7 @@ export async function addLinksAction(_: LinksState, formData: FormData): Promise
     (l) => l.length <= 300,
   );
   if (links.length === 0) return { error: 'noLinks' };
-  if (links.length > 200) return { error: 'tooManyLinks' };
+  if (links.length > MAX_LINKS) return { error: 'tooManyLinks' };
   const result = await addPurchaseLinks(db, user.id, links);
   revalidatePath('/', 'layout');
   return result;

@@ -13,6 +13,7 @@ import {
 } from '@tora/core';
 import { type Db, type Store, cachedStores } from '@tora/db';
 import { getLocale, getTranslations } from 'next-intl/server';
+import { POST_DAY_STARTS } from '@/lib/app-numbers';
 import { storeLabel } from './post-views';
 
 export interface Location {
@@ -68,13 +69,10 @@ export async function areaLocations(db: Db, area: StoreArea | null) {
   return { all, byId, inArea, locationOf, locations, mine, label };
 }
 
-/** A day of posts starts at this hour (a late night's posts belong to the day before). */
-const DAY_STARTS = '05:00';
-
 /** When today's posts start (5:00 in the app's time zone; before 5:00, yesterday's), and yesterday's. */
 export function postDays(now = new Date()): { today: string; yesterday: string } {
   const offset = toLocalIso(now).slice(-6);
-  const startOf = (date: string) => toLocalIso(new Date(`${date}T${DAY_STARTS}:00${offset}`));
+  const startOf = (date: string) => toLocalIso(new Date(`${date}T${POST_DAY_STARTS}:00${offset}`));
   let today = startOf(localDate(now));
   if (toLocalIso(now) < today) today = startOf(localDate(new Date(now.getTime() - 86_400_000)));
   return { today, yesterday: toLocalIso(new Date(Date.parse(today) - 86_400_000)) };

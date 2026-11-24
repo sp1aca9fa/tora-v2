@@ -14,7 +14,7 @@ export const FREE_ROWS_WRITTEN = 10_000_000;
 export const DEFAULT_ROWS_READ_BUDGET = 150_000_000;
 const BUDGET_KEY = 'dbBudget';
 /** Before this day of the month the pace says little: only the total so far is checked. */
-const PACE_FROM_DAY = 5;
+export const PACE_FROM_DAY = 5;
 
 export interface MonthUsage {
   /** UTC month, like Turso's. */

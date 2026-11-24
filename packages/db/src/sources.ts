@@ -1035,7 +1035,7 @@ export async function collectorTimes(db: Db): Promise<CollectorTimes> {
 }
 
 /** A source's last days with runs that must find nothing, and the run days before them looked at. */
-const QUIET_DAYS = 3;
+export const QUIET_DAYS = 3;
 const USUAL_DAYS = 14;
 
 /**
@@ -1087,6 +1087,12 @@ export interface SourceHealth {
   jumps: { product: Product; bucket: string | null; before: number; recent: number }[];
 }
 
+/** Collector health: listings stale after these days; a jump compares these days' medians. */
+export const HEALTH_STALE_DAYS = 3;
+export const JUMP_RECENT_DAYS = 7;
+export const JUMP_BEFORE_DAYS = 30;
+export const JUMP_SHARE = 0.5;
+
 /**
  * Per source: last run, linked / pending counts, listings not collected for 3+ days, and
  * buckets whose last-7-day median moved more than 50 % against the 30 days before (whole days).
@@ -1100,9 +1106,9 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
     .union(db.selectDistinct({ source: collectorRuns.source }).from(collectorRuns));
 
   // Every item's last 37 days of kept sales, from the packed item sales (one row per item).
-  const recentFrom = daysBack(7, now);
+  const recentFrom = daysBack(JUMP_RECENT_DAYS, now);
   const allDays = [...(await loadItemSales(db))].flatMap(([productId, sales]) =>
-    soldDaysOf(productId, sales, { since: daysBack(37, now) }),
+    soldDaysOf(productId, sales, { since: daysBack(JUMP_RECENT_DAYS + JUMP_BEFORE_DAYS, now) }),
   );
   const out: SourceHealth[] = [];
   for (const { source } of sources) {
@@ -1129,7 +1135,10 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
           eq(productSources.source, source),
           eq(productSources.active, true),
           lt(productSources.createdAt, iso(day)),
-          or(isNull(productSources.lastSuccessAt), lt(productSources.lastSuccessAt, iso(3 * day))),
+          or(
+            isNull(productSources.lastSuccessAt),
+            lt(productSources.lastSuccessAt, iso(HEALTH_STALE_DAYS * day)),
+          ),
         ),
       );
 
@@ -1152,7 +1161,9 @@ export async function collectorHealth(db: Db, now = new Date()): Promise<SourceH
     const flagged = [...groups.values()].filter((g) => {
       const r = median(g.recent);
       const b = median(g.before);
-      return g.recent.length >= 3 && g.before.length >= 3 && r && b && Math.abs(r - b) / b > 0.5;
+      return (
+        g.recent.length >= 3 && g.before.length >= 3 && r && b && Math.abs(r - b) / b > JUMP_SHARE
+      );
     });
     const flaggedProducts = flagged.length
       ? await db

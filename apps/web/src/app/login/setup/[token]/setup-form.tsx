@@ -15,12 +15,15 @@ export function SetupForm({
   kind,
   qr,
   secret,
+  minPassword,
 }: {
   token: string;
   kind: 'both' | 'password' | '2fa';
   /** The new authenticator's QR code (SVG) and key, when one is set. */
   qr: string | null;
   secret: string | null;
+  /** A new password's least length. */
+  minPassword: number;
 }) {
   const t = useTranslations('setup');
   const [state, action, pending] = useActionState<SetupState, FormData>(completeSetupAction, {});
@@ -60,7 +63,7 @@ export function SetupForm({
               name="password"
               type="password"
               autoComplete="new-password"
-              minLength={12}
+              minLength={minPassword}
               required
               autoFocus
             />

@@ -43,7 +43,7 @@
     "username": "Username",
     "continue": "Continue",
     "codeTitle": "Authenticator code",
-    "code": "6-digit code",
+    "code": "[[totpDigits]]-digit code",
     "codeHint": "From your authenticator app. Lost it? Enter one of your backup codes instead.",
     "startOver": "Start over",
     "errors": {
@@ -358,19 +358,19 @@
     "logout": "Sign out",
     "signedInAs": "Signed in as {username}",
     "devices": "Devices ({count}/{max})",
-    "devicesInfo": "Each account can be signed in on up to 2 devices. Signing out or revoking frees a slot; a new device needs the password and an authenticator code.",
+    "devicesInfo": "Each account can be signed in on up to [[maxDevices]] devices. Signing out or revoking frees a slot; a new device needs the password and an authenticator code.",
     "thisDevice": "This device",
     "deviceDates": "Since {since} · last used {seen}",
     "revoke": "Revoke",
     "sourceCounts": "{linked} linked · {pending} waiting for confirmation",
     "lastRunCounts": "{requests} requests · +{added} trades",
-    "stale": "Not collected for 3+ days:",
+    "stale": "Not collected for [[healthStaleDays]]+ days:",
     "never": "never",
-    "jumps": "Median moved more than 50% (last 7 days vs the 30 before):",
+    "jumps": "Median moved more than [[jumpPct]]% (last [[jumpRecentDays]] days vs the [[jumpBeforeDays]] before):",
     "recentRuns": "Recent runs",
     "market": {
       "title": "Extra daytime reads",
-      "info": "Reads of sales beyond the nightly collect, 05:00 to 22:00, within a number a day per marketplace.",
+      "info": "Reads of sales beyond the nightly collect, [[marketFrom]] to [[marketTo]], within a number a day per marketplace.",
       "link": "Extra reads",
       "marketplace": "Marketplace",
       "today": "Today",
@@ -390,7 +390,7 @@
       "lastFailure": "Last error of a failing job:",
       "blockedSpan": "{count, plural, one {# sale} other {# sales}} found under another item or undone by a load; no covered days written",
       "restart": "Restart",
-      "restartConfirm": "Starts the extra reads of {source} again at 25 a day (from tomorrow if today's 25 are used)."
+      "restartConfirm": "Starts the extra reads of {source} again at [[marketFloor]] a day (from tomorrow if today's [[marketFloor]] are used)."
     },
     "section": {
       "account": {
@@ -515,7 +515,7 @@
       "never": "Not run yet",
       "stale": "Has not run since {date}",
       "clear": "Nothing looks odd.",
-      "notYet": "Nothing judged yet: each source needs 14 nights of numbers first.",
+      "notYet": "Nothing judged yet: each source needs [[dataCheckNights]] nights of numbers first.",
       "needsLook": "Needs a look",
       "itemsInfo": "Can be a real difference, so not always a fault.",
       "sources": "Sources",
@@ -523,7 +523,7 @@
       "items": "Prices far apart between sources",
       "since": "since {date}",
       "watching": "Watching",
-      "learning": "Learning, {nights} of 14 nights",
+      "learning": "Learning, {nights} of [[dataCheckNights]] nights",
       "tooFew": "Too few sales to judge",
       "notSeen": "Not seen since {date}",
       "lastSeen": "last seen {date}"
@@ -593,7 +593,7 @@
     "noneSelected": "Select at least one card",
     "noneGraded": "Pick a grade for at least one card",
     "noLinks": "No links found.",
-    "tooManyLinks": "Up to 200 links at a time.",
+    "tooManyLinks": "Up to [[maxLinks]] links at a time.",
     "nonePicked": "Pick at least one panel.",
     "invalid_time_zone": "That time zone is not known.",
     "duplicate_watch": "This item is already on your wishlist in that condition.",
@@ -704,7 +704,7 @@
     },
     "pasteUrl": "Paste a product link from a price source ({sources})",
     "link": "Link",
-    "last30": "Last 30 days",
+    "last30": "Last [[priceStatsDays]] days",
     "median": "Median",
     "trades": "Trades",
     "unmapped": "unmapped",
@@ -779,8 +779,8 @@
       "low": "Low"
     },
     "confidenceHint": {
-      "high": "5+ sales in the last 30 days",
-      "medium": "3+ sales in the last 180 days",
+      "high": "[[highConfidenceSales]]+ sales in the last [[highConfidenceDays]] days",
+      "medium": "[[mediumConfidenceSales]]+ sales in the last [[mediumConfidenceDays]] days",
       "low": "Few or old sales, a store price, or the retail price"
     },
     "short": {
@@ -981,9 +981,9 @@
       "open": "Open the import",
       "error": {
         "sheetType": "Choose a .csv file (in Excel: Save as > CSV).",
-        "sheetTooBig": "The file is over 2 MB.",
+        "sheetTooBig": "The file is over [[sheetMaxMb]] MB.",
         "sheetNoHeader": "The first row must name the columns, with at least the item (as in the download).",
-        "sheetTooManyRows": "Over 5,000 rows: split the file."
+        "sheetTooManyRows": "Over [[sheetMaxRows]] rows: split the file."
       },
       "likely": "Maybe already in Tora",
       "addAnyway": "Add anyway",
@@ -1045,11 +1045,11 @@
     "editOrMerge": "Edit or merge",
     "market": {
       "value": "Market value",
-      "sales30": "Sales in 30 days",
-      "change4": "4 weeks",
-      "change12": "12 weeks",
-      "range": "180-day range",
-      "rangeHint": "The middle half of the last 180 days' daily prices (lower to upper quarter).",
+      "sales30": "Sales in [[fairDays]] days",
+      "change4": "[[monthTrendWeeks]] weeks",
+      "change12": "[[trendWeeks]] weeks",
+      "range": "[[rangeDays]]-day range",
+      "rangeHint": "The middle half of the last [[rangeDays]] days' daily prices (lower to upper quarter).",
       "condition": "In {condition}.",
       "historyInfo": "Daily sold medians over the last year, one line per source."
     }
@@ -1105,7 +1105,7 @@
     },
     "set": "Catalog set: {name} ({code}), released {date}",
     "setBefore": "The item says: {name} ({code}). Its release date comes from the set.",
-    "line": "Mark it as {line}: in its first 3 months it moved {pct}, unlike similar items ({groupPct}, {groupItems} items) but like {line} items ({linePct}, {lineItems} items)."
+    "line": "Mark it as {line}: in its first [[patternMonths]] months it moved {pct}, unlike similar items ({groupPct}, {groupItems} items) but like {line} items ({linePct}, {lineItems} items)."
   },
   "compare": {
     "title": "{primary} vs {secondary}",
@@ -1229,7 +1229,7 @@
     "quality": {
       "agrees": "Agrees with {reference}: {pct}% {direction}, {count} items",
       "disagrees": "{pct}% {direction} {reference} on {count} items: comparison only",
-      "unverified": "Unverified: {count} items in common with {reference} (10 needed)",
+      "unverified": "Unverified: {count} items in common with {reference} ([[qualityMinPairs]] needed)",
       "below": "below",
       "above": "above",
       "dismissed": "notice dismissed"
@@ -1321,7 +1321,7 @@
     "outside": "Outside the hours, the Stores pages say so in red, and admins can track for an hour or until the next start (once: the hours go on as usual after).",
     "save": "Save",
     "saved": "Saved.",
-    "invalid": "Two different times, and delays from 0 to 3600 seconds, the shortest first."
+    "invalid": "Two different times, and delays from 0 to [[maxTrackingDelay]] seconds, the shortest first."
   },
   "timeZone": {
     "title": "Time zone",
@@ -1420,12 +1420,12 @@
   },
   "database": {
     "title": "Database",
-    "info": "Rows the hosted database (Turso) read and wrote this month, as its replies report them. The free plan allows 500 million rows read and 10 million written a month.",
+    "info": "Rows the hosted database (Turso) read and wrote this month, as its replies report them. The free plan allows [[freeReadMillions]] million rows read and [[freeWrittenMillions]] million written a month.",
     "read": "{month}: {read} rows read of {free} free (at this pace, {projected} by the end of the month)",
     "written": "{written} rows written of {free} free",
     "budget": "Alert admins past",
     "millions": "{m} million rows read",
-    "budgetInfo": "The app's daily check sends an alert when the month passes this, or heads past it at this pace (from the 5th).",
+    "budgetInfo": "The app's daily check sends an alert when the month passes this, or heads past it at this pace (from the [[paceFromDay]]th).",
     "byOrigin": "By origin",
     "byDay": "By day (UTC)",
     "readWritten": "{read} read, {written} written",
@@ -1506,7 +1506,7 @@
       "title": "Accounts",
       "create": "Creates an account: password, authenticator QR code, backup codes. The first one is an admin.",
       "list": "Lists the accounts.",
-      "devices": "Lists an account's signed-in devices (at most 2).",
+      "devices": "Lists an account's signed-in devices (at most [[maxDevices]]).",
       "revoke": "Signs a device out, or all of them.",
       "password": "Sets a new password.",
       "twoFactor": "A lost phone: new authenticator key and backup codes.",
@@ -1523,7 +1523,7 @@
     "alerts": {
       "title": "Alerts",
       "afterRun": "Records a collect or backup that stopped before it could, and sends failures to admins at once. The schedule runs it after each collect and backup.",
-      "check": "The app's morning check, run from the PC: \"nothing ran\" alerts and the daily summaries (each person at most once in 20 hours)."
+      "check": "The app's morning check, run from the PC: \"nothing ran\" alerts and the daily summaries (each person at most once in [[summaryGapHours]] hours)."
     },
     "database": {
       "title": "Database and Claude",
@@ -1606,11 +1606,11 @@
     "backupFailed": "Tora: the backup failed: {error}",
     "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
     "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
-    "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan 500 million). See Settings > Admin > Database.",
+    "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan [[freeReadMillions]] million). See Settings > Admin > Database.",
     "marketRefused": "Tora: {source} refused one of its extra reads. Its extra reads are now at most {perDay} a day, from {at}.",
-    "marketStopped": "Tora: {source} refused its extra reads at 25 a day: they are stopped until an admin restarts them in Settings > Collectors.",
+    "marketStopped": "Tora: {source} refused its extra reads at [[marketFloor]] a day: they are stopped until an admin restarts them in Settings > Collectors.",
     "marketJobsFailed": "Tora: the extra reads could not run: {error}",
-    "sourceQuiet": "Tora: {sources} found no new sales on its last 3 days of runs, though it usually finds some. Its site may have changed: look at the collect log, or open one of its listings (Settings > Collectors).",
+    "sourceQuiet": "Tora: {sources} found no new sales on its last [[quietDays]] days of runs, though it usually finds some. Its site may have changed: look at the collect log, or open one of its listings (Settings > Collectors).",
     "selfCheck": "Tora: the nightly self-check found saved prices that did not match the collected sales, and rebuilt them: {items}. If this repeats, tell the developer.",
     "dataCheckTitle": "Tora's self check found something odd in its data. It changed nothing; this needs a look.",
     "dataCheckFar": "{source}: {share}% of this week's sales are over twice or under half their item's usual price (usually {usual}%).",
@@ -1644,11 +1644,11 @@
     "wishOnlyAlone": "The only copy at or under your price ({target}).",
     "wishSellers": "The cheapest from different sellers: {list}",
     "wishCheapest": "The cheapest tonight: {list}",
-    "summaryDrops": "Sharp drops (15% or more in a week):",
-    "summaryDrop": "{name}: {price}, {pct} in 7 days",
+    "summaryDrops": "Sharp drops ([[sharpDropPct]]% or more in a week):",
+    "summaryDrop": "{name}: {price}, {pct} in [[sharpDropDays]] days",
     "summaryWishes": "Wishes:",
-    "summaryWishLevel": "level {pct} over 4 weeks, now {price}",
-    "summaryWishBuyback": "{source} buys it back at {price}, {pct} over 4 weeks",
+    "summaryWishLevel": "level {pct} over [[wishChangeWeeks]] weeks, now {price}",
+    "summaryWishBuyback": "{source} buys it back at {price}, {pct} over [[wishChangeWeeks]] weeks",
     "summaryWishShopOut": "out of stock at {source} for {nights} nights",
     "summaryWishNoNew": "no new copy found for {nights} nights",
     "summaryWishFact": "fact recorded: {kind}{text}",
@@ -1660,7 +1660,7 @@
     "summaryWishFact_other": "other",
     "summaryWishCheck_held": "check needed: Tora held back this game's rules",
     "summaryWishCheck_unchecked": "check needed: its sales are not checked yet",
-    "summaryWishPointer": "the cheapest copy, {price} at {source}, is within 10% of your price ({target}); the wish page has the search to save in the marketplace's app",
+    "summaryWishPointer": "the cheapest copy, {price} at {source}, is within [[wishPointerPct]]% of your price ({target}); the wish page has the search to save in the marketplace's app",
     "storePosts": "Tora: cards on sale in your area",
     "storeReply": "reply",
     "storeStarts": "Tora: a sale has started",
@@ -1688,7 +1688,7 @@
     "updateWaiting": "Tora: the server has not updated for 24 h and keeps running {from}; the newest version, {to}, is waiting for GitHub CI ({status}). Check the repo's Actions tab (a commit CI never runs on is never installed automatically), or run ops/update-server.sh on the server by hand.",
     "ciPending": "not finished or not started",
     "ciUnknown": "no usable answer from GitHub",
-    "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone 3 nights in a row. Those items get no new prices from it until someone links their new page (Actions), or the page answers again: Tora tries once a week.",
+    "listingsGone": "Tora: {count, plural, one {# listing was} other {# listings were}} set aside: the site has said the page is gone [[listingBrokenNights]] nights in a row. Those items get no new prices from it until someone links their new page (Actions), or the page answers again: Tora tries once a week.",
     "listingGoneLine": "{source}: {name} ({error})",
     "summaryGone": "{count, plural, one {# item waits} other {# items wait}} for a new page link (its old one is gone)",
     "loginFailed": "Tora: a sign-in to {user} failed: {why}",
@@ -1700,7 +1700,7 @@
     "login_password": "wrong password.",
     "login_disabled": "the account is turned off (an admin can turn it on in Settings > Admin > Accounts).",
     "login_notSetUp": "the account is not set up yet (its setup link was not finished).",
-    "login_devices": "the account is already signed in on 2 devices ({devices}). Sign out of one in Settings > Devices on the other, or ask the admin.",
+    "login_devices": "the account is already signed in on [[maxDevices]] devices ({devices}). Sign out of one in Settings > Devices on the other, or ask the admin.",
     "login_code": "wrong authenticator or backup code.",
     "login_locked": "too many failed attempts; sign-ins from there wait up to an hour.",
     "login_unknownUser": "no account has that name.",
@@ -1760,7 +1760,7 @@
       "no_secret": "AUTH_SECRET is not set on the server."
     },
     "buy": "Wishlist items: Good price, or an ask under your target (at once, after the nightly collect)",
-    "drops": "Sharp drops of items owned and on your wishlist, 15% or more in a week (morning summary)",
+    "drops": "Sharp drops of items owned and on your wishlist, [[sharpDropPct]]% or more in a week (morning summary)",
     "styleLink": "Message style",
     "styleInfo": "See every kind of message with examples, and change how it looks and reads."
   },
@@ -1878,7 +1878,7 @@
       "rankings": "(the sites' popularity lists; new candidates collected the same night)",
       "collectors": "(one after another; each needs the site to answer)",
       "opening": "(each set once a week)",
-      "closing": "(pictures, lot sizes: the last 14 days nightly and all of them weekly, value history, buy timing, rule tests, opportunities)",
+      "closing": "(pictures, lot sizes: the last [[lotSizeRecentDays]] days nightly and all of them weekly, value history, buy timing, rule tests, opportunities)",
       "backup": "(the whole database, once a day)",
       "alerts": "(failures to admins, buy timing alerts)"
     },
@@ -1897,7 +1897,7 @@
     "others": "Other checks",
     "other": {
       "morning": "The morning check: every day from {hour} (app time), \"nothing ran\" alerts and the daily summaries.",
-      "feed": "The store feed check: every 2 minutes (a silent feed or board is told)."
+      "feed": "The store feed check: every [[feedCheckMinutes]] minutes (a silent feed or board is told)."
     },
     "underMinute": "<1 min",
     "minutes": "{m} min",
@@ -1945,7 +1945,7 @@
     "noCollect": "No collect for {hours} hours (last {last})",
     "noBackup": "No backup for {hours} hours (last {last})",
     "dbBudget": "Database: {read} million rows read this month, {projected} million at this pace (budget {budget} million)",
-    "sourceQuiet": "{sources}: no new sales on the last 3 days of runs (usually some)",
+    "sourceQuiet": "{sources}: no new sales on the last [[quietDays]] days of runs (usually some)",
     "selfCheck": "Self-check: saved prices differed from the sales and were rebuilt ({items})",
     "dataCheck": "Self check: {count, plural, one {# new finding} other {# new findings}}",
     "fromTo": "{from} to {to}",
@@ -2004,9 +2004,9 @@
       "consoleRemoved": "Console removed",
       "consolesSuggested": "Suggested consoles added",
       "gameRules": "Game rules switched",
-      "marketRefused": "Extra reads refused by a marketplace: fewer a day after a 3-day wait",
-      "marketStopped": "Extra reads stopped: a marketplace refused at 25 a day",
-      "marketRestarted": "Extra reads restarted at 25 a day",
+      "marketRefused": "Extra reads refused by a marketplace: fewer a day after a [[marketWaitDays]]-day wait",
+      "marketStopped": "Extra reads stopped: a marketplace refused at [[marketFloor]] a day",
+      "marketRestarted": "Extra reads restarted at [[marketFloor]] a day",
       "marketJobsFailed": "Extra reads could not run",
       "trackedAdded": "Tracked games added",
       "trackedRemoved": "Tracked game removed",
@@ -2023,7 +2023,7 @@
       "password": "password",
       "2fa": "authenticator"
     },
-    "listingsGone": "{count, plural, one {# listing set aside} other {# listings set aside}}: page gone 3 nights in a row"
+    "listingsGone": "{count, plural, one {# listing set aside} other {# listings set aside}}: page gone [[listingBrokenNights]] nights in a row"
   },
   "watchlist": {
     "intro": "Items you want to buy, in the condition you want, with today's market price. Items at or under your target come first.",
@@ -2133,11 +2133,11 @@
       "release": "Apply the rules anyway",
       "kindOff": "Game rules are off for this kind of game. Turned on, they would drop {count, plural, one {# stored sale} other {# stored sales}} (judged by title).",
       "turnOn": "Turn game rules on",
-      "sales": "Sales, last 12 months",
-      "noSales": "No sales stored in the last 12 months.",
+      "sales": "Sales, last [[wishCheckMonths]] months",
+      "noSales": "No sales stored in the last [[wishCheckMonths]] months.",
       "cheap": "cheapest",
       "median": "near the median",
-      "sampleHint": "Shown: the 20 cheapest and the 20 nearest the median price.",
+      "sampleHint": "Shown: the [[checkSample]] cheapest and the [[checkSample]] nearest the median price.",
       "dropped": "Dropped ({count})",
       "reason": {
         "rules": "Dropped by the rules",
@@ -2192,7 +2192,7 @@
       "lastRead": "last read {date}",
       "noneFound": "none found last night",
       "noneFoundOn": "none found on {date}",
-      "noNight": "No nightly read in the last 7 days.",
+      "noNight": "No nightly read in the last [[lastNightDays]] days.",
       "staleNight": "Copies as of the last nightly read, {date}.",
       "noCopies": "No copy in this condition or better.",
       "moreCopies": "{count, plural, one {# more copy} other {# more copies}} not listed here, dearer",
@@ -2240,9 +2240,9 @@
         "notYet": "The level is computed after the next nightly read.",
         "needsCondition": "A level needs a condition: choose one under Your price and condition.",
         "basis": "{count, plural, one {# sale} other {# sales}} over {window} days, to {date}",
-        "rule": "The level is the price a quarter of the sales were at or under, as paid, over the last 30 days (90 days when the 30 hold under 10 sales). Only sources whose days are all read and whose shipping is known count.",
-        "change": "Over 4 weeks: {change}",
-        "noChange": "No change over 4 weeks yet: there is no level 4 weeks back.",
+        "rule": "The level is the price a quarter of the sales were at or under, as paid, over the last [[levelDays]] days ([[levelLongDays]] days when the [[levelDays]] hold under [[levelMin]] sales). Only sources whose days are all read and whose shipping is known count.",
+        "change": "Over [[wishChangeWeeks]] weeks: {change}",
+        "noChange": "No change over [[wishChangeWeeks]] weeks yet: there is no level [[wishChangeWeeks]] weeks back.",
         "record": "Lowest level so far {amount}, on {date}",
         "recordShort": "Lowest so far",
         "nearLow": "near the low so far",
@@ -2255,11 +2255,11 @@
           "cost_unknown": "{source} left out: its shipping cost is not known yet."
         },
         "rowsUnknown": "{source}: {count, plural, one {# sale} other {# sales}} left out, their shipping not stated.",
-        "tooFew": "No level yet: {count, plural, =0 {no sale} one {only # sale} other {only # sales}} in 90 days, at least 10 needed.",
+        "tooFew": "No level yet: {count, plural, =0 {no sale} one {only # sale} other {only # sales}} in [[levelLongDays]] days, at least [[levelMin]] needed.",
         "hole": "No level yet: some days are not read yet. A level can be computed from {date}.",
         "holeNoDay": "No level yet: some days are not read yet.",
         "costUnknown": "No level yet: sale prices at these sources do not tell the shipping yet.",
-        "range90": "Last 90 days: {count, plural, one {# sale} other {# sales}} as paid, from {low} to {high}.",
+        "range90": "Last [[levelLongDays]] days: {count, plural, one {# sale} other {# sales}} as paid, from {low} to {high}.",
         "noPaid": "Sale prices at these sources do not tell the shipping yet, so no price is shown."
       },
       "bounds": {
@@ -2325,7 +2325,7 @@
       "noFacts": "No facts yet.",
       "recordedBy": "recorded by {name}, {date}",
       "fact": {
-        "buybackChange": "Buyback at {source} over 4 weeks: {change}.",
+        "buybackChange": "Buyback at {source} over [[wishChangeWeeks]] weeks: {change}.",
         "shopOut": "Out of stock at {source} for {nights} read nights running, since {since}.",
         "noNewCopy": "No new copy found for {nights} read nights running, since {since}.",
         "source": "source",
@@ -2359,11 +2359,11 @@
         "load": "Loaded"
       },
       "job": {
-        "running": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} is running",
-        "several_days": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} is running over several days",
-        "waiting": "{kind, select, deep {the 12-month read is waiting to start} readback {read weekly, the next read is waiting} other {a load is waiting to start}}",
-        "asked_again": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} was asked for again",
-        "stopped": "{kind, select, deep {the 12-month read} readback {the weekly read} other {a load}} stopped"
+        "running": "{kind, select, deep {the [[deepReadMonths]]-month read} readback {the weekly read} other {a load}} is running",
+        "several_days": "{kind, select, deep {the [[deepReadMonths]]-month read} readback {the weekly read} other {a load}} is running over several days",
+        "waiting": "{kind, select, deep {the [[deepReadMonths]]-month read is waiting to start} readback {read weekly, the next read is waiting} other {a load is waiting to start}}",
+        "asked_again": "{kind, select, deep {the [[deepReadMonths]]-month read} readback {the weekly read} other {a load}} was asked for again",
+        "stopped": "{kind, select, deep {the [[deepReadMonths]]-month read} readback {the weekly read} other {a load}} stopped"
       },
       "card": {
         "cheapest": "Cheapest checked copy {amount}",
@@ -2418,14 +2418,14 @@
     "askUnder": "Listed {amount} ({pct} under)",
     "buylistNear": "A shop buys at {amount}",
     "notProven": "not proven",
-    "record": "Higher 90 days later {higher} of {checked} times ({pct}; any day {any}).",
+    "record": "Higher [[opportunityDays]] days later {higher} of {checked} times ({pct}; any day {any}).",
     "recordFew": "Too few past signals to judge ({checked}).",
     "recordsTitle": "Signals and their record",
-    "recordsIntro": "Each signal tested on the group's past prices: every week, the first day of each stretch it was on, checked 90 days later. Proven: 10 or more checks and 5 points or more better than buying on any day (a warning: worse). Most of this history is a rising market, which flatters signals that follow a rise; they are tested again after every collect.",
+    "recordsIntro": "Each signal tested on the group's past prices: every week, the first day of each stretch it was on, checked [[opportunityDays]] days later. Proven: [[provenMinChecks]] or more checks and [[provenPoints]] points or more better than buying on any day (a warning: worse). Most of this history is a rising market, which flatters signals that follow a rise; they are tested again after every collect.",
     "anyDay": "Any day",
     "colSignal": "Signal",
     "colChecked": "Checked",
-    "colHigher": "Up 90 days later",
+    "colHigher": "Up [[opportunityDays]] days later",
     "colVsAny": "Vs any day",
     "points": "{n} pts",
     "colChange": "Typical change",
@@ -2447,17 +2447,17 @@
       "reprint_coming": "Reprint coming"
     },
     "why": {
-      "line_rising": "{Scope}: {line} over 12 weeks ({items} items).",
-      "line_falling": "{Scope}: {line} over 12 weeks ({items} items).",
-      "leader": "Its 12 weeks: {own}; {scope}: {line}.",
-      "laggard": "Its 12 weeks: {own}; {scope}: {line}.",
-      "sales_up": "{sales30} sales in 30 days, {before} a month before.",
-      "sales_down": "{sales30} sales in 30 days, {before} a month before.",
-      "strong_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
-      "weak_for_age": "Its last 90 days: {change}; similar items at day {days}: {typical} ({items} items).",
-      "quick_rise": "Its last 14 days: {jump} against the 60 days before.",
+      "line_rising": "{Scope}: {line} over [[trendWeeks]] weeks ({items} items).",
+      "line_falling": "{Scope}: {line} over [[trendWeeks]] weeks ({items} items).",
+      "leader": "Its [[trendWeeks]] weeks: {own}; {scope}: {line}.",
+      "laggard": "Its [[trendWeeks]] weeks: {own}; {scope}: {line}.",
+      "sales_up": "{sales30} sales in [[salesRecentDays]] days, {before} a month before.",
+      "sales_down": "{sales30} sales in [[salesRecentDays]] days, {before} a month before.",
+      "strong_for_age": "Its last [[ageChangeDays]] days: {change}; similar items at day {days}: {typical} ({items} items).",
+      "weak_for_age": "Its last [[ageChangeDays]] days: {change}; similar items at day {days}: {typical} ({items} items).",
+      "quick_rise": "Its last [[quickRiseDays]] days: {jump} against the [[quickRiseBeforeDays]] days before.",
       "out_of_print": "Not expected to be made or sold again (marked by an admin, or a plug-in's guess).",
-      "cheap_steady": "Cheaper than on {cheaper} of its past year's days, and its last 14 days are {hold} against the 30 before.",
+      "cheap_steady": "Cheaper than on {cheaper} of its past year's days, and its last [[holdDays]] days are {hold} against the [[holdBeforeDays]] before.",
       "reprint_coming": "A reprint is expected (marked by an admin)."
     },
     "scope": {
@@ -2478,7 +2478,7 @@
     "rankSame": "same as a week ago",
     "rankUp": "up {n} in a week",
     "rankDown": "down {n} in a week",
-    "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top 60 are added as candidates and collected while they stay there; how a rank change does as a signal is tested once enough days are saved.",
+    "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top [[candidateTop]] are added as candidates and collected while they stay there; how a rank change does as a signal is tested once enough days are saved.",
     "colWeek": "Week",
     "candidate": "Suggested",
     "search": {
@@ -2492,12 +2492,12 @@
       "searched": "{shown} of {all} items match \"{q}\". Suggest a mix picks from these; ticked items not shown still count.",
       "intro": "Set a budget, once or for every month, then tick what to buy or let Tora suggest a mix.",
       "howTitle": "How the mix is picked",
-      "how": "Only items worth a look or on your wishlist, best first: the best of each item type, then the next best of any type. No item over 40% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
+      "how": "Only items worth a look or on your wishlist, best first: the best of each item type, then the next best of any type. No item over [[mixMaxPct]]% of the budget, and one per set. Each item says when to buy and what it would cost, from its price history and your strategy for its type.",
       "needBudget": "Enter a budget to get a suggestion.",
       "listFrom": "Items come from Worth a look, your wishlist and your plan.",
       "suggest": "Suggest a mix",
       "swap": "Swap for the next best",
-      "noMix": "Nothing fits this budget yet: no item worth a look or on your wishlist has a price under 40% of it (by the date).",
+      "noMix": "Nothing fits this budget yet: no item worth a look or on your wishlist has a price under [[mixMaxPct]]% of it (by the date).",
       "noSwap": "No other item fits in its place.",
       "thinMix": "Only {count, plural, one {# item has} other {# items have}} a reason to buy within this budget (worth a look, or on your wishlist): the rest is left free rather than filled with items nothing points to.",
       "budget": "Budget ({symbol})",
@@ -2561,7 +2561,7 @@
         "weak_or_mixed": "{way} on {type}: in a test on past prices ({day}), this did not clearly find better buys. This list is not advice.",
         "cannot_be_tested": "{way} on {type}: there is not enough past data to test whether this finds better buys (checked {day}). This list is not advice."
       },
-      "why": "Listings: {now} now, {before} about 14 days earlier.",
+      "why": "Listings: {now} now, {before} about [[listingsBackDays]] days earlier.",
       "verdictWait": "Buy timing: {verdict}, but a warning says wait",
       "verdict": "Buy timing: {verdict}"
     },
@@ -2586,15 +2586,15 @@
     "chooseConditions": "Change which conditions are suggested",
     "seeRecord": "See its record on Signals",
     "bestTitle": "Best signals right now",
-    "bestLine": "{pct} of {checked} higher 90 days later, {points} pts vs any day",
+    "bestLine": "{pct} of {checked} higher [[opportunityDays]] days later, {points} pts vs any day",
     "fewChecks": "few checks",
     "tooFew": "too few",
     "jumpTo": "Jump to:",
     "fewGroups": "{count, plural, one {# group} other {# groups}} with few checks",
     "wait": "Wait",
     "waitUnder": "Wait, or buy at {price} or less",
-    "waitWhy": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
-    "waitWhyNow": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} 90 days after that. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "waitWhy": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} [[opportunityDays]] days after that. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "waitWhyNow": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} [[opportunityDays]] days after that. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
     "popular": {
       "by": "Rank by:",
       "measure": {
@@ -2605,19 +2605,19 @@
       },
       "about": {
         "site": "Each site's own ranking, read every night. Sites don't publish how they rank; they show listings and favorites next to it.",
-        "sold": "The items Tora follows, by trades in the last 30 days on every site it reads (as of {day}).",
-        "trending": "Trades up 1.5x or more against the 90 days before, counting only sites Tora has read for 120+ days (as of {day}).",
-        "year": "Trades in the last 365 days on every site Tora reads, since it started following each item (as of {day})."
+        "sold": "The items Tora follows, by trades in the last [[popularDays]] days on every site it reads (as of {day}).",
+        "trending": "Trades up [[trendingRatio]]x or more against the [[popularBeforeDays]] days before, counting only sites Tora has read for [[popularFollowDays]]+ days (as of {day}).",
+        "year": "Trades in the last [[popularYearDays]] days on every site Tora reads, since it started following each item (as of {day})."
       },
       "none": {
         "site": "No site ranking for this item type.",
-        "sold": "No trades in the last 30 days.",
-        "trending": "Nothing trending: no item trades 1.5 times as often as before, with enough history to compare.",
+        "sold": "No trades in the last [[popularDays]] days.",
+        "trending": "Nothing trending: no item trades [[trendingRatio]] times as often as before, with enough history to compare.",
         "year": "No trades in the last year."
       },
-      "trades30": "{n, plural, one {# trade} other {# trades}} in 30 days",
+      "trades30": "{n, plural, one {# trade} other {# trades}} in [[popularDays]] days",
       "tradesYear": "{n, plural, one {# trade} other {# trades}} this year",
-      "trendX": "{x}x its average of the 90 days before ({before} a month)",
+      "trendX": "{x}x its average of the [[popularBeforeDays]] days before ({before} a month)",
       "seeRanking": "See it in the ranking",
       "bySite": "by site: {sites}",
       "fellBack": "No recent site ranking for this item type: showing the most traded."
@@ -2625,20 +2625,20 @@
     "toraView": "Tora's view:",
     "toraWorth": "worth a look",
     "toraNow": "Tora {price}",
-    "waitLow": "It has been this cheap before: in the past year it sold for {low} or less on 1 day in 10.",
-    "waitFloored": "The usual drop would take it under {low}, a price it sold at or under on only 1 day in 10 in the past year, so Tora asks no lower.",
+    "waitLow": "It has been this cheap before: in the past year it sold for {low} or less on 1 day in [[yearLowOneIn]].",
+    "waitFloored": "The usual drop would take it under {low}, a price it sold at or under on only 1 day in [[yearLowOneIn]] in the past year, so Tora asks no lower.",
     "targetBasis": {
-      "quarter180": "Target: the price it sold at or under on a quarter of days in the last 6 months.",
+      "quarter180": "Target: the price it sold at or under on a quarter of days in the last [[rangeMonths]] months.",
       "tenth365": "Target: the price it sold at or under on a tenth of days in the last year.",
-      "margin": "Target: {pct}% under its usual price (the median of the last 6 months).",
-      "thin_margin": "Target: 10% under its usual price (too few sales for a range).",
+      "margin": "Target: {pct}% under its usual price (the median of the last [[rangeMonths]] months).",
+      "thin_margin": "Target: [[defaultMargin]]% under its usual price (too few sales for a range).",
       "watch": "The target on your wish."
     },
     "targetPattern": "Lowered: similar items usually fell further at this age.",
     "targetYours": "Your strategy for this item type: {name}.",
     "targetSuggested": "Tora's suggested strategy for this item type: {name} (choose your own in Wishlist > Strategy).",
-    "waitWhyNoTarget": "{signal} is on. While it was, prices were typically {change} 90 days later.",
-    "noRankings": "No popularity rankings in the last 3 days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
+    "waitWhyNoTarget": "{signal} is on. While it was, prices were typically {change} [[opportunityDays]] days later.",
+    "noRankings": "No popularity rankings in the last [[rankingFreshDays]] days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
     "showAll": "Show all {count}",
     "listingsN": "{n} listed",
     "favoritesN": "{n} favorites"
@@ -2687,7 +2687,7 @@
     "potentialTitle": "What you look for (optional)",
     "potentialIntro": "Items meeting these come first in a list by way of spotting a deal, and show a tag on Worth a look. This only changes the order: it does not check the price.",
     "potentialNote": "Some subjects and rarities were tested on past prices on 2026-11-07, and none clearly beat the rest. One you add here is not tested by itself.",
-    "potentialSubjects": "Subjects, comma between each (up to 10)",
+    "potentialSubjects": "Subjects, comma between each (up to [[potentialSubjects]])",
     "potentialSubjectsHint": "Dragon, Knight",
     "potentialRarities": "Rarities",
     "potentialOutOfPrint": "Marked out of print",
@@ -2709,8 +2709,8 @@
     "calls": "{count, plural, =0 {No buy days on this example} one {# buy day on this example} other {# buy days on this example}}",
     "paidUnder": "{pct}% under the average",
     "paidOver": "{pct}% over the average",
-    "after90": "the price was higher 90 days later after {higher} of {checked}",
-    "after90Few": "the price was higher 90 days later after {higher} of {checked}, too few to judge",
+    "after90": "the price was higher [[patternDays]] days later after {higher} of {checked}",
+    "after90Few": "the price was higher [[patternDays]] days later after {higher} of {checked}, too few to judge",
     "marginLabel": "Under the usual price by",
     "use": "Use {name} for {type}",
     "name": {
@@ -2721,9 +2721,9 @@
       "target": "Own target only"
     },
     "about": {
-      "steady": "Good price in the cheapest quarter of the last 180 days. With little history, 10% under the usual price. Waits while the price or its market falls fast, and while a new release is younger than the age similar items usually hit their low at.",
+      "steady": "Good price in the cheapest quarter of the last [[rangeDays]] days. With little history, [[defaultMargin]]% under the usual price. Waits while the price or its market falls fast, and while a new release is younger than the age similar items usually hit their low at.",
       "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price or its market falls fast, and on new releases.",
-      "margin": "{margin}% under the usual price (the median of the last 180 days). Waits while the price or its market falls fast, and on new releases.",
+      "margin": "{margin}% under the usual price (the median of the last [[rangeDays]] days). Waits while the price or its market falls fast, and on new releases.",
       "dip": "Like Steady, but still says good price while the price or its market falls fast, or on a new release, with a warning. Buys earlier; may buy before the bottom.",
       "target": "No zone: only the target prices you set on your wishes."
     },
@@ -2736,7 +2736,7 @@
     "exampleAbout": {
       "steady": "A card over a year: no trend, with dips along the way.",
       "fall": "A box falling for months, then flat, then starting to recover.",
-      "new_set": "A box from its release: hype, a dip over the first months, then a recovery. Strategies other than Catch the dip wait 90 days after release."
+      "new_set": "A box from its release: hype, a dip over the first months, then a recovery. Strategies other than Catch the dip wait [[newReleaseDays]] days after release."
     }
   },
   "buy": {
@@ -2754,32 +2754,32 @@
     },
     "zone": "Good price at or under <n>{amount}</n>",
     "basis": {
-      "quarter180": "the cheapest quarter of the last 180 days",
+      "quarter180": "the cheapest quarter of the last [[rangeDays]] days",
       "tenth365": "the cheapest tenth of the last year",
       "margin": "{pct}% under the usual price, {usual}",
-      "thin_margin": "10% under the usual price: not enough history for a range"
+      "thin_margin": "[[defaultMargin]]% under the usual price: not enough history for a range"
     },
     "loweredByPattern": "Lowered by the new-set pattern ({pct}).",
-    "falling": "Falling fast ({pct} in 2 weeks): wait until it flattens (under 5% down in 2 weeks).",
-    "fallingDip": "Still falling fast ({pct} in 2 weeks): it may go lower.",
+    "falling": "Falling fast ({pct} in [[fallWeeks]] weeks): wait until it flattens (under [[fallingPct]]% down in [[fallWeeks]] weeks).",
+    "fallingDip": "Still falling fast ({pct} in [[fallWeeks]] weeks): it may go lower.",
     "askInZone": "A listing is in the zone now.",
     "limited": "Limited data: {reasons}.",
     "limitedWhy": {
-      "few_sales": "under 3 sales in 30 days",
-      "short_range": "under 10 days with sales in 180 days"
+      "few_sales": "under [[limitedSales]] sales in [[fairDays]] days",
+      "short_range": "under [[rangeMinDays]] days with sales in [[rangeDays]] days"
     },
     "reason": {
-      "fair": "Market value <n>{amount}</n> ({count, plural, one {# sale} other {# sales}} in 30 days)",
-      "position": "At or below the price on {pct}% of the last 180 days",
+      "fair": "Market value <n>{amount}</n> ({count, plural, one {# sale} other {# sales}} in [[fairDays]] days)",
+      "position": "At or below the price on {pct}% of the last [[rangeDays]] days",
       "trend": "Trend: {list}",
       "weeks": "{pct} in {weeks} weeks",
       "ask": "Lowest ask <n>{amount}</n> ({pct} against market value)",
-      "pattern": "Similar items ({items}{group}) moved {pct} in the 90 days after day {days} from release",
+      "pattern": "Similar items ({items}{group}) moved {pct} in the [[patternDays]] days after day {days} from release",
       "noPattern": "New-set pattern: not enough similar items with prices at this age yet",
       "noRelease": "New-set pattern: no release date (only the first collected sale)",
       "sep": ", ",
-      "market": "Similar items ({items}{group}): {pct} over 12 weeks",
-      "noMarket": "Similar items: too few to judge the market (5 needed)",
+      "market": "Similar items ({items}{group}): {pct} over [[trendWeeks]] weeks",
+      "noMarket": "Similar items: too few to judge the market ([[marketMinItems]] needed)",
       "noAge": "No release date",
       "age": "Released {days} days ago",
       "ageFirstSale": "First collected sale {days} days ago (no release date, so no new-release wait)",
@@ -2787,9 +2787,9 @@
       "noLowAge": "Too few similar items with a full first year to learn when prices bottom out: day {wait} is used",
       "pastFirstYear": "Past its first year: no new-release wait or pattern"
     },
-    "marketFalling": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. Wait until it flattens.",
-    "marketFallingDip": "The market is still falling: similar items ({items}{group}) are {pct} over 12 weeks. It may go lower.",
-    "marketFallingHeld": "The market is falling: similar items ({items}{group}) are {pct} over 12 weeks. But this item is cheaper than on {cheaper} of its past year's days and its price has held over the last 2 weeks ({hold}), so it doesn't wait for the market. In the past, such items rose about as often as on any day.",
+    "marketFalling": "The market is falling: similar items ({items}{group}) are {pct} over [[trendWeeks]] weeks. Wait until it flattens.",
+    "marketFallingDip": "The market is still falling: similar items ({items}{group}) are {pct} over [[trendWeeks]] weeks. It may go lower.",
+    "marketFallingHeld": "The market is falling: similar items ({items}{group}) are {pct} over [[trendWeeks]] weeks. But this item is cheaper than on {cheaper} of its past year's days and its price has held over the last [[holdWeeks]] weeks ({hold}), so it doesn't wait for the market. In the past, such items rose about as often as on any day.",
     "newRelease": "New release ({days} days): similar items ({items}{group}) usually hit their first-year low around day {wait}. Wait until then{dated, select, true {, {date}} other {}}.",
     "newReleaseDefault": "New release ({days} days): new releases often drop in their first months. Wait until day {wait}{dated, select, true {, {date}} other {}} (too few similar items with a full first year to learn when).",
     "lowDrop": "From this age, similar items ({items}{group}) fell a median {pct} to their first-year low{priced, select, true { (about {price} from today's price)} other {}}.",
@@ -2808,21 +2808,21 @@
     },
     "chart": {
       "zone": "Buy zone: under {amount}",
-      "range": "Usual range (180 days): {low} - {high}",
+      "range": "Usual range ([[rangeDays]] days): {low} - {high}",
       "ask": "Lowest ask: {amount}",
-      "lowShort": "180d low",
-      "highShort": "180d high",
+      "lowShort": "[[rangeDays]]d low",
+      "highShort": "[[rangeDays]]d high",
       "askShort": "Ask"
     },
     "ruleTest": {
       "title": "Rule test",
       "about": "{name} on the whole price history of similar items ({items}{group}).",
       "notYet": "Worked out after the next collect.",
-      "few": "Not enough past signals to test yet: {count} with a price 90 days later ({min} needed).",
+      "few": "Not enough past signals to test yet: {count} with a price [[patternDays]] days later ({min} needed).",
       "signals": "Past buy signals ({count})",
-      "result": "higher 90 days later {higher} of {checked} times ({pct}%), typical change {change}",
+      "result": "higher [[patternDays]] days later {higher} of {checked} times ({pct}%), typical change {change}",
       "anyDay": "Buying on any day",
-      "anyResult": "higher 90 days later {pct}% of the time, typical change {change}",
+      "anyResult": "higher [[patternDays]] days later {pct}% of the time, typical change {change}",
       "better": "Better than buying on any day, in the past.",
       "worse": "Worse than buying on any day, in the past: the zone paid less, but prices often kept falling for a while.",
       "same": "About the same as buying on any day, in the past.",
@@ -2837,7 +2837,7 @@
   },
   "setLines": {
     "title": "Set lines",
-    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough (3 or more), else with the whole group. Japanese Pokemon sets get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
+    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough ([[patternMinItems]] or more), else with the whole group. Japanese Pokemon sets get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
     "builtIn": "Built in",
     "others": "Other lines, one per line",
     "saved": "Saved."
@@ -2923,7 +2923,7 @@
     "cardsNotRead": "Cards not read yet",
     "error": {
       "code": "Type the set code as card titles show it, e.g. SV2a.",
-      "packs": "Packs a box: a whole number from 1 to 100.",
+      "packs": "Packs a box: a whole number from 1 to [[openingPacksMax]].",
       "tiers": "Each rarity needs letters (SAR, AR...) and how many a box holds: 3, 0.2 or 1/6."
     }
   },
@@ -2980,7 +2980,7 @@
     "from": "From",
     "to": "To",
     "unknownAlerts": "Tell me about posts naming no store or place Tora knows (questions and chat too)",
-    "feedAlertsInfo": "No silent failures: the app checks every 2 minutes while it runs on this PC. A whole page of new posts at once (posts maybe missed) is always told.",
+    "feedAlertsInfo": "No silent failures: the app checks every [[feedCheckMinutes]] minutes while it runs on this PC. A whole page of new posts at once (posts maybe missed) is always told.",
     "addTitle": "Add a store or place",
     "addInfo": "For a chain or an area Tora has no list for. A place (an area's name or emoji, with its location) is matched on every board; a store only on its chain's board.",
     "chain": "Chain",
@@ -3001,7 +3001,7 @@
       "chain": "Chain key: lower-case letters, digits, - or _.",
       "name": "Give it a name.",
       "location": "Location: two numbers, latitude and longitude.",
-      "glossary": "A code and its meaning (code up to 20 characters)."
+      "glossary": "A code and its meaning (code up to [[glossaryCodeMax]] characters)."
     },
     "places": "Places (areas)",
     "allChains": "All {n}",
@@ -3052,7 +3052,7 @@
       "allInfo": "A message for new posts and every reply about your stores.",
       "starts": "Sales starting",
       "startsInfo": "A short message when someone says a sale started.",
-      "startsInfo2": "Or when 3 or more people post about one store within 15 minutes.",
+      "startsInfo2": "Or when [[burstAuthors]] or more people post about one store within [[burstMinutes]] minutes.",
       "off": "Off",
       "offInfo": "You will not be told of sales. Posts stay on these pages.",
       "paused": "The feed is down: Tora sends nothing until it is back, whatever you choose here.",
@@ -3061,7 +3061,7 @@
       "hideLotteriesInfo": "Only clear lottery announcements and their replies; they stay on Lotteries and the other pages. Anything unsure stays on Now."
     },
     "lottery": {
-      "intro": "First posts (not replies) using {words}, newest first, kept 30 days.",
+      "intro": "First posts (not replies) using {words}, newest first, kept [[keepPostsDays]] days.",
       "leftOut": "Posts with {words} are left out (Codes, kind: Not a lottery).",
       "noWords": "No lottery words yet. An admin adds them on Codes (kind: Lottery word), e.g. the word posters use for a lottery sale.",
       "shown": {
@@ -3071,7 +3071,7 @@
         "hidden": "Hidden"
       },
       "empty": {
-        "open": "No lottery posts in the last 30 days.",
+        "open": "No lottery posts in the last [[keepPostsDays]] days.",
         "interested": "Nothing marked Interested. Tap Interested on a post to keep it here.",
         "applied": "Nothing marked Applied. Tap Applied on a post once you have applied.",
         "hidden": "Nothing hidden."
@@ -3131,7 +3131,7 @@
     "noToday": "No posts about these stores today yet.",
     "noTodayDown": "Nothing received since {time}: Tora cannot see new posts right now.",
     "earlier": "{n, plural, one {Earlier (yesterday): # location} other {Earlier (yesterday): # locations}}",
-    "byLocationInfo": "Locations of your area with posts since yesterday (5:00), nearest first, with how many; open one to see its posts, newest first.",
+    "byLocationInfo": "Locations of your area with posts since yesterday ([[postDayStarts]]), nearest first, with how many; open one to see its posts, newest first.",
     "otherBoards": "Other boards",
     "allOfChain": "All its stores",
     "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
@@ -3147,7 +3147,7 @@
       "next": "next {board} in {in}",
       "reading": "Reading {board}",
       "late": "{board} late (due {time})",
-      "quiet": "No posts from {boards} for 10 min",
+      "quiet": "No posts from {boards} for [[silentMinutes]] min",
       "silent": "Feed silent since {time}: notices stopped",
       "stopped": "Stopped: out of tracking hours",
       "starting": "Starting",
@@ -3162,12 +3162,12 @@
   },
   "accounts": {
     "newTitle": "New account",
-    "newInfo": "Makes the account and a one-time setup link (24 hours). Send the link to the person: they choose their own password and add Tora to their authenticator app on their own device. You never see their password.",
+    "newInfo": "Makes the account and a one-time setup link ([[setupLinkHours]] hours). Send the link to the person: they choose their own password and add Tora to their authenticator app on their own device. You never see their password.",
     "username": "Username",
-    "usernameRule": "3 to 32 characters: a-z, 0-9, . _ -",
+    "usernameRule": "[[usernameMin]] to [[usernameMax]] characters: a-z, 0-9, . _ -",
     "asAdmin": "Admin",
     "create": "Create",
-    "yourCode": "Your 6-digit code",
+    "yourCode": "Your [[totpDigits]]-digit code",
     "cancel": "Cancel",
     "linkReady": "Setup link (shown once, send it to the person):",
     "linkInfo": "Works once, until {until}. A new link stops this one.",
@@ -3196,7 +3196,7 @@
       "invalid": "That code did not match (each code works once: wait for the next one).",
       "locked": "Too many attempts. Try again later.",
       "notConfigured": "Login is not configured (AUTH_SECRET missing).",
-      "username": "Usernames: 3 to 32 characters, a-z 0-9 . _ -",
+      "username": "Usernames: [[usernameMin]] to [[usernameMax]] characters, a-z 0-9 . _ -",
       "taken": "That username is taken.",
       "self": "Not your own account.",
       "missing": "No such account."
@@ -3215,14 +3215,14 @@
       "2fa": "Add Tora to your new authenticator app ({username})."
     },
     "newPassword": "New password",
-    "passwordRule": "At least 12 characters.",
+    "passwordRule": "At least [[minPassword]] characters.",
     "repeat": "Repeat it",
     "currentCode": "Code from your authenticator app",
     "currentCodeHint": "Lost it? One of your backup codes works too.",
     "currentPassword": "Your password",
     "scanTitle": "Authenticator",
     "scanInfo": "Scan with your authenticator app (Google Authenticator, 1Password...), or type the key below, then enter the code it shows.",
-    "newCode": "6-digit code",
+    "newCode": "[[totpDigits]]-digit code",
     "save": "Save",
     "done": "Done. Every device was signed out: sign in again.",
     "backupTitle": "Backup codes",
@@ -3232,9 +3232,9 @@
       "expired": "This link no longer works (used, expired or replaced). Ask the admin for a new one.",
       "locked": "Too many attempts. Try again later.",
       "notConfigured": "Login is not configured (AUTH_SECRET missing).",
-      "short": "The password needs at least 12 characters.",
+      "short": "The password needs at least [[minPassword]] characters.",
       "mismatch": "The passwords do not match.",
-      "signIn": "Wrong username or password, or this account is already signed in on 2 devices or not set up yet. Sign out on one of its devices, or ask the admin.",
+      "signIn": "Wrong username or password, or this account is already signed in on [[maxDevices]] devices or not set up yet. Sign out on one of its devices, or ask the admin.",
       "invalid": "That did not match. Try again.",
       "newCode": "The authenticator's code did not match (check the phone's clock is automatic)."
     }
@@ -3287,19 +3287,19 @@
     "addSuggested": "Add the suggested consoles",
     "suggestedAdded": "{count, plural, =0 {Nothing added: they are all here.} one {# console added.} other {# consoles added.}}",
     "error": {
-      "key": "The key needs lower case letters, digits or dashes (up to 32).",
+      "key": "The key needs lower case letters, digits or dashes (up to [[consoleKeyMax]]).",
       "exists": "A console with this key exists already.",
       "names": "A name is too long.",
       "aliases": "Too many other spellings, or one is too long.",
       "category": "A category number can hold only letters, digits and dashes.",
-      "sort": "The order is a whole number from 0 to 9999.",
+      "sort": "The order is a whole number from 0 to [[consoleSortMax]].",
       "missing": "That console was already deleted."
     }
   },
   "tracked": {
     "info": "Console games read before anyone wishes for them, so their history is there when someone does. They belong to no one and show in no portfolio or wishlist.",
     "more": "How they are read",
-    "moreText": "The chosen set is read weekly at each marketplace (a read back 2 weeks) and at the identity shop on its night (a seventh of the set each night). The rest gets one page a month at one marketplace, only while its switch is on. A game someone wishes for is read as a wish, every night, and stays tracked. All reads count against each marketplace's number a day.",
+    "moreText": "The chosen set is read weekly at each marketplace (a read back [[trackedWeeklyWeeks]] weeks) and at the identity shop on its night (a seventh of the set each night). The rest gets one page a month at one marketplace, only while its switch is on. A game someone wishes for is read as a wish, every night, and stays tracked. All reads count against each marketplace's number a day.",
     "moreShop": "The identity shop's prices are read once you confirm the game's shop page (on the item's page).",
     "totals": "{count, plural, one {# tracked game} other {# tracked games}}",
     "weekly": "Weekly reads",

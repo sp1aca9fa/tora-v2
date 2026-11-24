@@ -22,6 +22,7 @@ import {
   plainText,
   telegramHtml,
   SHARP_DROP_7D,
+  SHARP_DROP_DAYS,
   type DataCheckDescribed,
   type SignalStats,
   alertPrefs,
@@ -1379,7 +1380,7 @@ export async function morningCheck(db: Db, ctx: AlertContext, now = new Date()):
 }
 
 /** Hours between two summaries of one person (the PC and the app's check may both try). */
-const SUMMARY_GAP_HOURS = 20;
+export const SUMMARY_GAP_HOURS = 20;
 
 /** Rows of an import that were not added: already in Tora, left out, or with a problem. */
 function notAdded(entry: Activity) {
@@ -1784,7 +1785,10 @@ export async function sharpDrops(
     if (last.fair === null || day(today) - day(last.day) > 1) continue;
     const seriesBreak = breaks[pairs.get(key)!.product.id] ?? '';
     const before = list.find(
-      (r) => Math.abs(day(last.day) - day(r.day) - 7) <= 1 && r.fair && r.day > seriesBreak,
+      (r) =>
+        Math.abs(day(last.day) - day(r.day) - SHARP_DROP_DAYS) <= 1 &&
+        r.fair &&
+        r.day > seriesBreak,
     );
     if (!before?.fair) continue;
     const change = last.fair / before.fair - 1;

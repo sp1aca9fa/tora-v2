@@ -43,7 +43,7 @@
     "username": "Usuario",
     "continue": "Continuar",
     "codeTitle": "Código del autenticador",
-    "code": "Código de 6 dígitos",
+    "code": "Código de [[totpDigits]] dígitos",
     "codeHint": "De tu app de autenticación. ¿La perdiste? Introduce uno de tus códigos de respaldo.",
     "startOver": "Empezar de nuevo",
     "errors": {
@@ -310,15 +310,15 @@
     "logout": "Cerrar sesión",
     "signedInAs": "Sesión iniciada como {username}",
     "devices": "Dispositivos ({count}/{max})",
-    "devicesInfo": "Cada cuenta puede tener sesión abierta en hasta 2 dispositivos. Cerrar sesión o revocar libera un hueco; un dispositivo nuevo necesita la contraseña y un código del autenticador.",
+    "devicesInfo": "Cada cuenta puede tener sesión abierta en hasta [[maxDevices]] dispositivos. Cerrar sesión o revocar libera un hueco; un dispositivo nuevo necesita la contraseña y un código del autenticador.",
     "thisDevice": "Este dispositivo",
     "deviceDates": "Desde {since} · último uso {seen}",
     "revoke": "Revocar",
     "sourceCounts": "{linked} enlazados · {pending} esperando confirmación",
     "lastRunCounts": "{requests} peticiones · +{added} ventas",
-    "stale": "Sin recoger desde hace 3+ días:",
+    "stale": "Sin recoger desde hace [[healthStaleDays]]+ días:",
     "never": "nunca",
-    "jumps": "La mediana se movió más de un 50% (últimos 7 días frente a los 30 anteriores):",
+    "jumps": "La mediana se movió más de un [[jumpPct]]% (últimos [[jumpRecentDays]] días frente a los [[jumpBeforeDays]] anteriores):",
     "recentRuns": "Ejecuciones recientes",
     "section": {
       "account": {
@@ -493,7 +493,7 @@
     "noneSelected": "Selecciona al menos una carta",
     "noneGraded": "Elige un grado para al menos una carta",
     "noLinks": "No se encontraron enlaces.",
-    "tooManyLinks": "Hasta 200 enlaces a la vez.",
+    "tooManyLinks": "Hasta [[maxLinks]] enlaces a la vez.",
     "nonePicked": "Elige al menos un panel.",
     "invalid_time_zone": "Esa zona horaria no se conoce.",
     "duplicate_watch": "Ya sigues este artículo en ese estado.",
@@ -602,7 +602,7 @@
     },
     "pasteUrl": "Pega un enlace de producto de una fuente de precios ({sources})",
     "link": "Enlazar",
-    "last30": "Últimos 30 días",
+    "last30": "Últimos [[priceStatsDays]] días",
     "median": "Mediana",
     "trades": "Ventas",
     "unmapped": "sin asignar",
@@ -677,8 +677,8 @@
       "low": "Baja"
     },
     "confidenceHint": {
-      "high": "5+ ventas en los últimos 30 días",
-      "medium": "3+ ventas en los últimos 180 días",
+      "high": "[[highConfidenceSales]]+ ventas en los últimos [[highConfidenceDays]] días",
+      "medium": "[[mediumConfidenceSales]]+ ventas en los últimos [[mediumConfidenceDays]] días",
       "low": "Pocas ventas o antiguas, un precio de tienda o el precio de venta al público"
     },
     "short": {
@@ -879,7 +879,7 @@
       "open": "Abrir la importación",
       "error": {
         "sheetType": "Elige un archivo .csv (en Excel: Guardar como > CSV).",
-        "sheetTooBig": "El archivo pasa de 2 MB.",
+        "sheetTooBig": "El archivo pasa de [[sheetMaxMb]] MB.",
         "sheetNoHeader": "La primera fila debe nombrar las columnas, al menos el artículo (como en la descarga).",
         "sheetTooManyRows": "Más de 5.000 filas: divide el archivo."
       },
@@ -942,11 +942,11 @@
     "editOrMerge": "Editar o fusionar",
     "market": {
       "value": "Valor de mercado",
-      "sales30": "Ventas en 30 días",
-      "change4": "4 semanas",
-      "change12": "12 semanas",
-      "range": "Rango de 180 días",
-      "rangeHint": "La mitad central de los precios diarios de los últimos 180 días (del cuartil inferior al superior).",
+      "sales30": "Ventas en [[fairDays]] días",
+      "change4": "[[monthTrendWeeks]] semanas",
+      "change12": "[[trendWeeks]] semanas",
+      "range": "Rango de [[rangeDays]] días",
+      "rangeHint": "La mitad central de los precios diarios de los últimos [[rangeDays]] días (del cuartil inferior al superior).",
       "condition": "En {condition}.",
       "historyInfo": "Medianas diarias de venta del último año, una línea por fuente."
     }
@@ -1002,7 +1002,7 @@
     },
     "set": "Set del catálogo: {name} ({code}), salió el {date}",
     "setBefore": "El artículo dice: {name} ({code}). Su fecha de salida viene del set.",
-    "line": "Marcarlo como {line}: en sus 3 primeros meses se movió {pct}, a diferencia de artículos parecidos ({groupPct}, {groupItems} artículos) pero como los artículos {line} ({linePct}, {lineItems} artículos)."
+    "line": "Marcarlo como {line}: en sus [[patternMonths]] primeros meses se movió {pct}, a diferencia de artículos parecidos ({groupPct}, {groupItems} artículos) pero como los artículos {line} ({linePct}, {lineItems} artículos)."
   },
   "compare": {
     "title": "{primary} frente a {secondary}",
@@ -1126,7 +1126,7 @@
     "quality": {
       "agrees": "Coincide con {reference}: {pct}% {direction}, {count} artículos",
       "disagrees": "{pct}% {direction} {reference} en {count} artículos: solo comparación",
-      "unverified": "Sin verificar: {count} artículos en común con {reference} (hacen falta 10)",
+      "unverified": "Sin verificar: {count} artículos en común con {reference} (hacen falta [[qualityMinPairs]])",
       "below": "por debajo de",
       "above": "por encima de",
       "dismissed": "aviso descartado"
@@ -1217,7 +1217,7 @@
     "outside": "Fuera del horario, las páginas de Tiendas lo dicen en rojo, y los administradores pueden seguir una hora o hasta el próximo inicio (una vez: después sigue el horario de siempre).",
     "save": "Guardar",
     "saved": "Guardado.",
-    "invalid": "Dos horas distintas y retrasos de 0 a 3600 segundos, el más corto primero."
+    "invalid": "Dos horas distintas y retrasos de 0 a [[maxTrackingDelay]] segundos, el más corto primero."
   },
   "timeZone": {
     "title": "Zona horaria",
@@ -1316,12 +1316,12 @@
   },
   "database": {
     "title": "Base de datos",
-    "info": "Filas que la base de datos alojada (Turso) leyó y escribió este mes, según sus respuestas. El plan gratuito permite 500 millones de filas leídas y 10 millones escritas al mes.",
+    "info": "Filas que la base de datos alojada (Turso) leyó y escribió este mes, según sus respuestas. El plan gratuito permite [[freeReadMillions]] millones de filas leídas y [[freeWrittenMillions]] millones escritas al mes.",
     "read": "{month}: {read} filas leídas de {free} gratis (a este ritmo, {projected} a fin de mes)",
     "written": "{written} filas escritas de {free} gratis",
     "budget": "Avisar a los administradores al pasar de",
     "millions": "{m} millones de filas leídas",
-    "budgetInfo": "La comprobación diaria de la app envía una alerta cuando el mes pasa de esto, o va camino de pasarlo a este ritmo (desde el día 5).",
+    "budgetInfo": "La comprobación diaria de la app envía una alerta cuando el mes pasa de esto, o va camino de pasarlo a este ritmo (desde el día [[paceFromDay]]).",
     "byOrigin": "Por origen",
     "byDay": "Por día (UTC)",
     "readWritten": "{read} leídas, {written} escritas",
@@ -1402,7 +1402,7 @@
       "title": "Cuentas",
       "create": "Crea una cuenta: contraseña, código QR del autenticador, códigos de respaldo. La primera es de administrador.",
       "list": "Lista las cuentas.",
-      "devices": "Lista los dispositivos con sesión abierta de una cuenta (2 como máximo).",
+      "devices": "Lista los dispositivos con sesión abierta de una cuenta ([[maxDevices]] como máximo).",
       "revoke": "Cierra la sesión de un dispositivo, o de todos.",
       "password": "Pone una contraseña nueva.",
       "twoFactor": "Un móvil perdido: nueva clave de autenticador y códigos de respaldo.",
@@ -1419,7 +1419,7 @@
     "alerts": {
       "title": "Alertas",
       "afterRun": "Registra una recogida o copia que se paró antes de poder hacerlo, y envía los fallos a los administradores enseguida. El horario lo ejecuta tras cada recogida y copia.",
-      "check": "La comprobación matinal de la app, ejecutada desde el PC: alertas de \"no se ejecutó nada\" y los resúmenes diarios (a cada persona como mucho una vez cada 20 horas)."
+      "check": "La comprobación matinal de la app, ejecutada desde el PC: alertas de \"no se ejecutó nada\" y los resúmenes diarios (a cada persona como mucho una vez cada [[summaryGapHours]] horas)."
     },
     "database": {
       "title": "Base de datos y Claude",
@@ -1500,8 +1500,8 @@
     "backupFailed": "Tora: la copia de seguridad falló: {error}",
     "noCollect": "Tora: no se ha ejecutado ninguna recogida en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
     "noBackup": "Tora: ninguna copia de seguridad en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
-    "dbBudget": "Tora: la base de datos leyó {read} millones de filas este mes; a este ritmo, {projected} millones a fin de mes (presupuesto {budget} millones, plan gratuito 500 millones). Ver Ajustes > Administración > Base de datos.",
-    "sourceQuiet": "Tora: {sources} no ha encontrado ventas nuevas en sus últimos 3 días de recogida, aunque normalmente sí encuentra. Puede que su web haya cambiado: mira el registro de recogida o abre uno de sus anuncios (Ajustes > Recolectores).",
+    "dbBudget": "Tora: la base de datos leyó {read} millones de filas este mes; a este ritmo, {projected} millones a fin de mes (presupuesto {budget} millones, plan gratuito [[freeReadMillions]] millones). Ver Ajustes > Administración > Base de datos.",
+    "sourceQuiet": "Tora: {sources} no ha encontrado ventas nuevas en sus últimos [[quietDays]] días de recogida, aunque normalmente sí encuentra. Puede que su web haya cambiado: mira el registro de recogida o abre uno de sus anuncios (Ajustes > Recolectores).",
     "selfCheck": "Tora: la autocomprobación nocturna encontró precios guardados que no coincidían con las ventas recogidas, y los reconstruyó: {items}. Si se repite, avisa al desarrollador.",
     "summaryTitle": "Tora: resumen diario",
     "summaryImport": "{method}: {imported} añadidos, {existing} ya en Tora, {skipped} descartados, {problem} con un problema",
@@ -1515,8 +1515,8 @@
     "buyZone": "{name}: buen precio, {price} (zona de compra por debajo de {zone}).",
     "buyLimited": "Datos limitados.",
     "buyTarget": "{name}: un precio pedido de {price} en {source}, por debajo de tu objetivo {target}.",
-    "summaryDrops": "Bajadas fuertes (15% o más en una semana):",
-    "summaryDrop": "{name}: {price}, {pct} en 7 días",
+    "summaryDrops": "Bajadas fuertes ([[sharpDropPct]]% o más en una semana):",
+    "summaryDrop": "{name}: {price}, {pct} en [[sharpDropDays]] días",
     "storePosts": "Tora: cartas a la venta en tu zona",
     "storeLink": "Avisos de tiendas en Tora",
     "storeOpen": "publicación",
@@ -1537,7 +1537,7 @@
     "updateWaiting": "Tora: el servidor lleva 24 h sin actualizarse y sigue funcionando con {from}; la versión más reciente, {to}, espera el CI de GitHub ({status}). Revisa la pestaña Actions del repositorio (un commit en el que el CI nunca se ejecuta no se instala automáticamente) o ejecuta ops/update-server.sh a mano en el servidor.",
     "ciPending": "sin terminar o sin empezar",
     "ciUnknown": "sin respuesta útil de GitHub",
-    "listingsGone": "Tora: {count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}: el sitio dice que la página ya no existe 3 noches seguidas. Esos artículos no reciben precios nuevos de él hasta que alguien enlace su página nueva (Pendientes).",
+    "listingsGone": "Tora: {count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}: el sitio dice que la página ya no existe [[listingBrokenNights]] noches seguidas. Esos artículos no reciben precios nuevos de él hasta que alguien enlace su página nueva (Pendientes).",
     "listingGoneLine": "{source}: {name} ({error})",
     "summaryGone": "{count, plural, one {# artículo espera} other {# artículos esperan}} un enlace a su página nueva (la anterior ya no existe)"
   },
@@ -1589,7 +1589,7 @@
       "no_secret": "AUTH_SECRET no está definido en el servidor."
     },
     "buy": "Artículos seguidos: buen precio, o un precio pedido por debajo de tu objetivo (enseguida, tras la recogida nocturna)",
-    "drops": "Bajadas fuertes de artículos en posesión y seguidos, 15% o más en una semana (resumen matinal)",
+    "drops": "Bajadas fuertes de artículos en posesión y seguidos, [[sharpDropPct]]% o más en una semana (resumen matinal)",
     "styleLink": "Estilo de mensajes",
     "styleInfo": "Mira cada tipo de mensaje con ejemplos, y cambia su aspecto y su texto."
   },
@@ -1707,7 +1707,7 @@
       "rankings": "(las listas de popularidad de los sitios; los nuevos candidatos se recogen esa misma noche)",
       "collectors": "(uno tras otro; cada uno necesita que el sitio responda)",
       "opening": "(cada set una vez a la semana)",
-      "closing": "(imágenes, tamaños de lote: los últimos 14 días cada noche y todos cada semana, historial de valor, momento de compra, pruebas de reglas, oportunidades)",
+      "closing": "(imágenes, tamaños de lote: los últimos [[lotSizeRecentDays]] días cada noche y todos cada semana, historial de valor, momento de compra, pruebas de reglas, oportunidades)",
       "backup": "(toda la base de datos, una vez al día)",
       "alerts": "(fallos a los administradores, alertas de momento de compra)"
     },
@@ -1726,7 +1726,7 @@
     "others": "Otras comprobaciones",
     "other": {
       "morning": "La comprobación matinal: cada día desde las {hour} (hora de la app), alertas de \"no se ejecutó nada\" y los resúmenes diarios.",
-      "feed": "La comprobación del canal de tiendas: cada 2 minutos (se avisa de un canal o tablón en silencio)."
+      "feed": "La comprobación del canal de tiendas: cada [[feedCheckMinutes]] minutos (se avisa de un canal o tablón en silencio)."
     },
     "underMinute": "<1 min",
     "minutes": "{m} min",
@@ -1774,7 +1774,7 @@
     "noCollect": "Ninguna recogida en {hours} horas (última {last})",
     "noBackup": "Ninguna copia en {hours} horas (última {last})",
     "dbBudget": "Base de datos: {read} millones de filas leídas este mes, {projected} millones a este ritmo (presupuesto {budget} millones)",
-    "sourceQuiet": "{sources}: sin ventas nuevas en los últimos 3 días de recogida (normalmente hay)",
+    "sourceQuiet": "{sources}: sin ventas nuevas en los últimos [[quietDays]] días de recogida (normalmente hay)",
     "selfCheck": "Autocomprobación: los precios guardados no coincidían con las ventas y se reconstruyeron ({items})",
     "fromTo": "de {from} a {to}",
     "none": "ninguno",
@@ -1834,7 +1834,7 @@
       "password": "contraseña",
       "2fa": "autenticador"
     },
-    "listingsGone": "{count, plural, one {# anuncio apartado} other {# anuncios apartados}}: página inexistente 3 noches seguidas"
+    "listingsGone": "{count, plural, one {# anuncio apartado} other {# anuncios apartados}}: página inexistente [[listingBrokenNights]] noches seguidas"
   },
   "watchlist": {
     "intro": "Artículos que quieres comprar, en el estado que quieres, con el precio de mercado de hoy. Los que están en tu objetivo o por debajo van primero.",
@@ -1885,14 +1885,14 @@
     "askUnder": "Anunciado a {amount} ({pct} por debajo)",
     "buylistNear": "Una tienda compra a {amount}",
     "notProven": "sin probar",
-    "record": "Más alto 90 días después {higher} de {checked} veces ({pct}; cualquier día {any}).",
+    "record": "Más alto [[opportunityDays]] días después {higher} de {checked} veces ({pct}; cualquier día {any}).",
     "recordFew": "Muy pocas señales pasadas para juzgar ({checked}).",
     "recordsTitle": "Señales y su historial",
-    "recordsIntro": "Cada señal probada con los precios pasados del grupo: cada semana, el primer día de cada tramo en que estuvo activa, comprobado 90 días después. Probada: 10 o más comprobaciones y 5 puntos o más mejor que comprar cualquier día (una advertencia: peor). Casi todo este historial es un mercado al alza, lo que favorece a las señales que siguen una subida; se vuelven a probar tras cada recogida.",
+    "recordsIntro": "Cada señal probada con los precios pasados del grupo: cada semana, el primer día de cada tramo en que estuvo activa, comprobado [[opportunityDays]] días después. Probada: [[provenMinChecks]] o más comprobaciones y [[provenPoints]] puntos o más mejor que comprar cualquier día (una advertencia: peor). Casi todo este historial es un mercado al alza, lo que favorece a las señales que siguen una subida; se vuelven a probar tras cada recogida.",
     "anyDay": "Cualquier día",
     "colSignal": "Señal",
     "colChecked": "Comprobadas",
-    "colHigher": "Más alto 90 días después",
+    "colHigher": "Más alto [[opportunityDays]] días después",
     "colChange": "Cambio típico",
     "proven": "Probada",
     "warning": "Advertencia",
@@ -1908,21 +1908,21 @@
       "weak_for_age": "Débil para su edad"
     },
     "why": {
-      "line_rising": "Su línea: {line} en 12 semanas ({items} artículos).",
-      "line_falling": "Su línea: {line} en 12 semanas ({items} artículos).",
-      "leader": "Sus 12 semanas: {own}, las de su línea {line}.",
-      "laggard": "Sus 12 semanas: {own}, las de su línea {line}.",
-      "sales_up": "{sales30} ventas en 30 días, {before} un mes antes.",
-      "sales_down": "{sales30} ventas en 30 días, {before} un mes antes.",
-      "strong_for_age": "Sus últimos 90 días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos).",
-      "weak_for_age": "Sus últimos 90 días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos)."
+      "line_rising": "Su línea: {line} en [[trendWeeks]] semanas ({items} artículos).",
+      "line_falling": "Su línea: {line} en [[trendWeeks]] semanas ({items} artículos).",
+      "leader": "Sus [[trendWeeks]] semanas: {own}, las de su línea {line}.",
+      "laggard": "Sus [[trendWeeks]] semanas: {own}, las de su línea {line}.",
+      "sales_up": "{sales30} ventas en [[salesRecentDays]] días, {before} un mes antes.",
+      "sales_down": "{sales30} ventas en [[salesRecentDays]] días, {before} un mes antes.",
+      "strong_for_age": "Sus últimos [[ageChangeDays]] días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos).",
+      "weak_for_age": "Sus últimos [[ageChangeDays]] días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos)."
     },
     "rankLine": "#{rank} en {label} ({move})",
     "rankNew": "nuevo",
     "rankSame": "igual que hace una semana",
     "rankUp": "sube {n} en una semana",
     "rankDown": "baja {n} en una semana",
-    "popularIntro": "El ranking del propio sitio, leído con la recogida del {day}. Los artículos de su top 30 que nadie seguía se añaden como candidatos y se recogen mientras sigan ahí; cómo funciona un cambio de puesto como señal se prueba cuando haya bastantes días guardados.",
+    "popularIntro": "El ranking del propio sitio, leído con la recogida del {day}. Los artículos de su top [[candidateTop]] que nadie seguía se añaden como candidatos y se recogen mientras sigan ahí; cómo funciona un cambio de puesto como señal se prueba cuando haya bastantes días guardados.",
     "colWeek": "Semana",
     "candidate": "Candidato",
     "plan": {
@@ -1992,7 +1992,7 @@
     "calls": "{count, plural, =0 {Ningún día de compra} one {# día de compra} other {# días de compra}}",
     "paidUnder": "{pct}% por debajo de la media",
     "paidOver": "{pct}% por encima de la media",
-    "after90": "más alto 90 días después en {higher} de {checked}",
+    "after90": "más alto [[patternDays]] días después en {higher} de {checked}",
     "marginLabel": "Por debajo del precio habitual en",
     "use": "Usar {name} para {type}",
     "name": {
@@ -2003,9 +2003,9 @@
       "target": "Solo mi objetivo"
     },
     "about": {
-      "steady": "Buen precio en el cuarto más barato de los últimos 180 días. Con poco historial, un 10% por debajo del precio habitual. Espera mientras el precio o su mercado caen deprisa, y mientras una novedad es más joven que la edad a la que los artículos parecidos suelen tocar fondo.",
+      "steady": "Buen precio en el cuarto más barato de los últimos [[rangeDays]] días. Con poco historial, un [[defaultMargin]]% por debajo del precio habitual. Espera mientras el precio o su mercado caen deprisa, y mientras una novedad es más joven que la edad a la que los artículos parecidos suelen tocar fondo.",
       "bargain": "Solo la décima parte más barata del último año. Pocas señales, descuentos más profundos. Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
-      "margin": "Un {margin}% por debajo del precio habitual (la mediana de los últimos 180 días). Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
+      "margin": "Un {margin}% por debajo del precio habitual (la mediana de los últimos [[rangeDays]] días). Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
       "dip": "Como Constante, pero sigue diciendo buen precio mientras el precio o su mercado caen deprisa, o con una novedad, con una advertencia. Compra antes; puede comprar antes de tocar fondo.",
       "target": "Sin zona: solo los precios objetivo que pongas en tus seguimientos."
     },
@@ -2018,7 +2018,7 @@
     "exampleAbout": {
       "steady": "Una carta durante un año: sin tendencia, con caídas por el camino.",
       "fall": "Una caja bajando durante meses, luego plana, luego empezando a recuperarse.",
-      "new_set": "Una caja desde su salida: expectación, una caída en los primeros meses y luego una recuperación. Las estrategias distintas de Aprovechar la caída esperan 90 días tras la salida."
+      "new_set": "Una caja desde su salida: expectación, una caída en los primeros meses y luego una recuperación. Las estrategias distintas de Aprovechar la caída esperan [[newReleaseDays]] días tras la salida."
     }
   },
   "buy": {
@@ -2036,32 +2036,32 @@
     },
     "zone": "Buen precio en <n>{amount}</n> o menos",
     "basis": {
-      "quarter180": "el cuarto más barato de los últimos 180 días",
+      "quarter180": "el cuarto más barato de los últimos [[rangeDays]] días",
       "tenth365": "la décima parte más barata del último año",
       "margin": "un {pct}% por debajo del precio habitual, {usual}",
-      "thin_margin": "un 10% por debajo del precio habitual: no hay historial suficiente para un rango"
+      "thin_margin": "un [[defaultMargin]]% por debajo del precio habitual: no hay historial suficiente para un rango"
     },
     "loweredByPattern": "Rebajado por el patrón de sets nuevos ({pct}).",
-    "falling": "Bajando deprisa ({pct} en 2 semanas): espera a que se estabilice.",
-    "fallingDip": "Sigue bajando deprisa ({pct} en 2 semanas): puede bajar más.",
+    "falling": "Bajando deprisa ({pct} en [[fallWeeks]] semanas): espera a que se estabilice.",
+    "fallingDip": "Sigue bajando deprisa ({pct} en [[fallWeeks]] semanas): puede bajar más.",
     "askInZone": "Ahora hay un anuncio en la zona.",
     "limited": "Datos limitados: {reasons}.",
     "limitedWhy": {
-      "few_sales": "menos de 3 ventas en 30 días",
-      "short_range": "menos de 10 días con ventas en 180 días"
+      "few_sales": "menos de [[limitedSales]] ventas en [[fairDays]] días",
+      "short_range": "menos de [[rangeMinDays]] días con ventas en [[rangeDays]] días"
     },
     "reason": {
-      "fair": "Valor de mercado <n>{amount}</n> ({count, plural, one {# venta} other {# ventas}} en 30 días)",
-      "position": "Igual o por debajo del precio del {pct}% de los últimos 180 días",
+      "fair": "Valor de mercado <n>{amount}</n> ({count, plural, one {# venta} other {# ventas}} en [[fairDays]] días)",
+      "position": "Igual o por debajo del precio del {pct}% de los últimos [[rangeDays]] días",
       "trend": "Tendencia: {list}",
       "weeks": "{pct} en {weeks} semanas",
       "ask": "Precio pedido más bajo <n>{amount}</n> ({pct} frente al valor de mercado)",
-      "pattern": "Artículos parecidos ({items}{group}) se movieron {pct} en los 90 días tras el día {days} desde su salida",
+      "pattern": "Artículos parecidos ({items}{group}) se movieron {pct} en los [[patternDays]] días tras el día {days} desde su salida",
       "noPattern": "Patrón de sets nuevos: aún no hay bastantes artículos parecidos con precios a esta edad",
       "noRelease": "Patrón de sets nuevos: sin fecha de salida (solo la primera venta recogida)",
       "sep": ", ",
-      "market": "Artículos parecidos ({items}{group}): {pct} en 12 semanas",
-      "noMarket": "Artículos parecidos: muy pocos para juzgar el mercado (hacen falta 5)",
+      "market": "Artículos parecidos ({items}{group}): {pct} en [[trendWeeks]] semanas",
+      "noMarket": "Artículos parecidos: muy pocos para juzgar el mercado (hacen falta [[marketMinItems]])",
       "noAge": "Sin fecha de salida",
       "age": "Salió hace {days} días",
       "ageFirstSale": "Primera venta recogida hace {days} días (sin fecha de salida, así que sin espera de novedad)",
@@ -2069,8 +2069,8 @@
       "noLowAge": "Muy pocos artículos parecidos con un primer año completo para saber cuándo tocan fondo los precios: se usa el día {wait}",
       "pastFirstYear": "Pasado su primer año: sin espera de novedad ni patrón"
     },
-    "marketFalling": "El mercado está bajando: los artículos parecidos ({items}{group}) van {pct} en 12 semanas. Espera a que se estabilice.",
-    "marketFallingDip": "El mercado sigue bajando: los artículos parecidos ({items}{group}) van {pct} en 12 semanas. Puede bajar más.",
+    "marketFalling": "El mercado está bajando: los artículos parecidos ({items}{group}) van {pct} en [[trendWeeks]] semanas. Espera a que se estabilice.",
+    "marketFallingDip": "El mercado sigue bajando: los artículos parecidos ({items}{group}) van {pct} en [[trendWeeks]] semanas. Puede bajar más.",
     "newRelease": "Novedad ({days} días): los artículos parecidos ({items}{group}) suelen tocar su mínimo del primer año hacia el día {wait}. Espera hasta entonces.",
     "newReleaseDefault": "Novedad ({days} días): las novedades suelen bajar en sus primeros meses. Espera hasta el día {wait} (muy pocos artículos parecidos con un primer año completo para saber cuándo).",
     "newReleaseDip": "Novedad ({days} días): los precios suelen bajar hasta el día {wait} más o menos. Puede bajar más.",
@@ -2086,21 +2086,21 @@
     },
     "chart": {
       "zone": "Zona de compra: por debajo de {amount}",
-      "range": "Rango habitual (180 días): {low} - {high}",
+      "range": "Rango habitual ([[rangeDays]] días): {low} - {high}",
       "ask": "Precio pedido más bajo: {amount}",
-      "lowShort": "Mín. 180 d",
-      "highShort": "Máx. 180 d",
+      "lowShort": "Mín. [[rangeDays]] d",
+      "highShort": "Máx. [[rangeDays]] d",
       "askShort": "Pedido"
     },
     "ruleTest": {
       "title": "Prueba de la regla",
       "about": "{name} sobre todo el historial de precios de artículos parecidos ({items}{group}).",
       "notYet": "Se calcula tras la próxima recogida.",
-      "few": "Aún no hay bastantes señales pasadas para probar: {count} con precio 90 días después (hacen falta {min}).",
+      "few": "Aún no hay bastantes señales pasadas para probar: {count} con precio [[patternDays]] días después (hacen falta {min}).",
       "signals": "Señales de compra pasadas ({count})",
-      "result": "más alto 90 días después {higher} de {checked} veces ({pct}%), cambio típico {change}",
+      "result": "más alto [[patternDays]] días después {higher} de {checked} veces ({pct}%), cambio típico {change}",
       "anyDay": "Comprar cualquier día",
-      "anyResult": "más alto 90 días después el {pct}% de las veces, cambio típico {change}",
+      "anyResult": "más alto [[patternDays]] días después el {pct}% de las veces, cambio típico {change}",
       "better": "Mejor que comprar cualquier día, en el pasado.",
       "worse": "Peor que comprar cualquier día, en el pasado: la zona pagó menos, pero los precios a menudo siguieron bajando un tiempo.",
       "same": "Más o menos igual que comprar cualquier día, en el pasado.",
@@ -2115,7 +2115,7 @@
   },
   "setLines": {
     "title": "Líneas de sets",
-    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes (3 o más), y si no con todo el grupo. Los sets japoneses de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario); los demás se marcan a mano en su página de edición.",
+    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes ([[patternMinItems]] o más), y si no con todo el grupo. Los sets japoneses de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario); los demás se marcan a mano en su página de edición.",
     "builtIn": "Incluidas",
     "others": "Otras líneas, una por línea",
     "saved": "Guardado."
@@ -2193,7 +2193,7 @@
     "cardsNotRead": "Cartas aún sin leer",
     "error": {
       "code": "Escribe el código del set tal como aparece en los títulos de las cartas, p. ej. SV2a.",
-      "packs": "Sobres por caja: un número entero del 1 al 100.",
+      "packs": "Sobres por caja: un número entero del 1 al [[openingPacksMax]].",
       "tiers": "Cada rareza necesita letras (SAR, AR...) y cuántas trae una caja: 3, 0.2 o 1/6."
     }
   },
@@ -2249,7 +2249,7 @@
     "from": "De",
     "to": "A",
     "unknownAlerts": "Avisarme de publicaciones que no nombran ninguna tienda o lugar que Tora conozca (también preguntas y charla)",
-    "feedAlertsInfo": "Sin fallos silenciosos: la app comprueba cada 2 minutos mientras funciona en este PC. Siempre se avisa de una página entera de publicaciones nuevas de golpe (quizá se perdieron algunas).",
+    "feedAlertsInfo": "Sin fallos silenciosos: la app comprueba cada [[feedCheckMinutes]] minutos mientras funciona en este PC. Siempre se avisa de una página entera de publicaciones nuevas de golpe (quizá se perdieron algunas).",
     "addTitle": "Añadir una tienda o lugar",
     "addInfo": "Para una cadena o zona de la que Tora no tiene lista. Un lugar (el nombre o emoji de una zona, con su ubicación) se reconoce en todos los tablones; una tienda solo en el tablón de su cadena.",
     "chain": "Cadena",
@@ -2270,7 +2270,7 @@
       "chain": "Clave de cadena: minúsculas, dígitos, - o _.",
       "name": "Ponle un nombre.",
       "location": "Ubicación: dos números, latitud y longitud.",
-      "glossary": "Un código y su significado (código de hasta 20 caracteres)."
+      "glossary": "Un código y su significado (código de hasta [[glossaryCodeMax]] caracteres)."
     },
     "places": "Lugares (zonas)",
     "allChains": "Todas {n}",
@@ -2333,7 +2333,7 @@
     "nowInfo": "Las publicaciones de hoy por zona, primero la más reciente; abre una para ver las de cada tienda.",
     "noToday": "Aún no hay publicaciones de estas tiendas hoy.",
     "earlier": "{n, plural, one {Antes (ayer): # zona} other {Antes (ayer): # zonas}}",
-    "byLocationInfo": "Zonas de tu área con publicaciones desde ayer (5:00), las más cercanas primero, con cuántas; elige una para ver sus publicaciones, primero las más recientes.",
+    "byLocationInfo": "Zonas de tu área con publicaciones desde ayer ([[postDayStarts]]), las más cercanas primero, con cuántas; elige una para ver sus publicaciones, primero las más recientes.",
     "otherBoards": "Otros tablones",
     "allOfChain": "Todas sus tiendas",
     "quietLocations": "{n, plural, one {# zona sin publicaciones desde ayer} other {# zonas sin publicaciones desde ayer}}",
@@ -2349,7 +2349,7 @@
       "next": "siguiente {board} en {in}",
       "reading": "Leyendo {board}",
       "late": "{board} con retraso (previsto {time})",
-      "quiet": "Sin posts de {boards} en 10 min",
+      "quiet": "Sin posts de {boards} en [[silentMinutes]] min",
       "silent": "Feed en silencio desde {time}: avisos parados",
       "stopped": "Detenido: fuera del horario",
       "starting": "Empezando",
@@ -2364,12 +2364,12 @@
   },
   "accounts": {
     "newTitle": "Cuenta nueva",
-    "newInfo": "Crea la cuenta y un enlace de configuración de un solo uso (24 horas). Envía el enlace a la persona: elige su propia contraseña y añade Tora a su app de autenticación en su propio dispositivo. Nunca ves su contraseña.",
+    "newInfo": "Crea la cuenta y un enlace de configuración de un solo uso ([[setupLinkHours]] horas). Envía el enlace a la persona: elige su propia contraseña y añade Tora a su app de autenticación en su propio dispositivo. Nunca ves su contraseña.",
     "username": "Usuario",
-    "usernameRule": "De 3 a 32 caracteres: a-z, 0-9, . _ -",
+    "usernameRule": "De [[usernameMin]] a [[usernameMax]] caracteres: a-z, 0-9, . _ -",
     "asAdmin": "Administrador",
     "create": "Crear",
-    "yourCode": "Tu código de 6 dígitos",
+    "yourCode": "Tu código de [[totpDigits]] dígitos",
     "cancel": "Cancelar",
     "linkReady": "Enlace de configuración (se muestra una vez, envíalo a la persona):",
     "linkInfo": "Funciona una vez, hasta {until}. Un enlace nuevo anula este.",
@@ -2398,7 +2398,7 @@
       "invalid": "Ese código no coincide (cada código funciona una vez: espera al siguiente).",
       "locked": "Demasiados intentos. Inténtalo más tarde.",
       "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET).",
-      "username": "Usuarios: de 3 a 32 caracteres, a-z 0-9 . _ -",
+      "username": "Usuarios: de [[usernameMin]] a [[usernameMax]] caracteres, a-z 0-9 . _ -",
       "taken": "Ese usuario ya existe.",
       "self": "No en tu propia cuenta.",
       "missing": "No existe esa cuenta."
@@ -2417,14 +2417,14 @@
       "2fa": "Añade Tora a tu nueva app de autenticación ({username})."
     },
     "newPassword": "Contraseña nueva",
-    "passwordRule": "Al menos 12 caracteres.",
+    "passwordRule": "Al menos [[minPassword]] caracteres.",
     "repeat": "Repítela",
     "currentCode": "Código de tu app de autenticación",
     "currentCodeHint": "¿La perdiste? También vale uno de tus códigos de respaldo.",
     "currentPassword": "Tu contraseña",
     "scanTitle": "Autenticador",
     "scanInfo": "Escanea con tu app de autenticación (Google Authenticator, 1Password...), o escribe la clave de abajo, y luego introduce el código que muestra.",
-    "newCode": "Código de 6 dígitos",
+    "newCode": "Código de [[totpDigits]] dígitos",
     "save": "Guardar",
     "done": "Hecho. Se cerró la sesión en todos los dispositivos: vuelve a iniciar sesión.",
     "backupTitle": "Códigos de respaldo",
@@ -2434,7 +2434,7 @@
       "expired": "Este enlace ya no funciona (usado, caducado o sustituido). Pide uno nuevo al administrador.",
       "locked": "Demasiados intentos. Inténtalo más tarde.",
       "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET).",
-      "short": "La contraseña necesita al menos 12 caracteres.",
+      "short": "La contraseña necesita al menos [[minPassword]] caracteres.",
       "mismatch": "Las contraseñas no coinciden.",
       "invalid": "No coincide. Inténtalo de nuevo.",
       "newCode": "El código del autenticador no coincide (comprueba que la hora del móvil sea automática)."

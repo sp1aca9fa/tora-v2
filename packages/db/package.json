@@ -11,7 +11,8 @@
     "./seed": "./src/seed.ts",
     "./catalog": "./src/catalog.ts",
     "./testing": "./src/testing.ts",
-    "./backup": "./src/backup.ts"
+    "./backup": "./src/backup.ts",
+    "./alert-texts": "./src/alert-texts.ts"
   },
   "scripts": {
     "build": "tsc -p .",

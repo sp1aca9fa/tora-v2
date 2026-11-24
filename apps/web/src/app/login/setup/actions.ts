@@ -5,6 +5,7 @@ import {
   generateBackupCodes,
   hashPassword,
   keyedHash,
+  MIN_PASSWORD,
   looksLikeBackupCode,
   matchBackupCode,
   verifyPassword,
@@ -22,9 +23,6 @@ import {
 import { clientIp } from '@/lib/auth/admin-code';
 import { beginAttempt } from '@/lib/auth/lockout';
 import { authConfigFromEnv } from '@/lib/auth/session';
-
-/** As `pnpm user` asks (the page says so too). */
-const MIN_PASSWORD = 12;
 
 export interface SetupState {
   error?: 'expired' | 'locked' | 'notConfigured' | 'short' | 'mismatch' | 'invalid' | 'newCode';

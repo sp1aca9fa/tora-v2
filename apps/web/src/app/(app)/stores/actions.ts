@@ -32,6 +32,7 @@ import {
 } from '@tora/db';
 import { revalidatePath } from 'next/cache';
 import { alertContext } from '@/lib/alerts';
+import { GLOSSARY_CODE_MAX } from '@/lib/app-numbers';
 import { authed } from '@/lib/auth/guard';
 import { LOTTERY_SHOWN, type PostsFilter, postViews } from './post-views';
 
@@ -247,7 +248,7 @@ export async function addGlossaryAction(
   if (user.role !== 'admin') return { error: 'admin' };
   const c = code.normalize('NFKC').trim();
   const m = meaning.trim();
-  if (!c || !m || c.length > 20 || m.length > 200) return { error: 'glossary' };
+  if (!c || !m || c.length > GLOSSARY_CODE_MAX || m.length > 200) return { error: 'glossary' };
   await addGlossary(db, {
     code: c,
     meaning: m,

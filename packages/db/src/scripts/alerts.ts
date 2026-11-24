@@ -22,7 +22,6 @@
 //       Its levels start over and its findings close.
 import { localDate, toLocalIso } from '@tora/core';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { lastActivity, recordActivity } from '../activity';
 import {
@@ -38,7 +37,8 @@ import {
 } from '../alerts';
 import { createDb } from '../client';
 import { resetDataCheck, watchDataCheck } from '../data-check';
-import { dbConfigFromEnv, findRepoRoot, loadRootEnv } from '../env';
+import { readAlertTexts } from '../alert-texts';
+import { dbConfigFromEnv, loadRootEnv } from '../env';
 import { loadTimeZone } from '../registry';
 import { nightAlerts } from '../wish-alerts';
 
@@ -71,9 +71,11 @@ await loadTimeZone(db);
 /** The app's texts (apps/web/messages), so the PC and the app send the same words. */
 const texts = (locale: string): AlertTexts => {
   try {
-    const file = join(findRepoRoot(), 'apps', 'web', 'messages', `${locale}.json`);
-    return (JSON.parse(readFileSync(file, 'utf8')) as { alertText?: AlertTexts }).alertText ?? {};
-  } catch {
+    return readAlertTexts(locale);
+  } catch (e) {
+    // A language with no file falls back to English; anything else is said in the log.
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT')
+      console.error(`alerts: the texts of ${locale} could not be read: ${String(e)}`);
     return {};
   }
 };

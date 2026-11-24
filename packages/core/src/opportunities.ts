@@ -2,7 +2,15 @@
 // similar items, from the prices already collected, each tested on the group's past prices. Only
 // a signal that beat buying on any day ranks items; the others are shown as not tested yet.
 import { median } from './market';
-import { type DayPrice, RANGE_MIN_DAYS, YEAR_MIN_DAYS, cheapSteady } from './signals';
+import {
+  type DayPrice,
+  HOLD_BEFORE_DAYS,
+  HOLD_DAYS,
+  RANGE_MIN_DAYS,
+  TREND_DAYS,
+  YEAR_MIN_DAYS,
+  cheapSteady,
+} from './signals';
 
 /** Signals that point to a buy, and warnings against one. */
 export const OPPORTUNITY_SIGNALS = [
@@ -81,10 +89,15 @@ export const AGAINST_LINE = 0.15;
 export const SALES_UP = 1.5;
 export const SALES_DOWN = 0.6;
 export const SALES_MIN = 10;
+export const SALES_RECENT_DAYS = 30;
+export const SALES_BEFORE_DAYS = 90;
 /** A quick rise: the last 14 days' price this far above the 60 days before (S27). */
 export const QUICK_RISE = 0.2;
+export const QUICK_RISE_DAYS = 14;
+export const QUICK_RISE_BEFORE_DAYS = 60;
 /** The last 90 days' change against similar items' at the same age (3+), from day 120 to 3 years. */
 export const AGAINST_AGE = 0.2;
+export const AGE_CHANGE_DAYS = 90;
 export const AGE_MIN_ITEMS = 3;
 export const AGE_RANGE = { from: 120, to: 1095 } as const;
 /** Tests: checked 90 days later; proven with 10+ checks and 5 points better (or worse) than any day. */
@@ -304,7 +317,7 @@ export class OpportunityGroup {
 
   private fit(id: string, end: number): number | null {
     const key = `${id}|${end}`;
-    if (!this.fits.has(key)) this.fits.set(key, this.items.get(id)!.s.fitted(end, 84));
+    if (!this.fits.has(key)) this.fits.set(key, this.items.get(id)!.s.fitted(end, TREND_DAYS));
     return this.fits.get(key)!;
   }
 
@@ -347,14 +360,14 @@ export class OpportunityGroup {
     const days = release === null ? null : end - release;
     const price = s.price(end, 30) ?? s.price(end, 90);
     if (days !== null && days >= AGE_RANGE.from && days <= AGE_RANGE.to) {
-      const before = s.price(end - 90, 30);
+      const before = s.price(end - AGE_CHANGE_DAYS, 30);
       const others: number[] = [];
       for (const [otherId, o] of this.items) {
         if (otherId === id || !o.member.release) continue;
         const r = dayNumber(o.member.release);
         // Only what had already happened by this day.
         if (r + days + 7 > end) continue;
-        const a = o.s.around(r + days - 90);
+        const a = o.s.around(r + days - AGE_CHANGE_DAYS);
         const b = o.s.around(r + days);
         if (a && b) others.push(b / a - 1);
       }
@@ -366,17 +379,21 @@ export class OpportunityGroup {
       price: price === null ? null : Math.round(price),
       own84: this.fit(id, end),
       line84: this.lineChange(member, end),
-      sales30: s.sales(end - 29, end),
-      salesBefore: s.first! <= end - 119 ? s.sales(end - 119, end - 30) / 3 : null,
+      sales30: s.sales(end - (SALES_RECENT_DAYS - 1), end),
+      salesBefore:
+        s.first! <= end - (SALES_RECENT_DAYS + SALES_BEFORE_DAYS - 1)
+          ? s.sales(end - (SALES_RECENT_DAYS + SALES_BEFORE_DAYS - 1), end - SALES_RECENT_DAYS) /
+            (SALES_BEFORE_DAYS / SALES_RECENT_DAYS)
+          : null,
       age,
       jump14: (() => {
-        const recent = s.price(end, 14);
-        const before = s.price(end - 14, 60);
+        const recent = s.price(end, QUICK_RISE_DAYS);
+        const before = s.price(end - QUICK_RISE_DAYS, QUICK_RISE_BEFORE_DAYS);
         return recent && before ? recent / before - 1 : null;
       })(),
       hold14: (() => {
-        const recent = s.price(end, 14);
-        const before = s.price(end - 14, 30);
+        const recent = s.price(end, HOLD_DAYS);
+        const before = s.price(end - HOLD_DAYS, HOLD_BEFORE_DAYS);
         return recent && before ? recent / before - 1 : null;
       })(),
       year:

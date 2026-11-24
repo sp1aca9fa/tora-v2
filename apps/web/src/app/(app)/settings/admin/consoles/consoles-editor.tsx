@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { type ReactNode, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CONSOLE_SORT_MAX } from '@/lib/app-numbers';
 import { cn } from '@/lib/utils';
 import {
   type ConsoleForm,
@@ -173,7 +174,7 @@ function ConsoleFields({
         <Input
           type="number"
           min={0}
-          max={9999}
+          max={CONSOLE_SORT_MAX}
           value={form.sort}
           onChange={(e) => set({ sort: e.target.value })}
           className="h-9 w-28"

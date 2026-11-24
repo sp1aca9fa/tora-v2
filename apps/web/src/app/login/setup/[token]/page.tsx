@@ -1,4 +1,10 @@
-import { decryptSecret, encryptSecret, generateTotpSecret, otpauthUri } from '@tora/auth';
+import {
+  MIN_PASSWORD,
+  decryptSecret,
+  encryptSecret,
+  generateTotpSecret,
+  otpauthUri,
+} from '@tora/auth';
 import { getDb, loadTimeZone, offerSetupSecret, otpauthQrSvg, setupByToken } from '@tora/db';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
@@ -64,6 +70,7 @@ export default async function SetupPage({ params }: { params: Promise<{ token: s
               kind={found.setup.kind}
               qr={qr}
               secret={secret?.match(/.{1,4}/g)?.join(' ') ?? null}
+              minPassword={MIN_PASSWORD}
             />
           ) : (
             <>

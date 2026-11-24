@@ -55,7 +55,7 @@ import {
 } from './wishes';
 
 /** How far back the check reads sales (S36 B1: "the last 12 months", as the labeled check). */
-const SALES_DAYS = 365;
+export const WISH_CHECK_SALES_DAYS = 365;
 
 /**
  * Why a stored sale is not counted: `rules` marked by the item's rules at the closing step, `manual`
@@ -239,7 +239,7 @@ export async function registrationCheck(
     !!plainRules &&
     rulesApplied(state?.appliedHash ?? null, plainRules);
 
-  const since = toLocalIso(new Date(now.getTime() - SALES_DAYS * 86_400_000));
+  const since = toLocalIso(new Date(now.getTime() - WISH_CHECK_SALES_DAYS * 86_400_000));
   const all = await wishSales(db, product.id, { since, withExcluded: true });
   const byCheck = await checkExcluded(db, from);
   const bySource = new Map<string, WishSale[]>();

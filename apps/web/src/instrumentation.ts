@@ -4,7 +4,7 @@
 // app has no long-lived server: there, /api/feed/check and /api/cron/daily are called from
 // outside. A dev server (`next dev`) runs neither, unless `TORA_DEV_ALERTS=1`: it often runs on
 // a copy of a real database, whose channels are real.
-const CHECK_MINUTES = 2;
+import { FEED_CHECK_MINUTES as CHECK_MINUTES } from './lib/app-numbers';
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs' || process.env.VERCEL) return;

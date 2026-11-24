@@ -1,11 +1,11 @@
 import { decryptSecret } from '@tora/auth';
 import { linesNotice, storeNotice, toLocalIso } from '@tora/core';
-import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
+import { readAlertTexts } from './alert-texts';
 import { listActivity, recordActivity } from './activity';
 import {
   alertMarketRefusals,
@@ -255,9 +255,7 @@ it('tells admins of a site refusing while reading rankings or box opening cards,
   expect(await alertFailures(db, ctx, since)).toBe(0);
   expect(sent).toHaveLength(1);
   // The real texts exist for both, under the same section as the collector's.
-  const { alertText } = JSON.parse(
-    readFileSync(join(__dirname, '../../../apps/web/messages/en.json'), 'utf8'),
-  ) as { alertText: Record<string, string> };
+  const alertText = readAlertTexts('en', join(__dirname, '../../..'));
   expect(alertText.status_blocked).toBeTruthy();
   expect(alertText.status_blocked_rankings).toContain('rankings');
   expect(alertText.status_blocked_opening).toContain('box opening cards');
@@ -744,9 +742,7 @@ it('tells why a sign-in failed: the account, else admins; one message per 15 min
 it('a server update that never left its version says so: CI failed, refused, waiting for CI', async () => {
   // The app's own wording (apps/web/messages), in every language it ships.
   const messages = (l: string): AlertTexts =>
-    JSON.parse(
-      readFileSync(join(import.meta.dirname, '../../../apps/web/messages', `${l}.json`), 'utf8'),
-    ).alertText;
+    readAlertTexts(l, join(import.meta.dirname, '../../..'));
   for (const l of ['en', 'ja', 'es']) {
     for (const k of [
       'updateCiFailed',

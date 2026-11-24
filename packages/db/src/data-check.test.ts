@@ -9,11 +9,11 @@ import {
   localDate,
   toLocalIso,
 } from '@tora/core';
-import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { readAlertTexts } from './alert-texts';
 import { recordActivity } from './activity';
 import { type AlertContext, addDiscordChannel, alertFailures, checkMissedRuns } from './alerts';
 import { type Db, createDb } from './client';
@@ -49,10 +49,10 @@ const SOURCES: SourceInfo[] = [
   { key: 'hidden', label: 'Hidden', market: 'jp', priceKinds: ['sold'], noAi: true },
 ] as SourceInfo[];
 
-// The texts people get, so a key the code names and the file lacks fails here.
-const EN = JSON.parse(
-  readFileSync(join(import.meta.dirname, '../../../apps/web/messages/en.json'), 'utf8'),
-) as { alertText: Record<string, string> };
+// The texts people get (their numbers replaced), so a key the code names and the file lacks fails here.
+const EN = {
+  alertText: readAlertTexts('en', join(import.meta.dirname, '../../..')),
+};
 
 let db: Db;
 let admin: string;

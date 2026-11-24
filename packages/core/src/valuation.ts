@@ -50,6 +50,10 @@ export const STORE_DAYS = 30;
 export const MIN_SAMPLES = 3;
 /** The longest look back, used only when the usual windows have too few sales. */
 export const LONG_WINDOW = 365;
+/** Confidence: high with this many own sales in its days; medium with `MIN_SAMPLES` in its days. */
+export const HIGH_CONFIDENCE_SALES = 5;
+export const HIGH_CONFIDENCE_DAYS = 30;
+export const MEDIUM_CONFIDENCE_DAYS = 180;
 
 /**
  * Conditions close enough to pool when one has too few sales: an item's conditions ("cond:*"), a
@@ -205,11 +209,11 @@ export function valueUnit(input: {
         newestAt,
         ageDays: ageDays(newestAt, now),
         confidence:
-          chosen.pooled || chosen.days > 180
+          chosen.pooled || chosen.days > MEDIUM_CONFIDENCE_DAYS
             ? 'low'
-            : own(30) >= 5
+            : own(HIGH_CONFIDENCE_DAYS) >= HIGH_CONFIDENCE_SALES
               ? 'high'
-              : own(180) >= MIN_SAMPLES
+              : own(MEDIUM_CONFIDENCE_DAYS) >= MIN_SAMPLES
                 ? 'medium'
                 : 'low',
         estimatedSamples: samples.filter((o) => o.quantityInferred).length,
