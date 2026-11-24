@@ -28,6 +28,7 @@ Rules the code computes from, each stated once (`rules/`):
 | [Sources, markets and currency](rules/sources-markets.md) | The valuation order, the quality gate, identity links, the compared price, rates                       |
 | [Alerts and the self check](rules/alerts.md)              | Each message, who gets it, when it repeats; the Settings flags; the self check of sales                |
 | [Collecting](rules/collectors.md)                         | What a collect reads, the pace and caps, refusals, the schedule, the daytime reads                     |
+| [The data model](rules/data-model.md)                     | The rules every table follows, what is one person's or shared, collected prices, lots, the tables      |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 

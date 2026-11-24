@@ -237,10 +237,10 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
 
 ## 2. Example scenarios (acceptance reference for the whole project)
 
-1. Register a Fire Emblem Switch 2 collector's edition with its condition.
+1. Register a game's collector's edition (say, "Star Lancers: Collector's Edition") with its condition.
 2. Register several amiibo, including 3 identical ones bought at the same price and condition in one entry (qty 3).
 3. Register special edition controllers.
-4. Register a Pokemon 30th anniversary BOX bought new at Yodobashi, where the clerk opened the box in front of me (packaging state: box opened, packs sealed). Its value must be judged as an opened box, not as a shrink-wrapped one.
+4. Register an anniversary box of a card game bought new at an electronics megastore, where the clerk opened the box in front of me (packaging state: box opened, packs sealed). Its value must be judged as an opened box, not as a shrink-wrapped one.
 5. Register the cards pulled from that box, linked to it, and see: price paid for the box, what the box would be worth now in the state I received it, current value of the pulls, and net result.
 6. Later, send a raw grade A pull to PSA, record the grading fee, and update it to PSA 10 when it returns, keeping history.
 7. See total inventory: amount spent, current value, unrealized P/L, value over time.
@@ -251,12 +251,12 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
 - Node 24 LTS (>= 22), pnpm workspaces, TypeScript strict everywhere.
 - `apps/web`: Next.js (App Router), Tailwind, shadcn/ui, next-intl, zod.
 - Charts: lightweight-charts (TradingView).
-- DB: SQLite dialect via Drizzle ORM with the libSQL client (`@libsql/client`). Production: **Turso** (hosted libSQL, free tier). Local dev and tests: a plain SQLite file / in-memory DB through the same client. Must stay portable to Postgres later (avoid SQLite-only features).
-- Tests: vitest.
-- **Hosting split:**
-  - Web app: **Vercel** (Hobby, free), connected to the public GitHub repo. Talks to Turso over HTTPS.
-  - Collectors: run only on the user's home Windows PC inside **WSL2** (residential IP is required for scraping; never run collectors on Vercel/cloud/CI). They write directly to Turso using a DB token from `.env`.
-  - Jobs that do not scrape (valuation snapshots) also run locally right after collectors, so all scheduling lives in one place.
+- DB: SQLite through Drizzle ORM with the libSQL client (`@libsql/client`). One `DATABASE_URL` serves the app, the scripts and the collect: a local file (the owner's install, development, tests) or a hosted libSQL database. Migrations are add-only. More: [docs/rules/data-model.md](docs/rules/data-model.md).
+- Tests: vitest (with property tests), a page crawler, and CI on every push ([docs/ci.md](docs/ci.md)).
+- **Where it runs:**
+  - The owner's install: one home server runs everything (the app, the database file, the collect, the backups, their timers), reached from outside through a tunnel ([docs/home-server.md](docs/home-server.md)).
+  - The other way ([docs/setup.md](docs/setup.md)): the app on a hosted platform with a hosted database. Collectors still run only on a home machine (a residential connection is needed; never on a hosted platform or in CI) and write to the database `DATABASE_URL` names.
+  - What reads no site (values, buy timing, the backup, the alerts) runs right after the collect on the same machine. The app runs its own morning check; a hosted app is called once a day for it.
 - **Auth** (app is on the public internet):
   - Accounts have a username, a password (scrypt hash) and a TOTP authenticator secret (encrypted at rest), plus one-time backup codes. No public sign-up: accounts are created and managed with a CLI on the home PC (`pnpm user ...`).
   - Login = username + password, then a 6-digit authenticator code (or a backup code). Every new device login needs both steps.
@@ -264,19 +264,22 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
   - Sessions do not expire: the cookie (signed, httpOnly, Secure, SameSite=Lax) is renewed automatically on use (browsers cap cookie lifetime at ~400 days). A revoked device, password change or 2FA reset ends its sessions.
   - Failed attempts are counted in the DB per IP and per username, with temporary lockout. Every page and API route requires a session except the login pages and static assets.
 - Phone use is first-class: registration flows must be mobile-first. Add a PWA manifest so it can be added to the home screen.
-- Scheduling: the PC is not always on, so Windows Task Scheduler starts `scripts/collect-cron.sh` in WSL at logon (+5 min) and daily with catch-up; the script runs at most once per day (stamp file), with jitter. cron is the fallback when WSL stays running.
+- Scheduling: the home server starts `scripts/collect-cron.sh` every hour; the script runs the collect at most once a day, after a random wait ([docs/rules/collectors.md](docs/rules/collectors.md#when-the-collect-runs)).
 
 ## 4. Repo layout and public/private split
 
-The main repo is **public** (portfolio piece). Scrapers live in a **private** repo.
+The main repo is **public** (portfolio piece). The owner's own scrapers live in a **private** repo.
 
 ```
-apps/web                 Next.js app (UI + API routes / server actions)
-packages/db              Drizzle schema, migrations, queries
-packages/core            Domain logic: lots/splits, valuation, buckets, export/import
-packages/collector-sdk   Collector interface, runner, HTTP utils (rate limit, retry), run logging
-collectors/              PRIVATE git submodule (private GitHub repo): SNKRDUNK, Mercari, eBay, 駿河屋 collectors
-collectors-public/       Collectors safe to publish (TCGCSV, FX)
+apps/web                 Next.js app (pages, API routes, server actions)
+packages/db              Drizzle schema, migrations, every query and write, the saved numbers
+packages/core            Domain logic with no database: lots and splits, valuation, buckets, buy timing, opportunities
+packages/collector-sdk   The plug-in contract, the runner, polite HTTP, the command line tools
+packages/auth            Passwords, authenticator codes, backup codes
+packages/mcp             The read-only MCP server
+collectors-public/       Plug-ins safe to publish
+collectors/              PRIVATE git submodule: the owner's plug-ins and notes
+ops/, scripts/           The home server's scripts and the schedule
 ```
 
 - The public repo must install, build, test and run **without** the private submodule (collectors simply not registered; show a notice in Settings).
@@ -286,77 +289,7 @@ collectors-public/       Collectors safe to publish (TCGCSV, FX)
 
 ## 5. Data model
 
-General rules:
-- **Store facts, derive everything else.** Totals, P/L, current values are computed, never the source of truth.
-- IDs: ULID strings. Money: integer JPY (`*_jpy`); foreign amounts as integer minor units + currency + fx rate.
-- Timestamps: ISO 8601 with offset, user timezone Asia/Tokyo.
-- Every table has `created_at`, `updated_at`.
-
-### users
-- `username` (unique, lowercase), `password_hash`, `totp_secret_enc`, `totp_last_step` (replay protection), `backup_code_hashes` (JSON), `role`: admin | member, `disabled_at`
-
-### user_devices (login slots; max 2 active per user)
-- `user_id`, `label` (browser / OS), `last_seen_at`, `revoked_at`
-
-### tcg_sets (pre-registered TCG catalog, shared)
-- `franchise` (pokemon | one_piece | yugioh | mtg), `region` (null = all regions, e.g. Magic), `code`, `name`, `name_alias` (search only), `set_type`: expansion | deck | special, `release_date`, `source` + `source_key` (unique; for idempotent re-sync)
-- Built from public sources by `pnpm catalog:fetch` (Pokemon official product list, One Piece official site, Yugipedia, Scryfall) into JSON files in the repo, loaded with `pnpm catalog:sync`.
-
-### products (catalog entry, one per distinct item; shared by all users)
-- `category`: tcg | game
-- `kind`: tcg: single | booster_box | booster_pack | deck | special_set | supply | other; game: software | collectors_edition | amiibo | controller | figure | console | other
-- `name` (one name, in whatever language it is sold under), `name_alias` (optional, search only)
-- `franchise` (TCG: pokemon | one_piece | yugioh | mtg | free text; games: free text), `region` (TCG: jp | en | zh_cn | zh_tw | kr | th | id | other; games: jp | na | eu | asia | kr | other), `platform` (games)
-- `set_id` (tcg_sets, nullable), `set_name`, `set_code` (free text when the set is not in the catalog), `variant` (e.g. Magic "Collector" vs "Play" booster), `card_number`, `rarity`, `release_date`, `retail_price_jpy`, `image_url`, `notes`, `created_by` (null for catalog-generated products)
-- Sealed products for a catalog set are created on first use (find-or-create by set + kind + variant), named from the set.
-- Product class drives condition and valuation: tcg single = card; tcg booster_box / booster_pack / deck / special_set = sealed; everything else = item.
-
-### product_sources (how to fetch prices for a product)
-- `product_id`, `source` (snkrdunk | mercari | surugaya | tcgcsv | ebay | ...), `external_id` (nullable), `query` (JSON: keywords, exclude_keywords, category_id, price_min, price_max, extra), `active`, `last_success_at`
-- A product can have several sources. Sources are created automatically when a product is created from a source search (S3), or edited manually.
-
-### holdings (a lot of identical units I own)
-- `user_id` (owner), `product_id`, `quantity` (>= 1), `cost_total_jpy` (total paid for the lot, incl. what I choose to include like shipping)
-- `acquired_at`, `acquired_from` (free text with suggestions: Yodobashi, Mercari, ...), `acquisition_type`: purchase | pull | gift | trade
-- `parent_holding_id` (nullable): set for pulls, pointing to the sealed product they came from
-- `condition`: Mercari scale: new_unused | like_new | no_noticeable_damage | minor_damage | damaged | poor
-- `packaging_state` (sealed products and boxed items): sealed_shrink | sealed_no_shrink | box_opened_contents_sealed | opened | empty | n/a
-- Cards: `grading`: raw | graded; `raw_grade`: S | A | B | C | D (SNKRDUNK-style); `grader`: PSA | BGS | CGC | ARS | other; `grade` (text, e.g. "10", "9.5"); `cert_number`
-- `status`: owned | sold | consumed (e.g. box fully opened) | lost
-- `notes`
-
-Lot rules:
-- Identical units bought together at the same price and condition = one holding with quantity N.
-- When some units change (graded, sold, opened, condition change), **split** them into a new holding first. Cost is allocated proportionally (integer yen; remainder stays on the original). A `split` event is recorded on both.
-- Pulls have `cost_total_jpy = 0` by default; the parent box keeps its cost. Box P/L is computed at box level.
-- Grading fees are added to the holding's cost basis via the grading event.
-
-### holding_events (history; append-only)
-- `holding_id`, `type`: acquired | split | opened | grading_submitted | grading_returned | condition_changed | sold | note
-- `occurred_at`, `amount_jpy` (fee or sale price), `fees_jpy` (platform fees, shipping), `payload` (JSON: before/after values, platform, split target, etc.)
-- Selling: split if needed, then `sold` event with price and fees; holding status -> sold. Realized P/L is derivable.
-
-### price_observations (raw market data; never deleted)
-- `product_id`, `source`, `observation_type`: sold | listing | buylist | retail
-- `bucket` (normalized valuation bucket, see 6), `price_jpy`, `price_original`, `currency`, `fx_rate`
-- `observed_at` (sale/listing time; best available proxy), `fetched_at`
-- `external_ref` (listing/transaction id; unique per source for dedupe), `title`, `url`, `raw` (JSON)
-- `excluded` (bool) + `excluded_reason` (outlier | manual | mismatch)
-
-### manual_prices
-- `user_id`, `product_id`, `bucket`, `price_jpy`, `set_at`, `note`. Always wins over computed values (for that user).
-
-### valuation_snapshots (daily, for portfolio-over-time chart)
-- `date`, `holding_id`, `value_jpy`, `method`, `source`, `sample_size`, `confidence`
-
-### fx_rates
-- `date`, `pair` (USDJPY), `rate`
-
-### collector_runs (health)
-- `source`, `started_at`, `finished_at`, `status` (ok | partial | failed | blocked), `requests`, `observations_added`, `error`
-
-### login_attempts (auth lockout)
-- `ip_hash`, `username_hash`, `attempted_at`, `success`. Old rows may be pruned (not domain data; excluded from export).
+Moved to [docs/rules/data-model.md](docs/rules/data-model.md) (2026-11-24): the general rules (facts and derived numbers, IDs, money, times, add-only migrations), what is one person's and what is shared, the rules of collected prices and of lots, and every table with what a row is. The columns are in `packages/db/src/schema.ts`. This section as first written is kept as a record in [docs/history.md](docs/history.md#core-3-5); nothing is built from it.
 
 ## 6. Valuation rules
 

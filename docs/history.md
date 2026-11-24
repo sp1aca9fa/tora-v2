@@ -752,3 +752,113 @@ sources, not at items.
 - Parsing must be covered by fixture tests (saved responses) so site changes show up as test failures.
 - Health: a run returning 0 observations for products that previously had data, or medians moving > 50 % day over day, is flagged in Settings.
 - A failing collector must never corrupt data; it only makes values stale.
+
+<a id="core-3-5"></a>
+
+## Core sections 3 to 5: stack, repo layout and data model (as written 2026-10-09)
+
+A record. Today's: sections 3 and 4 of [requirements.md](../requirements.md) and
+[docs/rules/data-model.md](rules/data-model.md). The text below is the first design: hosting moved to a
+home server (2026-10-20), money columns became `*_base` (2026-10-14), lists became admin settings,
+`valuation_snapshots` was replaced (2026-10-18), and 47 tables were added since. The sign-in lines of
+section 3 are still in the requirements.
+
+### 3. Stack and environment (the lines replaced)
+
+- Node 24 LTS (>= 22), pnpm workspaces, TypeScript strict everywhere.
+- `apps/web`: Next.js (App Router), Tailwind, shadcn/ui, next-intl, zod.
+- Charts: lightweight-charts (TradingView).
+- DB: SQLite dialect via Drizzle ORM with the libSQL client (`@libsql/client`). Production: **Turso** (hosted libSQL, free tier). Local dev and tests: a plain SQLite file / in-memory DB through the same client. Must stay portable to Postgres later (avoid SQLite-only features).
+- Tests: vitest.
+- **Hosting split:**
+  - Web app: **Vercel** (Hobby, free), connected to the public GitHub repo. Talks to Turso over HTTPS.
+  - Collectors: run only on the user's home Windows PC inside **WSL2** (residential IP is required for scraping; never run collectors on Vercel/cloud/CI). They write directly to Turso using a DB token from `.env`.
+  - Jobs that do not scrape (valuation snapshots) also run locally right after collectors, so all scheduling lives in one place.
+- Scheduling: the PC is not always on, so Windows Task Scheduler starts `scripts/collect-cron.sh` in WSL at logon (+5 min) and daily with catch-up; the script runs at most once per day (stamp file), with jitter. cron is the fallback when WSL stays running.
+
+### 4. Repo layout and public/private split (the lines replaced)
+
+The main repo is **public** (portfolio piece). Scrapers live in a **private** repo.
+
+```
+apps/web                 Next.js app (UI + API routes / server actions)
+packages/db              Drizzle schema, migrations, queries
+packages/core            Domain logic: lots/splits, valuation, buckets, export/import
+packages/collector-sdk   Collector interface, runner, HTTP utils (rate limit, retry), run logging
+collectors/              PRIVATE git submodule (private GitHub repo): SNKRDUNK, Mercari, eBay, 駿河屋 collectors
+collectors-public/       Collectors safe to publish (TCGCSV, FX)
+```
+
+### 5. Data model
+
+General rules:
+- **Store facts, derive everything else.** Totals, P/L, current values are computed, never the source of truth.
+- IDs: ULID strings. Money: integer JPY (`*_jpy`); foreign amounts as integer minor units + currency + fx rate.
+- Timestamps: ISO 8601 with offset, user timezone Asia/Tokyo.
+- Every table has `created_at`, `updated_at`.
+
+### users
+- `username` (unique, lowercase), `password_hash`, `totp_secret_enc`, `totp_last_step` (replay protection), `backup_code_hashes` (JSON), `role`: admin | member, `disabled_at`
+
+### user_devices (login slots; max 2 active per user)
+- `user_id`, `label` (browser / OS), `last_seen_at`, `revoked_at`
+
+### tcg_sets (pre-registered TCG catalog, shared)
+- `franchise` (pokemon | one_piece | yugioh | mtg), `region` (null = all regions, e.g. Magic), `code`, `name`, `name_alias` (search only), `set_type`: expansion | deck | special, `release_date`, `source` + `source_key` (unique; for idempotent re-sync)
+- Built from public sources by `pnpm catalog:fetch` (Pokemon official product list, One Piece official site, Yugipedia, Scryfall) into JSON files in the repo, loaded with `pnpm catalog:sync`.
+
+### products (catalog entry, one per distinct item; shared by all users)
+- `category`: tcg | game
+- `kind`: tcg: single | booster_box | booster_pack | deck | special_set | supply | other; game: software | collectors_edition | amiibo | controller | figure | console | other
+- `name` (one name, in whatever language it is sold under), `name_alias` (optional, search only)
+- `franchise` (TCG: pokemon | one_piece | yugioh | mtg | free text; games: free text), `region` (TCG: jp | en | zh_cn | zh_tw | kr | th | id | other; games: jp | na | eu | asia | kr | other), `platform` (games)
+- `set_id` (tcg_sets, nullable), `set_name`, `set_code` (free text when the set is not in the catalog), `variant` (e.g. Magic "Collector" vs "Play" booster), `card_number`, `rarity`, `release_date`, `retail_price_jpy`, `image_url`, `notes`, `created_by` (null for catalog-generated products)
+- Sealed products for a catalog set are created on first use (find-or-create by set + kind + variant), named from the set.
+- Product class drives condition and valuation: tcg single = card; tcg booster_box / booster_pack / deck / special_set = sealed; everything else = item.
+
+### product_sources (how to fetch prices for a product)
+- `product_id`, `source` (snkrdunk | mercari | surugaya | tcgcsv | ebay | ...), `external_id` (nullable), `query` (JSON: keywords, exclude_keywords, category_id, price_min, price_max, extra), `active`, `last_success_at`
+- A product can have several sources. Sources are created automatically when a product is created from a source search (S3), or edited manually.
+
+### holdings (a lot of identical units I own)
+- `user_id` (owner), `product_id`, `quantity` (>= 1), `cost_total_jpy` (total paid for the lot, incl. what I choose to include like shipping)
+- `acquired_at`, `acquired_from` (free text with suggestions: a megastore, a marketplace, ...), `acquisition_type`: purchase | pull | gift | trade
+- `parent_holding_id` (nullable): set for pulls, pointing to the sealed product they came from
+- `condition`: Mercari scale: new_unused | like_new | no_noticeable_damage | minor_damage | damaged | poor
+- `packaging_state` (sealed products and boxed items): sealed_shrink | sealed_no_shrink | box_opened_contents_sealed | opened | empty | n/a
+- Cards: `grading`: raw | graded; `raw_grade`: S | A | B | C | D (SNKRDUNK-style); `grader`: PSA | BGS | CGC | ARS | other; `grade` (text, e.g. "10", "9.5"); `cert_number`
+- `status`: owned | sold | consumed (e.g. box fully opened) | lost
+- `notes`
+
+Lot rules:
+- Identical units bought together at the same price and condition = one holding with quantity N.
+- When some units change (graded, sold, opened, condition change), **split** them into a new holding first. Cost is allocated proportionally (integer yen; remainder stays on the original). A `split` event is recorded on both.
+- Pulls have `cost_total_jpy = 0` by default; the parent box keeps its cost. Box P/L is computed at box level.
+- Grading fees are added to the holding's cost basis via the grading event.
+
+### holding_events (history; append-only)
+- `holding_id`, `type`: acquired | split | opened | grading_submitted | grading_returned | condition_changed | sold | note
+- `occurred_at`, `amount_jpy` (fee or sale price), `fees_jpy` (platform fees, shipping), `payload` (JSON: before/after values, platform, split target, etc.)
+- Selling: split if needed, then `sold` event with price and fees; holding status -> sold. Realized P/L is derivable.
+
+### price_observations (raw market data; never deleted)
+- `product_id`, `source`, `observation_type`: sold | listing | buylist | retail
+- `bucket` (normalized valuation bucket, see 6), `price_jpy`, `price_original`, `currency`, `fx_rate`
+- `observed_at` (sale/listing time; best available proxy), `fetched_at`
+- `external_ref` (listing/transaction id; unique per source for dedupe), `title`, `url`, `raw` (JSON)
+- `excluded` (bool) + `excluded_reason` (outlier | manual | mismatch)
+
+### manual_prices
+- `user_id`, `product_id`, `bucket`, `price_jpy`, `set_at`, `note`. Always wins over computed values (for that user).
+
+### valuation_snapshots (daily, for portfolio-over-time chart)
+- `date`, `holding_id`, `value_jpy`, `method`, `source`, `sample_size`, `confidence`
+
+### fx_rates
+- `date`, `pair` (USDJPY), `rate`
+
+### collector_runs (health)
+- `source`, `started_at`, `finished_at`, `status` (ok | partial | failed | blocked), `requests`, `observations_added`, `error`
+
+### login_attempts (auth lockout)
+- `ip_hash`, `username_hash`, `attempted_at`, `success`. Old rows may be pruned (not domain data; excluded from export).

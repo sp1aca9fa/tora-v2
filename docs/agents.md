@@ -14,9 +14,9 @@ bugs cost a few wrong days; a leak between accounts cannot be recomputed away.
 
 ## Rules files
 
-- Public: `CLAUDE.md`, `requirements.md` Core (rule 5 for data), and
+- Public: `CLAUDE.md`, `requirements.md` Core, and
   `docs/rules/` (one file per concern: `values.md` for valuation, `buy-timing.md`, `opportunities.md`,
-  `sources-markets.md`, `alerts.md`, `collectors.md`).
+  `sources-markets.md`, `alerts.md`, `collectors.md`, `data-model.md`).
 - Private: `collectors/ops/claude-rules.md` (read it if it exists; its hard rules never break).
 
 ## Risk class
@@ -45,8 +45,9 @@ Paths (a changed file here makes the change Tier 2):
 
 - Unknown stays unknown (never 0, never a guess); stale data is never shown as current.
 - Money carries its currency; per unit vs per lot kept apart.
-- A price matched to the right item and condition; raw observations never edited or deleted
-  (exclusions are marked); derived values can be recomputed.
+- A price matched to the right item and condition; a collected price never deleted or changed to
+  put a value right (a wrong one is marked; the two cases where prices leave are in
+  `docs/rules/data-model.md`); derived values can be recomputed.
 - No look-ahead in tests of signals (prices read before their day).
 - Quantiles and medians not computed on too few points.
 - Plug-ins (collectors) never write to the database directly.
