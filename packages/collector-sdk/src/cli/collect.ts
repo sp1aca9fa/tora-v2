@@ -35,6 +35,8 @@ import {
   saveUsage,
   loadTimeZone,
   loadSourceRegistry,
+  queueWeeklyReads,
+  saveJobKinds,
 } from '@tora/db';
 import { INSIGHT_PERIODS, localDate, marketsInUse } from '@tora/core';
 import { dbConfigFromEnv, isRemoteUrl, loadRootEnv } from '@tora/db/env';
@@ -53,6 +55,7 @@ import { readOpeningCards } from '../opening';
 import { readRankings } from '../rankings';
 import { runCollector } from '../runner';
 import { applyItemRules } from '../game-rules';
+import { dropUncoveredSpans } from '../job-search';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
 import { type SourceResult, offEverywhere, refusedResult, runFailed } from './collect-plan';
@@ -120,6 +123,8 @@ try {
   console.log(`set catalog: not loaded (${errorText(e)})`);
 }
 for (const dir of missing) console.log(`Collector package not present: ${dir}/ (skipped)`);
+// The job kinds each plug-in reads (S36 B3): the web and the closing step read them.
+await saveJobKinds(db, Object.fromEntries(collectors.map((c) => [c.source, c.jobKinds ?? []])));
 const marketOf = new Map(sources.map((s) => [s.key, s.market]));
 // Only the markets the admin uses, unless a market or source is asked for by name (S10).
 const registry = await loadSourceRegistry(db);
@@ -404,6 +409,20 @@ if (!values.refresh && fetched === 0 && closedOn === localDate()) {
     await applyItemRules(db, collectors, { log });
   } catch (error) {
     log(`game rules: stopped (${errorText(error)})`);
+  }
+  // Spans whose read search is narrower than the item's search now go (fix round 1, rule c); their
+  // deep reads are queued again just below. No request.
+  try {
+    log(`deep read spans: ${await dropUncoveredSpans(db, collectors)} dropped (search changed)`);
+  } catch (error) {
+    log(`deep read spans: not checked (${errorText(error)})`);
+  }
+  // The wished games' deep reads and weekly read-backs (S36 B3): queued here, run by day; no request.
+  try {
+    const reads = await queueWeeklyReads(db, new Date());
+    log(`deep reads: ${reads.queued} job(s) queued, ${reads.stopped} stopped`);
+  } catch (error) {
+    log(`deep reads: not queued (${errorText(error)})`);
   }
   // Each item's packed sales, which the pages and the steps below read (the days changed by this
   // run and the lot sizes; everything once a week).

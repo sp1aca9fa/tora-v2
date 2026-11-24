@@ -30,6 +30,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { Db } from './client';
+import { forgetReads } from './deep-reads';
 import {
   daysBack,
   loadItemSales,
@@ -1152,6 +1153,8 @@ export async function updateSourceQuery(
           ),
         ),
       );
+    // What rested on those rows goes with them: spans, nights, jobs' places (fix round 1, rule a).
+    await forgetReads(tx, link.productId, link.source);
     await clearBucketValues(tx, [link.productId]);
   });
   await refreshItemSales(db, { marksOnly: true });
@@ -1167,7 +1170,10 @@ export async function sourceObservations(db: Db, productId: string, source: stri
     .limit(limit);
 }
 
-/** Excludes a sale by hand (or includes it again). */
+/**
+ * Excludes a sale by hand (or includes it again). An include settles a load's undo on the row: its
+ * `undone:` mark goes, so later deep reads no longer count it as undone (fix round 2, item 3).
+ */
 export async function setObservationExcluded(
   db: Db,
   observationId: string,
@@ -1175,7 +1181,14 @@ export async function setObservationExcluded(
 ): Promise<{ productId: string } | null> {
   const [row] = await db
     .update(priceObservations)
-    .set({ excluded, excludedReason: excluded ? 'manual' : null })
+    .set({
+      excluded,
+      excludedReason: excluded ? 'manual' : null,
+      ...(!excluded && {
+        ruleMark: sql`CASE WHEN ${priceObservations.ruleMark} LIKE 'undone:%' THEN NULL
+          ELSE ${priceObservations.ruleMark} END`,
+      }),
+    })
     .where(eq(priceObservations.id, observationId))
     .returning({ productId: priceObservations.productId });
   if (row) {

@@ -320,6 +320,18 @@ describe('sample', () => {
     ]);
   });
 
+  it('listings: the nights are the days listings were stored, with or without coverage', async () => {
+    const g = await game('Hero Quest');
+    for (let d = 1; d <= 7; d++) await night(g.id, `2026-11-0${d}`, [offer('L1', 900)]);
+    // A search saved again drops the item's nights (`forgetReads`); its stored listings stay.
+    await db.delete(schema.saleCoverage).where(eq(schema.saleCoverage.productId, g.id));
+    const file = await buildSample(db, 'listings', [{ id: g.id, name: 'Hero Quest' }], opts(NOW));
+    expect(file.items[0]!.checks).toMatchObject([
+      { source: 'flea', nights: 7, entries: [{ ref: 'L1' }] },
+    ]);
+    expect(file.items[0]!.checks[0]).not.toHaveProperty('tooFewNights');
+  });
+
   it("listings: the identity shop's own copy and outside seller are never sampled (S36 A6)", async () => {
     const g = await game('Hero Quest');
     for (let d = 1; d <= 7; d++) {

@@ -1,5 +1,6 @@
 import type { MarketStateView } from '@tora/db';
 import { getFormatter, getTranslations } from 'next-intl/server';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { ConfirmButton } from '../admin/accounts/account-forms';
@@ -10,7 +11,8 @@ export const EXTRA_READS_ID = 'extra-reads';
 /**
  * The extra daytime reads per marketplace (S36 B4): the number a day and today's use, the jobs
  * (failing ones amber, stopped ones red, each with its last error), a pause after a refusal or a
- * stop, and the restart. A table on wider screens, cards on phone.
+ * stop, and the restart; the items whose deep read wrote no covered days in the last 30 days because
+ * of sales stored under another item (S36 B3). A table on wider screens, cards on phone.
  */
 export async function ExtraReads({
   views,
@@ -73,9 +75,12 @@ export async function ExtraReads({
         task={{ kind: 'restartMarket', source: v.source }}
       />
     );
-  // The last error of a stopped job, then of a failing one; nothing when there is neither.
+  // The last error of a stopped job, then of a failing one, then the items a job could not cover;
+  // nothing when there is none.
   const hasErrors = (v: MarketStateView) =>
-    (v.stoppedJobs > 0 && !!v.lastError) || (v.failingJobs > 0 && !!v.lastFailure);
+    (v.stoppedJobs > 0 && !!v.lastError) ||
+    (v.failingJobs > 0 && !!v.lastFailure) ||
+    v.blocked.length > 0;
   const errors = (v: MarketStateView) => (
     <>
       {v.stoppedJobs > 0 && v.lastError && (
@@ -88,6 +93,19 @@ export async function ExtraReads({
           {t('lastFailure')} <span className="break-words text-foreground">{v.lastFailure}</span>
         </p>
       )}
+      {v.blocked.map((b, i) => (
+        <p key={`${b.productId}-${i}`} className="text-xs text-muted-foreground">
+          {b.productId ? (
+            <Link href={`/products/${b.productId}`} className="text-foreground hover:underline">
+              {b.name ?? b.productId}
+            </Link>
+          ) : (
+            '-'
+          )}
+          {': '}
+          {t('blockedSpan', { count: b.n })}
+        </p>
+      ))}
     </>
   );
 

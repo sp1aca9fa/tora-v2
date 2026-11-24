@@ -40,13 +40,11 @@ import {
 } from '@tora/core';
 import {
   type Db,
-  type DayRange,
   type RuleState,
   RULE_MARK_PREFIX,
   addCheckMarks,
   clearBucketValues,
   currentRules,
-  daysOf,
   dismissedExclusions,
   failureStands,
   gameRulesOn,
@@ -411,9 +409,10 @@ async function salesBlock(
  * A game's listings blocks as of `at`, one per source with stored listings: the distinct listings (by
  * ref, each once, as last stored) over every night whose row was written by then (`supply.updated_at`,
  * the write time; `fetched_at` is the collect's start, earlier than rows it writes later), that pass
- * today's rules and were not marked "not the item" by then; the 20 cheapest. The nights: the source's
- * covered nights (`sale_coverage`) from the first day it stored listings for the item, each counted
- * only when its stored listings were written by `at` (S36 A2 "stored over 7 or more nights"). A mark
+ * today's rules and were not marked "not the item" by then; the 20 cheapest. The nights: the days
+ * the source's search listings for the item were stored, each counted only when they were written by
+ * `at` (S36 A2 "stored over 7 or more nights"; not `sale_coverage`, which a search save drops while
+ * the listings stay: fix round 2, item 4). A mark
  * made after `at` (this sample's own recording, or a person's click while it was labeled) leaves the
  * rebuilt sample as it was.
  */
@@ -441,14 +440,6 @@ async function listingsBlocks(
     // The shop's own copy and outside seller (S36 A6) are not search listings: never sampled.
     (r) => r.day <= lastDay && Date.parse(r.updatedAt) <= until && searchOffers(r) !== null,
   );
-  const coverage = new Map(
-    (
-      await db
-        .select({ source: schema.saleCoverage.source, nights: schema.saleCoverage.nights })
-        .from(schema.saleCoverage)
-        .where(eq(schema.saleCoverage.productId, productId))
-    ).map((r) => [r.source, r.nights as DayRange[]]),
-  );
   const marks = new Set(
     (
       await db
@@ -464,10 +455,10 @@ async function listingsBlocks(
       .map((m) => `${m.source}|${m.ref}`),
   );
   type Seen = { entry: CheckEntry; category: string | null };
-  const bySource = new Map<string, { first: string; listings: Map<string, Seen> }>();
+  const bySource = new Map<string, { listings: Map<string, Seen> }>();
   for (const r of rows) {
     if (!ctx.allowed(r.source)) continue;
-    const seen = bySource.get(r.source) ?? { first: r.day, listings: new Map<string, Seen>() };
+    const seen = bySource.get(r.source) ?? { listings: new Map<string, Seen>() };
     bySource.set(r.source, seen);
     for (const offer of searchOffers(r) ?? []) {
       if (marks.has(`${r.source}|${offer.ref}`)) continue;
@@ -489,13 +480,10 @@ async function listingsBlocks(
     }
   }
   const out: CheckBlock[] = [];
-  for (const [source, { first, listings }] of [...bySource].toSorted(([a], [b]) => cmp(a, b))) {
-    // Nights as of `at` too: a covered night counts only when the source's listings of that day were
-    // written by `at` (`rows` holds only those).
-    const stored = new Set(rows.filter((r) => r.source === source).map((r) => r.day));
-    const nights = daysOf(coverage.get(source) ?? []).filter(
-      (d) => d >= first && stored.has(d),
-    ).length;
+  for (const [source, { listings }] of [...bySource].toSorted(([a], [b]) => cmp(a, b))) {
+    // Nights as of `at` too: a day counts only when the source's listings of that day were written
+    // by `at` (`rows` holds only those).
+    const nights = new Set(rows.filter((r) => r.source === source).map((r) => r.day)).size;
     const hash = current.hashFor('listings', source);
     if (nights < LISTING_NIGHTS_MIN) {
       out.push({ kind: 'listings', source, hash, nights, tooFewNights: true, entries: [] });

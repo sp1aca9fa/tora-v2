@@ -22,6 +22,7 @@ import { and, asc, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { listConsoles } from './consoles';
 import { type Confirmations, confirmationsMany, getItemRules, saveItemRules } from './item-rules';
+import { queueWishReadsSafely } from './deep-reads';
 import { DomainError, createProduct } from './mutations';
 import { type RuleHold, isHeld } from './rule-marks';
 import {
@@ -478,7 +479,7 @@ export async function addGameWish(
   if (!name || name.length > 200) throw new DomainError('invalid_input');
   const edition = input.edition?.trim() || null;
   if (edition && edition.length > 80) throw new DomainError('invalid_input');
-  return db.transaction(async (tx) => {
+  const made = await db.transaction(async (tx) => {
     const consoles = await listConsoles(tx);
     const row = findConsole(input.console ?? '', consoles);
     if (!row) throw new DomainError('invalid_input');
@@ -497,6 +498,9 @@ export async function addGameWish(
     const watch = await addWatchOf(tx, userId, target, input.watch, { keepUntyped: true });
     return { watch, product: target, plain };
   });
+  // Its deep reads (S36 B3), once the wish is stored.
+  await queueWishReadsSafely(db, made.product.id);
+  return made;
 }
 
 /**

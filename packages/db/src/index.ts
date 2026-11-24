@@ -54,3 +54,4 @@ export * from './sale-coverage';
 export * from './not-item';
 export * from './source-facts';
 export * from './market-jobs';
+export * from './deep-reads';

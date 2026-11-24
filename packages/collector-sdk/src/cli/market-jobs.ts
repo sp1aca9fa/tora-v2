@@ -1,7 +1,13 @@
 // `pnpm market-jobs [--source <s>] [--dry-run]`: the daytime job runner (requirements S36 B4),
 // started every 30 minutes by scripts/market-jobs-cron.sh. Exit 0; 1 when it could not run or
 // failed (an admin entry, at most one a day); 4 when a marketplace's refusal was recorded.
-import { createDb, loadSourceRegistry, loadTimeZone, recordMarketJobsFailed } from '@tora/db';
+import {
+  createDb,
+  loadSourceRegistry,
+  loadTimeZone,
+  recordMarketJobsFailed,
+  saveJobKinds,
+} from '@tora/db';
 import { dbConfigFromEnv, loadRootEnv } from '@tora/db/env';
 import { exitIfUnmigrated } from '@tora/db/migrate';
 import { parseArgs } from 'node:util';
@@ -49,6 +55,12 @@ if (typeof run === 'object' && run) {
 // Plug-ins only: their registry entries are the collect's to write. The admin's switches leave
 // sources out as they do for the collect (read only).
 const loaded = await loadCollectors();
+// The job kinds each plug-in reads (S36 B3), as the collect writes them; a dry run writes nothing.
+if (!dryRun)
+  await saveJobKinds(
+    db,
+    Object.fromEntries(loaded.collectors.map((c) => [c.source, c.jobKinds ?? []])),
+  );
 const { kept, unused, off } = jobCollectors(
   loaded.collectors,
   loaded.sources,

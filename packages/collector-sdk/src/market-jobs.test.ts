@@ -3,12 +3,14 @@ import {
   type Db,
   createDb,
   createProduct,
+  createQuerySource,
   createUser,
   ensureMarketState,
   queueMarketJob,
   restartMarket,
   saveSourceInfos,
   schema,
+  updateSourceQuery,
 } from '@tora/db';
 import { migrateDb } from '@tora/db/migrate';
 import { TEST_SOURCES } from '@tora/db/testing';
@@ -27,9 +29,11 @@ const {
   marketJobs,
   marketState,
   priceObservations,
+  productSources,
   products,
   activity,
   collectorRuns,
+  saleSpans,
 } = schema;
 
 let db: Db;
@@ -789,5 +793,157 @@ describe('the daytime job runner (S36 B4)', () => {
     expect(await used()).toBe(25);
     expect(await jobRow(job.id)).toMatchObject({ status: 'waiting', cursor: { page: 2 } });
     expect(await rows()).toHaveLength(1);
+  });
+  it('a search saved again mid-step: the page in flight saves nothing, the job starts over', async () => {
+    const { g, job } = await setup();
+    await createQuerySource(db, g.id, 'marketa', { keywords: ['Game A'] });
+    const [link] = await db.select().from(productSources).where(eq(productSources.productId, g.id));
+    const base = plugin();
+    const editing = plugin(async (j, ctx) => {
+      const step = await base.runJob!(j, ctx);
+      // The search form saved with nothing changed while page 3 was being read.
+      if ((j.cursor as { page: number } | null)?.page === 3)
+        await updateSourceQuery(db, link!.id, link!.query!);
+      return step;
+    });
+    at('2026-11-24T12:00:00+09:00');
+    await run(editing);
+    expect(fetched).toHaveLength(3);
+    const stamped = (await rows()).filter(
+      (r) => (r.raw as { job?: string } | null)?.job === job.id,
+    );
+    expect(stamped).toEqual([]);
+    expect(await db.select().from(saleSpans)).toEqual([]);
+    expect(await jobRow(job.id)).toMatchObject({
+      status: 'waiting',
+      cursor: null,
+      oldestReached: null,
+      result: null,
+    });
+    // The next run reads from page 1 again.
+    at('2026-11-24T13:00:00+09:00');
+    await run(plugin(undefined, 2));
+    expect(fetched.slice(3)).toEqual([
+      'https://marketa.test/search?page=1',
+      'https://marketa.test/search?page=2',
+    ]);
+  });
+
+  it('a search saved while another job of the run is read: that job starts over from its first page', async () => {
+    // Game B: 30 pages, its search saved while Game A's job (listed first, 1 page) is read.
+    const a = await game('Game A');
+    const b = await game('Game B');
+    await createQuerySource(db, b.id, 'marketa', { keywords: ['Game B'] });
+    const [link] = await db.select().from(productSources).where(eq(productSources.productId, b.id));
+    const paged = (saveOn?: string) =>
+      plugin(async (j, ctx) => {
+        const name = ctx.product!.name;
+        const page = (j.cursor as { page: number } | null)?.page ?? 1;
+        await ctx.http.json(`https://marketa.test/search?q=${encodeURIComponent(name)}&p=${page}`);
+        if (name === saveOn) await updateSourceQuery(db, link!.id, link!.query!);
+        const row = {
+          productId: j.productId!,
+          source: 'marketa',
+          observationType: 'sold' as const,
+          bucket: 'used',
+          price: 1000 + page,
+          currency: 'JPY',
+          observedAt: '2026-11-01T12:00:00.000+09:00',
+          fetchedAt: ctx.now.toISOString(),
+          externalRef: `${name}-p${page}`,
+        };
+        const last = name === 'Game B' ? 30 : 1;
+        return {
+          rows: [row],
+          cursor: { page: page + 1 },
+          done: page >= last,
+          oldestReached: '2026-06-01',
+          // The marketplace's saved search, first read on the 25th: B's read can end with a span.
+          search: { key: `k-${name}`, day: '2026-11-25' },
+        };
+      });
+    const jobB = await queueMarketJob(db, { source: 'marketa', productId: b.id, kind: 'deep' });
+    await ensureMarketState(db, 'marketa');
+    await db.update(marketState).set({ perDay: 25 }).where(eq(marketState.source, 'marketa'));
+    // The first day reads 25 of B's pages: its stored cursor is at page 26.
+    at('2026-11-24T05:00:00+09:00');
+    await run(paged());
+    expect(await jobRow(jobB.id)).toMatchObject({ status: 'waiting', cursor: { page: 26 } });
+    // The next day lists A, then B; A's step saves B's search with nothing changed.
+    const jobA = await queueMarketJob(db, { source: 'marketa', productId: a.id, kind: 'deep' });
+    await db
+      .update(marketJobs)
+      .set({ createdAt: '2026-11-01T00:00:00.000+09:00' })
+      .where(eq(marketJobs.id, jobA.id));
+    await db.update(marketState).set({ perDay: 100 }).where(eq(marketState.source, 'marketa'));
+    at('2026-11-25T05:00:00+09:00');
+    await run(paged('Game A'));
+    const pages = (name: string) =>
+      fetched
+        .slice(25)
+        .map((u) => new URL(u).searchParams)
+        .filter((q) => q.get('q') === name)
+        .map((q) => Number(q.get('p')));
+    expect(pages('Game A')).toEqual([1]);
+    expect(pages('Game B')).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
+    expect(await jobRow(jobB.id)).toMatchObject({ status: 'done' });
+    // Every page of B's span holds its row again: none rests on a deleted one.
+    const ofB = (await rows()).filter((r) => r.productId === b.id).map((r) => r.externalRef);
+    expect(new Set(ofB)).toEqual(new Set(Array.from({ length: 30 }, (_, i) => `Game B-p${i + 1}`)));
+    const spansOfB = (await db.select().from(saleSpans)).filter((s) => s.productId === b.id);
+    expect(spansOfB.map((s) => s.jobId)).toEqual([jobB.id]);
+  });
+
+  it("a finished deep read keeps the search the plug-in was given as its result's read", async () => {
+    const { g, job } = await setup();
+    await createQuerySource(db, g.id, 'marketa', { keywords: ['Game A', 'Gold'], categoryId: '7' });
+    const given: unknown[] = [];
+    const base = plugin(undefined, 2);
+    const keyed = plugin(async (j, ctx) => {
+      given.push(ctx.search);
+      const step = await base.runJob!(j, ctx);
+      return { ...step, search: { key: 'k1', day: '2026-11-24' } };
+    });
+    at('2026-11-24T12:00:00+09:00');
+    await run(keyed);
+    expect(given).toEqual([
+      { keywords: ['Game A', 'Gold'], categoryId: '7' },
+      { keywords: ['Game A', 'Gold'], categoryId: '7' },
+    ]);
+    expect(await jobRow(job.id)).toMatchObject({
+      status: 'done',
+      result: { search: 'k1', read: { keyword: 'Game A Gold', categoryId: '7' } },
+    });
+  });
+
+  it("a search that cannot be built fails its job's step; the other marketplaces go on", async () => {
+    const { g, job } = await setup();
+    // A search left to the plug-in's default, which throws.
+    await db.insert(productSources).values({
+      productId: g.id,
+      source: 'marketa',
+      externalId: 'search',
+      query: null,
+      active: true,
+    });
+    const broken: Collector = {
+      ...plugin(),
+      defaultQuery: () => {
+        throw new Error('no default search');
+      },
+    };
+    const b = await game('Game B');
+    const other = await queueMarketJob(db, { source: 'marketb', productId: b.id, kind: 'deep' });
+    const second: Collector = { ...named(), source: 'marketb', label: 'Market B' };
+    at('2026-11-24T12:00:00+09:00');
+    const report = await run([broken, second]);
+    expect(report.stops.marketa).toMatch(/no default search/);
+    expect(fetched.map(item)).toEqual(['Game B']);
+    expect(await jobRow(job.id)).toMatchObject({
+      status: 'waiting',
+      failures: 1,
+      error: expect.stringMatching(/no default search/),
+    });
+    expect(await jobRow(other.id)).toMatchObject({ status: 'done' });
   });
 });

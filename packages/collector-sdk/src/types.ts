@@ -319,14 +319,30 @@ export interface JobContext {
   log: (message: string) => void;
   /** The job's item now (it may have been merged since the job was queued); null: none. */
   product: Product | null;
+  /**
+   * The search the nightly read would send for the item now (its stored or default search, an
+   * outdated auto search renewed, the game rules laid over it), never stored; null: none.
+   */
+  search: SourceQuery | null;
+  /** Titles of the pasted listings already in the item's link state (read by no request). */
+  references: string[];
 }
 
 export interface JobStep {
   rows: PriceInput[];
   cursor: unknown;
   done: boolean;
-  /** The oldest sale day this step reached (YYYY-MM-DD), or null. */
+  /**
+   * The oldest listing day the current search has surely read (YYYY-MM-DD), or null; reset when
+   * the search changes (a merge, an edit), so a span never reaches back on another search.
+   */
   oldestReached: string | null;
+  /**
+   * The search the step read (any key naming it) and the app-zone day its first page was read: a
+   * finished job's covered days end the day before (S36 "Covered day"). Findings of another key are
+   * dropped.
+   */
+  search?: { key: string; day: string };
 }
 
 export type ProductDetails = Partial<

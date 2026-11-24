@@ -1253,9 +1253,14 @@ keeps what the Watchlist does today (S9's zone, target and alerts), unchanged.
   buckets is measured at the rerun (step D).
 - Covered day, per source: a day whose night read that source for the item, from the item's first nightly
   collect on; a day a later read-back reached past (A3, a tracked game's weekly read); or a day inside the
-  span of a finished deep read (B3). A deep read's span runs to the day it finished, from the date it was
-  asked to reach when it read 4 weeks past that date, and otherwise (the pages ran out first) from 4 weeks
-  after the oldest listing it reached. A deep read that has not finished covers nothing yet.
+  span of a finished deep read (B3). A deep read's span runs to the day before its first page was read (a
+  read over several days sees the newest sales only on its first day; the nights cover the days since), from
+  the date it was asked to reach when it read 4 weeks past that date, and otherwise (the pages ran out
+  first) from 4 weeks after the oldest listing it reached. A deep read that has not finished covers nothing
+  yet. A span stands only while what it rests on does: it is dropped when the item's stored sales at that
+  source are removed (its search saved again), when a load it overlaps is undone, or when the item's search
+  today is no longer within the search the read was made under (a console corrected, a word dropped, a
+  merge); the deep read is then asked for again.
 - Record: the lowest level of any day, with its date and window. It is computed from the clean sales as they
   are now, never kept as a running minimum, so it follows an exclusion or a change of rules. It is never the
   lowest single sale: that is usually a loose or wrong copy, or was gone within hours.

@@ -22,6 +22,7 @@ import {
   toLocalIso,
   type AlertState,
   type ItemCheckBy,
+  type JobResult,
   type ItemCheckKind,
   type ItemCheckOutcome,
   type Names,
@@ -1549,6 +1550,8 @@ export const marketJobs = sqliteTable(
     error: text('error'),
     /** Failed steps in a row; a saved step resets it (the W10 review's error rule). */
     failures: integer('failures').notNull().default(0),
+    /** What the job found (S36 A3, B3): rows added, sales under another item, its span or why none. */
+    result: text('result', { mode: 'json' }).$type<JobResult>(),
   },
   (t) => [
     index('market_jobs_queue_idx').on(t.source, t.status, t.kind, t.createdAt),

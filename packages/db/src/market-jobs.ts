@@ -2,7 +2,9 @@
 // marketplace's refusal state. The rules (numbers, order, hours) are in @tora/core market-ceiling.
 // Only the collector SDK's job runner and an admin's restart write here.
 import {
+  type JobResult,
   MARKET_FLOOR,
+  MARKET_JOB_KINDS,
   MARKET_PER_DAY,
   type MarketJobKind,
   afterRefusal,
@@ -29,6 +31,8 @@ import {
 
 const ACTIVE = ['waiting', 'running'];
 const isActive = inArray(marketJobs.status, ACTIVE);
+/** Jobs the runner reads: a `load` (S36 A3) is a stored row only, never picked up or counted. */
+const isRunKind = inArray(marketJobs.kind, [...MARKET_JOB_KINDS]);
 
 /** Admin activity actions the refusal alert pass sends (alerts.ts). */
 export const MARKET_ALERT_ACTIONS = ['marketRefused', 'marketStopped', 'marketJobsFailed'];
@@ -123,7 +127,7 @@ export async function activeJobSources(db: Db): Promise<string[]> {
   const rows = await db
     .selectDistinct({ source: marketJobs.source })
     .from(marketJobs)
-    .where(isActive)
+    .where(and(isActive, isRunKind))
     .orderBy(marketJobs.source);
   return rows.map((r) => r.source);
 }
@@ -133,21 +137,23 @@ export async function nextJobs(db: Db, source: string): Promise<MarketJobRow[]> 
   const rows = await db
     .select()
     .from(marketJobs)
-    .where(and(eq(marketJobs.source, source), isActive));
+    .where(and(eq(marketJobs.source, source), isActive, isRunKind));
   return rows.sort(compareJobs);
 }
 
 /**
  * Marks a job running, `started_at` its last attempt (a job failing 5 times in a row is tried at
- * most once a day by it). False: it is gone or finished.
+ * most once a day by it). Returns the job as claimed, the one place a run reads its cursor and
+ * findings from (a search saved since the run listed its jobs reset them; fix round 2, item 1).
+ * Null: it is gone or finished.
  */
-export async function claimJob(db: Db, jobId: string, now: Date): Promise<boolean> {
-  const rows = await db
+export async function claimJob(db: Db, jobId: string, now: Date): Promise<MarketJobRow | null> {
+  const [row] = await db
     .update(marketJobs)
     .set({ status: 'running', startedAt: toLocalIso(now) })
     .where(and(eq(marketJobs.id, jobId), isActive))
-    .returning({ id: marketJobs.id });
-  return rows.length > 0;
+    .returning();
+  return row ?? null;
 }
 
 /**
@@ -191,9 +197,13 @@ export async function reserveRequest(
 export async function jobTarget(
   db: Db,
   jobId: string,
-): Promise<{ productId: string | null; status: string } | null> {
+): Promise<{ productId: string | null; status: string; result: JobResult | null } | null> {
   const [row] = await db
-    .select({ productId: marketJobs.productId, status: marketJobs.status })
+    .select({
+      productId: marketJobs.productId,
+      status: marketJobs.status,
+      result: marketJobs.result,
+    })
     .from(marketJobs)
     .where(eq(marketJobs.id, jobId));
   return row ?? null;
@@ -202,13 +212,15 @@ export async function jobTarget(
 /**
  * A step's progress: its cursor, the oldest day reached so far, and done. A saved step clears the
  * error and the failures of earlier failed ones. Written only while the job still exists and runs;
- * false otherwise (merged into a job the target had, deleted, restarted).
+ * false otherwise (merged into a job the target had, deleted, restarted). `result`: what the job
+ * found so far, merged by the caller (S36 B3), replacing the stored one.
  */
 export async function saveJobStep(
   db: Db,
   jobId: string,
   step: { cursor: unknown; oldestReached: string | null; done: boolean },
   now: Date,
+  result?: JobResult,
 ): Promise<boolean> {
   const oldest = step.oldestReached;
   const rows = await db
@@ -223,6 +235,7 @@ export async function saveJobStep(
           : sql`CASE WHEN ${marketJobs.oldestReached} IS NULL OR ${oldest} < ${marketJobs.oldestReached}
               THEN ${oldest} ELSE ${marketJobs.oldestReached} END`,
       ...(step.done ? { status: 'done', finishedAt: toLocalIso(now) } : {}),
+      ...(result ? { result } : {}),
     })
     .where(and(eq(marketJobs.id, jobId), eq(marketJobs.status, 'running')))
     .returning({ id: marketJobs.id });
@@ -411,12 +424,20 @@ export interface MarketStateView {
   failingJobs: number;
   mostFailures: number;
   lastFailure: string | null;
+  /**
+   * Jobs finished in the last 30 days that wrote no span because sales they found are stored under
+   * another item or were undone by a load (S36 B3): the item and how many such sales.
+   */
+  blocked: { productId: string | null; name: string | null; n: number }[];
 }
+
+/** Days a job that wrote no span for sales stored elsewhere stays listed (collectors page). */
+const BLOCKED_DAYS = 30;
 
 /** Per marketplace with a state row or jobs: the day's number, use and jobs (collectors page). */
 export async function marketStates(db: Db, now = new Date()): Promise<MarketStateView[]> {
   const day = localDate(now);
-  const [states, days, jobs, errors, failing] = await Promise.all([
+  const [states, days, jobs, errors, failing, blocked] = await Promise.all([
     db.select().from(marketState),
     db.select().from(marketDays).where(eq(marketDays.day, day)),
     db
@@ -427,18 +448,35 @@ export async function marketStates(db: Db, now = new Date()): Promise<MarketStat
         oldest: sql<string>`min(${marketJobs.createdAt})`,
       })
       .from(marketJobs)
-      .where(inArray(marketJobs.status, [...ACTIVE, 'stopped']))
+      .where(and(inArray(marketJobs.status, [...ACTIVE, 'stopped']), isRunKind))
       .groupBy(marketJobs.source, marketJobs.status),
     db
       .select({ source: marketJobs.source, error: marketJobs.error })
       .from(marketJobs)
-      .where(eq(marketJobs.status, 'stopped'))
+      .where(and(eq(marketJobs.status, 'stopped'), isRunKind))
       .orderBy(desc(marketJobs.finishedAt)),
     db
       .select({ source: marketJobs.source, failures: marketJobs.failures, error: marketJobs.error })
       .from(marketJobs)
-      .where(and(isActive, gt(marketJobs.failures, 0)))
+      .where(and(isActive, isRunKind, gt(marketJobs.failures, 0)))
       .orderBy(desc(marketJobs.startedAt)),
+    db
+      .select({
+        source: marketJobs.source,
+        productId: marketJobs.productId,
+        name: products.name,
+        result: marketJobs.result,
+      })
+      .from(marketJobs)
+      .leftJoin(products, eq(products.id, marketJobs.productId))
+      .where(
+        and(
+          eq(marketJobs.status, 'done'),
+          sql`json_extract(${marketJobs.result}, '$.why') = 'elsewhere'`,
+          sql`julianday(${marketJobs.finishedAt}) >= julianday(${toLocalIso(now)}) - ${BLOCKED_DAYS}`,
+        ),
+      )
+      .orderBy(desc(marketJobs.finishedAt)),
   ]);
   const sources = [...new Set([...states.map((s) => s.source), ...jobs.map((j) => j.source)])];
   return sources.sort().map((source) => {
@@ -460,6 +498,13 @@ export async function marketStates(db: Db, now = new Date()): Promise<MarketStat
       failingJobs: failed.length,
       mostFailures: Math.max(0, ...failed.map((f) => f.failures)),
       lastFailure: failed[0]?.error ?? null,
+      blocked: blocked
+        .filter((b) => b.source === source)
+        .map(({ productId, name, result: r }) => ({
+          productId,
+          name,
+          n: (r?.elsewhere?.length ?? 0) + (r?.undoneHere?.length ?? 0) + (r?.elsewhereMore ?? 0),
+        })),
     };
   });
 }

@@ -388,6 +388,7 @@
       "stopped": "Stopped, restart needed",
       "lastError": "Last error of a stopped job:",
       "lastFailure": "Last error of a failing job:",
+      "blockedSpan": "{count, plural, one {# sale} other {# sales}} found under another item or undone by a load; no covered days written",
       "restart": "Restart",
       "restartConfirm": "Starts the extra reads of {source} again at 25 a day (from tomorrow if today's 25 are used)."
     },

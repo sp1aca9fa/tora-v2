@@ -20,3 +20,5 @@ export * from './money';
 export * from './opening';
 export * from './catalog';
 export * from './market-jobs';
+export * from './job-search';
+export * from './job-save';

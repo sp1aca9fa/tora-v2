@@ -18,6 +18,7 @@ import {
   categoryDef,
   itemTypeOf,
   isGameItem,
+  LOAD_JOB_KIND,
   resolveTaxonomy,
   kindsForSetType,
   orderSourceOf,
@@ -28,7 +29,7 @@ import {
   splitHolding,
   toLocalIso,
 } from '@tora/core';
-import { and, count, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import type { Db } from './client';
 import { findSameCard } from './similar';
 import { loadSourceRegistry } from './registry';
@@ -1057,44 +1058,51 @@ export async function flagForReview(
 
 /**
  * A game's marketplace jobs (S36 B4) when item `fromId` is merged into `intoId`, or deleted (`intoId`
- * null): merged, they go to the target, except one of a marketplace and kind the target already has
- * waiting or running (the target's wins); a target that is not a game item gets none (jobs are for
- * games only). Deleted, they go with the item.
+ * null): merged, they go to the target, except a read of a marketplace and kind the target already
+ * has waiting or running (the target's wins); a target that is not a game item gets no read waiting
+ * or running (jobs are for games only). A load and a finished job always go with the rows (its undo
+ * stays possible, plan-deep-read 10.11); a load running beside the target's is stopped first.
+ * Deleted, they go with the item.
  */
 async function moveMarketJobs(tx: Tx, fromId: string, intoId: string | null): Promise<void> {
-  const [into] =
-    intoId === null
-      ? []
-      : await tx
-          .select({
-            category: products.category,
-            kind: products.kind,
-            gameRules: itemRules.gameRules,
-          })
-          .from(products)
-          .leftJoin(itemRules, eq(itemRules.productId, products.id))
-          .where(eq(products.id, intoId));
-  const g = into?.gameRules;
-  if (intoId === null || !into || !isGameItem(into, { gameRules: g === 0 || g === 1 ? g : null })) {
+  if (intoId === null) {
     await tx.delete(marketJobs).where(eq(marketJobs.productId, fromId));
     return;
   }
+  const [into] = await tx
+    .select({
+      category: products.category,
+      kind: products.kind,
+      gameRules: itemRules.gameRules,
+    })
+    .from(products)
+    .leftJoin(itemRules, eq(itemRules.productId, products.id))
+    .where(eq(products.id, intoId));
+  const g = into?.gameRules;
   const active = inArray(marketJobs.status, ['waiting', 'running']);
-  const taken = await tx
-    .select({ source: marketJobs.source, kind: marketJobs.kind })
-    .from(marketJobs)
-    .where(and(eq(marketJobs.productId, intoId), active));
-  for (const t of taken) {
+  if (!into || !isGameItem(into, { gameRules: g === 0 || g === 1 ? g : null })) {
     await tx
       .delete(marketJobs)
-      .where(
-        and(
-          eq(marketJobs.productId, fromId),
-          eq(marketJobs.source, t.source),
-          eq(marketJobs.kind, t.kind),
-          active,
-        ),
+      .where(and(eq(marketJobs.productId, fromId), active, ne(marketJobs.kind, LOAD_JOB_KIND)));
+  } else {
+    const taken = await tx
+      .select({ source: marketJobs.source, kind: marketJobs.kind })
+      .from(marketJobs)
+      .where(and(eq(marketJobs.productId, intoId), active));
+    for (const t of taken) {
+      const same = and(
+        eq(marketJobs.productId, fromId),
+        eq(marketJobs.source, t.source),
+        eq(marketJobs.kind, t.kind),
+        active,
       );
+      if (t.kind === LOAD_JOB_KIND)
+        await tx
+          .update(marketJobs)
+          .set({ status: 'stopped', error: 'merged during a load', finishedAt: toLocalIso() })
+          .where(same);
+      else await tx.delete(marketJobs).where(same);
+    }
   }
   await tx.update(marketJobs).set({ productId: intoId }).where(eq(marketJobs.productId, fromId));
 }

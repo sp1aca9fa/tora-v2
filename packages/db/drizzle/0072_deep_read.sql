@@ -1,0 +1,1 @@
+ALTER TABLE `market_jobs` ADD `result` text;

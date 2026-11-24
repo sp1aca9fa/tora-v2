@@ -89,7 +89,8 @@ export function coversDay(ranges: readonly DayRange[], day: string): boolean {
  * nights at the source as the caller read them this run (`sourceNights`), so nothing is read again.
  * The write then applies only while the stored nights still equal `known`; when another writer (a
  * merge of two items during the run) changed them meanwhile, the row is read again and the day
- * added to what is there, so nothing recorded is lost. Returns the nights as they are now.
+ * added to what is there, so nothing recorded is lost. A row removed since (a search saved) is not
+ * brought back with `known`: only the day is written. Returns the nights as they are now.
  */
 export async function addNight(
   db: Db,
@@ -116,17 +117,33 @@ export async function addNight(
     const merged = mergeRanges([...nights, [day, day]]);
     const at = toLocalIso();
     const last = attempt >= 3;
-    const written = await db
-      .insert(saleCoverage)
-      .values({ productId, source, nights: merged, updatedAt: at })
-      .onConflictDoUpdate({
-        target: [saleCoverage.productId, saleCoverage.source],
-        set: { nights: merged, updatedAt: at },
-        // The column stores `JSON.stringify` of the ranges, so the same call compares exactly. A row
-        // that appeared since a read that found none (`stored` null) never matches.
-        setWhere: last ? undefined : sql`${saleCoverage.nights} = ${stored ?? ''}`,
-      })
-      .returning({ productId: saleCoverage.productId });
+    // Nights read from a row are written over that row only: when it was removed since (a search
+    // saved, `forgetReads`), nothing is written and the row is read again, so the removed nights
+    // never come back and only this night is recorded (fix round 2, item 2).
+    const fromRow = stored !== null && nights.length > 0 && !last;
+    const written = fromRow
+      ? await db
+          .update(saleCoverage)
+          .set({ nights: merged, updatedAt: at })
+          .where(
+            and(
+              eq(saleCoverage.productId, productId),
+              eq(saleCoverage.source, source),
+              sql`${saleCoverage.nights} = ${stored}`,
+            ),
+          )
+          .returning({ productId: saleCoverage.productId })
+      : await db
+          .insert(saleCoverage)
+          .values({ productId, source, nights: merged, updatedAt: at })
+          .onConflictDoUpdate({
+            target: [saleCoverage.productId, saleCoverage.source],
+            set: { nights: merged, updatedAt: at },
+            // The column stores `JSON.stringify` of the ranges, so the same call compares exactly.
+            // A row that appeared since a read that found none (`stored` null) never matches.
+            setWhere: last ? undefined : sql`${saleCoverage.nights} = ${stored ?? ''}`,
+          })
+          .returning({ productId: saleCoverage.productId });
     if (written.length) return merged;
     // Someone else wrote this row since it was read: read it again and add the day to what is there.
     nights = null;
@@ -143,8 +160,11 @@ export interface SpanInput {
   jobId?: string | null;
 }
 
-/** Records the days a finished read-back, deep read or load covered. Returns the span's id. */
-export async function addSpan(db: Db, span: SpanInput): Promise<string> {
+/**
+ * Records the days a finished read-back, deep read or load covered (also inside a transaction).
+ * Returns the span's id.
+ */
+export async function addSpan(db: Pick<Db, 'insert'>, span: SpanInput): Promise<string> {
   if (!isDay(span.from) || !isDay(span.to) || span.from > span.to) {
     throw new Error(`addSpan: not a span: ${span.from} to ${span.to}`);
   }
@@ -164,11 +184,28 @@ export async function addSpan(db: Db, span: SpanInput): Promise<string> {
 }
 
 /** Takes back the spans a job recorded (its load undone). Returns how many went. */
-export async function removeSpan(db: Db, jobId: string): Promise<number> {
+export async function removeSpan(db: Pick<Db, 'delete'>, jobId: string): Promise<number> {
   if (!jobId) return 0;
   const gone = await db
     .delete(saleSpans)
     .where(eq(saleSpans.jobId, jobId))
+    .returning({ id: saleSpans.id });
+  return gone.length;
+}
+
+/**
+ * Takes back every span of an item at a source (also inside a transaction): its rows there were
+ * deleted or excluded, so no span may claim them (fix round 1, rule a). Nights stay. Returns how
+ * many went.
+ */
+export async function dropSpans(
+  db: Pick<Db, 'delete'>,
+  productId: string,
+  source: string,
+): Promise<number> {
+  const gone = await db
+    .delete(saleSpans)
+    .where(and(eq(saleSpans.productId, productId), eq(saleSpans.source, source)))
     .returning({ id: saleSpans.id });
   return gone.length;
 }

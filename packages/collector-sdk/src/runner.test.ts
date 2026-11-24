@@ -1,5 +1,6 @@
 import {
   type Db,
+  addNight,
   addWatch,
   bucketStats,
   insertObservations,
@@ -964,6 +965,30 @@ it('records the night a source was read for a game, not for a failed link or a c
   expect(rows.map((r) => [r.productId, r.source, r.nights])).toEqual([
     [ok.id, 'fake', [['2026-11-10', '2026-11-10']]],
   ]);
+});
+
+it("an auto search renewed in a nightly run leaves only that run's night (fix round 2, item 2)", async () => {
+  const g = await createProduct(db, userId, {
+    category: 'game',
+    kind: 'software',
+    name: 'Hero Quest',
+    platform: 'Alpha',
+  });
+  await createQuerySource(db, g.id, 'fake', { keywords: ['old'], extra: { auto: true } });
+  for (const day of ['2026-11-08', '2026-11-09']) await addNight(db, g.id, 'fake', day);
+  await runCollector(
+    db,
+    fakeCollector({
+      supports: () => true,
+      defaultQuery: (p) => ({ keywords: [p.name], extra: { auto: true, v: 2 } }),
+      queryVersion: 2,
+      collect: async () => ({ state: null, complete: true }),
+    }),
+    { ...quiet, now: new Date('2026-11-10T03:00:00.000Z') },
+  );
+  // The renewal dropped the old search's rows and the nights that rested on them.
+  const rows = await db.select().from(schema.saleCoverage);
+  expect(rows.map((r) => r.nights)).toEqual([[['2026-11-10', '2026-11-10']]]);
 });
 
 it("a boxed game is never offered its plain item's listing, nor searched outside the identity shop (S36)", async () => {

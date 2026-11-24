@@ -181,6 +181,20 @@ describe('sale coverage', () => {
     ]);
   });
 
+  it('a row removed since its nights were read is not brought back: only the night is written', async () => {
+    const p = await game('Hero Quest');
+    await addNight(db, p.id, 'market', '2026-11-01');
+    await addNight(db, p.id, 'market', '2026-11-02');
+    const known = (await sourceNights(db, 'market')).get(p.id)!;
+    // As `forgetReads` does when the item's search is saved again mid-run.
+    await db.delete(saleCoverage).where(eq(saleCoverage.productId, p.id));
+    expect(await addNight(db, p.id, 'market', '2026-11-03', known)).toEqual([
+      ['2026-11-03', '2026-11-03'],
+    ]);
+    const rows = await db.select().from(saleCoverage);
+    expect(rows.map((r) => r.nights)).toEqual([[['2026-11-03', '2026-11-03']]]);
+  });
+
   it('refuses a day or span that is not one', async () => {
     const p = await game('Hero Quest');
     await expect(addNight(db, p.id, 'market', '2026-13-01')).rejects.toThrow();

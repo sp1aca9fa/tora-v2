@@ -7,6 +7,7 @@ import {
   MARKET_FLOOR,
   MARKET_PER_DAY,
   MARKET_WAIT_MS,
+  type JobResult,
   type MarketJobKind,
   type MarketStopReason,
   type SourceInfo,
@@ -23,16 +24,19 @@ import {
 } from '@tora/core';
 import {
   type Db,
+  type JobFindings,
   type MarketJobRow,
   activeJobSources,
   claimJob,
   collectRequest,
   ensureMarketState,
+  finishJob,
   getItemRules,
   getProduct,
   jobTarget,
   lastCollectRun,
   marketUsed,
+  mergeFindings,
   nextJobs,
   readMarketState,
   recordRefusal,
@@ -45,6 +49,8 @@ import { readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { offEverywhere } from './cli/collect-plan';
 import { BlockedError, PoliteHttp, RequestCapError, errorText } from './http';
+import { saveJobRows } from './job-save';
+import { jobSearch } from './job-search';
 import { bootId, collectBusy, lockSource, stateDir } from './lock';
 import { baseConverter } from './money';
 import { saveObservations } from './save';
@@ -406,13 +412,19 @@ export async function runMarketJobs(
     };
 
     // Rows go under the job's marketplace and its item as read just before the insert. A job about
-    // no one item saves rows for game items only; a row for any other item stops it (fix 3).
+    // no one item saves rows for game items only; a row for any other item stops it (fix 3). A job
+    // about an item saves through the job save path (rule marks, sales under another item left
+    // there; S36 B3) and keeps what it found; a deep read or read-back ends with its span.
     const save = async (
       jobId: string,
+      kind: string,
       result: JobStep,
+      read: JobResult['read'],
     ): Promise<'ok' | 'gone' | 'redo' | 'stopped'> => {
       const target = await jobTarget(db, jobId);
       if (target?.status !== 'running') return 'gone';
+      const item = target.productId ? await getProduct(db, target.productId) : null;
+      if (target.productId && !item) return 'gone';
       if (target.productId === null) {
         for (const id of new Set(result.rows.map((r) => r.productId))) {
           const p = id ? await getProduct(db, id) : null;
@@ -427,15 +439,28 @@ export async function runMarketJobs(
         source,
         productId: target.productId ?? r.productId,
       }));
+      let found: JobFindings | null = null;
       try {
-        await saveObservations(db, toBase!, rows);
+        if (item)
+          found = await saveJobRows(db, { collector, jobId, product: item, rows, toBase: toBase! });
+        else await saveObservations(db, toBase!, rows);
       } catch (e) {
         const after = await jobTarget(db, jobId);
         if (after?.status !== 'running') return 'gone';
         if (after.productId !== target.productId) return 'redo';
         throw e;
       }
-      return (await saveJobStep(db, jobId, result, now())) ? 'ok' : 'gone';
+      const merged = found ? mergeFindings(target.result, found, result.search, read) : undefined;
+      if (merged && result.done && (kind === 'deep' || kind === 'readback'))
+        return (await finishJob(
+          db,
+          jobId,
+          { oldestReached: result.oldestReached, result: merged },
+          now(),
+        ))
+          ? 'ok'
+          : 'gone';
+      return (await saveJobStep(db, jobId, result, now(), merged)) ? 'ok' : 'gone';
     };
 
     // A job ends when a step reached its wanted day, past it by the kind's margin (fix 11).
@@ -452,8 +477,11 @@ export async function runMarketJobs(
     const EMPTY_STEPS = 3;
 
     let paced = false;
-    const runOne = async (row: MarketJobRow): Promise<'job' | 'source' | 'run'> => {
-      if (!(await claimJob(db, row.id, now()))) return 'job';
+    const runOne = async (listed: MarketJobRow): Promise<'job' | 'source' | 'run'> => {
+      // The job as claimed, not as listed at the start of the run: a search saved while an
+      // earlier job ran reset its cursor and findings (fix round 2, item 1).
+      const row = await claimJob(db, listed.id, now());
+      if (!row) return 'job';
       let cursor = row.cursor;
       let oldest = row.oldestReached;
       let empty = 0;
@@ -475,7 +503,17 @@ export async function runMarketJobs(
         try {
           let result: JobStep | null = null;
           let thrown: { e: unknown } | null = null;
+          // The search the nightly would send for the item now (S36 B3). No active search: none,
+          // and the plug-in ends the job without a request (the closing step stops such jobs).
+          // Inside the step, so a throw fails this job like any step (N5). `read`: what it stands
+          // for, kept with the job's findings (fix round 1, rule b).
+          let read: JobResult['read'];
           try {
+            const searched = product ? await jobSearch(db, collector, product) : null;
+            const s = searched?.search;
+            read = s?.keywords?.length
+              ? { keyword: s.keywords.join(' '), categoryId: s.categoryId || null }
+              : undefined;
             result = await collector.runJob!(
               {
                 id: row.id,
@@ -485,7 +523,14 @@ export async function runMarketJobs(
                 wantedFrom: row.wantedFrom,
                 cursor,
               },
-              { http: ctxHttp, now: now(), log: (m) => log(`[${source}] ${m}`), product },
+              {
+                http: ctxHttp,
+                now: now(),
+                log: (m) => log(`[${source}] ${m}`),
+                product,
+                search: searched?.search ?? null,
+                references: searched?.references ?? [],
+              },
             );
           } catch (e) {
             thrown = { e };
@@ -513,7 +558,7 @@ export async function runMarketJobs(
           const done = result!.done || reachedWanted(row, result!.oldestReached);
           let saved: 'ok' | 'gone' | 'redo' | 'stopped';
           try {
-            saved = await save(row.id, { ...result!, done });
+            saved = await save(row.id, row.kind, { ...result!, done }, read);
           } catch (e) {
             return await failed(row.id, new Error(`saving failed: ${errorText(e)}`));
           }

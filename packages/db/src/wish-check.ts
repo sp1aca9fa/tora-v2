@@ -29,6 +29,7 @@ import {
   recordItemCheck,
   saveItemRules,
 } from './item-rules';
+import { queueWishReadsSafely } from './deep-reads';
 import { DomainError } from './mutations';
 import { markNotItem, unmarkNotItem } from './not-item';
 import { RULE_MARK_PREFIX, type RuleHold, gameRulesOn, isHeld, releaseHeld } from './rule-marks';
@@ -397,7 +398,7 @@ export async function confirmWish(
   const wish = await gameWish(db, user, input.wishId);
   const source = input.kind === 'sales' ? '' : String(input.source ?? '').slice(0, 60);
   if (await awaitsRead(db, wish.product.id)) throw new DomainError('invalid_input');
-  return recordItemCheck(db, {
+  const check = await recordItemCheck(db, {
     productId: wish.product.id,
     kind: input.kind,
     source,
@@ -406,6 +407,9 @@ export async function confirmWish(
     rulesHash: String(input.hash ?? ''),
     userId: user.id,
   });
+  // An existing game watch gets its deep reads at its registration check (S36 B3).
+  await queueWishReadsSafely(db, wish.product.id);
+  return check;
 }
 
 /** Words as typed: one per line or comma, trimmed, no repeats, at most 30 of up to 60 characters. */
