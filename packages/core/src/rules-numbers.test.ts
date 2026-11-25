@@ -546,7 +546,26 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('SALES_MIN', plain('', ', ')),
       ],
     },
-    'Quick rise': { checks: [c('QUICK_RISE', percent)] },
+    "Price windows; days; change for age's earlier window": {
+      notChecked: [
+        ['numbers', NO_CONSTANT],
+        ['Indexed.price', NO_CONSTANT],
+      ],
+    },
+    'Spread: eras, price levels': {
+      notChecked: [
+        ['eraOf', NO_CONSTANT],
+        ['priceLevelOf', NO_CONSTANT],
+      ],
+    },
+    'Opening: low, high': { notChecked: [['openingValue', NO_CONSTANT]] },
+    'Sales windows': {
+      checks: [c('SALES_RECENT_DAYS', plain(',')), c('SALES_BEFORE_DAYS', plain(' days'))],
+    },
+    'Quick rise; falling hard': { checks: [c('QUICK_RISE', percent)] },
+    'Jump windows': {
+      checks: [c('QUICK_RISE_DAYS', plain(',')), c('QUICK_RISE_BEFORE_DAYS', plain(' days'))],
+    },
     'For its age: points, items, ages': {
       checks: [
         c('AGAINST_AGE', points(';')),
@@ -554,6 +573,7 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('AGE_RANGE', fromTo()),
       ],
     },
+    'Change for age: back': { checks: [c('AGE_CHANGE_DAYS', plain(' days'))] },
     'Tests: days ahead, outcomes, points': {
       checks: [
         c('OPPORTUNITY_HORIZON', plain(';')),
@@ -561,13 +581,18 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('PROVEN_POINTS', points('', '; ')),
       ],
     },
+    'Tests: every, from': { notChecked: [['tests', NO_CONSTANT]] },
     'A listing under the market': {
       checks: [c('ASK_FLOOR', percent), c('ASK_UNDER', percent)],
     },
     'A shop buy price near': {
       checks: [c('BUYLIST_NEAR', percent), c('BUYLIST_DAYS', plain(' days'))],
     },
-    "The market's warning": { checks: [c('MARKET_SHARE', percent)] },
+    "The market's warning": {
+      checks: [c('MARKET_SHARE', percent)],
+      notChecked: [['withMarket', 'the 5 is a literal in its body']],
+    },
+    'The bar: close, too high': { checks: [c('CLOSE', percent), c('TOO_HIGH', percent)] },
     "Days of sales for a reference's series": { checks: [c('STEADY_DAYS', plain())] },
     'Listings drying up': {
       checks: [
@@ -580,6 +605,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     Potential: {
       checks: [
         c('POTENTIAL_SUBJECTS', plain(' words')),
+        c('POTENTIAL_SUBJECT_CHARS', plain(' characters')),
         c('POTENTIAL_RARITIES', plain(' rarities')),
       ],
     },
@@ -587,7 +613,21 @@ const WIRING: Record<string, Record<string, Row>> = {
       checks: [
         c('TRENDING_MIN', (v) => `${fmt(asNumber(v))}, ${fmt(asNumber(v))},`),
         c('TRENDING_RATIO', plain(';')),
+        c('POPULAR_DAYS', (v) => `${fmt(asNumber(v) + 90)} days`),
       ],
+      notChecked: [
+        [
+          'POPULAR_BEFORE_DAYS',
+          'the 120 is POPULAR_DAYS plus this; the check above adds a literal 90 to POPULAR_DAYS',
+        ],
+      ],
+    },
+    'Popular: sold, this year': {
+      checks: [c('POPULAR_DAYS', plain(',')), c('POPULAR_YEAR_DAYS', plain(' days'))],
+    },
+    'A rank: shown for, the week before': {
+      checks: [c('RANKING_FRESH_DAYS', plain(' days;'))],
+      notChecked: [['latestRanks', NO_CONSTANT]],
     },
     Candidates: {
       checks: [c('CANDIDATE_TOP', plain(',', 'top ')), c('CANDIDATE_DAYS', plain(' days'))],
@@ -601,7 +641,7 @@ const WIRING: Record<string, Record<string, Row>> = {
       ],
     },
     'Opening: boxes, fee, re-read': {
-      checks: [c('DEFAULT_OPENING_FEE', percent)],
+      checks: [c('DEFAULT_OPENING_FEE', percent), c('READ_EVERY_DAYS', plain(' days'))],
       notChecked: [['openingValue', NO_CONSTANT]],
     },
   },
@@ -654,7 +694,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 17;
+const NOT_CHECKED_COUNT = 26;
 
 // ---------------------------------------------------------------------------------------------
 
