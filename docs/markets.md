@@ -2,8 +2,7 @@
 
 ## Markets
 
-Every source belongs to a **market**: the country its prices come from (`jp`, `us`, `fr`, ... as
-ISO 3166 codes), declared by its plug-in. A market appears in Settings once a plug-in for it has
+Every source belongs to a **market**: the country or region its prices come from (`jp`, `us`, `fr`, ...: lowercase ISO 3166-1 two-letter codes; `eu`, the code ISO 3166-1 reserves for the European Union, for a Europe-wide site), declared by its plug-in. A market appears in Settings once a plug-in for it has
 registered (after its first `pnpm collect`). It is shown by its name in the app's texts
 (`sources.market.<code>` in `apps/web/messages/*.json`), else by its code (`FR`).
 
@@ -14,22 +13,20 @@ In **Settings > Admin preferences > Markets**, the admin picks:
   next to the value (e.g. "Japan vs US"), never counted in it;
 - with three or more markets, **what item pages compare**: the primary against the secondary
   (default) or every market.
+- Until the admin picks, the primary is the market of the source with the best plug-in priority (whatever its roles) and the secondary the next ([the rule](rules/sources-markets.md#markets-and-the-compared-price)); with only the public plug-ins, the US.
 
-Each compared market shows its reference source's price for the item (else a supporting
-source's), converted to the base currency. Markets are told apart by their sources' market, not
+Each compared market shows one price for the item, from the first of its reference and supporting sources that has one, converted to the base currency. Markets are told apart by their sources' market, not
 their currency: two markets may share one (France and Germany both in euros). How that one price
 is picked: [the rules](rules/sources-markets.md#markets-and-the-compared-price).
 
-**Graded cards need a source that prices them.** A lot is valued only from prices in its own
-condition. If the primary market's sources price ungraded cards only (Cardmarket's price guide,
+**Graded cards need a source that prices them.** A graded card is valued only from prices in its own grade (graded cards are never pooled: [Values](rules/values.md#similar-conditions)). If the primary market's sources price ungraded cards only (Cardmarket's price guide,
 TCGplayer), graded cards there get no value until a source with graded sales is added or a manual
-price is set; another market's graded sales are compared, never counted.
+price is set; another market's prices are compared (a graded card at raw A, below), never counted.
 
 **Which condition is compared.** TCG: ungraded cards in their own grade, graded cards at ungraded
-A (other markets often price ungraded near-mint only), sealed product with shrink wrap unless the
-lot has none. Other categories: the lot's own condition (the one most units are in); another
+A (other markets often price ungraded near-mint only), sealed product with shrink wrap unless the lot is in "no shrink". Other categories: the lot's own condition (the item page's condition: [the rule](rules/sources-markets.md#markets-and-the-compared-price)); another
 market's price counts when it prices that condition, or when it is a plain "as sold new" price and
-the lot is in its list's best value.
+the lot is in its list's best condition.
 
 Each market has its own roles and identity pages (see [Sources and roles](sources.md)). Changing
 the primary market rebuilds the values and their history right after (a minute or two).
@@ -48,18 +45,16 @@ Every amount (costs, prices, values) is stored in one **base currency**, set by 
   Usually your primary market's currency.
 - **One currency only** (every source prices in the base): nothing else to set up.
 - **Two or more currencies** (usually the secondary market's): each other currency needs an
-  exchange rate to the base, from a **rate plug-in** or **typed by hand**. Prices in a currency
-  without a rate are not saved until it has one (Settings flags it).
+  exchange rate to the base, from a **rate plug-in** or **typed by hand**. Prices in a currency without a rate are not saved until it has one (Settings flags it): set the rate before a collect reads them.
 - **Changing the base later** is rare (e.g. after years, a new primary market). It is offered only
-  for a currency with rates; after a confirmation naming how many amounts it touches, every stored
-  amount is converted with the rate of its own date and values are rebuilt. Do it while no collect
+  for a currency with rates; after a confirmation naming how many amounts it touches, every stored amount is converted with the rate of its own date (amounts with no date, such as watch targets and list prices, at today's rate: [the rule](rules/sources-markets.md#currency-and-rates)) and values are rebuilt. Do it while no collect
   is running.
 
 Plug-ins never convert: each reports amounts in its own currency, in the currency's smallest unit
 (yen; cents for dollars). The collect converts each amount to the base with the rate of its day and
 keeps the rate used.
 
-A typed rate is used from today until changed; earlier days keep their rates. A rate plug-in's
+A typed rate is stored as today's: later days use it until changed, earlier days keep their own rates, and days before every stored rate use it ([the rule](rules/sources-markets.md#currency-and-rates)). A rate plug-in's
 rates arrive with the next collect.
 
 ## Rate plug-ins
@@ -82,9 +77,9 @@ export const frankfurter: RateSource = {
 
 Rules for a rate plug-in:
 
-- **Daily rates**; working days are enough (the app uses the last rate on or before a date).
-- **The direction**: `rate` is units of `to` per unit of `from`. The app asks for the pair it needs.
-- **History**: the first run asks for a little over a year back (item pages compare the last
+- **Daily rates**; working days are enough (the app uses a day's rate, else the last one before it, else the first one after).
+- **The direction**: `rate` is units of `to` per unit of `from`, in whole units, not smallest ones (1 USD = 151.2 JPY). The app asks for the pair it needs.
+- **History**: when the pair has no stored rate yet (a typed one counts: the fetch then starts at its day), the first run asks for a little over a year back (item pages compare the last
   year; the number is in [the rules](rules/sources-markets.md#currency-and-rates)); later runs ask
   from the last stored day.
 - **A free source whose terms allow it**, fetched through `http` (the polite client).
@@ -92,5 +87,5 @@ Rules for a rate plug-in:
   with the base.
 - Days without a rate are left out, not filled in.
 
-Then, in Settings > Markets > Currencies, pick the plug-in for the currency; the next collect
+Then, in Settings > Admin preferences > Markets > Currencies, pick the plug-in for the currency; the next collect
 fetches its history.
