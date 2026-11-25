@@ -529,11 +529,23 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('MIN_DELAY_MS', per(SECOND, ' to ')),
       ],
     },
+    'The identity shop for games: wait': {
+      notChecked: [['http', 'set in a private plug-in, not in the public tree']],
+    },
     'Requests per run': { checks: [c('PoliteHttp.maxRequests', plain())] },
     'Tries again, waits, no answer': {
       checks: [c('PoliteHttp.retries', plain(';')), c('PoliteHttp.timeoutMs', per(SECOND, ' s'))],
     },
-    'Searches per run, results kept': { checks: [c('MATCH_PER_RUN', plain(', '))] },
+    'Searches per run, results kept': {
+      checks: [c('MATCH_PER_RUN', plain(', '))],
+      notChecked: [['runCollector', 'the 8 is a literal in its body']],
+    },
+    'Other reads per collect: rates, links, rankings, boxes, pictures': {
+      notChecked: [['collect.ts', NO_CONSTANT]],
+    },
+    'A challenge page: under': {
+      notChecked: [['PoliteHttp', 'the 50,000 is a literal in `request`']],
+    },
     'Set aside after, tried again every': {
       checks: [
         c('LISTING_BROKEN_NIGHTS', plain(' nights')),
@@ -546,7 +558,12 @@ const WIRING: Record<string, Record<string, Row>> = {
       ],
     },
     'A run left as running': { checks: [c('STALE_RUN_MS', per(HOUR, ' hours'))] },
-    'A long run; the night window': { notChecked: [['collectorTimes', NO_CONSTANT]] },
+    'A long run; the night window': {
+      checks: [c('COLLECT_WINDOW_HOURS', plain(' h'))],
+      notChecked: [
+        ['collectorTimes', 'the 2, the 5 minutes and the 7 runs are literals in its body'],
+      ],
+    },
     'Daytime: a day, the floor, pace, hours': {
       checks: [
         c('MARKET_PER_DAY', plain(', ')),
@@ -567,6 +584,9 @@ const WIRING: Record<string, Record<string, Row>> = {
       ],
     },
     'Daytime: after a refused collect': { checks: [c('COLLECT_REFUSAL_MS', per(HOUR, ' hours'))] },
+    'Daytime: tries, an answer within': {
+      notChecked: [['runSource', 'retries 0 and 20,000 ms are literals in its body']],
+    },
   },
 
   'opportunities.md': {
@@ -729,7 +749,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 31;
+const NOT_CHECKED_COUNT = 36;
 
 // ---------------------------------------------------------------------------------------------
 
