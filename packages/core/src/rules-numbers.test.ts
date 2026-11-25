@@ -435,20 +435,51 @@ const WIRING: Record<string, Record<string, Row>> = {
   },
 
   'buy-timing.md': {
-    "Days for a 180-day range, a year's tenth": { checks: [c('RANGE_MIN_DAYS', list())] },
+    "Days with sales: 180-day range, year's tenth and year position": {
+      checks: [c('RANGE_MIN_DAYS', list())],
+    },
     'Days for a usual price': { notChecked: [['seriesStats', NO_CONSTANT]] },
     'Days for a trend': { notChecked: [['fittedChange', NO_CONSTANT]] },
+    'Fair value without a saved value': {
+      checks: [c('FAIR_DAYS', plain(' days'))],
+      notChecked: [['seriesStats', 'the 90 is a literal in its body']],
+    },
+    'Range windows': {
+      checks: [c('RANGE_DAYS', plain(','))],
+      notChecked: [['seriesStats', 'the 365 is a literal in its body']],
+    },
+    "Year's tenth": { checks: [c('YEAR_LOW_SHARE', plain())] },
+    'Trend windows': {
+      checks: [
+        c('FALL_DAYS', plain(',')),
+        c('MONTH_TREND_DAYS', plain(',', ', ')),
+        c('TREND_DAYS', plain(' days')),
+      ],
+    },
+    'Held: recent days, days before': {
+      checks: [c('HOLD_DAYS', plain(',')), c('HOLD_BEFORE_DAYS', plain('', ', '))],
+    },
+    'Typical price: days either side, days with sales': {
+      notChecked: [['priceAround', NO_CONSTANT]],
+    },
+    "Item's own source: days counted": {
+      notChecked: [['SERIES_DAYS', 'an expression, 365 + 90']],
+    },
+    "Market: days an item's series is picked on": {
+      notChecked: [['refreshSignals', NO_CONSTANT]],
+    },
+    'Margin range': { notChecked: [['actions.ts', NO_CONSTANT]] },
     'Falling fast': {
       checks: [c('FALLING_2W', percent), c('FALL_DAYS', per(7, ' weeks'), { token: null })],
     },
     'Market: items, fall': {
       checks: [c('MARKET_MIN_ITEMS', plain(', ')), c('MARKET_FALLING_12W', percent)],
     },
-    'Pattern: items, days ahead, oldest age': {
+    "Items a group study needs, the pattern's days ahead, the oldest age": {
       checks: [
         c('PATTERN_MIN_ITEMS', plain(', ')),
         c('PATTERN_HORIZON', plain(', ', ', ')),
-        c('PATTERN_MAX_AGE', plain('', ', '), { token: null }),
+        c('PATTERN_MAX_AGE', plain('', ', ')),
       ],
     },
     'New-release wait when the age is unknown': {
@@ -472,16 +503,20 @@ const WIRING: Record<string, Record<string, Row>> = {
     },
     'Default margin': { checks: [c('DEFAULT_MARGIN', plain(' %'))] },
     'Limited data': { checks: [c('LIMITED_SALES', plain(' sales', 'under '))] },
-    'Rule tests: signals shown from, margin': { checks: [c('RULE_TEST_MIN_SIGNALS', plain(', '))] },
+    'Rule tests: signals shown from, margin': {
+      checks: [c('RULE_TEST_MIN_SIGNALS', plain(', ')), c('RULE_TEST_MARGIN', points())],
+    },
     'A saved row, a listing report is used for': {
       checks: [c('SIGNAL_FRESH_DAYS', plain(' days')), c('SUPPLY_FRESH_DAYS', plain(' days'))],
     },
-    'Line suggestion': { notChecked: [['suggestLines', NO_CONSTANT]] },
+    'Line suggestion': {
+      checks: [c('UNLIKE_GROUP', points(' and')), c('LIKE_LINE', points())],
+    },
     'Target shares, rough under, wrong date': {
       checks: [
         c('TARGET_SHARES', list(';')),
         c('TARGET_ROUGH_UNDER', plain(';', '; ')),
-        c('WRONG_AGE_EARLY_DAYS', plain('', '; '), { token: null }),
+        c('WRONG_AGE_EARLY_DAYS', plain('', '; ')),
       ],
     },
   },
@@ -694,7 +729,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 26;
+const NOT_CHECKED_COUNT = 31;
 
 // ---------------------------------------------------------------------------------------------
 
