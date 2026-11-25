@@ -612,7 +612,7 @@ const WIRING: Record<string, Record<string, Row>> = {
       checks: [c('QUALITY_MIN_PAIRS', plain(',')), c('QUALITY_MAX_GAP', percent)],
     },
     'Identity amount, default': {
-      checks: [c('IDENTITY_MIN_COST', plain(' yen'), { token: null })],
+      checks: [c('IDENTITY_MIN_COST', plain(' yen'))],
       notChecked: [
         [
           'identityMinCostFor',
@@ -620,9 +620,15 @@ const WIRING: Record<string, Record<string, Row>> = {
         ],
       ],
     },
+    "A plug-in's priority, none set": {
+      notChecked: [
+        ['byPriority', NO_CONSTANT],
+        ['marketsOf', NO_CONSTANT],
+      ],
+    },
     "A compared market's prices": { notChecked: [['foreignPrices', NO_CONSTANT]] },
-    'Rates: first fetch': { notChecked: [['rates.ts', NO_CONSTANT]] },
-    'A stale rate': { notChecked: [['rates.ts', NO_CONSTANT]] },
+    'Rates: first fetch': { checks: [c('HISTORY_DAYS', plain(' days back'))] },
+    'A stale rate': { checks: [c('STALE_RATE_DAYS', plain(' days'))] },
   },
 
   'values.md': {
