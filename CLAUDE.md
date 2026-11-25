@@ -48,18 +48,22 @@ The main session (Opus, high effort) orchestrates: it plans, writes the spec, ro
 commits and keeps the owner's actions file current. The loop is the shared `/ship`
 (`~/.claude/commands/ship.md`, from the `selfhost-blueprint` repo linked into `~/.claude`): tiers
 0-3 decided by the changed files, Tier 3 handling, which questions may stop the work, how to write
-for the owner, the setup review. Read it before any Tier 1-3 work, with or without `/ship`. This
-project's profile is `docs/agents.md`: risk class, trust-territory paths, domain checklist, the
-model and effort per role (pass them as `model` and `effort` every time an agent is started), the
-owner's list, standing rules. Small changes (a few files, one area) the main session does itself,
+for the owner, the setup review, doc review. Read it before any Tier 1-3 work, with or without
+`/ship`. Any doc edit, Tier 0 work included, follows its section 9 (doc review): each changed hunk
+gets a doc level 0-3 by its content, and a hunk at level 1-3 is reviewed when that section says ("When");
+a level 3 section a spec computes from is reviewed before building even
+when older (its catch-up task goes first). This project's profile is `docs/agents.md`: risk class,
+trust-territory paths, domain checklist, the model and effort per role (pass them as `model` and
+`effort` every time an agent is started), the owner's list, standing rules, doc paths, levels and
+review focus. Small changes (a few files, one area) the main session does itself,
 since an agent re-reads everything cold. Subagents cannot start subagents.
 
-| Tier | When                                                                                         | Review                                                    |
-| ---- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| 0    | docs, notes, comments, wording in `en.json` only, tests only, config with no behavior change | none; CHECKS only                                         |
-| 1    | product code outside trust territory                                                         | `code-reviewer-light`; `ux-reviewer` if visible           |
-| 2    | a file on the trust-territory paths (`docs/agents.md`)                                       | `code-reviewer`; `ux-reviewer` if visible                 |
-| 3    | Tier 2 the normal loop cannot verify (`/ship` section 1 triggers)                            | plan review, then normal and adversarial review, `triage` |
+| Tier | When                                                                                         | Review                                                          |
+| ---- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 0    | docs, notes, comments, wording in `en.json` only, tests only, config with no behavior change | none; CHECKS only (a doc hunk at doc level 1-3: its doc review) |
+| 1    | product code outside trust territory                                                         | `code-reviewer-light`; `ux-reviewer` if visible                 |
+| 2    | a file on the trust-territory paths (listed in `docs/agents.md`)                             | `code-reviewer`; `ux-reviewer` if visible                       |
+| 3    | Tier 2 the normal loop cannot verify (`/ship` section 1 triggers)                            | plan review, then normal and adversarial review, `triage`       |
 
 Project specifics: visible changes sync the test copy and crawl the changed pages
 (`--views phone,wide,half,full,dark`); reviewer ideas for the reviewed pages are built, ideas about other
