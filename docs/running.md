@@ -1,7 +1,6 @@
 # Running collectors
 
-Collectors run only on the home PC (WSL2 or Linux, a residential connection), at a polite pace,
-and write straight to the database. Never on Vercel or CI: the CLI refuses when `VERCEL` or `CI` is
+Collectors run only on the home PC (WSL2 or Linux, a residential connection), at a polite pace; the collect saves what they return to the database (a plug-in never writes to it). Never on Vercel or CI: the CLI refuses when `VERCEL` or `CI` is
 set. The rules they follow (what is read, the pace, refusals, the schedule):
 [the collecting rules](rules/collectors.md).
 
@@ -25,13 +24,12 @@ values, and the day's value snapshot. It refuses to run against a database that 
 (run `pnpm db:migrate`).
 
 **Re-check of stored sales (`pnpm --silent recheck-sales`).** Runs a plug-in's sales filters again on
-what it stored, rules alone unless `--far` also marks sales far from the item's own history. Dry unless `--apply --limits <file>`, a file a rehearsal on a copy writes, with that copy's date; it
+what it stored, rules alone unless `--far` also marks sales far from the item's own history. Dry unless `--apply --limits <file>`, a file that a dry run on a copy of the database writes with `--write-limits <file>`, with that copy's date; it
 refuses above or below those limits, under other rules or options, while a collect runs, outside the
-state folder collects use, and when that folder's `collect.log` is over 3 days old (likely a server
-that has been off: run `scripts/collect-cron.sh`, wait for it to end, and try again; undo too). No `pnpm collect` by hand may be running: those hold
+state folder collects use, and when that folder's `collect.log` is 3 days (72 hours) old or more (likely a server that has been off: run `scripts/collect-cron.sh`, wait for it to end, and try again; the same holds for `--undo`). No `pnpm collect` by hand may be running: those hold
 no lock in their closing steps. It only excludes, adding the reason to the row, and never touches a row a person included,
 excluded or pasted. `--undo <run> --apply` puts a run's rows back, except what a person changed since;
-an unknown id lists the runs. After a crash, the same command continues. Item values are refreshed at
+an unknown id lists the runs. `--apply` changes rows: take a copy first, `pnpm backup --keep <<NAME>> && pnpm --silent recheck-sales --apply --limits <<FILE>>` (replace `<<NAME>>` with a name of small letters, digits and dashes, and `<<FILE>>` with the limits file). After a crash, run `pnpm --silent recheck-sales --apply --limits <<FILE>>` again, without the backup (its copy stays): it continues. Item values are refreshed at
 the end; charts and the rest at the next collect. A run or undo marks a break in its items' value
 series, so a sharp drop warning on them compares only with a value from after it.
 
@@ -42,7 +40,7 @@ day (a retry after the PC turned off, a second task) does only what is left. `--
 schedule) is skipped, so two runs never fetch from the same site at once; the skipped run does not
 count as the day's run, and the schedule tries again later. A site that blocked a run (HTTP 403 or
 429, a captcha) is left alone until the next day, so the day's retries do not keep knocking;
-`--source` or `--refresh` tries it anyway.
+`--source`, `--product` or `--refresh` tries it anyway ([Collecting](rules/collectors.md#refusals)).
 
 **How items get prices.** Register an item; on the next run each collector searches its site for
 it and stores the best candidates; confirm the right one under **Actions** or the item's **Lots & details** page
@@ -53,8 +51,7 @@ a box with and without shrink wrap), each feeding its own condition.
 ## The daily schedule
 
 `scripts/collect-cron.sh` runs `pnpm collect`, then the day's database backup (`pnpm backup`, see
-[backups](backups.md)), then `pnpm alerts after-run` (failures to admins, see [alerts](alerts.md)), **at most once a day**: it exits at once when today's run already succeeded (a day in the app's time zone, written down by each collect), waits a
-random 0-5 min, loads nvm, and logs to
+[backups](backups.md)), then `pnpm alerts after-run` (failures to admins, see [alerts](alerts.md)), **at most once a day**: it exits at once when today's collect and backup both succeeded (the day the script started, in the app's time zone, which each collect writes down; [Collecting](rules/collectors.md#when-the-collect-runs)), so a failed backup is tried again at the next start. Otherwise it waits a random 0-5 min, loads nvm, and logs to
 `~/.local/state/tora/collect.log`. Because it is safe to start often, it is started by events
 rather than one fixed time. Arguments are passed on (`--market jp`), each set with its own daily
 stamp and lock.
@@ -65,10 +62,9 @@ live. A run that stops early sends admins the reason read from the log (e.g. a d
 not run yet) and records it on Settings > Activity; the schedule tries again the next hour.
 
 A second Tora on the same PC (a test copy, another market) needs its own state folder, or the
-two share one log, one set of locks and one daily stamp: set `TORA_STATE_DIR` in that copy's
-`.env` (e.g. `~/.local/state/tora-test`).
+two share one log, one set of locks and one daily stamp: set `TORA_STATE_DIR`, `BACKUP_DIR` and `TORA_ANALYSIS_DB` in that copy's `.env` (e.g. `~/.local/state/tora-test`, `~/.local/share/tora-test/backups`, `~/.local/share/tora-test/analysis/tora.db`). Otherwise its backup takes the real one's daily file name, and the real backup is skipped that day.
 
-**Windows Task Scheduler** (recommended when the PC is not always on), from WSL, no admin needed:
+**Windows Task Scheduler** (recommended when the PC is not always on), from WSL in the repo folder, no admin needed:
 
 ```bash
 ./scripts/install-windows-task.sh
@@ -79,16 +75,16 @@ as possible if the PC was off), then every hour around the clock. A run cut shor
 off is retried; a finished day is skipped, unless an admin pressed **Collect now** in Settings >
 Collectors: the next hourly check (`pnpm collect:request`) takes the request and runs a collect at
 once (re-run the install script once to get the hourly check around the clock). Only the task
-without arguments takes requests. It starts WSL by itself. Leave the PC on until a run is
-done (Settings > Collectors shows how long one takes). Remove it with
+without arguments takes requests. It starts WSL by itself. Leave the PC on, and stay signed in to Windows, until a run is done (Settings > Collectors shows how long one takes). The task gives a run 3 hours, after which Task Scheduler may stop it; the next hourly check continues what is left. Remove it with
 `powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"`.
 
 **cron** (only if WSL or the Linux machine stays running):
 
-```bash
-crontab -e
-0 * * * * /path/to/tora-v2/scripts/collect-cron.sh          # hourly; runs once a day
-*/5 * * * * cd /path/to/tora-v2 && pnpm import-uploads       # optional: files uploaded in the app
+Run `crontab -e` and add these lines (replace `<<PATH_TO_TORA>>` with the repo folder):
+
+```
+0 * * * * <<PATH_TO_TORA>>/scripts/collect-cron.sh   # hourly; runs once a day
+*/5 * * * * bash -c '. "$HOME/.nvm/nvm.sh" && cd <<PATH_TO_TORA>> && pnpm import-uploads'   # optional: files uploaded in the app
 ```
 
 Manual run any time: `pnpm collect`, or `FORCE=1 MAX_JITTER_SECONDS=0 ./scripts/collect-cron.sh`
@@ -97,29 +93,30 @@ to go through the scheduled path.
 ## Watching it: Settings > Collectors
 
 Each collector's last run (status, requests, prices added, errors), items waiting for
-confirmation, listings not collected for 3+ days, big median moves, and its **working time** (time
-the PC slept is not counted) against its usual time; a run over twice its usual time is flagged.
-The last night's total is compared with a **night window** the admin sets (6 hours by default).
+confirmation, listings not collected for 3+ days ([Alerts](rules/alerts.md#shown-in-settings-only)), big median moves, and its **working time** (time
+the PC slept is not counted) against its usual time; a run over twice its usual time, and at least 5 minutes over it, is flagged ([Collecting](rules/collectors.md#when-the-collect-runs)).
+The last night's total is compared with a **night window** the admin sets (6 hours by default; [Collecting](rules/collectors.md#when-the-collect-runs)).
 
 A source whose runs suddenly add no sales on its last 3 days with runs, while they usually did (a
-site that changed so its pages still load but yield nothing), is **quiet**: admins get an alert
-once a day while it stays so.
+site that changed so its pages still load but yield nothing), is **quiet**: admins are told on its first mornings of silence (the 3rd to 5th for a source that runs daily; [Alerts](rules/alerts.md)).
 
 ## Many collectors
 
 Measure first on Settings > Collectors, then:
 
-| Setup                                                        | How to run                                                                              |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Up to about 3 markets and 10 collectors, a few hundred items | One nightly `pnpm collect` (the author's: 6 collectors, about 100 items, about an hour) |
-| More markets or collectors                                   | One run per market at its own hour (below); remove the all-markets task                 |
-| Too many items for one night                                 | Not built yet: taking turns, held items first                                           |
+| Setup                                                        | How to run                                                                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Up to about 3 markets and 10 collectors, a few hundred items | One nightly `pnpm collect` (the author's, 2026-10-15: 6 collectors, about 100 items, about an hour)                                         |
+| More markets or collectors                                   | One task per market (below); remove the all-markets task, and **Collect now** is no longer taken (only the task without arguments takes it) |
+| Too many items for one night                                 | Not built yet: taking turns, held items first                                                                                               |
 
 ```bash
 AT=01:00 scripts/install-windows-task.sh --market jp   # task tora-collect-market-jp
 AT=03:00 scripts/install-windows-task.sh --market us   # task tora-collect-market-us
 powershell.exe -Command "Unregister-ScheduledTask -TaskName tora-collect -Confirm:\$false"
 ```
+
+Run these in the repo folder in WSL. Each task also checks every hour, like the main one, so each market's day starts at its first check after midnight; `AT` (24-hour, Windows' clock) sets only its daily start.
 
 `--source <key>` works the same for one collector. Different sites may run side by side (two tasks
 at once); never two runs for the same site. Each site's pace and request cap are its plug-in's
@@ -187,11 +184,10 @@ Turso's free plan allows 500 million rows read and 10 million written a month. T
 its own queries read and write (Turso reports it with each reply), per day and per origin (app
 pages, collect, backup, Claude's MCP tools, ...), and shows the month so far in **Settings > Admin
 preferences > Database**, with the pace for the whole month. The app's daily check alerts admins
-when the month passes the budget set there (150 million by default), or heads past it at this pace
-from the 5th. Turso's dashboard has the exact total, including anything run outside Tora (such as
+when the UTC month passes the budget set there (150 million by default), or heads past it ([Alerts](rules/alerts.md), "The read budget"). Turso's dashboard has the exact total, including anything run outside Tora (such as
 the Turso shell). Nothing is counted while Tora runs on a local file. The pages and the collect read
 saved numbers (the sales per day, saved values and the saved Portfolio chart) instead of every
-sale; see requirements S19 for what each reads. Every night a self-check packs a few items again from their raw sales and compares them with what is saved; a difference is fixed and admins get an alert. `pnpm rebuild` rebuilds every saved result from the raw sales (after a restore, or if the self-check keeps finding differences).
+sale; see [the record](history.md#s19-database-reads-within-the-free-plan) for what each reads. Every night the collect packs a few items again from their raw sales and compares them with what is saved; a difference is rebuilt and admins are told ("Saved results that differed", [Alerts](rules/alerts.md); not [the self check](rules/alerts.md#the-self-check), which fixes nothing). `pnpm rebuild` rebuilds every saved result from the raw sales (after a restore, or if those differences keep coming back).
 
 ## Claude Code and the hosted database
 
@@ -200,7 +196,7 @@ Programs started by Claude Code (it sets `CLAUDECODE=1`) refuse to open the host
 are better answered from the analysis copy (see [Backups](backups.md)). The Tora MCP server is
 the exception (its tools read a few hundred rows; `query_sql` reads the analysis copy). To run a
 command against Turso from a Claude Code session anyway, prefix it yourself:
-`TORA_ALLOW_TURSO=1 pnpm ...`. A database server on this machine (localhost) is always allowed.
+`TORA_ALLOW_TURSO=1 pnpm ...`. An editor's Claude Code extension sets `CLAUDECODE` in its built-in terminal too: run your own commands for the hosted database in a plain terminal. A database server on this machine (localhost) is always allowed.
 
 ## The server's status (Settings > Admin > Server)
 
@@ -208,7 +204,7 @@ On a self-hosted server, admins see what it runs without a terminal: the version
 uptime, memory, disk, the systemd services and timers named `tora-*` (`TORA_UNITS` for another
 pattern), the last collect and backup, and the end of each log in the state folder. Read-only.
 
-For a helper on another machine (Claude Code, a monitoring tool), make a read-only token there:
+For a helper on another machine (Claude Code, a monitoring tool), make a read-only token on that page:
 it reads the same at `/api/server/status` (`Authorization: Bearer <token>`; `?lines=` per log,
 `?log=collect` for one log) and can change nothing. Values of secret settings and lines naming a
 source kept from AI models are left out. With `TORA_STATUS_URL` (the app's address) and
