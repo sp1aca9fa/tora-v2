@@ -390,11 +390,18 @@ const WIRING: Record<string, Record<string, Row>> = {
 
   'alerts.md': {
     'Nothing ran': { checks: [c('MISSED_HOURS', plain(' hours'))] },
+    'Morning check: from, looks every': {
+      checks: [
+        c('MORNING_CHECK_HOUR', (v) => `${String(asNumber(v)).padStart(2, '0')}:00`),
+        c('FEED_CHECK_MINUTES', plain(' minutes')),
+      ],
+    },
     'Morning items, the summary: not again in': {
       checks: [c('SUMMARY_GAP_HOURS', plain(' hours'))],
     },
     'Quiet source': {
       checks: [c('QUIET_DAYS', plain(' days')), c('USUAL_DAYS', plain('', 'to '))],
+      notChecked: [['quietSources', 'the 0.8 and the 7 are literals in its body']],
     },
     'Read budget, pace from': {
       checks: [
@@ -409,7 +416,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     'Sharp drop': {
       checks: [
         c('SHARP_DROP_7D', percentSize),
-        c('SHARP_DROP_DAYS', plain(' days'), { token: null }),
+        c('SHARP_DROP_DAYS', plain(' days')),
         c('ALERT_QUIET_DAYS', plain(' days')),
       ],
     },
@@ -421,6 +428,17 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('JUMP_SHARE', percent),
         c('JUMP_RECENT_DAYS', plain(' and')),
         c('JUMP_BEFORE_DAYS', plain('', 'and ')),
+      ],
+    },
+    'Settings: self check not run, server not heard from': {
+      checks: [c('STALE_DAYS', plain(' days'))],
+      notChecked: [['collectSchedule', 'the 3 intervals are a literal in its body']],
+    },
+    'Self check: skips after, stopped after, lines a message': {
+      checks: [
+        c('NO_COLLECT_HOURS', plain(' hours')),
+        c('STOPPED_COLLECT_DAYS', plain(' days', 'collects on ')),
+        c('DATA_CHECK_LINES', plain(' lines')),
       ],
     },
     'Self check: every limit above': {
@@ -756,7 +774,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 35;
+const NOT_CHECKED_COUNT = 37;
 
 // ---------------------------------------------------------------------------------------------
 
