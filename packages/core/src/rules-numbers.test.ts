@@ -359,8 +359,14 @@ const WIRING: Record<string, Record<string, Row>> = {
   'accounts.md': {
     'Devices per account': { checks: [c('MAX_ACTIVE_DEVICES', plain())] },
     'Password length': { checks: [c('MIN_PASSWORD', plain(' or more'))] },
+    'Name length': {
+      checks: [c('USERNAME_MIN', plain(' to ')), c('USERNAME_MAX', plain(' characters'))],
+    },
     'Second step within': { checks: [c('MFA_MAX_AGE_SECONDS', per(MINUTE / SECOND, ' minutes'))] },
     'Code accepted': { notChecked: [['totp.ts', NO_CONSTANT]] },
+    'Authenticator code': {
+      checks: [c('TOTP_DIGITS', plain(' digits')), c('TOTP_PERIOD_SECONDS', plain('-second'))],
+    },
     'Backup codes': { notChecked: [['backup-codes.ts', NO_CONSTANT]] },
     'Session: renewed after, ends': {
       checks: [
@@ -368,6 +374,7 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('SESSION_MAX_AGE_SECONDS', per(DAY / SECOND, ' days')),
       ],
     },
+    'Secret length': { checks: [c('MIN_SECRET_LENGTH', plain(' characters or more'))] },
     Lockout: {
       checks: [
         c('MAX_FAILURES_PER_IP', plain(' / ')),
@@ -378,7 +385,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     },
     'Attempts kept': { checks: [c('RETENTION_MS', per(DAY, ' days'))] },
     'Setup link': { checks: [c('SETUP_LINK_HOURS', plain(' hours'))] },
-    'A download that can be loaded': { notChecked: [['the import route', NO_CONSTANT]] },
+    'A download that can be loaded': { checks: [c('MAX_BYTES', per(1_000_000, ' MB'))] },
   },
 
   'alerts.md': {
@@ -749,7 +756,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 36;
+const NOT_CHECKED_COUNT = 35;
 
 // ---------------------------------------------------------------------------------------------
 
