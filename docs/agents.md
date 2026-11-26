@@ -22,7 +22,7 @@ bugs cost a few wrong days; a leak between accounts cannot be recomputed away.
 ## Risk class
 
 B (recomputable): derived values are rebuilt nightly from kept raw data; user accounts make auth
-and access the exception (`high`).
+and access the exception (`builder-heavy` at `high` effort there, as under "Models and efforts").
 
 ## Trust territory (Tier 2)
 
@@ -31,7 +31,7 @@ timing, opportunities and popularity math, alerts (who gets what, how often), au
 checks in server actions, migrations, backups and restore, imports, merges and deletes, the
 self-update and server scripts.
 
-Paths (a changed file here makes the change Tier 2):
+Paths (a changed file here makes the change Tier 2; a test or Markdown file under them stays Tier 0, as `CLAUDE.md`'s Tier 0 row ("tests only") and `ops/process-check.json` (`tier0`) have it):
 
 - `packages/core/`, `packages/db/`, `packages/auth/`, `packages/collector-sdk/`, `packages/mcp/`
 - `collectors-public/src/`, `collectors/` code (not `collectors/ops/`)
@@ -54,14 +54,14 @@ Paths (a changed file here makes the change Tier 2):
 
 ## Owner decides
 
-A closed list; anything else the orchestrator decides and reports. What a price, signal or alert
+A closed list, with the items `/ship` section 4 always adds (pushing or deploying; a new dependency, service or cost; publishing; an irreversible action on real data; a conflict with the requirements); anything else the orchestrator decides and reports. What a price, signal or alert
 means; direction (what a phase covers, new features); production data changes (give the command,
 never run it).
 
 ## Doc levels
 
 Doc review (`/ship` section 9) levels each changed doc hunk by its content (0 to 3); this section
-only raises a level. Adopted by the commit in which `CLAUDE.md` points to `/ship` section 9, which also adds this section (2026-11-25): text from before
+only raises a level. Adopted by the commit in which `CLAUDE.md` points to `/ship` section 9, which also adds this section (`9943c31`, 2026-11-25): text from before
 that commit is reviewed once, doc by doc (catch-up).
 
 - Docs (public): `CLAUDE.md`, `README.md`, `requirements.md`, `docs/`, `.env.example`,
@@ -124,7 +124,7 @@ that commit is reviewed once, doc by doc (catch-up).
 - Time: the app's time zone (`docs/rules/data-model.md`), what a "night" and a "day" are, and that a rule reads only what
   was stored by then.
 - Missing, unknown or unverified data: what the rule does (never 0 or a guess; an unverified ask
-  sends no alert, `docs/decisions.md`, 2026-11-23, "Wishlist, S36").
+  sends no alert, `requirements.md`, "S36: Wishlist").
 - A number is stated once and matches the constant in the code; a text that repeats it points to
   its home. Windows and limits say whether their ends are included ("5 or more", "under 30 days").
 - Collectors: the pace, the daily number and the "never" rules in a doc match the plug-in,
@@ -146,8 +146,7 @@ that commit is reviewed once, doc by doc (catch-up).
 Confirmed by the owner 2026-11-04.
 
 - 2026-10-29: reviewer findings: fix what is right, take the recommended option on "ask"
-  findings, skip what is wrong; ideas for the reviewed pages are built, others go to the notes'
-  to-do list.
+  findings, skip what is wrong; ideas for the reviewed pages are built, others go to the notes' to-do list. (An ask on the "Owner decides" list, or on `/ship` section 4's always-list, still goes to the actions file: `/ship` section 5 step 7.)
 
 ## Texts and time
 
@@ -156,38 +155,37 @@ Confirmed by the owner 2026-11-04.
 
 ## CHECKS
 
-`pnpm check:all` (in Claude's sandbox use the split commands in the private rules: the web
-typecheck and `next build` need workarounds there).
+`pnpm check:all`. CI then also runs `pnpm build` (`.github/workflows/ci.yml`), which `check:all` leaves out. In Claude's sandbox use the split commands in the private rules (`collectors/ops/claude-rules.md`, "Commands"): the web typecheck needs a workaround there, and `next build` fails.
 
 ## Models and efforts
 
 The orchestrator passes these values as `model` and `effort` when it starts each agent.
 
-| Role                                 | Model  | Effort | Note                                                                                                                                                                                                 |
-| ------------------------------------ | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| builder                              | sonnet | medium | pages, texts, glue, docs, tests                                                                                                                                                                      |
-| builder-heavy                        | opus   | medium | `high` for auth, sessions, 2FA, devices and access checks                                                                                                                                            |
-| code-reviewer-light                  | sonnet | medium |                                                                                                                                                                                                      |
-| code-reviewer                        | opus   | high   | above the class's minimum; see below                                                                                                                                                                 |
-| ux-reviewer                          | sonnet | medium | every visible change; also asks the trust question                                                                                                                                                   |
-| trust-reviewer                       | -      | -      | not used: the UX reviewer asks it (one run fewer per change)                                                                                                                                         |
-| triage                               | opus   | medium | Tier 3 with no doc reviewer; a batch holding a doc reviewer uses the row `triage, Mode: docs`; otherwise none: at most two reviewers (code and UX), which cannot overlap (Setup changes, 2026-11-03) |
-| Tier 3: builder-heavy, code-reviewer | opus   | xhigh  | plan, build, normal and adversarial review                                                                                                                                                           |
-| challenger                           | opus   | high   | direction only, on request or at a phase's start                                                                                                                                                     |
-| summarizer                           | haiku  | low    |                                                                                                                                                                                                      |
-| doc-reviewer-consistency             | opus   | high   | doc level 1-3; follows `code-reviewer`, see below                                                                                                                                                    |
-| doc-reviewer-clarity                 | sonnet | medium | doc level 2; a different model on purpose                                                                                                                                                            |
-| doc-reviewer-source                  | opus   | high   | doc level 3; web tools                                                                                                                                                                               |
-| doc-reviewer-examples                | opus   | high   | doc level 3                                                                                                                                                                                          |
-| doc-reviewer-adversarial             | opus   | high   | doc level 3                                                                                                                                                                                          |
-| doc-reviewer-derive                  | sonnet | high   | on trial, doc drills only                                                                                                                                                                            |
-| triage, `Mode: docs`                 | opus   | medium | any batch of two or more reviewers holding a doc reviewer, Tier 3 and code reviewers included: one run for the batch                                                                                 |
+| Role                                 | Model  | Effort | Note                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| builder                              | sonnet | medium | pages, texts, glue, docs, tests                                                                                                                                                                                                                                                                                                                          |
+| builder-heavy                        | opus   | medium | `high` for auth, sessions, 2FA, devices and access checks                                                                                                                                                                                                                                                                                                |
+| code-reviewer-light                  | sonnet | medium |                                                                                                                                                                                                                                                                                                                                                          |
+| code-reviewer                        | opus   | high   | above the class's minimum; see below                                                                                                                                                                                                                                                                                                                     |
+| ux-reviewer                          | sonnet | medium | every visible change; also asks the trust question                                                                                                                                                                                                                                                                                                       |
+| trust-reviewer                       | -      | -      | not used: the UX reviewer asks it (one run fewer per change)                                                                                                                                                                                                                                                                                             |
+| triage                               | opus   | medium | Tier 3 with no doc reviewer; a batch holding a doc reviewer uses the row `triage, Mode: docs`; otherwise none, and the main session checks the findings itself: the code and UX reviewers and the `Mode: actions` run look at different things and cannot overlap (the owner, 2026-10-30, "no triage agent"; Tier 3's triage: Setup changes, 2026-11-03) |
+| Tier 3: builder-heavy, code-reviewer | opus   | xhigh  | plan, build, normal and adversarial review                                                                                                                                                                                                                                                                                                               |
+| challenger                           | opus   | high   | direction only, on request or at a phase's start                                                                                                                                                                                                                                                                                                         |
+| summarizer                           | haiku  | low    |                                                                                                                                                                                                                                                                                                                                                          |
+| doc-reviewer-consistency             | opus   | high   | doc level 1-3; follows `code-reviewer`, see below                                                                                                                                                                                                                                                                                                        |
+| doc-reviewer-clarity                 | sonnet | medium | doc level 2; a different model on purpose                                                                                                                                                                                                                                                                                                                |
+| doc-reviewer-source                  | opus   | high   | doc level 3; web tools                                                                                                                                                                                                                                                                                                                                   |
+| doc-reviewer-examples                | opus   | high   | doc level 3                                                                                                                                                                                                                                                                                                                                              |
+| doc-reviewer-adversarial             | opus   | high   | doc level 3                                                                                                                                                                                                                                                                                                                                              |
+| doc-reviewer-derive                  | sonnet | high   | on trial, doc drills only                                                                                                                                                                                                                                                                                                                                |
+| triage, `Mode: docs`                 | opus   | medium | any batch of two or more reviewers holding a doc reviewer, Tier 3 and code reviewers included: one run for the batch                                                                                                                                                                                                                                     |
 
 The doc reviewers are at the shared class table's row for class B, except
 `doc-reviewer-consistency`: that table ties it to the code reviewer, which is at high here. In a
 doc drill, `builder-heavy` (plants and scores) runs at the Tier 3 row.
 
-Why the builder stays at medium, not Saku's high: Tora's math is medians, quantiles and joins over
+Why `builder-heavy` stays at medium, not the shared class table's class A, which is at high: Tora's math is medians, quantiles and joins over
 kept raw data, not chained records, so a bug is recomputed away the next night. Why `code-reviewer`
 is at high: on 4 past changes with known bugs, high caught 11 of 12 and medium 9 of 12, for about
 22% more cost. All of the gap is one change, so this is a hint; the cost is small enough to take it.
@@ -203,7 +201,7 @@ is at high: on 4 past changes with known bugs, high caught 11 of 12 and medium 9
   commands changed.
 - Docs, in any tier (`/ship` section 9; "Doc levels" above): level 1 `doc-reviewer-consistency`;
   level 2 adds `doc-reviewer-clarity`; level 3 is `doc-reviewer-consistency`,
-  `doc-reviewer-source`, `doc-reviewer-examples` and `doc-reviewer-adversarial`; `triage` with
+  `doc-reviewer-source`, `doc-reviewer-examples` and `doc-reviewer-adversarial` (no `doc-reviewer-clarity`, as in `/ship` section 9's table; the catch-up adds it: `collectors/ops/doc-drill-2026-11-25.md`, "What follows from it"); `triage` with
   `Mode: docs` when the batch holds two or more reviewers, code reviewers included (one run for
   the batch; `/ship` sections 5 and 9).
 - Page crawler for screenshots: `pnpm crawl --views phone,wide,half,full,dark --shots <dir>` on the test
@@ -229,4 +227,4 @@ is at high: on 4 past changes with known bugs, high caught 11 of 12 and medium 9
 - 2026-11-07: `/ship` gains, for class B, the recoverable route for one-offs and two triage rules (no real impact, fixes breeding findings), resting on one Tier 3 task, so reported at each setup review and easy to remove. Landed under the owner's exception to Tier 3 handling: one normal, one adversarial and one re-review, no builder or triage agent, and no rerun of the review measures, which cannot see the narrowed adversarial pass.
 - 2026-11-07: by the owner, review measures run only when the setup changes, not per setup review: a reviewer's text, model or effort, or a new model version, which `setup-view.mjs` now reports. No review step changed.
 - 2026-11-11: by the owner, edits to the shared setup are checked by what they change: any edit to `/ship` or a shared agent is Tier 3; review measures rerun only for what code reviewers get; a loop edit that could let more through gets a back-check on past tasks. Shared-setup items for the owner now live in the blueprint's `private/global-actions.md`. This project's own reviews are unchanged.
-- 2026-11-25: doc review adopted (`/ship` section 9), by the owner's plan of 2026-11-24, after the docs were sorted so that each rule has one home (`docs/rules/`): "Doc levels" and "Doc review focus" added, the six doc reviewers in the table at class B's rows (`doc-reviewer-consistency` at high, as the code reviewer), `doc-reviews.csv` started. The Wishlist's chapter stays out until it has its rules file. No code review step changed.
+- 2026-11-25: doc review adopted (`/ship` section 9), by the owner's plan of 2026-11-24, after the docs were sorted so that each rule has one home (`docs/rules/`): "Doc levels" and "Doc review focus" added, the six doc reviewers in the table at class B's rows (`doc-reviewer-consistency` at high, as the code reviewer), `doc-reviews.csv` started. The Wishlist's chapter stays out until it has its rules file. Code review steps are unchanged, except that a batch holding a doc reviewer gets one triage for all (`/ship` section 5 step 6).
