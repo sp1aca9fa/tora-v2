@@ -3,13 +3,13 @@
 ## How to use this file (Claude Code: read first)
 
 - This file holds what Tora is for and where it stands: the goal, the example scenarios, the stack and the repo layout (**Core**), and one line per build phase (the Status table).
-- The rules the code computes from are in `docs/rules/`, one file per concern, each the one home of its numbers; Core sections 5 to 7 point to them. Before changing something, read the rules file of the concern it touches ([the list](docs/README.md)).
-- A phase's chapter (what was asked, designed and built) is a record in [docs/history.md](docs/history.md), not where rules live. One chapter is still below: the phase whose checks are not done.
+- The rules the code computes from are in `docs/rules/`, one file per concern, each the one home of its numbers; Core sections 3 and 5 to 7 point to them. Before changing something, read the rules file of the concern it touches ([the list](docs/README.md)).
+- A phase's chapter (what was asked, designed and built) is a record in [docs/history.md](docs/history.md), not where rules live. One chapter is still below, S36's, until the owner's Wishlist steps are done, since fixes from those checks are built from it (the doc sorting, 2026-11-24). The chapters of the other phases, those still awaiting checks included, are records: later work on them is built from the rules files.
 - Dated decisions are in [docs/decisions.md](docs/decisions.md); new ones are appended there.
 - The owner's own setup, sources and to-dos are in private notes (`collectors/ops/notes.md`, in the private submodule).
 - Do **not** start the next phase until the current one meets its acceptance criteria and the user confirms.
-- At the end of a phase: update its line in the Status table, move its chapter and dated log to the history, commit.
-- If something here or in a rules file turns out wrong or ambiguous, ask the user, then fix it there rather than working around it.
+- At the end of a phase: update its line in the Status table, move its chapter, with the dated log it holds, to the history, commit.
+- If something here or in a rules file turns out wrong or ambiguous, or the chapter below and a rules file differ, point it out and ask the owner, then fix it in its home (a rule or a number in its rules file; the goal, stack, layout and Status here) rather than working around it.
 
 ### Status
 
@@ -49,7 +49,7 @@ One line per phase. Each links to its chapter in the history; the dated log of e
 | [S10](docs/history.md#req-s10) | Reliability, consistency, efficacy and function review, incl. cloning the repo and doing a full setup from start to finish in another market (Spain + Brazil) | done (2026-10-24) |
 | [S14](docs/history.md#req-s14) | Speed at any size: measure every page, data at three sizes, fix the slowest, keep a speed check; revisit infinite scroll for the app's long lists (the Items page first; built on the Stores pages, S25) | in progress (2026-10-25): every page within the targets; next the user's check |
 | [S15](docs/history.md#req-s15) | Stress test and bug hunting: automated crawl and checks, edge cases, bug log | in progress (2026-10-25): next the user's check |
-| [S18](docs/history.md#req-s18) | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress: continues as the doc sorting and review (2026-11-24); left: the own-server guide and the Japanese documentation |
+| [S18](docs/history.md#req-s18) | Documentation pass: bring every guide in `docs/` and the README up to date with what was built since S12 | in progress: continues as the doc sorting and review (2026-11-24); left: the Japanese documentation |
 | [S26](docs/history.md#req-s26) | Opportunities as sub pages: Worth a look, Popular now, Signals, Buy plan; cards with tags and a target price; every item ranked, loaded as you scroll; a singles ranking and the top 60 as candidates | built 2026-10-27 |
 | [S27](docs/history.md#req-s27) | Opportunities part 2: chains in store posts; singles (market note, steadier prices, the set as the line); tested signal plug-ins (PSA 10 vs raw A, a quick rise); planning: spend a budget well, a monthly plan, a spread check, a look-back test | steps 1-6 built (to 2026-10-31); follow-ups moved to S28, S31, S32 and S33 |
 | [S28](docs/history.md#req-s28-s35) | The owner's notes, small round: Spread on wide screens and its links, refused rankings alert, store codes, franchise fix, old backup codes | built 2026-11-07 |
@@ -72,7 +72,7 @@ In [docs/decisions.md](docs/decisions.md), in date order. New decisions are appe
 
 ## 1. Goal
 
-A personal, single-user app to track collectibles (Pokemon and other TCG singles and sealed products, game collector's editions, amiibo, special controllers, other game-related items):
+A personal app, for a handful of accounts, to track collectibles (Pokemon and other TCG singles and sealed products, game collector's editions, amiibo, special controllers, other game-related items):
 - what I own, quantity, condition, when/where/how much I paid
 - what it is worth now, per condition, from accumulated Japanese second-hand market data (and US data for comparison)
 - for sealed TCG products: which cards I pulled, and box-level profit/loss
@@ -102,11 +102,11 @@ Personal use: a handful of accounts (the owner, possibly family). **Each user se
 - Tests: vitest (with property tests), a page crawler, and CI on every push ([docs/ci.md](docs/ci.md)).
 - **Where it runs:**
   - The owner's install: one home server runs everything (the app, the database file, the collect, the backups, their timers), reached from outside through a tunnel ([docs/home-server.md](docs/home-server.md)).
-  - The other way ([docs/setup.md](docs/setup.md)): the app on a hosted platform with a hosted database. Collectors still run only on a home machine (a residential connection is needed; never on a hosted platform or in CI) and write to the database `DATABASE_URL` names.
-  - What reads no site (values, buy timing, the backup, the alerts) runs right after the collect on the same machine. The app runs its own morning check; a hosted app is called once a day for it.
+  - The other way ([docs/setup.md](docs/setup.md)): the app on a hosted platform with a hosted database. Collectors still run only on a home machine (a residential connection is needed; never on a hosted platform or in CI); the collect saves what they return in the database `DATABASE_URL` names (a plug-in never writes to it).
+  - What reads no site (values, buy timing, the backup, the alerts) runs right after the collect on the same machine. The app runs its own morning check; a hosted app is called once a day for it ([Alerts](docs/rules/alerts.md#words)).
 - **Accounts and access**: a name, a password and an authenticator code to sign in, at most 2 devices per account, no public sign-up, every page and action behind a session. The rules and their numbers: [docs/rules/accounts.md](docs/rules/accounts.md). These lines as first written are a record in [docs/history.md](docs/history.md#core-3-auth).
 - Phone use is first-class: registration flows must be mobile-first. Add a PWA manifest so it can be added to the home screen.
-- Scheduling: the home server starts `scripts/collect-cron.sh` every hour; the script runs the collect at most once a day, after a random wait ([docs/rules/collectors.md](docs/rules/collectors.md#when-the-collect-runs)).
+- Scheduling: the home server (on the other way, the home PC's task, `scripts/install-windows-task.sh`) starts `scripts/collect-cron.sh` every hour; until that day's collect and backup have succeeded, each start runs the collect after a random wait, and an admin's collect now runs at the next start without the wait ([docs/rules/collectors.md](docs/rules/collectors.md#when-the-collect-runs)).
 
 ## 4. Repo layout and public/private split
 
@@ -121,10 +121,10 @@ packages/auth            Passwords, authenticator codes, backup codes
 packages/mcp             The read-only MCP server
 collectors-public/       Plug-ins safe to publish
 collectors/              PRIVATE git submodule: the owner's plug-ins and notes
-ops/, scripts/           The home server's scripts and the schedule
+ops/, scripts/           The home server's scripts and the schedule, CI checks, developer tools
 ```
 
-- The public repo must install, build, test and run **without** the private submodule (collectors simply not registered; show a notice in Settings).
+- The public repo must install, build, test and run **without** the private submodule (its plug-ins are simply not loaded; the collect runs the public ones).
 - No scraping code, tokens, endpoints or fixtures from private sources in the public repo.
 - Secrets/config in `.env` (gitignored), with `.env.example`.
 - Built into Tora, usable anywhere (user, 2026-10-19): what is specific to a country, a shop, a site or a market is a plug-in (collectors, purchase importers, rate sources, set card sources, pull rate sources, store directories, feeds...), and Tora's core stays general; a plug-in kind is documented (docs/) so others can write their own, without the private reading code.
@@ -144,13 +144,13 @@ Moved to [docs/rules/collectors.md](docs/rules/collectors.md) (2026-11-24): the 
 UI principles (all screens):
 - Calm by default: few numbers, details on demand. Show data freshness and confidence wherever a market value appears.
 - Mobile-first for registration, desktop-friendly for analysis.
-- EN/JA via next-intl. Product names show in the current locale with fallback to the other.
+- A primary and an optional secondary language, picked by the admin, via next-intl; a text missing in a language shows in English. Item names follow the markets, not the language ([Languages](docs/languages.md)).
 
 ---
 
 # SESSIONS
 
-Every phase's chapter is a record in [docs/history.md](docs/history.md) (the Status table links to each). One chapter stays here until the owner's checks of its phase are done, since fixes are still built from it.
+Every phase's chapter is a record in [docs/history.md](docs/history.md) (the Status table links to each). One chapter stays here, S36's, until the owner's Wishlist steps are done, since fixes are still built from it.
 
 ## S36: Wishlist
 
@@ -213,7 +213,7 @@ keeps what the Watchlist does today (S9's zone, target and alerts), unchanged.
   taken as zero.
 - Level: the price a quarter of recent sales were at or under. For a day: the 0.25 quantile (of single
   sales, interpolated as Core's quantile is) of the as-paid prices of the item's clean sales in the wish's
-  bucket, over the 30 days ending that day, from every source of the home market whose sales' added cost is
+  bucket, over the 30 days ending that day, from every source of the primary market whose sales' added cost is
   known and whose days in the window are all covered; the page names the sources counted. A day has a level
   only with 10 or more such sales. With fewer than 10 the window is 90 days, on the same conditions, and
   the page says so. Otherwise there is no level: the page shows the lowest, the highest and the count of the clean sales of the last 90 days, and
@@ -483,18 +483,15 @@ where the 10 comparison games are added as tracked games; E.
 
 Logged at the user's request (2026-10-13): known gaps to come back to with a plan of their own. Not scheduled yet.
 
-- Japanese documentation for the portfolio (user, 2026-10-15): Tora is also part of the user's personal portfolio, so some documentation in Japanese is wanted, without keeping every guide in two languages. To decide: what form (e.g. one Japanese overview of the project and its design, or the README's introduction) and how it stays current.
-- Setup path for other people (user, 2026-10-13): today the public repo has the app, the framework, every command (`pnpm collect`, `import-ai`, `import-uploads`, `demo`, `valuate`...) and the public plug-ins (TCGplayer via TCGCSV, eBay API, exchange rates); the scrapers for SNKRDUNK, Mercari, 駿河屋 and Yahoo Auctions are private (`collectors/`). Collecting needs a machine with a residential IP running `pnpm collect` daily. Accounts on an existing deployment need nothing (the owner's PC collects for every account); someone wanting their own deployment needs Vercel + Turso + a PC running collectors with their own source plug-ins, which only a developer can do. Options to weigh in S10: a packaged collector app (installer / tray app running the daily collect and uploads on a home PC, no repo), API-only sources run by a scheduled job in the cloud (no residential IP needed, e.g. TCGCSV, eBay), a hosted multi-account deployment where people just sign up (the owner collects for all; terms and load to consider), a guided setup in the app.
-  - Direction chosen by the user (2026-10-13): documentation first, now chapter S12. The repo ships no scrapers for others; it ships a complete guide to building a collector (what data it must return: listings, candidates and scores, sales and asking prices with buckets, currencies and times, searches and their state; how it describes itself: roles, links, aliases) and to connecting it (package layout, `pnpm collect`, scheduling, the database, Vercel), plus a template plug-in, clear enough for a user (or their coding assistant) to write their own collector for the shops they use. Others' collectors are their responsibility.
+- Japanese documentation for the portfolio (user, 2026-10-15): Tora is also part of the user's personal portfolio, so some documentation in Japanese is wanted, without keeping every guide in two languages. To decide: what form (e.g. one Japanese overview of the project and its design, or the README's introduction) and how it stays current. S18 leaves it here until the form is chosen.
+- Setup path for other people (user, 2026-10-13): the public repo has the app, the framework, every command (`pnpm collect`, `import-ai`, `import-uploads`, `demo`, `valuate`...) and the public plug-ins (TCGplayer via TCGCSV, eBay API, exchange rates); the scrapers for SNKRDUNK, Mercari, 駿河屋 and Yahoo Auctions are private (`collectors/`). Collecting needs a machine with a residential IP running `pnpm collect` daily. Accounts on an existing deployment need nothing (the owner's machine collects for every account); someone wanting their own deployment follows [the setup guide](docs/setup.md) (a hosted app and database plus a home PC) or [the home server guide](docs/home-server.md), and writes plug-ins for their own sources, which only a developer can do. The repo ships no scrapers for others; the guide to building and connecting a collector, with a template plug-in, is built ([S12](docs/history.md#s12)), and others' collectors are their responsibility. Options not built: a packaged collector app (installer or tray app running the daily collect on a home PC, no repo), API-only sources run by a scheduled job in the cloud (no residential IP needed, e.g. TCGCSV, eBay), a hosted multi-account deployment where people just sign up (the owner collects for all; terms and load to consider), a guided setup in the app.
 
-- A guide for running Tora on your own server as a service (from S18, user 2026-10-26): the app started on boot, the daily schedule, updates from pushes, the server status. The guides give it one paragraph (setup.md, Web app); the owner's own guide is private. Written with neutral names, after the board tracker's working hours.
-- Japanese documentation (from S18, user 2026-10-26): see the first item; S18 leaves it here until the form is chosen.
 
 - Git history rewrite (user, 2026-10-23): moving personal files out does not remove them from the public history (nor the board codes leaked earlier); rewrite it once, close to the finish line (needs a force-push and a fresh clone on the server).
 
 - Left open by the whole-code review (2026-10-31):
   - The client address used by the sign-in lockout and alerts prefers `X-Real-IP`; whether the reverse proxy in front (Tailscale Serve) sets or passes it through decides whether a client can rotate it. To check on the server.
-  - The picture step does not know which sites refused earlier in the run; pictures that keep failing are fetched again on every retry run (at most 40 requests a run).
+  - The picture step does not know which sites refused earlier in the run; pictures that keep failing are fetched again on every retry run (up to the run's picture cap: [Collecting](docs/rules/collectors.md#what-is-read)).
   - Backup codes made before 2026-10-31 stay unsalted hashes until replaced (new ones are keyed).
   - A store plug-in that reads "item gone" from a 404 on its search cannot tell it from a moved search page; needs the site's own no-results page as a fixture.
   - A sold listing found by two items' searches is stored once, for the first item (decision pending).
@@ -514,12 +511,9 @@ The user does not know yet what to do with these (2026-10-17): analyse before an
 ## Out of scope for v1 (future ideas, do not build)
 
 - Markets screen: JP vs US arbitrage table after fees and shipping
-- Yahoo auctions / Yahoo flea market collectors
 - Photos and receipt attachments
 - JAN barcode scan when registering
 - Realized gains report per year (tax)
-- Price alerts (now part of S9)
-- Home market and currency per user (user, 2026-10-12; status 2026-10-13: the primary and secondary market part is chapter S11; the home currency stays here. Sources now declare their market and currency and the admin sets each source's role, so the value can already come from any market's sources; still to do: a primary market setting that the Japan vs US card, the market labels and the default roles follow (the comparison card names "Japan" and "US" today), per user or per deployment, and the home currency). A card's language (the product's region) is not the market it is priced in: a Japanese card has a Japan price (SNKRDUNK, Mercari, 駿河屋) and a US price (TCGplayer's Pokemon Japan category, eBay). Today Japan is the fixed home market: the value counts yen prices only, other markets are shown beside it. Cheap step: each source declares its market, the user picks a home market, the value uses that market's sources, the others are secondary, and missing-source warnings follow the home market (SNKRDUNK for Japan, TCGplayer for the US). Expensive step: a home currency other than yen (costs, totals and P/L in dollars), since every amount is stored in yen today; purchases would keep the currency paid and convert everywhere.
-- Yahoo Auctions closed listings (落札相場) collector (user + Claude, 2026-10-12): where rare and odd items trade in Japan (limited watches, event-only goods, 非売品). The closed-listings search loaded fine from the home PC in the web-research trial. Would cover items no shop lists, daily and without model cost. Candidate for the next source after S8.
-- "Ask Claude to look" for items no source covers (user, 2026-10-12): a button queues the item; the home PC runs a model with web search and page fetches only, and its finds (link, price, date, sold / listing, how sure) come back as suggestions; accepted ones become reference sales or a manual price. Trial (Haiku, 2 items: the TAG Heuer × Mario watch and the WCS2023 Hokusai deck shields): about $0.07 per item, no prices invented, but almost nothing usable (one eBay.de listing, a launch price, a search-snippet Amazon price). Worth it only after the Yahoo collector, for what that still misses.
+- Markets and currency per person (user, 2026-10-12): built for the whole install as the admin's choice of primary and secondary markets and base currency ([S11](docs/history.md#req-s11), [S16](docs/history.md#s16); the rules: [Sources and markets](docs/rules/sources-markets.md)). A choice per person stays out of scope.
+- "Ask Claude to look" for items no source covers (user, 2026-10-12): a button queues the item; the home PC runs a model with web search and page fetches only, and its finds (link, price, date, sold / listing, how sure) come back as suggestions; accepted ones become reference sales or a manual price. Trial (Haiku, 2 items: the TAG Heuer × Mario watch and the WCS2023 Hokusai deck shields): about $0.07 per item, no prices invented, but almost nothing usable (one eBay.de listing, a launch price, a search-snippet Amazon price). Now that auction closings are collected ([S8](docs/history.md#s8)), worth it only for what they still miss.
 - Mixed bundles split into their items (user, 2026-10-12, undecided: maybe later, maybe never). A purchase of several different items in one listing (e.g. Mercari "ポケカWCS2023 ヨコハマ限定 デッキシールド、デッキケース" and "ピカチュウ ポケカ 公式 デッキシールド 4個セット" of different designs) is imported as one lot of one item, so it cannot be valued per item. Ideal: one lot per item, cost divided. Hard part: listing titles rarely name each item; the listing's photos and description would have to be read (a model could list the items it sees, the user confirms), and the cost split is a guess (equal, or by each item's market value). A cheap step first: a "split this lot" action in the app where the user names the items and the cost is divided.
