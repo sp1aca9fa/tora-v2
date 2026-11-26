@@ -1,8 +1,7 @@
 # Languages
 
 The app has a **primary language** and an optional **secondary language**, picked by the admin in
-**Settings > Admin preferences > Languages** from the installed ones. Anyone who has not chosen,
-and the sign-in page, gets the primary; everyone switches between the two with the language
+**Settings > Admin preferences > Languages** from the installed ones. Anyone who has not chosen gets the primary, on the sign-in page too; everyone switches between the two with the language
 toggle. With no secondary language there is no toggle. Dates, numbers and charts follow the page's
 language.
 
@@ -11,7 +10,7 @@ collectors find it on that market's sites), and its second name is the secondary
 are editable and searched.
 
 Installed today: English (`en`, the base: every text is there), Japanese (`ja`) and Spanish
-(`es`; drafted by Claude for the S10 Spain setup, not yet checked by a native speaker).
+(`es`; drafted by Claude for a Spain setup, not yet checked by a native speaker).
 
 A language file may be partial: a text it lacks shows in English. New features add their texts to
 `en.json` only; each language catches up when whoever looks after it translates them.
@@ -29,11 +28,11 @@ A language file may be partial: a text it lacks shows in English. New features a
 To keep a language up: `pnpm languages` shows how many texts each one lacks; `pnpm languages fr`
 prints those `fr` lacks, in English, as JSON to translate and merge into `fr.json`. Claude can
 draft it ("translate this file's values into French, keep the keys, the `{placeholders}` and the
-ICU plural and select syntax as they are"), then read it through. About 2,000 texts in all.
+ICU plural and select syntax as they are"), then read it through.
 
 ## Numbers in a text
 
-A text never types one of the app's own numbers (a window in days, a limit, a share). It names it
+A text never types one of the app's own numbers (a window in days, a limit, a share), except a number defined where the loader cannot import it (a shell script, the backup module): that one is typed, and listed on the test with its source, which the test checks. Otherwise it names it
 in double square brackets, such as `[[rangeDays]]`, and the number is filled in from the code when
 the texts are loaded, so a text cannot keep an old number after the code changes. The names and
 their values are in `packages/core/src/text-numbers.ts`, `packages/db/src/text-numbers.ts` and
@@ -43,7 +42,7 @@ their values are in `packages/core/src/text-numbers.ts`, `packages/db/src/text-n
   the same numbers as its English text (a shorter one that leaves a number out is listed, with the
   reason, in `apps/web/src/i18n/text-numbers.test.ts`).
 - **Writing a new English text**: a digit is either one of these names or on that test's reviewed
-  list with why it is not one of the code's numbers (an example, a format, a label).
+  list with why (an example, a format, a label, or a number the loader cannot import, checked against its source).
 - Anything that reads a text file without the app (a script that sends alerts) reads it through
   `readAlertTexts` (`@tora/db/alert-texts`), which fills the numbers in the same way.
 

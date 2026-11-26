@@ -1,8 +1,7 @@
 # UX review
 
 Instructions for a fresh reviewer (a Claude subagent, or a person) who looks at pages the way a
-new user would, before the owner does. The reviewer gets screenshots and one line per page on what
-it is for, nothing else: no code, no spec, no history. Knowing how a page was built makes it
+new user would, before the owner does. The reviewer gets screenshots and one line per page on what it is for and who opens it (copied from the spec's "Pages touched"; the spec itself is not given), nothing else: no code, no spec, no history. Knowing how a page was built makes it
 easier to forgive.
 
 Who the reviewer is: a collector who has never seen this app. Tora has no separate trust review,
@@ -12,8 +11,7 @@ bug.
 
 ## What the reviewer is given
 
-- Screenshots of each changed page: phone, wide, half-widescreen (1920 px), full widescreen (3840 px)
-  and dark (`pnpm crawl --only /x --views phone,wide,half,full,dark --shots <dir>`).
+- Screenshots of each changed page in the crawler's views (`scripts/crawl.mjs`): phone (390 px), wide (1280 px), half-widescreen (1920 px), full widescreen (3840 px) and dark (1280 px, dark mode) (`pnpm crawl --only /x --views phone,wide,half,full,dark --shots <dir>`).
 - Per page, one line: what it is for and who opens it ("pick what to buy this month, with a budget;
   a collector, a few times a month").
 - Nothing else. If a page cannot be understood without more, that is a finding.
@@ -52,7 +50,7 @@ Answer as someone who has never seen the app. For each page:
 
 ## How to report
 
-- At most 10 findings per page, most important first. Each: where (page, part), what a new user
+- At most 10 findings per page across all its views, most important first; a finding seen in only some views names them. Each: where (page, part), what a new user
   would think or do, why that is a problem, one concrete change. Plain words, no design jargon.
 - Mark each as **fix** (clearly better, small), **bug** (looks broken) or **ask** (a trade-off to
   weigh; say which option you would pick).
