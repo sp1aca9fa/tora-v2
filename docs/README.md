@@ -3,21 +3,21 @@
 Guides for running your own Tora: written for a person or their coding assistant. Read them in
 this order the first time.
 
-| Guide                                 | What it covers                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| [Setup](setup.md)                     | Accounts and tools, cloning, the database, deploying, the first user, first settings |
-| [Markets and currency](markets.md)    | Primary and secondary markets, the base currency, exchange rates                     |
-| [Categories](categories.md)           | Kinds of items, their fields and condition lists, item types and price buckets       |
-| [Sources and roles](sources.md)       | Reference, supporting, comparison; identity pages; the quality gate                  |
-| [Building a collector](collectors.md) | The plug-in contract, the template plug-in, testing, rate plug-ins, importers        |
-| [Running collectors](running.md)      | `pnpm collect`, the daily schedule, many collectors, logs, imports, the data review  |
-| [Languages](languages.md)             | The app's two languages and adding a new one                                         |
-| [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                 |
-| [A home server](home-server.md)       | Running everything on one small machine at home: services, updates, off-box copies   |
-| [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                   |
-| [Buy timing](buy-timing.md)           | The Watchlist's verdicts, the numbers saved daily, the buy strategies                |
-| [Opportunities](opportunities.md)     | Items worth a look within their group, the signals and their tests on past prices    |
-| [Store notices](store-feeds.md)       | Posts about cards on sale in stores near you: store lists, feeds, the notices        |
+| Guide                                 | What it covers                                                                                                                                                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Setup](setup.md)                     | Accounts and tools, cloning, the database, deploying, the first user, first settings                                                                                                                                    |
+| [Markets and currency](markets.md)    | Primary and secondary markets, the base currency, exchange rates, rate plug-ins                                                                                                                                         |
+| [Categories](categories.md)           | Kinds of items, their fields and condition lists, item types and price buckets                                                                                                                                          |
+| [Sources and roles](sources.md)       | Reference, supporting, comparison; identity pages; the quality gate                                                                                                                                                     |
+| [Building a collector](collectors.md) | Where plug-ins live, the template, the plug-in contract (daytime jobs too), polite fetching, testing, importers, set lists, pull rates, rankings, signals, the checklist before turning a source on                     |
+| [Running collectors](running.md)      | `pnpm collect`, the daily schedule, logs, Settings > Collectors, many collectors, imports, the data review, the hosted database's reads and Claude Code's access to it, the server's status, checking every page, speed |
+| [Languages](languages.md)             | The app's two languages and adding a new one                                                                                                                                                                            |
+| [Backups](backups.md)                 | The daily copy of the database, keeping copies off the PC, restoring                                                                                                                                                    |
+| [A home server](home-server.md)       | Running everything on one small machine at home: services, updates, off-box copies                                                                                                                                      |
+| [Alerts](alerts.md)                   | Telegram and Discord messages, the morning check, the activity log                                                                                                                                                      |
+| [Buy timing](buy-timing.md)           | Where the verdicts show: the Wishlist, item pages, the Strategy page, alerts, MCP                                                                                                                                       |
+| [Opportunities](opportunities.md)     | Where it shows: Worth a look, Popular, Signals, the Buy plan, MCP                                                                                                                                                       |
+| [Store notices](store-feeds.md)       | Posts about cards on sale in stores near you: store lists, feeds, the notices                                                                                                                                           |
 
 Rules the code computes from, each stated once (`rules/`):
 
@@ -34,15 +34,15 @@ Rules the code computes from, each stated once (`rules/`):
 
 Records and development:
 
-| File                               | What it holds                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------------- |
-| [Requirements](../requirements.md) | The goal, the example scenarios, the stack, and one line per build phase              |
-| [Decision log](decisions.md)       | Dated decisions with their reasons, in date order; a record, not where rules live     |
-| [Build history](history.md)        | Each phase's chapter as asked and built, and the older texts the rules files replaced |
-| [Agents](agents.md)                | How Claude Code agents build and review changes here (profile for the shared agents)  |
-| [CI](ci.md)                        | What the checks on every push run                                                     |
-| [Spec template](spec-template.md)  | The form of a task's spec                                                             |
-| [UX review](ux-review.md)          | What the review of a changed page looks for                                           |
+| File                               | What it holds                                                                                                                                                                    |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Requirements](../requirements.md) | Core (the goal, the example scenarios, the stack, the repo layout), the Status table (one line per phase) and the chapter of the phase in progress: the first read when building |
+| [Decision log](decisions.md)       | Dated decisions with their reasons, in date order; a record, not where rules live                                                                                                |
+| [Build history](history.md)        | Each phase's chapter as asked and built, and the older texts the rules files replaced                                                                                            |
+| [Agents](agents.md)                | How Claude Code agents build and review changes here (profile for the shared agents)                                                                                             |
+| [CI](ci.md)                        | What the checks on every push run                                                                                                                                                |
+| [Spec template](spec-template.md)  | The form of a task's spec                                                                                                                                                        |
+| [UX review](ux-review.md)          | What the review of a changed page looks for                                                                                                                                      |
 
 Settings > Admin preferences > Commands lists the home-PC commands with what each does.
 
@@ -56,21 +56,20 @@ home PC (WSL or Linux): pnpm collect ─────────┘   plug-ins f
 
 - The **web app** shows your items, what you paid and what they are worth. It never fetches from
   shops.
-- The **collectors** run only on your home PC (a residential connection, at a polite pace) and
-  write prices straight to the database. The CLI refuses to run on Vercel or CI.
+- The **collectors** run only on your home PC (a residential connection, at a polite pace); `pnpm collect` runs the plug-ins and saves the prices they return straight to the database (a plug-in never writes to it). The CLI refuses to run on Vercel or CI.
 - **Plug-ins** are the code that knows a site. The public repo ships the framework and a few
   public-API plug-ins, not scrapers: you write (or ask your coding assistant to write) plug-ins
   for the shops you use. Whether a site may be collected from is your responsibility.
 
 ## Words used in the guides
 
-- **Item** (product): a thing that exists once in the catalog, e.g. one card, one game edition.
-- **Lot** (holding): units of an item you own, with their cost and condition.
-- **Item type**: a category's kinds that share a condition list (`card`, `sealed`, `game`, or an
-  admin's, like `watch/watch_condition`). Roles are set per item type.
+- **Item** (product): a thing that exists once in the catalog, e.g. one card, one game edition ([the data model](rules/data-model.md#the-tables)).
+- **Lot** (holding): units of an item you own, with their cost and condition ([the rules](rules/data-model.md#lots)).
+- **Item type**: a category's kinds that share a condition list: the built-in `card`, `sealed`, `item`, `game`, or an admin's, like `watch/watch_condition` ([Categories](categories.md#item-types)). Roles are set per item type.
+- **Role**: how a source's prices are used for one item type: reference, supporting, comparison or off ([the rules](rules/sources-markets.md#roles-and-the-valuation-order)).
 - **Bucket**: the condition a price is for (`raw:A`, `graded:PSA:10`, `sealed:shrink`,
-  `cond:new`, `watch_condition:unworn`). A lot is valued from prices in its own bucket.
-- **Source**: a site prices come from, described by its plug-in.
-- **Listing**: a source's page for one item (or a saved search, for search-based sources).
-- **Market**: a country's set of sources, with its currency. The primary market makes the value.
-- **Base currency**: the currency every amount is stored and shown in.
+  `cond:new`, `watch_condition:unworn`; [the keys](categories.md#condition-lists-and-buckets)). A lot is valued from prices in its own bucket.
+- **Source**: a site prices come from, described by its plug-in ([Sources and roles](sources.md)).
+- **Listing**: a source's page for one item (or a saved search, for search-based sources; [Collecting](rules/collectors.md#what-is-read)).
+- **Market**: the country or region a source's prices come from (`jp`, `us`, `eu`, ...), declared by its plug-in, whatever its currency ([Markets](markets.md#markets)). Only the primary market's sources make the value.
+- **Base currency**: the currency amounts are stored and shown in ([the rules](rules/sources-markets.md#currency-and-rates)).

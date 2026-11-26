@@ -6,11 +6,11 @@ second-hand market data accumulated in its own database. A few accounts (family)
 their own collection, while the product catalog and market data are shared.
 
 - **Web app** (`apps/web`): Next.js, hosted on Vercel (free) or on any always-on machine of your
-  own, behind username + password + authenticator code, limited to 2 devices per account.
+  own, behind username + password + authenticator code, limited to 2 devices per account ([the rules](docs/rules/accounts.md#devices-and-sessions)).
 - **Database**: Turso (hosted libSQL / SQLite, free) or a SQLite file on your own machine, via
   Drizzle ORM. Local dev uses a SQLite file.
 - **Collectors**: run only on a home PC or server of your own (WSL2 or Linux, a residential
-  connection) and write straight to the database. The public repo ships the app and the collector
+  connection); `pnpm collect` runs the plug-ins and saves what they return straight to the database (a plug-in never writes to it). The public repo ships the app and the collector
   framework, **not** scrapers for any site.
 
 ### Bring your own sources
@@ -28,15 +28,16 @@ packages/auth            Password hashing, TOTP, backup codes, secret encryption
 packages/db              Drizzle schema, migrations, queries, user CLI, seed
 packages/collector-sdk   Plug-in contract, polite HTTP, `pnpm collect` and the imports
 packages/mcp             Read-only MCP server (Claude reads your data on the home PC)
-collectors-public/       Publishable plug-ins (TCGCSV, eBay and Cardmarket prices, ECB exchange rates,
-                         TCG set lists, pull rates) and the template
+collectors-public/       Publishable plug-ins (TCGCSV, eBay, Cardmarket and Yahoo! Shopping prices,
+                         ECB exchange rates, TCG set lists, pull rates, a signal for Opportunities)
+                         and the template
 collectors/              Optional private plug-ins (git submodule; not in this repo)
 docs/                    The guides
 ```
 
 ## Quick start (local)
 
-Requires Node 22+ (24 LTS recommended) and pnpm via corepack.
+Requires Node 22+ (24 LTS recommended) and pnpm via corepack (Node 25 and later ship without it: `npm install -g corepack` first).
 
 ```bash
 corepack enable
@@ -44,7 +45,7 @@ pnpm install
 cp .env.example .env
 openssl rand -base64 32       # put it in .env as AUTH_SECRET
 pnpm db:migrate               # creates ./data/local.db
-pnpm db:seed                  # catalog + demo account with sample data (local DB only)
+pnpm db:seed                  # catalog + a demo admin with sample data (a local test database only, never one a server serves)
 pnpm dev                      # http://localhost:3000
 ```
 
