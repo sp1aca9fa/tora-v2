@@ -517,13 +517,13 @@ describe('the search words', () => {
       edition: '',
     });
     // The switch off: the search goes as stored.
-    expect((await page()).searches).toEqual([
+    expect((await page()).searches).toMatchObject([
       { source: 'market', words: 'Star Rover', added: [], inCategory: false },
     ]);
     await setGameRules(db, true);
     // On: the required word the stored words lack, inside the console's category; never the
     // excluded words (S36 A1).
-    expect((await page()).searches).toEqual([
+    expect((await page()).searches).toMatchObject([
       { source: 'market', words: 'Star Rover', added: ['limited'], inCategory: true },
     ]);
   });
@@ -741,6 +741,14 @@ describe('the search words', () => {
           .where(and(eq(productSources.productId, g.id), eq(productSources.source, 'market')))
       )[0]!;
     const state = async () => (await wishStates(db, [g])).get(g.id)!.state;
+    // The check says what a save would remove and when the marketplace was last read.
+    const shown = async () =>
+      (await registrationCheck(db, { watch: w, product: g })).searches.map((x) => [
+        x.source,
+        x.stored,
+        !!x.readAt,
+      ]);
+    expect(await shown()).toEqual([['market', 1, true]]);
     // The same search, the stored words differing only by a wide space: nothing is saved.
     const same = { ...(await link()).query, keywords: ['Star Rover'], excludeKeywords: ['poster'] };
     expect(await saveEditedSearch(db, bob, await link(), same)).toBe(false);
@@ -760,6 +768,7 @@ describe('the search words', () => {
       priceMax: 9000,
       extra: { auto: false, edited: true },
     });
+    expect(await shown()).toEqual([['market', 0, false]]);
     expect(await awaitsRead(db, g.id)).toBe(true);
     const [row] = (
       await db

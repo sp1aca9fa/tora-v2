@@ -275,6 +275,8 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
                 const note = [
                   s.added.length > 0 && t('searchAdded', { words: s.added.join(' ') }),
                   s.inCategory && t('searchCategory'),
+                  t('searchStored', { count: s.stored }),
+                  s.readAt ? t('searchReadAt', { date: date(s.readAt) }) : t('searchUnread'),
                 ]
                   .filter(Boolean)
                   .join(' ');
@@ -296,7 +298,15 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
                 );
               })}
               {c.searches.length > 0 && c.rowsOf && (
-                <p className="text-xs text-muted-foreground">{t('searchBoxed')}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('searchBoxed')}{' '}
+                  <Link
+                    href={`/products/${c.rowsOf}`}
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    {t('searchBoxedLink')}
+                  </Link>
+                </p>
               )}
             </div>
           </OpenOnWide>

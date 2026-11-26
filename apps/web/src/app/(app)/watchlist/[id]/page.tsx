@@ -407,7 +407,7 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
             {' · '}
             <Link
               href={`/products/${v.product.id}/edit?from=/watchlist/${v.watch.id}`}
-              className="underline-offset-2 hover:underline"
+              className="underline underline-offset-2 hover:text-foreground"
             >
               {tAll('holding.editProduct')}
             </Link>

@@ -19,7 +19,7 @@ import {
   rulesHash,
   toLocalIso,
 } from '@tora/core';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { listConsoles } from './consoles';
 import {
@@ -43,6 +43,7 @@ import {
   type User,
   type Watch,
   itemChecks,
+  priceObservations,
   itemRuleState,
   itemRules,
   notItemMarks,
@@ -130,6 +131,10 @@ export interface CheckSearch {
   added: string[];
   /** The search is sent inside a category (the console's, or one stored with the search). */
   inCategory: boolean;
+  /** How many stored sales of the item a save of other words would remove (`updateSourceQuery`). */
+  stored: number;
+  /** When this marketplace was last read for the item with these words; null: not since they were saved. */
+  readAt: string | null;
 }
 
 /** How long a search's words may be (as the item page's own search form). */
@@ -395,6 +400,29 @@ export async function registrationCheck(
       ),
     )
     .orderBy(asc(productSources.source));
+  // What a save would remove (the rows `updateSourceQuery` deletes, sales only) and the last read.
+  const [storedRows, readRows] = await Promise.all([
+    db
+      .select({ source: priceObservations.source, n: sql<number>`count(*)` })
+      .from(priceObservations)
+      .where(
+        and(
+          eq(priceObservations.productId, from),
+          eq(priceObservations.observationType, 'sold'),
+          or(
+            isNull(priceObservations.excludedReason),
+            ne(priceObservations.excludedReason, 'manual'),
+          ),
+        ),
+      )
+      .groupBy(priceObservations.source),
+    db
+      .select({ source: saleCoverage.source, at: saleCoverage.updatedAt })
+      .from(saleCoverage)
+      .where(eq(saleCoverage.productId, from)),
+  ]);
+  const storedOf = new Map(storedRows.map((r) => [r.source, Number(r.n)]));
+  const readOf = new Map(readRows.map((r) => [r.source, r.at]));
   const searches: CheckSearch[] = links.flatMap(({ source, query }) => {
     const keywords = query?.keywords;
     if (!Array.isArray(keywords) || !keywords.length || keywords.some((w) => typeof w !== 'string'))
@@ -410,6 +438,8 @@ export async function registrationCheck(
         words: keywords.join(' '),
         added: (sent.keywords ?? []).slice(keywords.length),
         inCategory: !!sent.categoryId,
+        stored: storedOf.get(source) ?? 0,
+        readAt: readOf.get(source) ?? null,
       },
     ];
   });
