@@ -2,9 +2,8 @@
 // (`DB_TEXT_NUMBERS`, core's included) and the web app's own. Imports only modules that do not
 // import next-intl: a page that does leads back here through the texts' loader.
 import { MIN_PASSWORD, TOTP_DIGITS, USERNAME_MAX, USERNAME_MIN } from '@tora/auth';
-import { type TextNumbers } from '@tora/core';
+import { BOARD_ROUND_FACTOR, type TextNumbers } from '@tora/core';
 import { DB_TEXT_NUMBERS } from '@tora/db';
-import { SILENT_MS } from '@/app/(app)/stores/feed-state';
 import {
   CONSOLE_KEY_MAX,
   CONSOLE_SORT_MAX,
@@ -34,5 +33,5 @@ export const TEXT_NUMBERS: TextNumbers = {
   postDayStarts: POST_DAY_STARTS.replace(/^0/, ''), // 05:00 shown as 5:00
   priceStatsDays: PRICE_STATS_DAYS,
   feedCheckMinutes: FEED_CHECK_MINUTES,
-  silentMinutes: SILENT_MS / 60_000, // ms shown as minutes
+  boardRoundFactor: BOARD_ROUND_FACTOR,
 };

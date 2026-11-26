@@ -3,6 +3,10 @@
 import {
   type CodeMeaning,
   DEFAULT_FEED_PREFS,
+  boardSilentMinutes,
+  watchedBoards,
+  feedSilentMinutes,
+  silentMs,
   PLACE,
   canConfirmLottery,
   chainsInPost,
@@ -280,6 +284,7 @@ export async function feedStatus(db: Db, userId: string) {
       boards: feedTokens.boards,
       watching: feedTokens.watching,
       offered: feedTokens.offered,
+      next: feedTokens.next,
     })
     .from(feedTokens)
     .where(eq(feedTokens.userId, userId));
@@ -290,6 +295,7 @@ export async function feedStatus(db: Db, userId: string) {
         boards: row.boards ?? {},
         watching: row.watching,
         offered: row.offered,
+        next: row.next,
       }
     : null;
 }
@@ -389,8 +395,8 @@ export interface Push {
   posts: (PushedPost & { pictures?: PostImage[] })[];
 }
 
-/** How far ahead a feed's next read may be said to be. */
-const NEXT_MAX_MS = 6 * 3_600_000;
+/** How far ahead a feed's next read may be said to be (the board userscript's blocked wait goes up to 8 hours). */
+const NEXT_MAX_MS = 9 * 3_600_000;
 
 /** A list of board keys, or null. */
 const keys = (v: unknown) =>
@@ -772,22 +778,36 @@ const shortAt = (iso: string) => toLocalIso(new Date(iso)).slice(5, 16).replace(
 /**
  * Boards of a running feed that gave no posts for longer than the limit (counted from the app's
  * start when that is later: time the server was off is no board's silence), each told once and
- * again every 2 hours while it lasts.
+ * again every 2 hours while it lasts. The limit is boardSilentMinutes of the person's and the
+ * boards watched (watchedBoards: the feed reads them in turn), and the wait the last push
+ * announced is no silence (`silentMs`).
  */
 async function checkBoards(
   db: Db,
   ctx: AlertContext,
   user: typeof users.$inferSelect,
-  boards: Record<string, BoardState>,
+  token: typeof feedTokens.$inferSelect,
   silentMinutes: number,
   now: Date,
   startedAt: number,
 ): Promise<number> {
-  const limit = now.getTime() - silentMinutes * 60_000;
+  const boards = token.boards ?? {};
+  const watched = watchedBoards(
+    token.watching,
+    Object.values(boards).map((b) => b.at),
+    now.getTime(),
+  );
+  const limit = boardSilentMinutes(silentMinutes, watched) * 60_000;
+  const seenAt = token.lastSeenAt ? Date.parse(token.lastSeenAt) : Number.NaN;
   const remind = now.getTime() - REMIND_HOURS * 3_600_000;
   const quiet = Object.entries(boards).filter(
     ([, b]) =>
-      Math.max(Date.parse(b.readAt ?? b.at), startedAt) < limit &&
+      silentMs(
+        Math.max(Date.parse(b.readAt ?? b.at), startedAt),
+        seenAt,
+        token.next?.at,
+        now.getTime(),
+      ) > limit &&
       (!b.alertedAt || Date.parse(b.alertedAt) < remind),
   );
   if (!quiet.length) return 0;
@@ -859,21 +879,16 @@ export async function checkFeeds(
     if (!token.lastSeenAt) continue;
     const prefs = { ...DEFAULT_FEED_PREFS, ...user.preferences?.storeFeed };
     if (!withinHours(time, prefs.from, prefs.to)) continue;
+    const silentMinutes = feedSilentMinutes(prefs);
     const lastSeen = Date.parse(token.lastSeenAt);
     const since = Math.max(lastSeen, startedAt);
     const minutes = Math.floor((now.getTime() - since) / 60_000);
-    if (minutes < prefs.silentMinutes) {
+    // Silence counts from max(last push, the next visit it announced): a step or a blocked
+    // board's retry is no silence, and the person is not sent to reload a waiting tab.
+    if (silentMs(since, lastSeen, token.next?.at, now.getTime()) < silentMinutes * 60_000) {
       // The feed runs, but a board may give nothing (an access check, a changed page) or no
       // longer be visited.
-      told += await checkBoards(
-        db,
-        ctx,
-        user,
-        token.boards ?? {},
-        prefs.silentMinutes,
-        now,
-        startedAt,
-      );
+      told += await checkBoards(db, ctx, user, token, silentMinutes, now, startedAt);
       continue;
     }
     const alerted = token.silenceAlertedAt ? Date.parse(token.silenceAlertedAt) : null;
@@ -881,8 +896,16 @@ export async function checkFeeds(
     const t = await textsFor(db, user, ctx);
     const base = await appUrl(db);
     const sinceText = shortAt(new Date(since).toISOString());
+    // The visit the feed's last push announced, when known: the person sees whether the feed
+    // missed it or waited on purpose before it (a blocked board's retry).
+    // Only a visit due since the silence began: one from before a restart or tracking's start
+    // points at last night, not at a missed visit.
+    const due =
+      token.next?.at && Date.parse(token.next.at) >= since
+        ? ` ${fillText(t.feedNextDue ?? 'Its next visit was due at {at}.', { at: shortAt(token.next.at) })}`
+        : '';
     const text =
-      alerted !== null
+      (alerted !== null
         ? fillText(
             t.feedStillSilent ??
               'Tora: the store feed is still silent: nothing since {since} ({hours} h). Check the feed (for a userscript: its browser tab).',
@@ -904,7 +927,7 @@ export async function checkFeeds(
                 t.feedSilent ??
                   'Tora: the store feed ({source}) has been silent since {since} ({minutes} min): no store notices until it sends again. Check the feed (for a userscript: its browser tab).',
                 { source: token.lastSource ?? '-', since: sinceText, minutes },
-              );
+              )) + due;
     await db
       .update(feedTokens)
       .set({ silenceAlertedAt: toLocalIso(now) })
@@ -1504,7 +1527,7 @@ export async function feedTracking(db: Pick<Db, 'select'>, now = new Date()) {
  * rows read, so an open page asks this and reloads only when something changed. With them, the
  * tracking hours and whether the feed tracks now.
  */
-export async function storesState(db: Db, userId: string) {
+export async function storesState(db: Db, userId: string, now = Date.now()) {
   const [[post], [token], tracking] = await Promise.all([
     // When the last post arrived (a push's time to the millisecond): posts carry only the minute
     // they were posted, so a second post in the same minute would go unnoticed.
@@ -1547,6 +1570,12 @@ export async function storesState(db: Db, userId: string) {
             key,
             readAt: token.boards?.[key]?.readAt ?? null,
           })),
+          // The boards counted for each board's silence limit (watchedBoards, as checkBoards).
+          count: watchedBoards(
+            token.watching,
+            boards.map(([, b]) => b.at),
+            now,
+          ),
         }
       : null,
   };

@@ -75,6 +75,7 @@ export const NOTICE_TEXTS: Record<NoticeKind, string[]> = {
     'feedSilentTracking',
     'feedStillSilent',
     'boardSilent',
+    'feedNextDue',
   ],
   buy: ['buyTitle', 'buyZone', 'buyLimited', 'buyTarget'],
   summary: [

@@ -172,8 +172,89 @@ export interface StoreFeedPrefs {
   boards?: string[];
 }
 
-export const FEED_SILENT_MINUTES = [5, 10, 15, 30, 60];
-export const DEFAULT_FEED_PREFS = { silentMinutes: 10, from: '08:00', to: '23:00', unknown: true };
+/**
+ * The silence limits a person can choose (docs/store-feeds.md "Silence"). The board tracker may
+ * wait minutes between pages and longer at a step, so a limit under 15 minutes would tell normal
+ * gaps; 5 and 10 were dropped (review of the board userscript 1.19, 2026-11-26).
+ */
+export const FEED_SILENT_MINUTES = [15, 30, 60];
+export const DEFAULT_FEED_PREFS = { silentMinutes: 15, from: '08:00', to: '23:00', unknown: true };
+
+/**
+ * A person's silence limit in minutes as used: a stored limit under the shortest choice (an older
+ * 5 or 10) reads as the shortest, without changing what is stored; none or not a number reads as
+ * the default.
+ */
+export function feedSilentMinutes(prefs: Pick<StoreFeedPrefs, 'silentMinutes'> | null | undefined) {
+  const m = prefs?.silentMinutes;
+  if (typeof m !== 'number' || !Number.isFinite(m)) return DEFAULT_FEED_PREFS.silentMinutes;
+  return Math.max(m, FEED_SILENT_MINUTES[0]!);
+}
+
+/**
+ * A board's round is longer than one page per board: the tracker picks its next board at random
+ * (long gaps now and then) and a visit to a newest page's page before takes a turn too, so a round
+ * of the boards takes about twice their number of pages. Simulated (pages 180-300 s apart, 15-hour
+ * days, with pages before): at 15 min x boards, 3 boards gave ~3.9 false alerts a day and 4 boards
+ * ~7.6; at x2, 0.03 and 0.33 (review of the board userscript 1.19, round 2, 2026-11-26).
+ */
+export const BOARD_ROUND_FACTOR = 2;
+
+/**
+ * The limit for one board: the feed reads its boards in turn, so each is read about once per
+ * round; the person's limit times the number of boards watched (at least one) times
+ * BOARD_ROUND_FACTOR.
+ */
+export function boardSilentMinutes(silentMinutes: number, watched: number) {
+  return silentMinutes * Math.max(1, Math.floor(watched) || 1) * BOARD_ROUND_FACTOR;
+}
+
+/** A board visited within this many hours counts as watched (watchedBoards). */
+export const WATCHED_RECENT_HOURS = 6;
+
+/**
+ * How many boards the feed watches, for the boards' silence limit: the larger of the boards its
+ * last push named (`watching`) and the boards visited (`visits`, each a board's last visit time)
+ * in the last WATCHED_RECENT_HOURS. With one tab per board, each push names only its own board, so
+ * `watching` alone would count 1 (review of the board userscript 1.19, round 2, 2026-11-26). A
+ * visit time missing or unreadable counts as no recent visit; none at all gives 0
+ * (boardSilentMinutes reads it as one).
+ */
+export function watchedBoards(
+  watching: readonly string[] | null | undefined,
+  visits: readonly (string | null | undefined)[],
+  now: number,
+): number {
+  const after = now - WATCHED_RECENT_HOURS * 3_600_000;
+  const recent = visits.filter((at) => {
+    const t = at ? Date.parse(at) : Number.NaN;
+    return !Number.isNaN(t) && t >= after;
+  }).length;
+  return Math.max(watching?.length ?? 0, recent);
+}
+
+/**
+ * How long something of a feed has been silent (ms), counted from `since` (its last push, its
+ * board's last posts, or the server's start when later) without the wait its last push announced:
+ * from that push (`seenAt`) to the next visit it named (`nextAt`; none or unreadable: no wait).
+ * A feed waiting for its next visit (a step, a blocked board's retry) is not silent, so for the
+ * feed silence counts from max(last push, next visit); a next visit past by more than the limit
+ * is silent as usual. A board's count only pauses for that same wait: a board visited but giving
+ * no posts stays silent (review of the board userscript 1.19, 2026-11-26).
+ */
+export function silentMs(
+  since: number,
+  seenAt: number,
+  nextAt: string | null | undefined,
+  now: number,
+): number {
+  const next = nextAt ? Date.parse(nextAt) : Number.NaN;
+  const waited =
+    Number.isNaN(next) || Number.isNaN(seenAt)
+      ? 0
+      : Math.max(0, Math.min(next, now) - Math.max(seenAt, since));
+  return now - since - waited;
+}
 
 /**
  * Whether a local time ("21:30") is within hours that may pass midnight ("22:00"-"02:00"); the

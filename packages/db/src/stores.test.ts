@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { localDate, toLocalIso } from '@tora/core';
 import { eq } from 'drizzle-orm';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type AlertContext, addDiscordChannel } from './alerts';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
@@ -232,7 +232,17 @@ it("shows the feed's last read and its next one on the Stores pages", async () =
       { key: 'store-a', readAt: toLocalIso(now) },
       { key: 'store-b', readAt: null },
     ],
+    count: 2,
   });
+  // One tab per board: each push names only its own board, yet both were visited lately.
+  await receivePush(
+    db,
+    uid,
+    { source: 'myboard', board: 'store-b', watching: ['store-b'], posts: [], next },
+    now,
+  );
+  expect((await storesState(db, uid, now.getTime())).status?.count).toBe(2);
+  expect((await storesState(db, uid, now.getTime() + 7 * 3_600_000)).status?.count).toBe(1);
   // A push that does not say clears it.
   await receivePush(db, uid, { source: 'myboard', board: 'store-b', seen: 3, posts: [] }, now);
   expect((await storesState(db, uid)).status?.next).toBeNull();
@@ -503,7 +513,9 @@ it('tells once when the feed goes silent within the hours, and when it speaks ag
   const later = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
   sent = [];
   expect(await checkFeeds(db, ctx, later(5))).toBe(0);
-  expect(await checkFeeds(db, ctx, later(11))).toBe(1);
+  // A stored 10 (a choice since dropped) reads as the shortest, 15.
+  expect(await checkFeeds(db, ctx, later(11))).toBe(0);
+  expect(await checkFeeds(db, ctx, later(16))).toBe(1);
   expect(await checkFeeds(db, ctx, later(30))).toBe(0);
   const back = await receivePush(db, uid, { source: 'myboard', posts: [] }, later(31));
   expect(back.resumed).toBe(true);
@@ -515,20 +527,21 @@ it('tells once when the feed goes silent within the hours, and when it speaks ag
 it('counts silence from the server start after a night off, and reminds while it lasts', async () => {
   await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
   await newFeedToken(db, uid);
-  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '08:00', to: '23:00' } });
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 15, from: '08:00', to: '23:00' } });
   // The feed's last push the night before; the server starts at 09:00.
   const night = new Date('2026-10-21T22:30:00+09:00');
   await receivePush(db, uid, { source: 'myboard', posts: [] }, night);
   const startedAt = new Date('2026-10-22T09:00:00+09:00');
   const at = (time: string) => new Date(`2026-10-22T${time}:00+09:00`);
   sent = [];
-  expect(await checkFeeds(db, ctx, at('09:05'), { startedAt })).toBe(0);
-  expect(await checkFeeds(db, ctx, at('09:11'), { startedAt })).toBe(1);
-  expect(sent.at(-1)).toContain('since the server started at 10-22 09:00 (11 min');
+  expect(await checkFeeds(db, ctx, at('09:14'), { startedAt })).toBe(0);
+  expect(await checkFeeds(db, ctx, at('09:16'), { startedAt })).toBe(1);
+  expect(sent.at(-1)).toContain('since the server started at 10-22 09:00 (16 min');
   expect(sent.at(-1)).toContain('its last push: 10-21 22:30');
   // Still silent: again every 2 hours.
   expect(await checkFeeds(db, ctx, at('10:30'), { startedAt })).toBe(0);
-  expect(await checkFeeds(db, ctx, at('11:12'), { startedAt })).toBe(1);
+  expect(await checkFeeds(db, ctx, at('11:12'), { startedAt })).toBe(0);
+  expect(await checkFeeds(db, ctx, at('11:17'), { startedAt })).toBe(1);
   expect(sent.at(-1)).toContain('still silent: nothing since 10-22 09:00 (2 h)');
   // A push clears it.
   await receivePush(db, uid, { source: 'myboard', posts: [] }, at('11:20'));
@@ -538,7 +551,7 @@ it('counts silence from the server start after a night off, and reminds while it
 it('lets feeds rest outside the tracking hours, and counts silence from the start', async () => {
   await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
   await newFeedToken(db, uid);
-  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '00:00', to: '23:59' } });
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 15, from: '00:00', to: '23:59' } });
   await saveTrackingHours(db, { from: '09:00', to: '21:00', minDelay: 0, maxDelay: 0 });
   const at = (day: string, time: string) => new Date(`2026-10-${day}T${time}:00+09:00`);
   // Its last push before the stop; nothing through the night.
@@ -551,9 +564,9 @@ it('lets feeds rest outside the tracking hours, and counts silence from the star
     resumeAt: '2026-10-22T09:00:00.000+09:00',
   });
   // After the start: silent only once the limit passed since the start, and said so.
-  expect(await checkFeeds(db, ctx, at('22', '09:05'))).toBe(0);
-  expect(await checkFeeds(db, ctx, at('22', '09:11'))).toBe(1);
-  expect(sent.at(-1)).toContain('since tracking started at 10-22 09:00 (11 min');
+  expect(await checkFeeds(db, ctx, at('22', '09:14'))).toBe(0);
+  expect(await checkFeeds(db, ctx, at('22', '09:16'))).toBe(1);
+  expect(sent.at(-1)).toContain('since tracking started at 10-22 09:00 (16 min');
   // An admin's hour at night: tracked once, then rest again.
   expect(await trackNow(db, 'hour', at('22', '12:00'))).toBeNull();
   const override = await trackNow(db, 'hour', at('22', '22:00'));
@@ -582,7 +595,7 @@ it('adds and removes stores by hand, never a plug-in one', async () => {
 it('keeps each board apart: a board giving no posts while the feed runs is told once', async () => {
   await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
   await newFeedToken(db, uid);
-  await setPreferences(db, uid, { storeFeed: { silentMinutes: 10, from: '00:00', to: '23:59' } });
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 15, from: '00:00', to: '23:59' } });
   const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
   const visit = (board: string, posts: ReturnType<typeof post>[], minutes: number) =>
     receivePush(db, uid, { source: 'myboard', board, chain: board, posts }, at(minutes));
@@ -590,18 +603,112 @@ it('keeps each board apart: a board giving no posts while the feed runs is told 
   await visit('arcade', [post('b1', '駅前')], 1);
   expect(Object.keys((await feedStatus(db, uid))!.boards).sort()).toEqual(['arcade', 'megastore']);
   // From then on アーケード reads nothing (an access check page) while メガストア goes on.
-  for (const m of [3, 6, 9, 12]) {
+  for (let m = 3; m <= 60; m += 3) {
     await visit('megastore', [post('y1', 'KTA')], m);
     await visit('arcade', [], m + 1);
   }
   sent = [];
-  expect(await checkFeeds(db, ctx, at(13))).toBe(1);
+  // Two boards read in turn: each may give nothing for 15 minutes x 2 boards x 2.
+  expect(await checkFeeds(db, ctx, at(61))).toBe(0);
+  await visit('megastore', [post('y1', 'KTA')], 63);
+  expect(await checkFeeds(db, ctx, at(63))).toBe(1);
   expect(sent.at(-1)).toContain('arcade');
-  expect(await checkFeeds(db, ctx, at(15))).toBe(0);
-  const back = await visit('arcade', [post('b2', '駅前')], 16);
+  expect(await checkFeeds(db, ctx, at(65))).toBe(0);
+  const back = await visit('arcade', [post('b2', '駅前', -65)], 66);
   expect(back.boardBack).toBe('arcade');
   // The board back (feed status) and its post naming no store Tora knows: two kinds, two notices.
-  expect(await sendFeedMessages(db, uid, back, ctx, at(16))).toBe(2);
+  expect(await sendFeedMessages(db, uid, back, ctx, at(66))).toBe(2);
+});
+
+it('counts every board visited lately, with one tab per board naming only its own', async () => {
+  await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+  await newFeedToken(db, uid);
+  await setPreferences(db, uid, { storeFeed: { silentMinutes: 15, from: '00:00', to: '23:59' } });
+  const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  const visit = (board: string, posts: ReturnType<typeof post>[], minutes: number) =>
+    receivePush(
+      db,
+      uid,
+      { source: 'myboard', board, chain: board, watching: [board], posts },
+      at(minutes),
+    );
+  // Three tabs, one board each, a page every 4 minutes in turn; arcade gives nothing after its first.
+  await visit('arcade', [post('b1', '駅前')], 0);
+  for (let m = 4; m <= 88; m += 12) {
+    await visit('megastore', [post('y1', 'KTA')], m);
+    await visit('shop', [post('s1', 'KTA')], m + 4);
+    await visit('arcade', [], m + 8);
+  }
+  sent = [];
+  // 3 boards: 15 x 3 x 2 = 90 minutes (counting the last push's board alone: 30, told at 31).
+  expect(await checkFeeds(db, ctx, at(89))).toBe(0);
+  await visit('megastore', [post('y1', 'KTA')], 92);
+  expect(await checkFeeds(db, ctx, at(92))).toBe(1);
+  expect(sent.at(-1)).toContain('arcade');
+});
+
+describe('the wait a push announces (its next visit)', () => {
+  // The push's next visit is checked against the clock (at most 6 h ahead): pinned to the test's.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+  const visit = (posts: ReturnType<typeof post>[], minutes: number, nextIn: number | null) =>
+    receivePush(
+      db,
+      uid,
+      {
+        source: 'myboard',
+        board: 'arcade',
+        chain: 'arcade',
+        posts,
+        next: nextIn === null ? null : { board: 'arcade', at: at(minutes + nextIn).toISOString() },
+      },
+      at(minutes),
+    );
+  beforeEach(async () => {
+    await addDiscordChannel(db, uid, HOOK, SECRET, fakeFetch);
+    await newFeedToken(db, uid);
+    await setPreferences(db, uid, { storeFeed: { silentMinutes: 15, from: '00:00', to: '23:59' } });
+  });
+
+  it('is no silence for the feed or its board until the visit, then counts from it', async () => {
+    // A blocked board's retry in 3 hours.
+    await visit([post('b1', '駅前')], 0, 180);
+    sent = [];
+    expect(await checkFeeds(db, ctx, at(30))).toBe(0);
+    expect(await checkFeeds(db, ctx, at(170))).toBe(0);
+    expect(await checkFeeds(db, ctx, at(194))).toBe(0);
+    expect(sent).toEqual([]);
+    // Past the visit by more than the limit: silent as usual, since the last push.
+    expect(await checkFeeds(db, ctx, at(196))).toBe(1);
+    expect(sent.at(-1)).toContain('(196 min)');
+    // It says when the visit was due, so a missed visit and a planned wait read apart.
+    expect(sent.at(-1)).toContain(
+      `Its next visit was due at ${toLocalIso(at(180)).slice(5, 16).replace('T', ' ')}.`,
+    );
+  });
+
+  it('counts a next visit already past as no wait', async () => {
+    await visit([post('b1', '駅前')], 0, -60);
+    sent = [];
+    expect(await checkFeeds(db, ctx, at(14))).toBe(0);
+    expect(await checkFeeds(db, ctx, at(16))).toBe(1);
+  });
+
+  it('still tells a board visited without posts, the feed sending on time', async () => {
+    await visit([post('b1', '駅前')], 0, 3);
+    for (let m = 3; m <= 33; m += 3) await visit([], m, 3);
+    sent = [];
+    // One board: 15 x 1 x 2 = 30 minutes.
+    expect(await checkFeeds(db, ctx, at(30))).toBe(0);
+    expect(await checkFeeds(db, ctx, at(35))).toBe(1);
+    expect(sent.at(-1)).toContain('arcade');
+  });
 });
 
 it('says when the feed connects, with the boards it tracks, and when the list changes', async () => {

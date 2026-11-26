@@ -30,6 +30,11 @@ import {
   storeLabelIn,
   storesInPost,
   withinHours,
+  FEED_SILENT_MINUTES,
+  boardSilentMinutes,
+  watchedBoards,
+  feedSilentMinutes,
+  silentMs,
 } from './stores';
 
 const chuo = {
@@ -128,6 +133,54 @@ describe('store notices: posts', () => {
     // A board mixing chains: places only, never a chain's codes.
     expect(storesInPost('新宿東口 販売', all)).toEqual([]);
   });
+});
+
+it('reads a silence limit under the shortest choice as the shortest, nothing as the default', () => {
+  expect(FEED_SILENT_MINUTES[0]).toBe(15);
+  expect(feedSilentMinutes({ silentMinutes: 5 })).toBe(15);
+  expect(feedSilentMinutes({ silentMinutes: 10 })).toBe(15);
+  expect(feedSilentMinutes({ silentMinutes: 30 })).toBe(30);
+  expect(feedSilentMinutes({})).toBe(15);
+  expect(feedSilentMinutes(null)).toBe(15);
+  expect(feedSilentMinutes({ silentMinutes: Number.NaN })).toBe(15);
+  // Each board: the limit times the boards watched (at least one) times 2.
+  expect(boardSilentMinutes(15, 4)).toBe(120);
+  expect(boardSilentMinutes(15, 1)).toBe(30);
+  expect(boardSilentMinutes(15, 0)).toBe(30);
+  expect(boardSilentMinutes(15, Number.NaN)).toBe(30);
+});
+
+it('counts the boards watched: those named or those visited in the last 6 hours', () => {
+  const t0 = Date.parse('2026-11-26T12:00:00+09:00');
+  const ago = (h: number) => new Date(t0 - h * 3_600_000).toISOString();
+  // One tab per board: each push names only its own.
+  expect(watchedBoards(['a'], [ago(0), ago(0.1), ago(0.2)], t0)).toBe(3);
+  // Named but not yet visited.
+  expect(watchedBoards(['a', 'b', 'c'], [ago(0)], t0)).toBe(3);
+  // A board last visited over 6 hours ago, a missing or unreadable time: not counted.
+  expect(watchedBoards(['a'], [ago(0), ago(6.5), null, 'soon'], t0)).toBe(1);
+  expect(watchedBoards(null, [ago(6)], t0)).toBe(1);
+  // Nothing at all: 0 (read as one by boardSilentMinutes).
+  expect(watchedBoards(null, [], t0)).toBe(0);
+  expect(watchedBoards([], [ago(7)], t0)).toBe(0);
+});
+
+it('counts no silence during the wait a push announced', () => {
+  const min = 60_000;
+  const t0 = Date.parse('2026-11-26T12:00:00+09:00');
+  const at = (m: number) => new Date(t0 + m * min).toISOString();
+  // No next visit (or an unreadable one): from the last push.
+  expect(silentMs(t0, t0, null, t0 + 20 * min)).toBe(20 * min);
+  expect(silentMs(t0, t0, 'soon', t0 + 20 * min)).toBe(20 * min);
+  // A 3-hour blocked wait: not silent until its end, then counted from it.
+  expect(silentMs(t0, t0, at(180), t0 + 170 * min)).toBe(0);
+  expect(silentMs(t0, t0, at(180), t0 + 196 * min)).toBe(16 * min);
+  // A next visit already past: from the last push as usual.
+  expect(silentMs(t0, t0, at(-30), t0 + 16 * min)).toBe(16 * min);
+  // A board without posts since before the push: only that wait is taken off.
+  expect(silentMs(t0 - 50 * min, t0, at(180), t0 + 100 * min)).toBe(50 * min);
+  // The server started during the wait: counted from the later of the start and the next visit.
+  expect(silentMs(t0 + 60 * min, t0, at(180), t0 + 200 * min)).toBe(20 * min);
 });
 
 it('tells hours apart, also past midnight', () => {

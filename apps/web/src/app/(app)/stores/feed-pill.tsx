@@ -1,12 +1,13 @@
 'use client';
 
+import { boardSilentMinutes } from '@tora/core';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { trackNowAction } from './actions';
-import { type FeedState, SILENT_MS, type Tracking, clock, feedDown } from './feed-state';
+import { type FeedState, type Tracking, boardQuiet, clock, feedDown } from './feed-state';
 
 /** After its next read was due, how long the feed may take to load, read and send. */
 const DUE_MS = 90_000;
@@ -17,9 +18,11 @@ const DUE_MS = 90_000;
  * dots while a read is due, amber when late or a watched board gives no posts, red when silent.
  * When the tracker does not run (outside its working hours, or silent), a red bar at the top of
  * the page says so, with admins' buttons to track outside the hours once. Asks every 15 s (and
- * when the page is looked at again); the pill opens the Feed page.
+ * when the page is looked at again); the pill opens the Feed page. Silent and quiet follow the
+ * person's limit (`silentMinutes`; each board's scaled by the boards watched) and the feed's
+ * announced next visit.
  */
-export function FeedPill({ admin }: { admin: boolean }) {
+export function FeedPill({ admin, silentMinutes }: { admin: boolean; silentMinutes: number }) {
   const t = useTranslations('stores.pill');
   const [feed, setFeed] = useState<FeedState | null | undefined>(undefined);
   const [tracking, setTracking] = useState<Tracking | null>(null);
@@ -53,7 +56,7 @@ export function FeedPill({ admin }: { admin: boolean }) {
   }, [asked]);
   if (feed === undefined || !now) return null;
 
-  const { stopped, silent, since, down } = feedDown(feed, tracking, now);
+  const { stopped, silent, since, down } = feedDown(feed, tracking, now, silentMinutes * 60_000);
   const starting = !stopped && !!feed && Date.parse(feed.at) < since;
 
   let tone: 'ok' | 'reading' | 'late' | 'silent' | 'none' | 'stopped';
@@ -74,7 +77,9 @@ export function FeedPill({ admin }: { admin: boolean }) {
     });
     const next = feed.next ? Date.parse(feed.next.at) - now : null;
     const nextBoard = feed.next?.board ?? feed.board ?? '';
-    const quiet = feed.watched.filter((b) => !b.readAt || now - Date.parse(b.readAt) > SILENT_MS);
+    const quiet = feed.watched.filter((b) =>
+      boardQuiet(b.readAt, feed, feed.count, silentMinutes, now),
+    );
     if (silent) {
       tone = 'silent';
       text = t('silent', { time: clock(feed.at) });
@@ -92,7 +97,12 @@ export function FeedPill({ admin }: { admin: boolean }) {
       if (!quiet.length) lead = t('online');
       const s = next === null ? null : Math.ceil(next / 1000);
       text = [
-        quiet.length ? t('quiet', { boards: quiet.map((b) => b.key).join(', ') }) : null,
+        quiet.length
+          ? t('quietFor', {
+              boards: quiet.map((b) => b.key).join(', '),
+              minutes: boardSilentMinutes(silentMinutes, feed.count),
+            })
+          : null,
         last,
         s === null
           ? null

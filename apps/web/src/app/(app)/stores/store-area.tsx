@@ -2,6 +2,8 @@
 
 import {
   DEFAULT_FEED_PREFS,
+  boardSilentMinutes,
+  feedSilentMinutes,
   FEED_SILENT_MINUTES,
   PLACE,
   type StoreArea,
@@ -495,10 +497,24 @@ export function FeedToken({ hasToken }: { hasToken: boolean }) {
   );
 }
 
-/** When the person is told about the feed itself: silence (minutes, hours), unknown stores. */
-export function FeedAlerts({ prefs: saved }: { prefs: StoreFeedPrefs | null }) {
+/**
+ * When the person is told about the feed itself: silence (minutes, hours; each board's limit is
+ * that times the `boards` watched), unknown stores.
+ */
+export function FeedAlerts({
+  prefs: saved,
+  boards,
+}: {
+  prefs: StoreFeedPrefs | null;
+  boards: number;
+}) {
   const t = useTranslations('stores');
-  const [prefs, setPrefs] = useState({ ...DEFAULT_FEED_PREFS, ...saved });
+  // A stored limit under the shortest choice (an older 5 or 10) shows as the shortest.
+  const [prefs, setPrefs] = useState({
+    ...DEFAULT_FEED_PREFS,
+    ...saved,
+    silentMinutes: feedSilentMinutes(saved),
+  });
   const [pending, startTransition] = useTransition();
   const save = (part: Partial<typeof prefs>) => {
     const next = { ...prefs, ...part };
@@ -547,7 +563,13 @@ export function FeedAlerts({ prefs: saved }: { prefs: StoreFeedPrefs | null }) {
         />
         {t('unknownAlerts')}
       </label>
-      <p className="text-xs text-muted-foreground">{t('feedAlertsInfo')}</p>
+      <p className="text-xs text-muted-foreground">
+        {t('silentBoardsInfo', {
+          boards: Math.max(1, boards),
+          minutes: boardSilentMinutes(prefs.silentMinutes, boards),
+        })}{' '}
+        {t('feedAlertsInfo')}
+      </p>
     </div>
   );
 }

@@ -93,7 +93,7 @@ Content-Type: application/json
 Required: `source`, `posts`, and each post's `id` and `text`; every other field is optional.
 
 - `source`: a short key for the board's site (a-z, 0-9, `-`, `_`, up to 40 characters; another refuses the push), shared by every person's feed: a post is its `source` and `id`, whoever sends it first (its chain, stores and pictures are that push's); "a feed's very first push" below is the first under that key from anyone; `products` replaces that key's list for everyone.
-- `board`: the board (page) read, when the feed reads several, a key written like `source` (another is dropped, and the push then counts under its `chain`, else its `source`): each board's last visit and last posts are shown on the Stores page, and a board giving no posts for longer than its person's silence alert ([No silent failures](#no-silent-failures)) while the feed runs is told (an access check or a changed page would otherwise go unnoticed).
+- `board`: the board (page) read, when the feed reads several, a key written like `source` (another is dropped, and the push then counts under its `chain`, else its `source`): each board's last visit and last posts are shown on the Stores page, and a board giving no posts for longer than its person's silence alert times the boards watched times 2 ([No silent failures](#no-silent-failures)) while the feed runs is told (an access check or a changed page would otherwise go unnoticed).
 - `offered`: every board the feed can read (a list of board keys written like `source`, up to 20); the person can then choose in the app which ones it
   watches, and the answer to each push carries that choice as `watch` (a list of board keys, or null when the feed decides).
 - `seen` and `gap` (optional, to send less): a feed may send only the posts it did not send
@@ -101,7 +101,7 @@ Required: `source`, `posts`, and each post's `id` and `text`; every other field 
   works it out from the posts sent, which costs a few more rows read per push.
 - `hello`: true once when the feed (re)starts (a new tab or browser session, a new version): its
   person is told "connected" again, so a restart is confirmed.
-- `next` (optional): where and when the feed reads next, `{ "board": "store-b", "at": "<ISO time>" }` (a time with its offset, within the next 6 hours; a later one is ignored);
+- `next` (optional): where and when the feed reads next, `{ "board": "store-b", "at": "<ISO time>" }` (a time with its offset, within the next 9 hours; a later one is ignored); until then the feed is not silent ([No silent failures](#no-silent-failures));
   the Stores pages show it counting down, then "reading" while it is due, and late when no push
   comes within a minute and a half. A push without it clears it.
 - `watching`: every board the feed goes through (board keys, up to 20); its person is told "connected, tracking these
@@ -246,7 +246,7 @@ The look and wording are set per person in Settings > Alerts > Message style.
 
 Besides the notices for your area, the person whose feed sent the posts is told:
 
-- when the feed has sent nothing for as long as they chose (5, 10, 15, 30 or 60 minutes; 10 unless changed) within their hours (08:00-23:00 unless changed; the end not included): told then, again every 2 hours while it lasts, and when it sends again; a board giving no posts that long is told the same way. The app checks every 2 minutes ([the alerts rules](rules/alerts.md#numbers)) while it runs
+- when the feed has sent nothing for as long as they chose (15, 30 or 60 minutes; 15 unless changed; a limit saved before as 5 or 10 counts as 15) within their hours (08:00-23:00 unless changed; the end not included): told then, again every 2 hours while it lasts, and when it sends again; a board giving no posts for that limit times the number of boards watched times 2 is told the same way (they are read in turn, the next one at random, and a newest page's page before takes a turn too: 120 minutes for 4 boards at 15). The boards watched are the larger of those the last push named in `watching` and those visited in the last 6 hours (with one tab per board, each push names only its own). A silence alert says when the next visit the last push announced was due, when it announced one; the Feed tab shows "waiting until" that time while a wait longer than the limit is announced. The wait a push announces in `next` is no silence: silence counts from the later of the last push and that next visit, so a step or a refused site's retry time is not told, and a next visit past by more than the limit is told as usual; a board visited without posts stays silent (only that wait is not counted). The Stores pages' status (the pill, the Feed tab) shows silent and quiet the same way. The app checks every 2 minutes ([the alerts rules](rules/alerts.md#numbers)) while it runs
   as a server on your own PC (`pnpm app`); a hosted app has nothing running between requests, so
   an outside scheduler (cron-job.org, a GitHub Actions schedule) calls
   `GET /api/feed/check` with `Authorization: Bearer $CRON_SECRET` (the app's secret, not a feed token) every few minutes (a GitHub Actions schedule runs at most every 5 minutes and can be late or skipped under load, so its alerts can come late);
@@ -261,7 +261,7 @@ The settings are on the Stores page, next to the feed's state.
 Read only what the site lets visitors read, and ask little of it: a page every 3 to 5 minutes for
 the whole feed (not per board or per tab), only what changed opened (a thread whose reply count went
 up), and working hours set. A page every 40 seconds with many reply loads got one browser refused;
-no pace is known to be safe. Choose a silence alert well above the time between two visits of the same board (15 minutes or more for one board at this pace, more for several).
+no pace is known to be safe. Choose a silence alert well above the time between two pages (15 minutes, the shortest choice, at this pace); each board's limit grows with the number of boards by itself.
 
 A page that checks for bots is not to be worked around: read it from your own browser while you
 have it open, as a userscript does, or not at all.

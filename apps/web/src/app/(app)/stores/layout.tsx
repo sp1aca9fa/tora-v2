@@ -1,3 +1,4 @@
+import { feedSilentMinutes } from '@tora/core';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
@@ -21,7 +22,10 @@ export default async function StoresLayout({ children }: { children: ReactNode }
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">{t('intro')}</p>
       </header>
-      <FeedPill admin={user.role === 'admin'} />
+      <FeedPill
+        admin={user.role === 'admin'}
+        silentMinutes={feedSilentMinutes(user.preferences?.storeFeed)}
+      />
       <StoresNav />
       {children}
     </div>

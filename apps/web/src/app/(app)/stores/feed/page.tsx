@@ -1,4 +1,4 @@
-import { localDate, storesInArea } from '@tora/core';
+import { feedSilentMinutes, localDate, storesInArea, watchedBoards } from '@tora/core';
 import { cachedStores, channelsOf, feedStatus } from '@tora/db';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authed } from '@/lib/auth/guard';
 import { cn } from '@/lib/utils';
 import { BoardsToWatch, FeedAlerts, FeedToken, ForgetBoard } from '../store-area';
+import { boardQuiet, clock, feedDown, waitingUntil } from '../feed-state';
 import { AutoRefresh } from '../stores-nav';
 
-/** Minutes after which a silent feed or board shows as stopped. */
-const FEED_ALIVE_MINUTES = 10;
 const minutesSince = (at: string) => Math.round((Date.now() - Date.parse(at)) / 60_000);
+/** The boards counted for each board's silence limit, now (watchedBoards). */
+const watchedNow = (watching: string[] | null | undefined, visits: string[]) =>
+  watchedBoards(watching, visits, Date.now());
 
 /**
  * The feed (S25): whether it runs, each board it reads, which boards it should watch, the alerts
@@ -26,8 +28,16 @@ export default async function StoreFeedPage() {
   ]);
   const inArea = storesInArea(user.preferences?.storeArea, all, localDate());
   const minutesAgo = feed?.lastSeenAt ? minutesSince(feed.lastSeenAt) : null;
-  const alive = minutesAgo !== null && minutesAgo <= FEED_ALIVE_MINUTES;
+  // The person's limit; the wait the last push announced (its next visit) is no silence.
+  const silentMinutes = feedSilentMinutes(user.preferences?.storeFeed);
+  const pushed = feed?.lastSeenAt ? { at: feed.lastSeenAt, next: feed.next } : null;
+  const alive = !!pushed && !feedDown(pushed, null, undefined, silentMinutes * 60_000).silent;
+  const waiting = alive ? waitingUntil(pushed, silentMinutes * 60_000) : null;
   const boards = Object.entries(feed?.boards ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  const watchedCount = watchedNow(
+    feed?.watching,
+    boards.map(([, b]) => b.at),
+  );
   const known = [...new Set([...(feed?.offered ?? []), ...boards.map(([key]) => key)])].sort();
 
   return (
@@ -39,10 +49,15 @@ export default async function StoreFeedPage() {
           <CardDescription>
             {minutesAgo === null
               ? t('feedNever')
-              : t(alive ? 'feedAlive' : 'feedStopped', {
-                  minutes: minutesAgo,
-                  source: feed?.lastSource ?? '-',
-                })}
+              : waiting
+                ? t('feedWaiting', {
+                    time: clock(waiting),
+                    source: feed?.lastSource ?? '-',
+                  })
+                : t(alive ? 'feedAlive' : 'feedStopped', {
+                    minutes: minutesAgo,
+                    source: feed?.lastSource ?? '-',
+                  })}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -69,7 +84,7 @@ export default async function StoreFeedPage() {
               </thead>
               <tbody>
                 {boards.map(([key, b]) => {
-                  const quiet = !b.readAt || minutesSince(b.readAt) > FEED_ALIVE_MINUTES;
+                  const quiet = boardQuiet(b.readAt, pushed, watchedCount, silentMinutes);
                   const watched = feed?.watching?.includes(key);
                   return (
                     <tr key={key} className="border-t">
@@ -113,7 +128,7 @@ export default async function StoreFeedPage() {
           <CardTitle>{t('feedSettings')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <FeedAlerts prefs={user.preferences?.storeFeed ?? null} />
+          <FeedAlerts prefs={user.preferences?.storeFeed ?? null} boards={watchedCount} />
           <FeedToken hasToken={!!feed} />
         </CardContent>
       </Card>
