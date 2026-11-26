@@ -155,7 +155,7 @@ These are choices made once, at setup, for the whole app (Settings > Admin prefe
 2. **Time zone**: what a day is (daily value snapshots, charts, the collect's once a day); every
    time is stored and shown in it. Usually yours; the page offers the device's. Changing it later
    rewrites every stored time.
-3. **Languages**: the primary language (shown first, and on the sign-in page) and an optional
+3. **Languages**: the primary language (shown to anyone who has not chosen, on the sign-in page too) and an optional
    secondary one for the toggle. See [Languages](languages.md).
 4. **Categories**: TCG and games are ready-made; add your own (watches, figures, ...) with their
    kinds, fields and condition list. See [Categories](categories.md).

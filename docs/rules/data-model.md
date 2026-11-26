@@ -23,7 +23,7 @@ Not here: how a value is made ([Values](values.md)); roles, rates and the base c
 - **Lists** (categories, kinds, regions, item types, conditions beyond the built-in ones) are
   admin settings, not fixed values in the schema. An item's type (card, sealed, item, game, or an admin's type) decides its condition list and how it is valued.
 - **Migrations are add-only.** A column or table is dropped only in a later migration, so the version before can still run after a rollback. A table rebuilt to change a check (SQLite's ALTER TABLE cannot change one) keeps every column and only loosens checks; a stricter check waits like a drop.
-- **The database** is SQLite (libSQL), a local file or a hosted one. It uses SQLite's own forms of triggers (a body of SQL statements) and of the JSON functions (`json_extract` and the like), so the early goal of staying portable to another database is not kept; whether to drop it is the owner's to decide.
+- **The database** is SQLite (libSQL), a local file or a hosted one. It uses SQLite's own forms of triggers (a body of SQL statements) and of the JSON functions (`json_extract` and the like), so the early goal of staying portable to another database is not kept; whether to drop it is the owner's to decide. Most fixed-value columns are enforced with CHECK constraints (`packages/db/src/schema.ts`; Decision log, 2026-10-09); some are checked only in code (`market_jobs` kind and status, `suggestions` kind and status, `purchase_links` and `import_uploads` status, `item_checks` outcome and by, `sale_spans` how), and free-text source columns have none.
 
 ## One person's, or shared
 
@@ -150,4 +150,4 @@ Stores (shared, except the last three):
 | `store_post_images` | a post's picture (pruned)                  | kept  |
 | `feed_tokens`       | a person's token for sending a feed        | state |
 | `store_notices`     | the last notice a person got about a store | state |
-| `notice_messages`   | the message that carried a post            | log   |
+| `notice_messages`   | the message that carried a post (pruned)   | log   |

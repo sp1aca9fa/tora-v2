@@ -309,7 +309,7 @@ condition. The shapes are in `packages/collector-sdk/src/types.ts` (`PurchaseImp
 
 A `SetCardSource` lists a TCG set's cards of one rarity with their lowest asks
 (`cards({ code, name, rarity }, ctx)`, e.g. searches for "ポケモンカード151 SAR" and "SV2a SAR"), for the box opening value: what a
-booster box's hit cards bring on average against its price. Its `sold(externalId, ctx)` gives a card's recent selling price (the median of its recent single raw sales; how recent is the plug-in's choice), read only for the ten cards with the largest share of the set's break-even value worked out from their asks. The nightly collect reads each set again once its cards are 7 or more days old ([the rule](rules/opportunities.md#box-opening-value)), and
+booster box's hit cards bring on average against its price. Its `sold(externalId, ctx)` gives a card's recent selling price (the median of its recent single raw sales; how recent is the plug-in's choice), read only for the cards with the largest share of the set's break-even value worked out from their asks ([how many](rules/opportunities.md#box-opening-value)). The nightly collect reads each set again once its cards are 7 or more days old ([the rule](rules/opportunities.md#box-opening-value)), and
 after an admin changes its code or rarities in Settings > Admin > Box opening. Prices are in the
 card's currency's smallest unit; graded copies and error prints are left out.
 

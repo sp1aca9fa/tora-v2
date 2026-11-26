@@ -82,7 +82,7 @@ and a direction of 0.
 
 ## Currency and rates
 
-- Every amount is stored in the base currency (the yen unless chosen otherwise), in its smallest
+- Every amount is stored in the base currency (the yen unless chosen otherwise; the three exceptions are in [The data model](data-model.md), "General rules"), in its smallest
   unit (the decimals the runtime's currency formatting uses, which can differ from ISO 4217's minor unit: the yen none and the euro 2 in both, the Iraqi dinar 0 against ISO's 3); a conversion rounds to the nearest smallest unit.
 - A plug-in reports amounts in its own currency. The collect converts each with the rate stored
   by then for its own day in the app's time zone (a price's: the day it was observed, `observedAt`; an order's: its order date; a rate's day is the date its provider gives it) and keeps the rate used; a rate fetched later does not change amounts already saved.
@@ -93,7 +93,7 @@ and a direction of 0.
 - **A stale rate**: a fetched rate whose newest day is more than 7 days old is reported in the
   collect's log and still used.
 - **No rate at all** for a currency: its prices are not saved until it has one.
-- **Changing the base currency** converts every stored amount with the rate of its own date (the
+- **Changing the base currency** converts every amount stored in the base with the rate of its own date (the
   rate of a day above: an amount older than every stored rate takes the first one), rounded to
   the new currency's smallest unit.
   Amounts with no date of their own (list prices, watch targets, a plan's budget, a typed

@@ -75,18 +75,19 @@ and 12 minutes. A source whose plug-in waits 30 seconds reads the same in about 
 
 Reads beyond the night's collect, queued as jobs for the marketplaces that have them.
 
-| Rule                | Value                                                                                                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hours               | 05:00 to 22:00 app time; no request from 22:00                                                                                                                   |
-| Pace                | a random 10 to 20 seconds from the start of one request to the next; a plug-in may only make it longer (its own shortest and longest count where over 10 and 20) |
-| Requests a day      | 200 per marketplace to start, counted before each is sent (one then refused counts)                                                                              |
-| A request           | one per step, no retry, 20 seconds for an answer                                                                                                                 |
-| Beside a collect    | never: jobs stop while a collect runs or an admin's "collect now" waits                                                                                          |
-| After a refused run | no job request to a site for 24 hours from the start of its last collect run, when that run was refused                                                          |
-| A refusal           | the day's number is halved, rounded down (never under 25), and no job asks for 72 hours from the refusal                                                         |
-| A refusal at 25     | the marketplace stops, with no 72-hour wait, until an admin starts it again at 25 a day                                                                          |
-| The number          | never rises by itself; an unknown number means no request                                                                                                        |
-| A job that fails    | runs after the jobs that did not fail, fewest failures first (failed steps since its last saved one); after 5 in a row it is tried at most once a day            |
+| Rule                   | Value                                                                                                                                                            |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hours                  | 05:00 to 22:00 app time; no request from 22:00                                                                                                                   |
+| Pace                   | a random 10 to 20 seconds from the start of one request to the next; a plug-in may only make it longer (its own shortest and longest count where over 10 and 20) |
+| Requests a day         | 200 per marketplace to start, counted before each is sent (one then refused counts)                                                                              |
+| A request              | one per step, no retry, 20 seconds for an answer                                                                                                                 |
+| Beside a collect       | never: jobs stop while a collect runs or an admin's "collect now" waits                                                                                          |
+| After a refused run    | no job request to a site for 24 hours from the start of its last collect run, when that run was refused                                                          |
+| A refusal              | the day's number is halved, rounded down (never under 25), and no job asks for 72 hours from the refusal                                                         |
+| A refusal at 25        | the marketplace stops, with no 72-hour wait, until an admin starts it again at 25 a day                                                                          |
+| The number             | never rises by itself; an unknown number means no request                                                                                                        |
+| A job that fails       | runs after the jobs that did not fail, fewest failures first (failed steps since its last saved one); after 5 in a row it is tried at most once a day            |
+| A job with nothing new | stopped after 3 steps in a row with no rows and no older day read; also a step not done with no request or the same cursor                                       |
 
 ## What is kept
 
@@ -118,3 +119,4 @@ Each is a choice.
 | Daytime: wait after a refusal, failures                          | 72 hours, 5                           | `MARKET_WAIT_MS`, `MARKET_FAILURES_DAILY`                       | 72 hours: the owner's 3 days of 2026-11-23, read as 72 h (assumption, 2026-11-24); 5 Claude, at build, 2026-11-24 (assumption)                            |
 | Daytime: after a refused collect                                 | 24 hours                              | `COLLECT_REFUSAL_MS`                                            | Claude, at build, 2026-11-24 (assumption)                                                                                                                 |
 | Daytime: tries, an answer within                                 | 1, 20 s                               | `runSource`                                                     | Claude, at build, 2026-11-24 (no record names them)                                                                                                       |
+| Daytime: empty steps that stop a job                             | 3                                     | `EMPTY_STEPS`                                                   | Claude, at build, 2026-11-24                                                                                                                              |

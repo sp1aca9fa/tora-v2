@@ -396,6 +396,11 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('FEED_CHECK_MINUTES', plain(' minutes')),
       ],
     },
+    'Morning check on a hosted app': {
+      checks: [
+        c('MORNING_CHECK_UTC_HOUR', (v) => `${String(asNumber(v)).padStart(2, '0')}:00 UTC`),
+      ],
+    },
     'Morning items, the summary: not again in': {
       checks: [c('SUMMARY_GAP_HOURS', plain(' hours'))],
     },
@@ -422,6 +427,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     },
     'Failed sign-in': { checks: [c('LOGIN_ALERT_QUIET_MS', per(MINUTE, ' minutes'))] },
     'History kept': { checks: [c('ALERT_LOG_DAYS', plain(' days'))] },
+    "Store notices: a sent message's record kept": { checks: [c('MESSAGE_DAYS', plain(' days'))] },
     'Settings: not collected, median moved': {
       checks: [
         c('HEALTH_STALE_DAYS', plain(' days')),
@@ -612,6 +618,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     'Daytime: tries, an answer within': {
       notChecked: [['runSource', 'retries 0 and 20,000 ms are literals in its body']],
     },
+    'Daytime: empty steps that stop a job': { checks: [c('EMPTY_STEPS', plain())] },
   },
 
   'opportunities.md': {
@@ -639,6 +646,7 @@ const WIRING: Record<string, Record<string, Row>> = {
       ],
     },
     'Opening: low, high': { notChecked: [['openingValue', NO_CONSTANT]] },
+    'Opening: cards whose sales are read': { checks: [c('SOLD_CARDS', plain())] },
     'Sales windows': {
       checks: [c('SALES_RECENT_DAYS', plain(',')), c('SALES_BEFORE_DAYS', plain(' days'))],
     },
