@@ -3,14 +3,12 @@
 Instead of Vercel + Turso, the whole of Tora can run on one small always-on computer at home (a
 mini PC with a low-power CPU uses about 6-10 W): the app, the database (a local file, no read
 quota), the nightly collect (which needs a home connection anyway) and a browser for store feeds
-([Store notices](store-feeds.md)). It is reached from anywhere through a free Tailscale Funnel
-address (`https://<machine>.<tailnet>.ts.net`): no app on the phone, no router port opened, and a
-changing home IP does not matter.
+([Store notices](store-feeds.md)). It is reached only from devices on your tailnet (or ones you share it with), through Tailscale (`https://tora.<tailnet>.ts.net`, section 4): each needs the Tailscale app; no router port is opened, and a changing home IP does not matter.
 
 What you take on: updates, and keeping backups off the box (its disk fails, they go with it).
 
 The steps below are for Ubuntu Server 24.04; each is run on the server unless said otherwise.
-`<user>` is your user on the server, the code is cloned to `~/code/tora-v2`.
+`<user>` is your user on the server, `<server>` its ssh host name or alias on your PC, and the code is cloned to `~/code/tora-v2`.
 
 ## 1. The box
 
@@ -30,23 +28,20 @@ The steps below are for Ubuntu Server 24.04; each is run on the server unless sa
 
 ## 2. Node, the code, the data
 
-- Node with nvm, the version the repo names in `.nvmrc` (`nvm install`, then `corepack enable`;
-  pnpm comes from `packageManager`), and a link the services run Node through:
-  `ln -sfn "$(dirname "$(dirname "$(nvm which default)")")" ~/.local/share/tora/node`. Updates
-  install a new `.nvmrc` version themselves and move the link (section 7).
-- The code: give the server read-only deploy keys on GitHub (one per repo, write access off) with
-  an ssh host alias each, clone, point the `collectors` submodule at its alias, `pnpm install`.
+- The code: clone the main repo from its public https address to `~/code/tora-v2` (`ops/ci-status.sh` reads CI only for a github.com address: with an ssh host alias as its origin every automatic update waits). For the private `collectors` repo, give the server a read-only deploy key on GitHub (write access off) with an ssh host alias: `git config submodule.collectors.url git@<alias>:<owner>/<repo>.git`, then `git submodule update --init`.
+- Node, in `~/code/tora-v2`: nvm, then `nvm install` (it reads `.nvmrc`) and `corepack enable`
+  (pnpm comes from `packageManager`), and a link the services run Node through:
+  `mkdir -p ~/.local/share/tora && ln -sfn "$(dirname "$(dirname "$(nvm which default)")")" ~/.local/share/tora/node`.
+  Then `pnpm install`. Updates install a new `.nvmrc` version themselves and move the link (section 7).
 - The data from the previous machine: the database file (`~/.local/share/tora/local/tora.db`),
-  the backups, `~/.local/state/tora/time-zone`; and `.env` with `AUTH_SECRET` (the same one, or
+  the backups, the state folder `~/.local/state/tora` (the time zone and the daytime reads' refusal stamps); and `.env` with `AUTH_SECRET` (the same one, or
   every authenticator stops working), plug-in keys, and
   `DATABASE_URL=file:/home/<user>/.local/share/tora/local/tora.db`. Then `pnpm db:migrate`,
   `pnpm plugins`, `pnpm build`.
 
 ## 3. Services
 
-`/etc/systemd/system/tora-app.service` (the app, on the box only; the Funnel brings the outside
-in). `$NODE_BIN` is `/home/<user>/.local/share/tora/node/bin` (the link above, so a new Node
-needs no change here):
+`/etc/systemd/system/tora-app.service` (the app, on the box only; Tailscale Serve brings your devices in). It runs Node through the link above, so a new Node needs no change here:
 
 ```ini
 [Unit]
@@ -57,10 +52,10 @@ Wants=network-online.target
 [Service]
 User=<user>
 WorkingDirectory=/home/<user>/code/tora-v2
-Environment=PATH=$NODE_BIN:/usr/bin:/bin
+Environment=PATH=/home/<user>/.local/share/tora/node/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
 Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-ExecStart=$NODE_BIN/pnpm --filter @tora/web start -H 127.0.0.1 -p 3000
+ExecStart=/home/<user>/.local/share/tora/node/bin/pnpm --filter @tora/web start -H 127.0.0.1 -p 3000
 Restart=always
 RestartSec=5
 
@@ -70,14 +65,12 @@ WantedBy=multi-user.target
 
 The collect: `tora-collect.service` (`Type=oneshot`, the same `User`, `PATH`, and
 `ExecStart=/home/<user>/code/tora-v2/scripts/collect-cron.sh`) and `tora-collect.timer`
-(`OnCalendar=*-*-* *:05:00`, `Persistent=true`). `collect-cron.sh` runs the day's collect, backup
-and alerts once a day (the first check after midnight) and a "collect now" from the app on the
-next check ([Running collectors](running.md)). Before the first check, if the old machine already
+(`OnCalendar=*-*-* *:05:00`, `Persistent=true`, `[Install]` `WantedBy=timers.target`). `collect-cron.sh` runs the day's collect, backup and alerts from the first check after midnight, again at each later check until they succeed, and a "collect now" from the app on the next check ([Running collectors](running.md); [the rules](rules/collectors.md#when-the-collect-runs)). Before the first check, if the old machine already
 collected today: `date +%F > ~/.local/state/tora/last-success-date`.
 
 Enable them: `sudo systemctl daemon-reload && sudo systemctl enable --now tora-app tora-collect.timer`.
 
-Daytime reads of the marketplaces (requirements S36 B4): `tora-market-jobs.service` and its timer.
+Daytime reads of the marketplaces ([Collecting](rules/collectors.md#daytime-reads)): `tora-market-jobs.service` and its timer.
 Until a plug-in reads jobs, a run finds nothing to read and sends no request.
 
 ```ini
@@ -89,7 +82,7 @@ Description=Tora daytime reads of the marketplaces
 Type=oneshot
 User=<user>
 WorkingDirectory=/home/<user>/code/tora-v2
-Environment=PATH=$NODE_BIN:/usr/bin:/bin
+Environment=PATH=/home/<user>/.local/share/tora/node/bin:/usr/bin:/bin
 Environment=COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 ExecStart=/home/<user>/code/tora-v2/scripts/market-jobs-cron.sh
 TimeoutStartSec=90min
@@ -108,7 +101,7 @@ WantedBy=timers.target
 
 Enable: `sudo systemctl daemon-reload && sudo systemctl enable --now tora-market-jobs.timer`. Its
 log: `~/.local/state/tora/market-jobs.log`. It runs from 05:00 to 22:00 (the app's time zone), at
-most each marketplace's number a day (200 to start; a refusal halves it after a 3-day wait), and
+most each marketplace's number a day (200 to start; a refusal halves it and pauses it for 72 hours: [the rules](rules/collectors.md#daytime-reads)), and
 stops for a collect. Stop all daytime reads: `sudo systemctl disable --now tora-market-jobs.timer`;
 a run in progress: `sudo systemctl stop tora-market-jobs.service` (safe at any point).
 
@@ -172,7 +165,7 @@ Four services, all with `User=<user>`:
 - `tora-clip`: keeps the clipboard in step (`Environment=DISPLAY=:1`, `/usr/bin/vncconfig -nowin`,
   after and requiring `tora-display`).
 - `tora-browser`: `Environment=DISPLAY=:1`, `/usr/bin/firefox --profile /home/<user>/.tora-firefox
---no-remote <board address>`, `Restart=always`, after and requiring `tora-display`.
+--no-remote` (no address: the board is `user.js`'s home page, below), `Restart=always`, after and requiring `tora-display`.
 
 One window with the board, kept between restarts: the service starts Firefox without an address
 (an address opens a new tab each time) and the profile's `user.js` pins the settings Firefox applies
@@ -191,34 +184,38 @@ a while (`timeout 600 python3 -m http.server 8765 --bind 127.0.0.1` in it) and o
 
 ## 6. Backups off the box
 
-On your PC (WSL or Linux, with an ssh key for the server):
+On your PC (WSL or Linux), from a clone of the repo, with an ssh key for the server. The copy mirrors the server's backups: a copy kept only in that folder on the PC is deleted at the next run.
 
 ```bash
 ops/copy-backups.sh <server> [folder]            # copy now
-ops/copy-backups.sh install <server> [folder]    # Windows: a hidden task at logon and every 6 hours
+ops/copy-backups.sh install <server> [folder]    # Windows: a hidden task 10 minutes after logon and every 6 hours
 ```
 
 The copies go to the folder given (default `BACKUP_DIR`, else `~/.local/share/tora/backups`;
 for example `~/backups/tora`, next to other apps' copies). It mirrors the server's backups (what the server prunes is pruned here too, never when the server
 suddenly holds almost none) and refreshes the analysis copy for read-only queries
 ([Backups](backups.md)). The PC is no longer a Tora host: point its `DATABASE_URL` at the analysis
-copy, and remove its own collect task.
+copy, and remove its own collect task. A copy you want to keep for good is made on the server with `pnpm backup --keep <name>` ([Backups](backups.md)), because the PC's folder only mirrors the server's.
 
 The same task watches the server from outside, since nothing on the server can say it is down:
 with `TORA_STATUS_URL` and `TORA_STATUS_TOKEN` (Settings > Admin > Server) and `TORA_WATCH_DISCORD`
 (a Discord channel's webhook link) in the repo's `.env`, a server not answering its address
-for a day (`TORA_WATCH_HOURS`, default 24) is told once on that channel, and again when it answers.
+for a day is told once on that channel, and again when it answers. The wait is `TORA_WATCH_HOURS` (default 24); it is not read from `.env`: export it where a login shell reads it (`~/.profile`), since the task starts one.
 Only while the PC is on. With the tailnet-only address, WSL must reach the tailnet: Tailscale on
 Windows plus WSL's mirrored networking (test: `curl -sI https://tora.<tailnet>.ts.net` in WSL).
 
 ## 7. Updates
 
-The server updates itself: every 5 minutes it checks GitHub, and when there are new commits it
-pulls both repos, installs, migrates, saves the plug-ins' data, builds, restarts the app and checks
-it answers (`ops/update-server.sh --auto`). Never while a collect runs (it waits for the next
-check). When a step fails, it goes back to the version before, keeps that running, tells admins
-(Discord, Telegram) and does not try that version again until a newer push. Every update is in
-Settings > Activity; the log is `~/.local/state/tora/update.log`. While the app builds (a minute
+The server updates itself: every 5 minutes it checks GitHub, and when the main repo has new
+commits it pulls them and checks out the collectors commit they record (a push to the collectors
+repo alone is installed once the main repo's pointer to it moves), installs, migrates, saves the
+plug-ins' data, builds, restarts the app and checks it answers (`ops/update-server.sh --auto`).
+Never while a collect runs (it waits for the next check). When a step fails, it goes back to the
+code and Node of the version before, restarts it and checks it answers; the database keeps the new
+version's migrations and plug-in data (they only add). If going back fails too, the app may be
+down (the log says so). It tells admins (Discord, Telegram) and does not try that version again
+until a newer push. Every automatic update is in Settings > Activity; an update by hand only
+prints its result; the log is `~/.local/state/tora/update.log`. While the app builds (a minute
 or two), pages may fail to load.
 
 It installs a new commit only after GitHub CI passed on that exact commit (`ops/ci-status.sh` reads
@@ -227,7 +224,7 @@ arrived meanwhile (that one waits for its own CI). While CI runs, or when GitHub
 answer (no network, an error, its rate limit), nothing changes and the next check asks again; the
 update log notes it once per commit and status. When the server has gone 24 hours without updating
 because CI is not green (counted from the server's own version, so newer pushes do not restart it;
-an update or a reported CI failure does), admins are told once and it keeps waiting. An alert no admin channel took is sent
+an update or a reported CI failure does), admins are told once ([the rules](rules/alerts.md)) and it keeps waiting. An alert no admin channel took is sent
 again at each check until one does. Only a passed run counts: a failed or unanswered check never
 updates the server. When CI failed, the server stays where it is, does not ask about that commit
 again until a newer push, and admins get an alert saying CI failed (in Settings > Activity too). The
@@ -238,11 +235,12 @@ commit's CI status as a warning and updates anyway. A fork without CI sets
 - CI failed, then a re-run passed on the same commit: the server does not notice by itself. Run
   `ops/update-server.sh` by hand, or delete `~/.local/state/tora/update-failed` and the next check
   updates.
-- A commit CI never runs on (`[skip ci]` in its message, a push that changes only ignored paths, a
-  disabled workflow) is never installed by the automatic update: it waits, and the 24-hour alert
+- Uncommitted edits to tracked files in the server's repo: no update (going back would drop them),
+  and admins are told. Drop them (`git stash` keeps them aside, `git checkout -- <file>` drops one; a commit made on the server cannot be pushed and blocks every later update), then run `ops/update-server.sh` by hand; the automatic update skips that commit until a newer push.
+- A commit CI never runs on (`[skip ci]` in its message, a disabled workflow) is never installed by the automatic update: it waits, and the 24-hour alert
   says so. Push a commit CI runs on, or update by hand.
 - "CI passed" means the run named exactly `check` (the job in `.github/workflows/ci.yml`) concluded
-  `success` and no other counted run failed. No `check` run yet, or one that concluded `skipped` or
+  `success` and every other counted run completed with `success`, `neutral` or `skipped` (one still running: the server waits). No `check` run yet, or one that concluded `skipped` or
   `neutral`, means CI did not test the commit, so the server waits. Renaming that job holds every
   update back until `ops/ci-status.sh` follows.
 - The process job (`process-check`) never holds back an update: `ops/ci-status.sh` drops it by that
@@ -250,16 +248,17 @@ commit's CI status as a warning and updates anyway. A fork without CI sets
   still counts.
 
 The restart needs root: a sudoers rule allows that one command without a password, and the timer
-runs the script:
+runs the script. A broken file in `/etc/sudoers.d/` stops every `sudo` and can lock you out of
+admin commands, so it is checked before it goes there:
 
 ```bash
-echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart tora-app" | sudo tee /etc/sudoers.d/tora-update
-sudo chmod 440 /etc/sudoers.d/tora-update && sudo visudo -c
+echo "$USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart tora-app" > /tmp/tora-update
+sudo visudo -cf /tmp/tora-update && sudo install -m 440 -o root -g root /tmp/tora-update /etc/sudoers.d/tora-update
 ```
 
 `tora-update.service` (`Type=oneshot`, `User=<user>`, the same `PATH` as the collect,
 `ExecStart=/home/<user>/code/tora-v2/ops/update-server.sh --auto`) and `tora-update.timer`
-(`OnCalendar=*:0/5`), enabled like the others. By hand, any time:
+(`OnCalendar=*:0/5`, `[Install]` `WantedBy=timers.target`): `sudo systemctl daemon-reload && sudo systemctl enable --now tora-update.timer`. By hand, any time:
 `ssh -t <server> code/tora-v2/ops/update-server.sh`.
 
 Node: the repo names its version in `.nvmrc` (e.g. after a Node security release). An update
@@ -269,7 +268,6 @@ points it back.
 
 Settings > Collectors > Schedule shows when things run: the server's hourly check (each one is
 recorded by `pnpm collect:request`), the next daily collect, each collector's likely start (last
-night's, moved to the next collect), what else the collect does, and the other timers (the
-morning check, the store feed check, updates).
+night's, moved to the next collect), what else the collect does, and the other timers (the morning check, the store feed check).
 
 Logs: `journalctl -u tora-app`, `~/.local/state/tora/collect.log`, `~/.local/state/tora/update.log`.
