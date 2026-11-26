@@ -276,7 +276,9 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
                   s.added.length > 0 && t('searchAdded', { words: s.added.join(' ') }),
                   s.inCategory && t('searchCategory'),
                   t('searchStored', { count: s.stored }),
-                  s.readAt ? t('searchReadAt', { date: date(s.readAt) }) : t('searchUnread'),
+                  // Read nights are recorded for games only.
+                  c.game &&
+                    (s.readAt ? t('searchReadAt', { date: date(s.readAt) }) : t('searchUnread')),
                 ]
                   .filter(Boolean)
                   .join(' ');

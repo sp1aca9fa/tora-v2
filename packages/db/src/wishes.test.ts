@@ -22,6 +22,7 @@ import {
   watches,
 } from './schema';
 import { setGameRules } from './rule-marks';
+import { addNight } from './sale-coverage';
 import { createQuerySource, productsWithoutSource } from './sources';
 import { type SupplyOffer, saveSupply } from './supply';
 import { createUser } from './users';
@@ -665,9 +666,36 @@ describe('the search words', () => {
         hash: await hashOf(g.id, 'listings', 'market'),
       }),
     ).rejects.toThrow('invalid_input');
-    // The listings found under the old words are set aside on the check (their stored row stays).
-    expect((await wishOffers(db, g.id)).map((r) => r.source)).toEqual([]);
-    expect((await db.select().from(supply).where(eq(supply.productId, g.id))).length).toBe(1);
+    // The listings found under the old words are hidden on the check (their stored row stays);
+    // another marketplace's listings still show.
+    await saveSupply(db, [
+      {
+        productId: g.id,
+        source: 'bazaar',
+        bucket: '',
+        day: localDate(),
+        lowestAskBase: 2400,
+        lowestAskOriginal: null,
+        currency: 'JPY',
+        fxRate: null,
+        listings: 1,
+        fetchedAt: toLocalIso(new Date(Date.now() - 60_000)),
+        offers: [offer('b1', 'Star Rover', 2400)],
+      },
+    ]);
+    expect((await wishOffers(db, g.id)).map((r) => r.source)).toEqual(['bazaar']);
+    expect((await db.select().from(supply).where(eq(supply.productId, g.id))).length).toBe(2);
+    // A read by a run that began before the save (it read with the old words) does not count.
+    await addNight(
+      db,
+      g.id,
+      'market',
+      localDate(),
+      undefined,
+      toLocalIso(new Date(Date.now() - 60_000)),
+    );
+    expect(await awaitsRead(db, g.id)).toBe(true);
+    await db.delete(saleCoverage).where(eq(saleCoverage.productId, g.id));
     // A read of another marketplace says nothing about this one: still waiting.
     await new Promise((r) => setTimeout(r, 5));
     await db.insert(saleCoverage).values({

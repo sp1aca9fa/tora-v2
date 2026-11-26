@@ -569,7 +569,18 @@ export async function runCollector(
           const read = nightsRead ? (nights.get(product.id) ?? []) : undefined;
           if (game && !(read && coversDay(read, today))) {
             try {
-              nights.set(product.id, await addNight(db, product.id, collector.source, today, read));
+              // Stamped with the run's start: a search saved during the run was not what it read with.
+              nights.set(
+                product.id,
+                await addNight(
+                  db,
+                  product.id,
+                  collector.source,
+                  today,
+                  read,
+                  inAppZone(now.toISOString()),
+                ),
+              );
             } catch (e) {
               log(`collect "${product.name}": read night not recorded: ${errorText(e)}`);
             }

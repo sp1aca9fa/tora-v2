@@ -97,7 +97,10 @@ export function coversDay(ranges: readonly DayRange[], day: string): boolean {
  * The write then applies only while the stored nights still equal `known`; when another writer (a
  * merge of two items during the run) changed them meanwhile, the row is read again and the day
  * added to what is there, so nothing recorded is lost. A row removed since (a search saved) is not
- * brought back with `known`: only the day is written. Returns the nights as they are now.
+ * brought back with `known`: only the day is written. `startedAt`: when the run that made the read
+ * began, written as the row's time: a search or rules saved while the run was going were not what
+ * it read with, so that read must not count as one made after the save (`awaitsRead`; review
+ * round 2). Without it: now. Returns the nights as they are now.
  */
 export async function addNight(
   db: Db,
@@ -105,6 +108,7 @@ export async function addNight(
   source: string,
   day: string,
   known?: readonly DayRange[],
+  startedAt?: string,
 ): Promise<DayRange[]> {
   if (!isDay(day)) throw new Error(`addNight: not a day: ${day}`);
   let nights: DayRange[] | null = known ? [...known] : null;
@@ -122,7 +126,7 @@ export async function addNight(
     }
     if (coversDay(nights, day)) return nights;
     const merged = mergeRanges([...nights, [day, day]]);
-    const at = toLocalIso();
+    const at = startedAt ?? toLocalIso();
     const last = attempt >= 3;
     // Nights read from a row are written over that row only: when it was removed since (a search
     // saved, `forgetReads`), nothing is written and the row is read again, so the removed nights

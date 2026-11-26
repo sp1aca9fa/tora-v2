@@ -2137,7 +2137,7 @@
       "searchUnread": "Not read yet with these words.",
       "saveSearch": "Save search words",
       "searchSaved": "Saved. Confirm again after the next read.",
-      "searchWarn": "Saving other words removes this item's sales stored from that marketplace and sets its listings aside. Tora reads both again from the next collect, and the check starts over.",
+      "searchWarn": "Saving other words removes this item's sales stored from that marketplace (not those excluded by hand) and hides its listings. Tora reads both again from the next collect, and the check starts over.",
       "searchNone": "No search yet: the first nightly read makes it from the item's name.",
       "searchBoxed": "These are the loose game's searches: a boxed game has none of its own.",
       "searchBoxedLink": "Open the loose game",

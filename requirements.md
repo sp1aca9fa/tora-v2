@@ -337,7 +337,7 @@ check. The check also shows the words each marketplace is searched with for the 
 add when the search is sent (A1). The words are made from the item's name when the search is first made and
 do not follow a later rename; the wish's owner or an admin can change them there (not on a boxed item, which
 has no search of its own). Saving other words removes the item's stored sales at that
-marketplace, except sales a person excluded by hand, and sets its stored listings there aside (kept, not
+marketplace, except sales a person excluded by hand, and hides its stored listings there (kept, not
 shown on the check); both are read again (its covered spans are dropped
 and its deep read is asked for again, as under "Covered day"); until that marketplace is read again no
 confirmation can be made. A save that changes nothing does nothing. A person holding a lot of the item saves its search from the item's page under the same rule. From the
