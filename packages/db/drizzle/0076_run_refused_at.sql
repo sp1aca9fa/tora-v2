@@ -1,0 +1,1 @@
+ALTER TABLE `collector_runs` ADD `refused_at` text;

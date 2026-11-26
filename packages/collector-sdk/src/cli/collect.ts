@@ -13,13 +13,11 @@ import {
   clearAllBucketValues,
   createDb,
   inferLotSizes,
-  blockedOn,
   linkSets,
   listUsers,
   recordActivity,
   refreshBucketValues,
   checkItemSales,
-  finishRun,
   getProduct,
   refreshItemSales,
   refreshOpportunities,
@@ -30,7 +28,6 @@ import {
   runSnapshots,
   rankingsSavedOn,
   readSetting,
-  startRun,
   saveSetting,
   saveUsage,
   loadTimeZone,
@@ -60,7 +57,17 @@ import { dropUncoveredSpans } from '../job-search';
 import { refreshWishLevels } from '../wish-levels';
 import { readWaitingUploads } from '../ai-import-run';
 import { askClaude, claudeJudge } from '../claude';
-import { type SourceResult, offEverywhere, refusedResult, runFailed } from './collect-plan';
+import {
+  READING,
+  type RefusedStep,
+  type SourceResult,
+  addRefused,
+  leftAlone,
+  offEverywhere,
+  recordRefusedRead,
+  refusedSites,
+  runFailed,
+} from './collect-plan';
 import { Progress } from './progress';
 import { reviewUsers } from './review-run';
 
@@ -188,15 +195,56 @@ const progress = new Progress(
     1,
 );
 const log = progress.log;
+// A site refused today (a collect's run or read, or a daytime job, its stamps replayed first) is
+// left alone until tomorrow ("Refusals"), unless asked for by name or with --refresh; its admins
+// were told after that refusal. Known before the exchange rates, the first read of a site; a
+// refusal in this run adds the site for the steps after it.
+const refusedToday = await refusedSites(db, { refresh: values.refresh, timeZone }, log);
+const left = leftAlone(refusedToday, { source: values.source, product: values.product });
+// The collectors, rankings and box opening cards: a source or item named tries again.
+const { blocked } = left;
+// Exchange rates, purchase links and pictures read every site: only the one named tries again.
+const { leave } = left;
+/** A source's lock for a read of the collect (a daytime job's is waited for); null: held. */
+const sourceLock = async (source: string) => {
+  const lock = await lockSourceWaiting(source);
+  return 'heldBy' in lock ? null : lock;
+};
+/**
+ * A refusal outside a collector's run (exchange rates, purchase links, rankings, box opening
+ * cards, pictures): the site is left alone for the rest of this run, and a blocked run is recorded
+ * with the refusal's time (`recordRefusedRead`).
+ */
+async function refused(source: string, step: RefusedStep, at: Date | null = null) {
+  addRefused(left, source);
+  log(`${source}: refused while reading ${READING[step]}, left alone until tomorrow`);
+  results.push(await recordRefusedRead(db, source, step, at));
+}
 // Exchange rates first: foreign prices collected in this run are converted with today's rate.
 if (withRates) {
   progress.next('exchange rates');
   try {
-    for (const r of await updateRates(db, rates, new PoliteHttp({ maxRequests: 10 }))) {
+    // One client per rate site, each with its own cap: one site refusing leaves the others read.
+    const http = new PoliteHttp({ maxRequests: 10 });
+    const httpFor = () => new PoliteHttp({ maxRequests: 10 });
+    for (const r of await updateRates(db, rates, http, new Date(), {
+      leave,
+      lock: sourceLock,
+      httpFor,
+    })) {
+      if (r.waits === 'refused') await refused(r.source!, 'rates', r.refusedAt);
       log(
-        r.source
-          ? `exchange rates: ${r.pair} ${r.saved} day(s) saved, latest ${r.latest ?? 'none'}`
-          : `exchange rates: ${r.pair} has no rate plug-in (Settings > Markets: pick one or type a rate)`,
+        r.waits === 'left'
+          ? `exchange rates: ${r.pair} not read, ${r.source} refused today (tried again tomorrow)`
+          : r.waits === 'locked'
+            ? `exchange rates: ${r.pair} not read, another run is reading ${r.source}`
+            : r.waits === 'refused'
+              ? `exchange rates: ${r.pair} not read, ${r.source} refused`
+              : r.waits === 'stopped'
+                ? `exchange rates: ${r.pair} not read, its client was stopped by another site's refusal`
+                : r.source
+                  ? `exchange rates: ${r.pair} ${r.saved} day(s) saved, latest ${r.latest ?? 'none'}`
+                  : `exchange rates: ${r.pair} has no rate plug-in (Settings > Markets: pick one or type a rate)`,
       );
     }
   } catch (error) {
@@ -214,14 +262,17 @@ if (withRates) {
 // Purchase links pasted in the app go first, so new products get searched in this run.
 if (withLinks) {
   progress.next('purchase links');
+  const http = new PoliteHttp({ maxRequests: 200 });
   const links = await importPurchaseLinks(
     db,
     importers,
     collectors,
-    new PoliteHttp({ maxRequests: 200 }),
+    http,
     (m) => log(`[purchase links] ${m}`),
     (p) => progress.update('purchase links', p.fraction, `${p.done}/${p.total}`),
+    { leave, lock: sourceLock },
   );
+  if (links.blocked) await refused(links.blocked, 'links', http.refusal?.at);
   const { imported, matched, duplicate, skipped, failed } = links.counts;
   if (links.read + failed + links.left > 0) {
     log(
@@ -237,31 +288,6 @@ if (!values.product && !values.source) {
   } catch (error) {
     log(`uploads: stopped (${errorText(error)})`);
   }
-}
-// A site that blocked an earlier run today is left alone until tomorrow (section 7), unless asked
-// for by name or with --refresh; its admins were told after that run. A refusal in this run adds
-// the site for the steps after it.
-const blocked =
-  values.source || values.product || values.refresh
-    ? new Set<string>()
-    : await blockedOn(db, localDate(new Date(), timeZone));
-/**
- * A refusal outside a collector's run (rankings, box opening cards): the site is left alone for the
- * rest of this run, a blocked run is recorded so the day's retries leave it alone too
- * (`blockedOn`), and admins are told after the run (`refusedResult`).
- */
-async function refused(source: string, step: 'rankings' | 'opening') {
-  blocked.add(source);
-  results.push(refusedResult(source, step));
-  const reading = step === 'rankings' ? 'rankings' : 'box opening cards';
-  log(`${source}: refused while reading ${reading}, left alone until tomorrow`);
-  const run = await startRun(db, source);
-  await finishRun(db, run, {
-    status: 'blocked',
-    requests: 0,
-    observationsAdded: 0,
-    error: `${reading}: the site refused (see the collect log)`,
-  });
 }
 if (withRankings) {
   progress.next('rankings');
@@ -288,13 +314,14 @@ if (withRankings) {
     } else if (locks.some((l) => 'heldBy' in l)) {
       log('rankings: skipped, another collect is reading the same site');
     } else {
-      const read = await readRankings(db, readable, new PoliteHttp({ maxRequests: 20 }), {
+      const http = new PoliteHttp({ maxRequests: 20 });
+      const read = await readRankings(db, readable, http, {
         log: (m) => log(`[rankings] ${m}`),
       });
       log(
         `rankings: ${read.read} read, ${read.candidates} new candidate(s), ${read.failed} failed`,
       );
-      if (read.blocked) await refused(read.blocked, 'rankings');
+      if (read.blocked) await refused(read.blocked, 'rankings', http.refusal?.at);
     }
   } catch (error) {
     log(`rankings: stopped (${errorText(error)})`);
@@ -334,7 +361,7 @@ for (const collector of selected) {
   log(
     `${s.source}: ${s.status}, ${s.requests} requests, ${s.candidates} new candidates, ${s.observationsAdded} new observations`,
   );
-  if (s.status === 'blocked') blocked.add(s.source);
+  if (s.status === 'blocked') addRefused(left, s.source);
   if (s.status === 'failed' || s.status === 'blocked') exitCode = 1;
   // Stopped at its request cap with listings left: not done for the day, so the schedule's next
   // try continues it (listings collected today are left out then).
@@ -357,7 +384,8 @@ if (withOpening) {
     } else if (locks.some((l) => 'heldBy' in l)) {
       log('box opening cards: skipped, another collect is reading the same site');
     } else {
-      const read = await readOpeningCards(db, readable, new PoliteHttp({ maxRequests: 400 }), {
+      const http = new PoliteHttp({ maxRequests: 400 });
+      const read = await readOpeningCards(db, readable, http, {
         log: (m) => log(`[box opening] ${m}`),
       });
       if (read.sets || read.failed) {
@@ -365,7 +393,7 @@ if (withOpening) {
           `box opening cards: ${read.sets} set(s) read, ${read.cards} card(s), ${read.failed} failed`,
         );
       }
-      if (read.blocked) await refused(read.blocked, 'opening');
+      if (read.blocked) await refused(read.blocked, 'opening', http.refusal?.at);
     }
   } catch (error) {
     log(`box opening cards: stopped (${errorText(error)})`);
@@ -376,12 +404,16 @@ if (withOpening) {
 // Product pictures not stored yet (separate polite client: the collectors' cap is spent).
 progress.next('pictures, lot sizes, chart');
 try {
-  const images = await downloadProductImages(db, new PoliteHttp({ maxRequests: 40 }), {
+  const http = new PoliteHttp({ maxRequests: 40 });
+  const images = await downloadProductImages(db, http, {
     log: (m) => log(`[images] ${m}`),
     isVariant: (source, title) =>
       !!title && !!collectors.find((c) => c.source === source)?.variantListing?.(title),
+    leave,
+    lock: sourceLock,
   });
   log(`images: ${images.saved} saved, ${images.failed} failed`);
+  if (images.blocked) await refused(images.blocked, 'pictures', http.refusal?.at);
 } catch (error) {
   log(`images: stopped (${errorText(error)})`);
 }

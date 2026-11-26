@@ -47,7 +47,7 @@ import {
   saveJobStep,
   stopJob,
 } from '@tora/db';
-import { readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { offEverywhere } from './cli/collect-plan';
 import { BlockedError, PoliteHttp, RequestCapError, errorText } from './http';
@@ -153,6 +153,83 @@ function readStamp(file: string, text: string) {
   return { when, source, at, stamp: old ? undefined : { perDay, stopped: stoppedText === '1' } };
 }
 
+/**
+ * Replays the refusals kept in stamps (amendment 4) that the database may not hold: one never
+ * written (the database failed) or lost (restored from before it). Recorded already, a stamp
+ * changes nothing. Run by the job runner before its jobs, and by the collect before it reads the
+ * sites refused today ("Refusals"), so a restore never lets a refused marketplace be read again
+ * that day. A stamp goes once its wait ended, or an admin restarted after its stop. Returns the
+ * marketplaces whose refusal was recorded now. `dryRun`: says what is kept, writes nothing.
+ * An unreadable stamp throws (the job runner must not go on without it), unless `unreadable` is
+ * given: then it is passed the stamp's file and the site named by the file name while the file
+ * is younger than the wait (its time stands for the refusal's), and the other stamps are still
+ * replayed (the collect counts that site as refused).
+ */
+export async function replayMarketStamps(
+  db: Db,
+  options: {
+    stateDir?: string;
+    now?: () => Date;
+    log?: (line: string) => void;
+    dryRun?: boolean;
+    unreadable?: (file: string, source: string) => void;
+  } = {},
+): Promise<string[]> {
+  const dir = options.stateDir ?? stateDir();
+  const now = options.now ?? (() => new Date());
+  const log = options.log ?? console.log;
+  const recorded: string[] = [];
+  let stamps: string[] = [];
+  try {
+    // `.tmp`: a stamp being written (renamed when whole).
+    stamps = readdirSync(dir).filter((f) => f.startsWith(STAMP) && !f.endsWith('.tmp'));
+  } catch {
+    // No state folder yet: nothing was refused here.
+  }
+  for (const file of stamps) {
+    let read: ReturnType<typeof readStamp>;
+    try {
+      read = readStamp(file, readFileSync(join(dir, file), 'utf8'));
+    } catch (error) {
+      if (!options.unreadable) throw error;
+      // Its refusal time cannot be read: the file's own time stands for it, so the site is left
+      // alone for one wait, never for good.
+      let written = 0;
+      try {
+        written = statSync(join(dir, file)).mtimeMs;
+      } catch {
+        // Gone since the listing: nothing to count.
+        continue;
+      }
+      if (now().getTime() < written + MARKET_WAIT_MS)
+        options.unreadable(file, file.slice(STAMP.length));
+      else log(`${file}: not readable and older than its wait, not counted (remove it)`);
+      continue;
+    }
+    const { when, source, at, stamp } = read;
+    if (options.dryRun) {
+      log(
+        `${source}: refused at ${when} (stamp kept until ${stamp?.stopped ? 'an admin restart' : 'its wait ends'})`,
+      );
+      continue;
+    }
+    if (stamp?.stopped) {
+      const s = await readMarketState(db, source);
+      if (s && !s.stopped && s.restartedBy && Date.parse(s.updatedAt) > at.getTime()) {
+        rmSync(join(dir, file), { force: true });
+        continue;
+      }
+    }
+    if ((await recordRefusal(db, { source, at, now: now(), stamp })).changed) {
+      recorded.push(source);
+      log(`${source}: its refusal at ${when} was recorded now`);
+    }
+    if (!stamp?.stopped && now().getTime() >= at.getTime() + MARKET_WAIT_MS)
+      rmSync(join(dir, file), { force: true });
+  }
+  return recorded;
+}
+
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const defaultWatchdog = (fire: () => void) => {
   const timer = setTimeout(fire, 45_000);
@@ -181,35 +258,7 @@ export async function runMarketJobs(
 
   // A refusal stamped but maybe never written (the database failed, or was restored from before
   // it) is replayed first; recorded already, it changes nothing.
-  let stamps: string[] = [];
-  try {
-    // `.tmp`: a stamp being written (renamed when whole).
-    stamps = readdirSync(dir).filter((f) => f.startsWith(STAMP) && !f.endsWith('.tmp'));
-  } catch {
-    // No state folder yet: nothing was refused here.
-  }
-  for (const file of stamps) {
-    const { when, source, at, stamp } = readStamp(file, readFileSync(join(dir, file), 'utf8'));
-    if (dryRun) {
-      log(
-        `${source}: refused at ${when} (stamp kept until ${stamp?.stopped ? 'an admin restart' : 'its wait ends'})`,
-      );
-      continue;
-    }
-    if (stamp?.stopped) {
-      const s = await readMarketState(db, source);
-      if (s && !s.stopped && s.restartedBy && Date.parse(s.updatedAt) > at.getTime()) {
-        rmSync(join(dir, file), { force: true });
-        continue;
-      }
-    }
-    if ((await recordRefusal(db, { source, at, now: now(), stamp })).changed) {
-      report.refused.push(source);
-      log(`${source}: its refusal at ${when} was recorded now`);
-    }
-    if (!stamp?.stopped && now().getTime() >= at.getTime() + MARKET_WAIT_MS)
-      rmSync(join(dir, file), { force: true });
-  }
+  report.refused.push(...(await replayMarketStamps(db, { stateDir: dir, now, log, dryRun })));
   // A dry run lists the jobs at any hour (each source says why it would not run).
   if (!dryRun && !insideHours(now(), zone)) {
     stop('*', 'hours');

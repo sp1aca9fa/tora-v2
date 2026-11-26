@@ -19,6 +19,7 @@ import {
   gameRulesSwitches,
   heldBuckets,
   finishRun,
+  markRunRefused,
   LISTING_BROKEN_NIGHTS,
   LISTING_RETRY_DAYS,
   linkSource,
@@ -214,6 +215,19 @@ export async function runCollector(
     summary.errors.push(`${what}: ${errorText(e)}`);
     log(`error ${what}: ${errorText(e)}`);
   };
+  /**
+   * A refusal the plug-in caught (and returned or threw something else) is still the run's
+   * refusal ("Refusals"): checked after each call of the plug-in, before anything it returned is
+   * stored, so nothing read around a refusal is kept and the run stops as blocked.
+   */
+  const stopIfRefused = () => {
+    if (http.refusal) throw http.refusal;
+  };
+  /** The refusal's time on the run; not written, the run's end stands for it (`blockedOn`). */
+  const keepRefusalTime = (at: Date) =>
+    markRunRefused(db, runId, at).catch((e: unknown) =>
+      log(`refusal time not recorded (${errorText(e)}), the run's end counts`),
+    );
 
   try {
     if (!options.collectOnly && collector.defaultQuery) {
@@ -261,6 +275,7 @@ export async function runCollector(
       for (const product of unlinked) {
         try {
           const [code] = await collector.findCandidates(product, byCode);
+          stopIfRefused();
           if (!code) continue;
           await linkSource(db, product.id, {
             source: collector.source,
@@ -272,6 +287,7 @@ export async function runCollector(
           log(`linked "${product.name}" by its product code`);
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          stopIfRefused();
           fail(`match ${product.name}`, e);
         }
       }
@@ -280,6 +296,7 @@ export async function runCollector(
           // No code now (none stored, or the identity pages disagree): the link is left, and the
           // plug-in's collect stores nothing for it.
           const [code] = await collector.findCandidates(product, byCode);
+          stopIfRefused();
           if (!code || code.externalId === link.externalId) continue;
           const moved = await repointCodeLink(db, link, {
             externalId: code.externalId,
@@ -293,6 +310,7 @@ export async function runCollector(
           );
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          stopIfRefused();
           fail(`match ${product.name}`, e);
         }
       }
@@ -327,8 +345,10 @@ export async function runCollector(
             log(`match "${product.name}": ${known} suggested from a linked look-alike`);
             continue;
           }
+          const candidates = await collector.findCandidates(product, ctx);
+          stopIfRefused();
           const found = [];
-          for (const { price, ...c } of (await collector.findCandidates(product, ctx)).slice(0, 8))
+          for (const { price, ...c } of candidates.slice(0, 8))
             found.push({
               ...c,
               priceBase: price == null ? null : (await toBase(price, own, now)).amount,
@@ -340,6 +360,7 @@ export async function runCollector(
           await markSearched(db, collector.source, day, searched);
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          stopIfRefused();
           fail(`match ${product.name}`, e);
         }
       }
@@ -472,6 +493,7 @@ export async function runCollector(
             linkCtx,
             await heldBuckets(db, product.id),
           );
+          stopIfRefused();
           if (onTrial) {
             onTrial = false;
             if (!(await reactivateListing(db, link.id))) {
@@ -617,6 +639,7 @@ export async function runCollector(
           );
         } catch (e) {
           if (e instanceof BlockedError || e instanceof RequestCapError) throw e;
+          stopIfRefused();
           // A listing failing night after night is set aside (its item asks for a new link on
           // Actions), so a run is not partial forever over a page that is gone. On trial it was
           // already told about: not a problem of this run, and nobody is told again.
@@ -650,6 +673,7 @@ export async function runCollector(
             { ...linkCtx, phase: 'history' },
             await heldBuckets(db, product.id),
           );
+          stopIfRefused();
           await updateSourceProgress(db, link.id, {
             state: overlaid
               ? keepStoredState(result.state, overlaid.stored, collector.overlayKeeps ?? [])
@@ -664,6 +688,7 @@ export async function runCollector(
             break;
           }
           if (e instanceof BlockedError) throw e;
+          stopIfRefused();
           fail(`history ${product.name}`, e);
         }
       }
@@ -674,6 +699,9 @@ export async function runCollector(
   } catch (e) {
     if (e instanceof BlockedError) {
       summary.status = 'blocked';
+      // Its time now, before the closing writes below: the day the site is left alone is the
+      // refusal's (`blockedOn`).
+      await keepRefusalTime((http.refusal ?? e).at);
       fail('blocked', e);
     } else if (e instanceof RequestCapError) {
       summary.status = 'partial';
@@ -683,6 +711,12 @@ export async function runCollector(
       summary.status = 'failed';
       fail('run', e);
     }
+  }
+  // A refusal the plug-in caught still blocks the run: its client sent nothing after it.
+  if (http.refusal && summary.status !== 'blocked') {
+    summary.status = 'blocked';
+    await keepRefusalTime(http.refusal.at);
+    fail('blocked', http.refusal);
   }
 
   summary.requests = http.requests;

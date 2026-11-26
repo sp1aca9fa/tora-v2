@@ -501,7 +501,7 @@ Logged at the user's request (2026-10-13): known gaps to come back to with a pla
 
 - Left open by the whole-code review (2026-10-31):
   - The client address used by the sign-in lockout and alerts prefers `X-Real-IP`; whether the reverse proxy in front (Tailscale Serve) sets or passes it through decides whether a client can rotate it. To check on the server.
-  - The picture step does not know which sites refused earlier in the run; pictures that keep failing are fetched again on every retry run (up to the run's picture cap: [Collecting](docs/rules/collectors.md#what-is-read)).
+  - Pictures that keep failing (an error answer, not a refusal) are fetched again on every retry run (up to the run's picture cap: [Collecting](docs/rules/collectors.md#what-is-read)).
   - Backup codes made before 2026-10-31 stay unsalted hashes until replaced (new ones are keyed).
   - A store plug-in that reads "item gone" from a 404 on its search cannot tell it from a moved search page; needs the site's own no-results page as a fixture.
   - A sold listing found by two items' searches is stored once, for the first item (decision pending).

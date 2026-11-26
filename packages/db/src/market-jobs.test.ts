@@ -22,6 +22,7 @@ import {
 import { migrateDb } from './migrate';
 import { createProduct } from './mutations';
 import { saveSourceInfos } from './registry';
+import { blockedOn } from './sources';
 import { activity, marketDays, marketJobs, marketState } from './schema';
 import { TEST_SOURCES } from './testing';
 import { changeTimeZone } from './time-zone';
@@ -200,6 +201,16 @@ describe('the day count (reserveRequest)', () => {
 });
 
 describe('refusals and restarts', () => {
+  it("leaves the site to the collect's later runs that day, in the app time zone (K16)", async () => {
+    // 08:30 on the 24th in Tokyo, 23:30 on the 23rd in UTC: the day is the app zone's.
+    await recordRefusal(db, { source: 'marketa', at: at('2026-11-24T08:30:00+09:00') });
+    expect([...(await blockedOn(db, '2026-11-24'))]).toEqual(['marketa']);
+    expect((await blockedOn(db, '2026-11-23')).size).toBe(0);
+    setAppTimeZone('UTC');
+    expect([...(await blockedOn(db, '2026-11-23'))]).toEqual(['marketa']);
+    expect((await blockedOn(db, '2026-11-24')).size).toBe(0);
+  });
+
   it('halves after a wait, down to 25, then stops; one entry per refusal', async () => {
     const t0 = at('2026-11-24T05:07:30+09:00');
     const r1 = await recordRefusal(db, { source: 'marketa', at: t0 });

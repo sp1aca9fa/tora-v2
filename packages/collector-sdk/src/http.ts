@@ -1,12 +1,19 @@
 // Polite HTTP for collectors (requirements section 7): random delay between requests, a request
 // cap per run, retries with backoff on 5xx, and an immediate stop on 403/429/captcha.
+// A refusal is never worked around (docs/rules/collectors.md, "Refusals"): once a client is
+// refused, every later request of it throws that refusal unsent, even when a plug-in caught it.
 
 /** The site refused us (403/429/captcha): stop this source for the run, do not retry. */
 export class BlockedError extends Error {
+  /** When the refusal came: the site is left alone for the rest of that day ("Refusals"). */
+  readonly at = new Date();
+
   constructor(
     message: string,
     /** Start of the response body, for APIs that also answer 403 for other reasons. */
     readonly body: string = '',
+    /** The answer's status (403, 429, or a server error's with a challenge); null: a challenge page. */
+    readonly status: number | null = null,
   ) {
     super(message);
     this.name = 'BlockedError';
@@ -55,6 +62,25 @@ export const BROWSER_HEADERS = {
 };
 
 const CAPTCHA_MARKERS = [/captcha/i, /cf-challenge/i, /Just a moment\.\.\./, /Access denied/i];
+/** A challenge page is an HTML answer under this many characters with a challenge's words. */
+const CHALLENGE_MAX_CHARS = 50_000;
+
+const hasMarkers = (body: string) => CAPTCHA_MARKERS.some((m) => m.test(body));
+
+/**
+ * Whether a body is a challenge page ("Refusals", "What counts"): an HTML answer under 50,000
+ * characters with a challenge's words, or an answer that should be JSON and is not, with them.
+ */
+function isChallenge(body: string, expectsJson: boolean): boolean {
+  if (!hasMarkers(body)) return false;
+  if (!expectsJson) return body.length < CHALLENGE_MAX_CHARS;
+  try {
+    JSON.parse(body);
+    return false;
+  } catch {
+    return true;
+  }
+}
 
 export interface PoliteHttpOptions {
   minDelayMs?: number;
@@ -77,6 +103,8 @@ export interface PoliteHttpOptions {
 export class PoliteHttp {
   requests = 0;
   private last = 0;
+  /** The refusal this client got; every later request throws it without being sent. */
+  private refused: BlockedError | null = null;
   private readonly o: Required<PoliteHttpOptions>;
 
   constructor(options: PoliteHttpOptions = {}) {
@@ -104,6 +132,25 @@ export class PoliteHttp {
     return this.o.maxRequests;
   }
 
+  /** The refusal that stopped this client, or null while it was never refused. */
+  get refusal(): BlockedError | null {
+    return this.refused;
+  }
+
+  /**
+   * Takes back one refusal a plug-in read as something else ("Refusals": a 403 that says the
+   * item was deleted is the listing gone), so later requests go out again. Only a 403 answer, the
+   * one case the rules allow; a 429 or a challenge page stays a refusal.
+   */
+  notRefused(error: BlockedError): void {
+    if (this.refused === error && error.status === 403) this.refused = null;
+  }
+
+  private refuse(error: BlockedError): BlockedError {
+    this.refused ??= error;
+    return error;
+  }
+
   async text(url: string, headers: Record<string, string> = {}): Promise<string> {
     return (await this.request(url, { Accept: 'text/html', ...headers })).text();
   }
@@ -114,8 +161,7 @@ export class PoliteHttp {
     try {
       return JSON.parse(body) as T;
     } catch {
-      if (CAPTCHA_MARKERS.some((m) => m.test(body)))
-        throw new BlockedError(`challenge page at ${url}`);
+      if (hasMarkers(body)) throw this.refuse(new BlockedError(`challenge page at ${url}`));
       throw new Error(`invalid JSON from ${url}`);
     }
   }
@@ -131,8 +177,7 @@ export class PoliteHttp {
     try {
       return JSON.parse(text) as T;
     } catch {
-      if (CAPTCHA_MARKERS.some((m) => m.test(text)))
-        throw new BlockedError(`challenge page at ${url}`);
+      if (hasMarkers(text)) throw this.refuse(new BlockedError(`challenge page at ${url}`));
       throw new Error(`invalid JSON from ${url}`);
     }
   }
@@ -152,6 +197,7 @@ export class PoliteHttp {
     init: { method?: string; body?: string } = {},
   ): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
+      if (this.refused) throw this.refused;
       if (this.requests >= this.o.maxRequests) throw new RequestCapError();
       await this.pace();
       await this.o.beforeRequest();
@@ -175,17 +221,34 @@ export class PoliteHttp {
       }
       if (res.status === 403 || res.status === 429) {
         const body = await res.text().catch(() => '');
-        throw new BlockedError(`HTTP ${res.status} for ${url}`, body.slice(0, 500));
+        throw this.refuse(
+          new BlockedError(`HTTP ${res.status} for ${url}`, body.slice(0, 500), res.status),
+        );
       }
-      if (res.status >= 500 && attempt < this.o.retries) {
-        await this.o.sleep(2 ** attempt * 5000);
-        continue;
+      if (res.status >= 500) {
+        // A server error's challenge page is looked for before any retry: a 503 challenge is a
+        // refusal, never tried again. Other error answers (a 404 or 410 page that mentions a
+        // captcha) are not read for it: they stay the error they are ("Refusals", "What counts").
+        const body = await res.text().catch(() => '');
+        if (isChallenge(body, (headers.Accept ?? '').includes('json')))
+          throw this.refuse(
+            new BlockedError(
+              `challenge page (HTTP ${res.status}) at ${url}`,
+              body.slice(0, 500),
+              res.status,
+            ),
+          );
+        if (attempt < this.o.retries) {
+          await this.o.sleep(2 ** attempt * 5000);
+          continue;
+        }
+        throw new HttpError(res.status, url);
       }
       if (!res.ok) throw new HttpError(res.status, url);
       if ((headers.Accept ?? '').includes('html')) {
         const body = await res.clone().text();
-        if (CAPTCHA_MARKERS.some((m) => m.test(body)) && body.length < 50_000) {
-          throw new BlockedError(`challenge page at ${url}`);
+        if (hasMarkers(body) && body.length < CHALLENGE_MAX_CHARS) {
+          throw this.refuse(new BlockedError(`challenge page at ${url}`));
         }
       }
       return res;

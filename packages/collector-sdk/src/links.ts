@@ -15,14 +15,20 @@ import {
   startImportRun,
 } from '@tora/db';
 import { BlockedError, type PoliteHttp, RequestCapError, errorText } from './http';
+import type { SourceLock } from './images';
 import { type Decision, applyImport, gatherReceipts, planImport } from './purchases';
 import type { Collector, LinkRead, PurchaseImporter, PurchaseReceipt } from './types';
 
 export interface LinkImportSummary {
   read: number;
   counts: Record<Exclude<PurchaseLinkStatus, 'pending'>, number>;
-  /** Links left pending (the site blocked us or the request budget ran out). */
+  /**
+   * Links left pending (the site refused today or now, another run reads it, or the request
+   * budget ran out).
+   */
   left: number;
+  /** The site that refused a link's read: the caller records a blocked run for it. */
+  blocked: string | null;
 }
 
 const yen = (n: number) => `¥${n.toLocaleString('en-US')}`;
@@ -34,6 +40,12 @@ export async function importPurchaseLinks(
   http: PoliteHttp,
   log: (message: string) => void = () => {},
   onProgress?: (p: { fraction: number; done: number; total: number }) => void,
+  options: {
+    /** Sources left alone for the rest of the day (a refusal today): their links stay pending. */
+    leave?: ReadonlySet<string>;
+    /** Each site's lock, taken before its first link (held by another run: its links wait). */
+    lock?: SourceLock;
+  } = {},
 ): Promise<LinkImportSummary> {
   const pending = await pendingPurchaseLinks(db);
   // Reading the links is what takes time (one polite request each).
@@ -47,7 +59,9 @@ export async function importPurchaseLinks(
     read: 0,
     counts: { imported: 0, matched: 0, duplicate: 0, skipped: 0, failed: 0 },
     left: 0,
+    blocked: null,
   };
+  const locks = new Map<string, { release: () => void } | null>();
   // One import run per user and collect (the Imports history), opened on their first link.
   const runs = new Map<
     string,
@@ -92,34 +106,55 @@ export async function importPurchaseLinks(
       items: { link: PurchaseLink; receipt: PurchaseReceipt }[];
     }
   >();
-  for (const [i, link] of pending.entries()) {
-    progress(i);
-    const importer = importers.find((im) => im.readLink && im.matchesLink?.(link.url));
-    if (!importer) {
-      await finish(link, 'failed', 'No importer reads links from this site.');
-      continue;
-    }
-    let read: LinkRead;
-    try {
-      read = await importer.readLink!(link.url, http);
-      summary.read++;
-    } catch (error) {
-      if (error instanceof BlockedError || error instanceof RequestCapError) {
-        summary.left = pending.length - i;
-        log(`stopped reading links (${errorText(error)}); the rest stay pending`);
-        break;
+  try {
+    for (const [i, link] of pending.entries()) {
+      progress(i);
+      const importer = importers.find((im) => im.readLink && im.matchesLink?.(link.url));
+      if (!importer) {
+        await finish(link, 'failed', 'No importer reads links from this site.');
+        continue;
       }
-      await finish(link, 'failed', `Could not read the listing (${errorText(error)}).`);
-      continue;
+      // A refused site is left alone for the rest of the day ("Refusals"): its links wait.
+      if (options.leave?.has(importer.source)) {
+        summary.left++;
+        continue;
+      }
+      if (options.lock) {
+        if (!locks.has(importer.source)) {
+          const lock = await options.lock(importer.source);
+          locks.set(importer.source, lock);
+          if (!lock) log(`${importer.source}: another run is reading it, its links wait`);
+        }
+        if (!locks.get(importer.source)) {
+          summary.left++;
+          continue;
+        }
+      }
+      let read: LinkRead;
+      try {
+        read = await importer.readLink!(link.url, http);
+        summary.read++;
+      } catch (error) {
+        if (error instanceof BlockedError || error instanceof RequestCapError) {
+          if (error instanceof BlockedError) summary.blocked = importer.source;
+          summary.left += pending.length - i;
+          log(`stopped reading links (${errorText(error)}); the rest stay pending`);
+          break;
+        }
+        await finish(link, 'failed', `Could not read the listing (${errorText(error)}).`);
+        continue;
+      }
+      if (read.kind !== 'purchase') {
+        await finish(link, read.kind === 'skip' ? 'skipped' : 'failed', read.reason);
+        continue;
+      }
+      const key = `${link.userId}|${importer.source}`;
+      const group = groups.get(key) ?? { userId: link.userId, importer, items: [] };
+      group.items.push({ link, receipt: read.receipt });
+      groups.set(key, group);
     }
-    if (read.kind !== 'purchase') {
-      await finish(link, read.kind === 'skip' ? 'skipped' : 'failed', read.reason);
-      continue;
-    }
-    const key = `${link.userId}|${importer.source}`;
-    const group = groups.get(key) ?? { userId: link.userId, importer, items: [] };
-    group.items.push({ link, receipt: read.receipt });
-    groups.set(key, group);
+  } finally {
+    for (const lock of locks.values()) lock?.release();
   }
 
   progress(pending.length);

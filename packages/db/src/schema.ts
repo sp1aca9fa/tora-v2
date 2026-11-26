@@ -847,6 +847,11 @@ export const collectorRuns = sqliteTable(
     /** Working time in ms, without time the PC slept (S16); null for older runs. */
     activeMs: integer('active_ms'),
     error: text('error'),
+    /**
+     * When the site refused the run ("Refusals"), written at the moment of the refusal: the site
+     * is left alone for the rest of that day (`blockedOn`). Null: not refused, or a run before it.
+     */
+    refusedAt: text('refused_at'),
     ...timestamps,
   },
   (t) => [

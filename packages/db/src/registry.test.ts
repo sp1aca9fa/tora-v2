@@ -2,6 +2,7 @@ import { identitySources, valuationOrder } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
@@ -19,6 +20,7 @@ import {
 } from './registry';
 import {
   blockedOn,
+  markRunRefused,
   collectorTimes,
   finishRun,
   identityFor,
@@ -236,6 +238,53 @@ it('lists the sources blocked on a day, so later retries leave them alone', asyn
   const today = (await db.select().from(schema.collectorRuns))[0]!.startedAt.slice(0, 10);
   expect([...(await blockedOn(db, today))]).toEqual(['snkrdunk']);
   expect((await blockedOn(db, '2000-01-01')).size).toBe(0);
+});
+
+it('counts a refusal for the day it came, in the app time zone (K16)', async () => {
+  // App time Asia/Tokyo (the default). Started 23:00 on the 1st, refused 00:20 on the 2nd.
+  await db.insert(schema.collectorRuns).values([
+    {
+      source: 'shopa',
+      status: 'blocked',
+      startedAt: '2026-11-01T23:00:00.000+09:00',
+      finishedAt: '2026-11-02T00:20:00.000+09:00',
+    },
+    // Refused at 23:59 on the 1st, its end written in UTC: still the 1st in app time.
+    {
+      source: 'shopb',
+      status: 'blocked',
+      startedAt: '2026-11-01T14:00:00.000Z',
+      finishedAt: '2026-11-01T14:59:00.000Z',
+    },
+  ]);
+  // A daytime job's refusal at 00:10 on the 2nd (app time), written as UTC on the 1st.
+  await db.insert(schema.marketState).values([
+    { source: 'shopc', perDay: 100, lastRefusalAt: '2026-11-01T15:10:00.000Z' },
+    { source: 'shopd', perDay: 200, lastRefusalAt: null },
+  ]);
+  expect([...(await blockedOn(db, '2026-11-01'))].sort()).toEqual(['shopb']);
+  expect([...(await blockedOn(db, '2026-11-02'))].sort()).toEqual(['shopa', 'shopc']);
+  expect((await blockedOn(db, '2026-11-03')).size).toBe(0);
+});
+
+it('keys a refusal on its own time, not the end of the run (K16)', async () => {
+  // App time Asia/Tokyo. Refused at 23:58 on the 1st, the run finishing at 00:05 on the 2nd.
+  const id = await startRun(db, 'shopa');
+  await markRunRefused(db, id, new Date('2026-11-01T23:58:00+09:00'));
+  // A later refusal of the same run does not move it.
+  await markRunRefused(db, id, new Date('2026-11-02T00:01:00+09:00'));
+  await finishRun(db, id, { status: 'blocked', requests: 3, observationsAdded: 0 });
+  await db
+    .update(schema.collectorRuns)
+    .set({
+      startedAt: '2026-11-01T23:00:00.000+09:00',
+      finishedAt: '2026-11-02T00:05:00.000+09:00',
+    })
+    .where(eq(schema.collectorRuns.id, id));
+  const [row] = await db.select().from(schema.collectorRuns);
+  expect(Date.parse(row!.refusedAt!)).toBe(Date.parse('2026-11-01T23:58:00+09:00'));
+  expect([...(await blockedOn(db, '2026-11-01'))]).toEqual(['shopa']);
+  expect((await blockedOn(db, '2026-11-02')).size).toBe(0);
 });
 
 it("records each run's working time and flags a long run and a long night (S16)", async () => {

@@ -11,6 +11,8 @@ import {
   baseCurrency,
   identityMinCostFor,
   localDate,
+  localTime,
+  addDays,
   slotOfDay,
   type TrackedStoredTier,
 } from '@tora/core';
@@ -25,12 +27,12 @@ import {
   inArray,
   isNotNull,
   isNull,
-  like,
   lt,
   ne,
   not,
   or,
   sql,
+  type SQLWrapper,
 } from 'drizzle-orm';
 import type { Db } from './client';
 import { forgetReads } from './deep-reads';
@@ -57,6 +59,7 @@ import {
   collectorRuns,
   holdings,
   itemRules,
+  marketState,
   priceObservations,
   productSources,
   products,
@@ -944,15 +947,51 @@ export async function startRun(
 }
 
 /**
- * Sources whose run was blocked (HTTP 403 / 429, a captcha) on this day of the app (`YYYY-MM-DD`):
- * the day's later retries leave them alone (section 7: do not retry aggressively).
+ * Sources refused (HTTP 403 / 429, a challenge page) on this day of the app (`YYYY-MM-DD`): the
+ * day's later collects leave them alone ("Refusals"). The day is the one the refusal came: a
+ * blocked run counts for the time of its refusal (`refusedAt`; a run started 23:00 and refused
+ * 00:20 counts for the new day, one refused 23:58 and finished 00:05 for the old one), a run
+ * written before that time was kept for the day it finished, and a daytime job's refusal (the
+ * marketplace's last one) counts the same.
  */
 export async function blockedOn(db: Db, day: string): Promise<Set<string>> {
-  const rows = await db
-    .selectDistinct({ source: collectorRuns.source })
-    .from(collectorRuns)
-    .where(and(eq(collectorRuns.status, 'blocked'), like(collectorRuns.startedAt, `${day}%`)));
-  return new Set(rows.map((r) => r.source));
+  const from = toLocalIso(localTime(day));
+  const to = toLocalIso(localTime(addDays(day, 1)));
+  // Compared as instants: a time written with another offset still falls on its day.
+  const within = (column: SQLWrapper) =>
+    sql`julianday(${column}) >= julianday(${from}) AND julianday(${column}) < julianday(${to})`;
+  const [runs, jobs] = await Promise.all([
+    db
+      .selectDistinct({ source: collectorRuns.source })
+      .from(collectorRuns)
+      .where(
+        and(
+          eq(collectorRuns.status, 'blocked'),
+          // The refusal's time; a run without one (written before it was kept): its end, else
+          // its start.
+          within(
+            sql`coalesce(${collectorRuns.refusedAt}, ${collectorRuns.finishedAt}, ${collectorRuns.startedAt})`,
+          ),
+        ),
+      ),
+    db
+      .select({ source: marketState.source })
+      .from(marketState)
+      .where(and(isNotNull(marketState.lastRefusalAt), within(marketState.lastRefusalAt))),
+  ]);
+  return new Set([...runs, ...jobs].map((r) => r.source));
+}
+
+/**
+ * The site refused this run at `at` ("Refusals"): written at the moment of the refusal, so the
+ * day it keeps the site away is the refusal's, not the day the run ends (`blockedOn`). The first
+ * refusal of a run is kept.
+ */
+export async function markRunRefused(db: Db, id: string, at: Date): Promise<void> {
+  await db
+    .update(collectorRuns)
+    .set({ refusedAt: toLocalIso(at) })
+    .where(and(eq(collectorRuns.id, id), isNull(collectorRuns.refusedAt)));
 }
 
 export async function finishRun(

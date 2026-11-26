@@ -43,6 +43,109 @@ describe('PoliteHttp', () => {
     }
   });
 
+  it('counts a challenge page at a server error as a refusal, never retried (K14)', async () => {
+    const page = '<html><title>Just a moment...</title></html>';
+    const f = fakeFetch([() => new Response(page, { status: 503 }), () => new Response('ok')]);
+    const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+    await expect(http.text('https://x/a')).rejects.toBeInstanceOf(BlockedError);
+    expect(f.calls).toHaveLength(1);
+    // An answer that should be JSON: a page with a challenge's words, at any status.
+    const j = fakeFetch([() => new Response('captcha required', { status: 500 })]);
+    const api = new PoliteHttp({ ...fast, fetchImpl: j.impl });
+    await expect(api.json('https://x/api')).rejects.toBeInstanceOf(BlockedError);
+    expect(j.calls).toHaveLength(1);
+  });
+
+  it('retries a server error without a challenge, and fails other error answers', async () => {
+    const big = `<html>${'x'.repeat(50_000)} captcha</html>`;
+    const f = fakeFetch([
+      () => new Response('oops', { status: 503 }),
+      () => new Response(big, { status: 503 }),
+      () => new Response('ok'),
+    ]);
+    const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+    expect(await http.text('https://x/a')).toBe('ok');
+    expect(f.calls).toHaveLength(3);
+    const json = fakeFetch([() => new Response('{"error":"captcha"}', { status: 404 })]);
+    const api = new PoliteHttp({ ...fast, fetchImpl: json.impl });
+    await expect(api.json('https://x/api')).rejects.toBeInstanceOf(HttpError);
+  });
+
+  it('reads a 404 page that mentions a captcha as an error answer, not a refusal', async () => {
+    // A shop's own HTML 404 page with a captcha form in its footer: the item is gone.
+    const page = '<html><title>Page not found</title><form class="g-recaptcha"></form></html>';
+    for (const status of [404, 410]) {
+      const f = fakeFetch([() => new Response(page, { status }), () => new Response('ok')]);
+      const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+      const error = await http.text('https://x/item').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error).not.toBeInstanceOf(BlockedError);
+      expect(http.refusal).toBeNull();
+      // The client goes on.
+      expect(await http.text('https://x/next')).toBe('ok');
+    }
+  });
+
+  it('sends nothing more after a refusal, even when the plug-in caught it (G2)', async () => {
+    for (const first of [
+      () => new Response('', { status: 403 }),
+      () => new Response('<html>captcha</html>', { status: 200 }),
+      () => new Response('<html>captcha</html>', { status: 502 }),
+    ]) {
+      const f = fakeFetch([first, () => new Response('ok'), () => Response.json({})]);
+      const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+      const refusal = await http.text('https://x/a').catch((e: unknown) => e);
+      expect(refusal).toBeInstanceOf(BlockedError);
+      expect(http.refusal).toBe(refusal);
+      await expect(http.text('https://x/b')).rejects.toBe(refusal);
+      await expect(http.json('https://x/c')).rejects.toBe(refusal);
+      await expect(http.bytes('https://x/d')).rejects.toBe(refusal);
+      expect(f.calls).toEqual(['https://x/a']);
+      expect(http.requests).toBe(1);
+    }
+    // A challenge found by the JSON reader stops the client too.
+    const j = fakeFetch([
+      () => new Response('<html>Access denied</html>'),
+      () => Response.json({}),
+    ]);
+    const api = new PoliteHttp({ ...fast, fetchImpl: j.impl });
+    await expect(api.json('https://x/a')).rejects.toBeInstanceOf(BlockedError);
+    await expect(api.json('https://x/b')).rejects.toBeInstanceOf(BlockedError);
+    expect(j.calls).toHaveLength(1);
+  });
+
+  it('lets a plug-in take back a refusal it read as the listing gone', async () => {
+    const f = fakeFetch([
+      () => new Response('{"code":"ItemDeleted"}', { status: 403 }),
+      () => Response.json({ ok: 1 }),
+    ]);
+    const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+    const refusal = (await http.json('https://x/a').catch((e: unknown) => e)) as BlockedError;
+    // Another error than the one held changes nothing.
+    http.notRefused(new BlockedError('other'));
+    expect(http.refusal).toBe(refusal);
+    http.notRefused(refusal);
+    expect(http.refusal).toBeNull();
+    expect(await http.json('https://x/b')).toEqual({ ok: 1 });
+  });
+
+  it('never takes back a 429 or a challenge page', async () => {
+    for (const first of [
+      () => new Response('{"code":"ItemDeleted"}', { status: 429 }),
+      () => new Response('<html>captcha ItemDeleted</html>', { status: 503 }),
+      () => new Response('<html>captcha ItemDeleted</html>'),
+    ]) {
+      const f = fakeFetch([first, () => Response.json({ ok: 1 })]);
+      const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+      const refusal = (await http.json('https://x/a').catch((e: unknown) => e)) as BlockedError;
+      expect(refusal).toBeInstanceOf(BlockedError);
+      http.notRefused(refusal);
+      expect(http.refusal).toBe(refusal);
+      await expect(http.json('https://x/b')).rejects.toBe(refusal);
+      expect(f.calls).toEqual(['https://x/a']);
+    }
+  });
+
   it('gives up on a site that does not answer, after retrying (S15)', async () => {
     let calls = 0;
     // Answers only when asked to stop, as a site that took the connection and went silent.

@@ -98,3 +98,124 @@ it('reports fetched rates more than 7 days old, not typed ones nor pairs with no
   await setCurrencySettings(db, { base: 'EUR', rates: {} });
   expect(await staleRates(db, [source], new Date('2026-10-20T03:00:00Z'))).toEqual([]);
 });
+
+it('leaves a refused rate site alone, takes its lock, and stops at a refusal (Refusals)', async () => {
+  // Two currencies to the base from one rate site.
+  await saveSourceInfos(db, [
+    { key: 'us', label: 'US', market: 'us', currency: 'USD' },
+    { key: 'eu', label: 'EU', market: 'eu', currency: 'EUR' },
+  ]);
+  const sent: string[] = [];
+  const refusing: RateSource = {
+    ...source,
+    rates: async (http, pair) => {
+      await http.text(`https://rates.example/${pair.from}`);
+      return [{ date: '2026-10-09', rate: 1 }];
+    },
+  };
+  const http = () =>
+    new PoliteHttp({
+      minDelayMs: 0,
+      maxDelayMs: 0,
+      fetchImpl: (async (url: string) => {
+        sent.push(url);
+        return new Response('', { status: 429 });
+      }) as unknown as typeof fetch,
+    });
+  const now = new Date('2026-10-12T03:00:00Z');
+  const taken: string[] = [];
+  const released: string[] = [];
+  const lock = async (key: string) => {
+    taken.push(key);
+    return { release: () => void released.push(key) };
+  };
+
+  // Refused earlier today: nothing is sent, no lock taken, the stored rates stay.
+  const left = await updateRates(db, [refusing], http(), now, { leave: new Set(['test']), lock });
+  expect(left.map((r) => r.waits)).toEqual(['left', 'left']);
+  expect(sent).toEqual([]);
+  expect(taken).toEqual([]);
+
+  // Its lock held by another run: its pairs wait.
+  const held = await updateRates(db, [refusing], http(), now, { lock: async () => null });
+  expect(held.map((r) => r.waits)).toEqual(['locked', 'locked']);
+  expect(sent).toEqual([]);
+
+  // A refusal: that pair is marked with its time, the next is not sent, the lock is given back.
+  const refused = await updateRates(db, [refusing], http(), now, { lock });
+  expect(refused.map((r) => r.waits)).toEqual(['refused', 'left']);
+  expect(refused[0]).toMatchObject({ source: 'test', saved: 0, waits: 'refused' });
+  expect(refused[0]!.refusedAt).toBeInstanceOf(Date);
+  expect(sent).toHaveLength(1);
+  expect(taken).toEqual(['test']);
+  expect(released).toEqual(['test']);
+
+  // A plug-in that catches the refusal still stops the rates.
+  sent.length = 0;
+  const swallowing: RateSource = {
+    ...refusing,
+    rates: async (h, pair) => {
+      await h.text(`https://rates.example/${pair.from}`).catch(() => '');
+      return [{ date: '2026-10-09', rate: 1 }];
+    },
+  };
+  const caught = await updateRates(db, [swallowing], http(), now);
+  expect(caught.map((r) => r.waits)).toEqual(['refused', 'left']);
+  expect(sent).toHaveLength(1);
+  expect(await latestFxDate(db, 'USDJPY')).toBeNull();
+  expect(await latestFxDate(db, 'EURJPY')).toBeNull();
+});
+
+it("a site's refusal leaves its later pairs, other sites are still read with their own client", async () => {
+  // Three currencies: two from a refusing site, one from another site.
+  await saveSourceInfos(db, [
+    { key: 'us', label: 'US', market: 'us', currency: 'USD' },
+    { key: 'eu', label: 'EU', market: 'eu', currency: 'EUR' },
+    { key: 'gb', label: 'GB', market: 'gb', currency: 'GBP' },
+  ]);
+  const sent: string[] = [];
+  const site = (key: string, currencies: string[]): RateSource => ({
+    key,
+    label: key,
+    currencies,
+    rates: async (http, pair) => {
+      await http.text(`https://${key}.example/${pair.from}`);
+      return [{ date: '2026-10-09', rate: 150 }];
+    },
+  });
+  const sources = [site('sitea', ['USD', 'EUR', 'JPY']), site('siteb', ['GBP', 'JPY'])];
+  const http = () =>
+    new PoliteHttp({
+      minDelayMs: 0,
+      maxDelayMs: 0,
+      fetchImpl: (async (url: string) => {
+        sent.push(url);
+        return url.includes('sitea')
+          ? new Response('', { status: 403 })
+          : new Response('ok', { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+  const now = new Date('2026-10-12T03:00:00Z');
+  const byPair = (rows: Awaited<ReturnType<typeof updateRates>>) =>
+    Object.fromEntries(rows.map((r) => [r.pair, r.waits ?? `saved ${r.saved}`]));
+
+  // One client per site: sitea refuses once, its other pair is left, siteb is still read.
+  const made: string[] = [];
+  const out = await updateRates(db, sources, http(), now, {
+    httpFor: (key) => (made.push(key), http()),
+  });
+  const waits = byPair(out);
+  expect(Object.values(waits).filter((w) => w === 'refused')).toHaveLength(1);
+  expect(Object.values(waits).filter((w) => w === 'left')).toHaveLength(1);
+  expect(waits.GBPJPY).toBe('saved 1');
+  expect(sent.filter((u) => u.includes('sitea'))).toHaveLength(1);
+  expect(made.sort()).toEqual(['sitea', 'siteb']);
+  expect(await latestFxDate(db, 'GBPJPY')).toBe('2026-10-09');
+
+  // One client shared by both (no httpFor): siteb's pair waits unsent, sitea alone is named.
+  sent.length = 0;
+  const shared = byPair(await updateRates(db, sources, http(), now));
+  expect(Object.values(shared).filter((w) => w === 'refused')).toHaveLength(1);
+  expect(shared.GBPJPY).toBe('stopped');
+  expect(sent.every((u) => u.includes('sitea'))).toBe(true);
+});

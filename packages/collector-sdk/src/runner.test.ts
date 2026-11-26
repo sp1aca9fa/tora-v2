@@ -176,6 +176,96 @@ it('marks the run blocked and stops on 403/429', async () => {
   const [row] = await db.select().from(schema.collectorRuns);
   expect(row).toMatchObject({ status: 'blocked' });
   expect(row?.error).toContain('429');
+  expect(row?.refusedAt).toBeTruthy();
+});
+
+it('blocks the run and sends nothing more when a plug-in catches a refusal (G2)', async () => {
+  await box();
+  await createHolding(
+    db,
+    userId,
+    { product: { category: 'tcg', kind: 'booster_box', name: 'BP2 BOX', setName: 'BP2' } },
+    {
+      quantity: 1,
+      costTotalBase: 5000,
+      acquiredAt: '2026-09-01T00:00:00.000+09:00',
+      packagingState: 'sealed_shrink',
+    },
+  );
+  const sent: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    sent.push(url);
+    return new Response('', { status: 403 });
+  }) as unknown as typeof fetch;
+  const caught: unknown[] = [];
+  const collector = fakeCollector({
+    // A plug-in that swallows every error, refusals included (the guide forbids it).
+    findCandidates: async (product, ctx) => {
+      try {
+        await ctx.http.text(`https://x/search?q=${product.id}`);
+      } catch (e) {
+        caught.push(e);
+      }
+      return [];
+    },
+  });
+  const run = await runCollector(db, collector, { ...quiet, http: { ...quiet.http, fetchImpl } });
+  // The run stops at the first call that caught it: the second item is not searched.
+  expect(caught).toHaveLength(1);
+  expect(caught.every((e) => e instanceof BlockedError)).toBe(true);
+  expect(sent).toHaveLength(1);
+  expect(run).toMatchObject({ status: 'blocked', requests: 1 });
+  const [row] = await db.select().from(schema.collectorRuns);
+  expect(row).toMatchObject({ status: 'blocked' });
+  expect(row?.refusedAt).toBeTruthy();
+});
+
+it('stores nothing a plug-in returns after catching a refusal in its collect (G2)', async () => {
+  const { product } = await box();
+  const other = await createProduct(db, userId, {
+    category: 'tcg',
+    kind: 'booster_box',
+    name: 'BP2 BOX',
+  });
+  await linkSource(db, product.id, { source: 'fake', externalId: 'X1', url: 'https://x/1' });
+  await linkSource(db, other.id, { source: 'fake', externalId: 'X2', url: 'https://x/2' });
+  const sent: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    sent.push(url);
+    return new Response('', { status: 429 });
+  }) as unknown as typeof fetch;
+  const collector = fakeCollector({
+    // Swallows the refusal and returns an ordinary result, as if the listing had nothing.
+    collect: async (link, _product, ctx) => {
+      await ctx.http.text(link.url ?? 'https://x').catch(() => '');
+      return {
+        state: { mode: 'incremental', ingestedThrough: '2026-10-01' },
+        complete: true,
+        title: 'Swallowed',
+        supply: [],
+        recentSales: [],
+      };
+    },
+  });
+  const before = Date.now();
+  const run = await runCollector(db, collector, {
+    ...quiet,
+    collectOnly: true,
+    http: { ...quiet.http, fetchImpl },
+  });
+  expect(run).toMatchObject({ status: 'blocked', requests: 1 });
+  expect(sent).toHaveLength(1);
+  // Neither listing has its progress, title or state written.
+  for (const id of [product.id, other.id]) {
+    const [source] = await listProductSources(db, id);
+    expect(source?.lastSuccessAt ?? null).toBeNull();
+    expect(source?.title ?? null).toBeNull();
+  }
+  const [row] = await db.select().from(schema.collectorRuns);
+  expect(row).toMatchObject({ status: 'blocked' });
+  // The refusal's time is kept on the run, written when it came.
+  expect(Date.parse(row!.refusedAt!)).toBeGreaterThanOrEqual(before - 1000);
+  expect(Date.parse(row!.refusedAt!)).toBeLessThanOrEqual(Date.parse(row!.finishedAt!));
 });
 
 it('keeps going after one product fails (partial)', async () => {

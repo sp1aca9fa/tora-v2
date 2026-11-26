@@ -197,6 +197,45 @@ describe('importPurchaseLinks', () => {
     const importer = shop({ c1: new BlockedError('403'), c2: new BlockedError('403') });
     const summary = await importPurchaseLinks(db, [importer], [collector], http);
     expect(summary.left).toBe(2);
+    expect(summary.blocked).toBe('shop');
     expect((await purchaseLinksOf(db, userId)).every((l) => l.status === 'pending')).toBe(true);
+  });
+
+  it('leaves a site refused today, or locked by another run, with its links pending (K15)', async () => {
+    await addPurchaseLinks(db, userId, ['https://shop.example/item/d1']);
+    let reads = 0;
+    const importer = shop({});
+    const counted: PurchaseImporter = {
+      ...importer,
+      readLink: async (url, h) => {
+        reads++;
+        return importer.readLink!(url, h);
+      },
+    };
+    const left = await importPurchaseLinks(db, [counted], [collector], http, undefined, undefined, {
+      leave: new Set(['shop']),
+    });
+    expect(left).toMatchObject({ left: 1, read: 0, blocked: null });
+    const released: string[] = [];
+    const locked = await importPurchaseLinks(
+      db,
+      [counted],
+      [collector],
+      http,
+      undefined,
+      undefined,
+      {
+        lock: async () => null,
+      },
+    );
+    expect(locked).toMatchObject({ left: 1, read: 0 });
+    expect(reads).toBe(0);
+    expect((await purchaseLinksOf(db, userId)).every((l) => l.status === 'pending')).toBe(true);
+    // With the lock taken, the link is read and the lock let go.
+    await importPurchaseLinks(db, [counted], [collector], http, undefined, undefined, {
+      lock: async (source) => ({ release: () => void released.push(source) }),
+    });
+    expect(reads).toBe(1);
+    expect(released).toEqual(['shop']);
   });
 });

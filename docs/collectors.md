@@ -276,7 +276,8 @@ Always fetch through `ctx.http` (`PoliteHttp`), never `fetch` directly:
   mean "slow down"; the plug-in then raises `BlockedError` itself, since without retries a server
   error is an ordinary error);
 - stops the source for the run on 403, 429 or a captcha page (`BlockedError`): never work around a block;
-- never swallow `BlockedError` or `RequestCapError` in `findCandidates` or `collect` (rethrow them if you catch errors): the runner stops a source only when one reaches it, and a caught refusal sends the next listing's request to the site that refused;
+- never swallow `BlockedError` or `RequestCapError` in `findCandidates` or `collect` (rethrow them if you catch errors): the runner stops a source only when one reaches it. After a refusal the client sends nothing more (each later request throws the same `BlockedError` unsent) and the run ends blocked even when the plug-in caught it, with nothing it returned after the refusal stored;
+- a plug-in that reads a refused answer as the listing gone (a 403 whose body says the item was deleted: check `error.status === 403`) calls `ctx.http.notRefused(error)` before throwing its own error, so the next listing's request goes out; it takes back a 403 only, never a 429 or a challenge page;
 
 - the numbers, and what follows a refusal: [the collecting rules](rules/collectors.md);
 - `ctx.http.json`, `text`, `postJson`, `bytes`.
