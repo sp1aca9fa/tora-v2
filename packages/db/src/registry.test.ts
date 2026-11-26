@@ -240,6 +240,27 @@ it('lists the sources blocked on a day, so later retries leave them alone', asyn
   expect((await blockedOn(db, '2000-01-01')).size).toBe(0);
 });
 
+it('counts a run with a refusal time as refused whatever its status', async () => {
+  // Crashed after the refusal, before its end: left running, or closed failed by the next start.
+  await db.insert(schema.collectorRuns).values([
+    {
+      source: 'shopa',
+      status: 'running',
+      startedAt: '2026-11-01T02:00:00.000+09:00',
+      refusedAt: '2026-11-01T02:10:00.000+09:00',
+    },
+    {
+      source: 'shopb',
+      status: 'failed',
+      startedAt: '2026-11-01T02:00:00.000+09:00',
+      finishedAt: '2026-11-01T03:00:00.000+09:00',
+      refusedAt: '2026-11-01T02:20:00.000+09:00',
+    },
+    { source: 'shopc', status: 'failed', startedAt: '2026-11-01T02:00:00.000+09:00' },
+  ]);
+  expect([...(await blockedOn(db, '2026-11-01'))].sort()).toEqual(['shopa', 'shopb']);
+});
+
 it('counts a refusal for the day it came, in the app time zone (K16)', async () => {
   // App time Asia/Tokyo (the default). Started 23:00 on the 1st, refused 00:20 on the 2nd.
   await db.insert(schema.collectorRuns).values([

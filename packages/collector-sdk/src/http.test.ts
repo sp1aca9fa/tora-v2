@@ -114,6 +114,30 @@ describe('PoliteHttp', () => {
     expect(j.calls).toHaveLength(1);
   });
 
+  it('reads an OK answer that says it is HTML for a challenge, whatever was asked', async () => {
+    const page = () =>
+      new Response('<html>Just a moment...</html>', { headers: { 'content-type': 'text/html' } });
+    const f = fakeFetch([page, () => new Response('ok')]);
+    const http = new PoliteHttp({ ...fast, fetchImpl: f.impl });
+    await expect(http.bytes('https://x/a.png')).rejects.toBeInstanceOf(BlockedError);
+    await expect(http.text('https://x/b')).rejects.toBeInstanceOf(BlockedError);
+    expect(f.calls).toEqual(['https://x/a.png']);
+    // Asked for JSON only, an answer that parses as JSON is not one, whatever it says it is.
+    const j = fakeFetch([
+      () => new Response('{"note":"captcha"}', { headers: { 'content-type': 'text/html' } }),
+    ]);
+    const api = new PoliteHttp({ ...fast, fetchImpl: j.impl });
+    expect(await api.json('https://x/c')).toEqual({ note: 'captcha' });
+    expect(api.refusal).toBeNull();
+    // A picture with challenge words in its bytes is not read for them.
+    const b = fakeFetch([
+      () => new Response('captcha', { headers: { 'content-type': 'image/png' } }),
+    ]);
+    expect(
+      (await new PoliteHttp({ ...fast, fetchImpl: b.impl }).bytes('https://x/d')).contentType,
+    ).toBe('image/png');
+  });
+
   it('lets a plug-in take back a refusal it read as the listing gone', async () => {
     const f = fakeFetch([
       () => new Response('{"code":"ItemDeleted"}', { status: 403 }),
@@ -132,6 +156,8 @@ describe('PoliteHttp', () => {
   it('never takes back a 429 or a challenge page', async () => {
     for (const first of [
       () => new Response('{"code":"ItemDeleted"}', { status: 429 }),
+      // A 403 whose kept body holds a challenge's words.
+      () => new Response('<html>Just a moment... ItemDeleted</html>', { status: 403 }),
       () => new Response('<html>captcha ItemDeleted</html>', { status: 503 }),
       () => new Response('<html>captcha ItemDeleted</html>'),
     ]) {

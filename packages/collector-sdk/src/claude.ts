@@ -80,7 +80,7 @@ export class ClaudeRefusedError extends Error {
       });
     super(
       (inside
-        ? 'Claude Code refused a read inside the upload folder: check its version (2.1.248 or ' +
+        ? 'Claude Code refused a read inside the upload folder: check its version (2.1.257 or ' +
           'later) and run `pnpm --filter @tora/collector-sdk confine-check`'
         : 'a file asked for a path outside its folder: remove that file and try again') +
         `. Refused: ${describeDenials(denials).slice(0, 300)}`,
@@ -125,8 +125,8 @@ export async function askClaude<T>(options: {
   // An upload is untrusted: nothing it says may widen what the run can read. Reads inside the
   // working folder (cwd = readDir) and `--add-dir` need no approval in `-p` mode; anything that
   // would need one is denied (`dontAsk`). `--restricted` (Claude Code 2.1.248+) confines the file
-  // tools to the working folders, and `blockReadsOutsideWorkingDirectories` refuses other paths
-  // in every mode. Never `--allowedTools Read`: a bare Read allow approves reads of any path.
+  // tools to the working folders, and `blockReadsOutsideWorkingDirectories` (2.1.257+, so 2.1.257
+  // or later is needed) refuses other paths in every mode. Never `--allowedTools Read`: a bare Read allow approves reads of any path.
   // A CLI that rejects a flag exits nonzero and the call fails; it is never retried without them.
   if (options.readDir) {
     args.push(

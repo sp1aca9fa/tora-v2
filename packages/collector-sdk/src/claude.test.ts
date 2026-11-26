@@ -147,7 +147,7 @@ it('names the setup, not a file, when a read inside the upload folder was refuse
   try {
     process.env.FAKE_CLAUDE_DENY = join(dir, '01-a.png');
     await expect(ask(dir)).rejects.toThrow(
-      /^Claude Code refused a read inside the upload folder: check its version .*confine-check/,
+      /^Claude Code refused a read inside the upload folder: check its version \(2\.1\.257 or later\) .*confine-check/,
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

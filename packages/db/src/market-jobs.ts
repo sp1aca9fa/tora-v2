@@ -112,9 +112,13 @@ export async function marketUsed(db: Db, source: string, day: string): Promise<n
 export async function lastCollectRun(
   db: Db,
   source: string,
-): Promise<{ status: string; startedAt: string } | null> {
+): Promise<{ status: string; startedAt: string; refusedAt: string | null } | null> {
   const [row] = await db
-    .select({ status: collectorRuns.status, startedAt: collectorRuns.startedAt })
+    .select({
+      status: collectorRuns.status,
+      startedAt: collectorRuns.startedAt,
+      refusedAt: collectorRuns.refusedAt,
+    })
     .from(collectorRuns)
     .where(eq(collectorRuns.source, source))
     .orderBy(desc(collectorRuns.startedAt))

@@ -295,8 +295,12 @@ export async function runMarketJobs(
     const skipped = (j: MarketJobRow) => skippedToday(j, t, zone);
     // A refusal at the nightly collect is never worked around (S36 B4); the collect alerted it.
     const last = await lastCollectRun(db, source);
+    // A run with a refusal time was refused whatever its status (a crash before its end leaves
+    // it running, and the next start closes it failed).
     const collectRefused =
-      last?.status === 'blocked' && t.getTime() - Date.parse(last.startedAt) < COLLECT_REFUSAL_MS;
+      !!last &&
+      (last.status === 'blocked' || last.refusedAt !== null) &&
+      t.getTime() - Date.parse(last.startedAt) < COLLECT_REFUSAL_MS;
     if (dryRun) {
       const state = (await readMarketState(db, source)) ?? {
         perDay: MARKET_PER_DAY,

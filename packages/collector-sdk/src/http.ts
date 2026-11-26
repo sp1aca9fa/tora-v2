@@ -140,10 +140,12 @@ export class PoliteHttp {
   /**
    * Takes back one refusal a plug-in read as something else ("Refusals": a 403 that says the
    * item was deleted is the listing gone), so later requests go out again. Only a 403 answer, the
-   * one case the rules allow; a 429 or a challenge page stays a refusal.
+   * one case the rules allow, and never one whose kept body (its first 500 characters) holds a
+   * challenge's words; a 429 or a challenge page stays a refusal.
    */
   notRefused(error: BlockedError): void {
-    if (this.refused === error && error.status === 403) this.refused = null;
+    if (this.refused === error && error.status === 403 && !hasMarkers(error.body))
+      this.refused = null;
   }
 
   private refuse(error: BlockedError): BlockedError {
@@ -245,11 +247,15 @@ export class PoliteHttp {
         throw new HttpError(res.status, url);
       }
       if (!res.ok) throw new HttpError(res.status, url);
-      if ((headers.Accept ?? '').includes('html')) {
+      // An OK answer is read for a challenge page when HTML was asked, or when the answer says it
+      // is HTML whatever was asked (a picture host's challenge comes back to `bytes`). Asked for
+      // JSON only, a body that parses as JSON is never one ("Refusals", "What counts").
+      const accept = headers.Accept ?? '';
+      const askedHtml = accept.includes('html');
+      if (askedHtml || /text\/html/i.test(res.headers.get('content-type') ?? '')) {
         const body = await res.clone().text();
-        if (hasMarkers(body) && body.length < CHALLENGE_MAX_CHARS) {
+        if (isChallenge(body, !askedHtml && accept.includes('json')))
           throw this.refuse(new BlockedError(`challenge page at ${url}`));
-        }
       }
       return res;
     }

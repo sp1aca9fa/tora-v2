@@ -612,6 +612,20 @@ describe('the daytime job runner (S36 B4)', () => {
     expect(await jobRow(job.id)).toMatchObject({ status: 'done' });
   });
 
+  it('a collect with a refusal time keeps the marketplace away whatever its status', async () => {
+    await setup();
+    // It crashed after the refusal: the next start closed it failed.
+    await db.insert(collectorRuns).values({
+      source: 'marketa',
+      startedAt: '2026-11-24T03:00:00.000+09:00',
+      refusedAt: '2026-11-24T03:05:00.000+09:00',
+      status: 'failed',
+    });
+    at('2026-11-24T05:10:00+09:00');
+    expect((await run(plugin(undefined, 1))).stops).toEqual({ marketa: 'collect refused' });
+    expect(fetched).toHaveLength(0);
+  });
+
   it("a stamp's state is the stricter one at a replay; a stop's stamp waits for a restart", async () => {
     await setup(200);
     const stamp = join(state, 'market-refused-marketa');

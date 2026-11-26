@@ -952,7 +952,8 @@ export async function startRun(
  * blocked run counts for the time of its refusal (`refusedAt`; a run started 23:00 and refused
  * 00:20 counts for the new day, one refused 23:58 and finished 00:05 for the old one), a run
  * written before that time was kept for the day it finished, and a daytime job's refusal (the
- * marketplace's last one) counts the same.
+ * marketplace's last one) counts the same. A run with a refusal time counts whatever its status
+ * (a crash before its end leaves it running or failed).
  */
 export async function blockedOn(db: Db, day: string): Promise<Set<string>> {
   const from = toLocalIso(localTime(day));
@@ -966,7 +967,9 @@ export async function blockedOn(db: Db, day: string): Promise<Set<string>> {
       .from(collectorRuns)
       .where(
         and(
-          eq(collectorRuns.status, 'blocked'),
+          // A run with a refusal time was refused whatever its status: one that crashed before
+          // `finishRun` stays running, and the next start closes it failed.
+          or(eq(collectorRuns.status, 'blocked'), isNotNull(collectorRuns.refusedAt)),
           // The refusal's time; a run without one (written before it was kept): its end, else
           // its start.
           within(

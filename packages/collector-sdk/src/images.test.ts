@@ -193,6 +193,38 @@ it('leaves refused sites out, takes each site lock, and stops at a refusal (K15)
   expect(requested).toEqual([]);
 });
 
+it('stops the pictures at a 200 HTML challenge from a picture host', async () => {
+  const png = await sharp({ create: { width: 50, height: 50, channels: 3, background: '#000' } })
+    .png()
+    .toBuffer();
+  const requested: string[] = [];
+  const fetchImpl = (async (url: string) => {
+    requested.push(url);
+    if (url.includes('shopa'))
+      return new Response('<html>Just a moment...</html>', {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    return new Response(png, { headers: { 'content-type': 'image/png' } });
+  }) as unknown as typeof fetch;
+  const http = new PoliteHttp({ minDelayMs: 0, maxDelayMs: 0, sleep: async () => {}, fetchImpl });
+  for (const name of ['one', 'two']) {
+    const p = await createProduct(db, uid, { category: 'tcg', kind: 'booster_box', name });
+    await linkSource(
+      db,
+      p.id,
+      { source: 'shopa', externalId: name },
+      `https://shopa.example/${name}.png`,
+    );
+  }
+  const result = await downloadProductImages(db, http, {
+    leave: new Set(),
+    lock: async () => ({ release: () => {} }),
+  });
+  expect(result.blocked).toBe('shopa');
+  expect(result.saved).toBe(0);
+  expect(requested).toHaveLength(1);
+});
+
 it("names the site of a product's own picture by its host (K15)", async () => {
   const png = await sharp({ create: { width: 50, height: 50, channels: 3, background: '#000' } })
     .png()
