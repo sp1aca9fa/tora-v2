@@ -96,15 +96,17 @@ export async function addWatchOf(
       },
     })
     .returning();
-  // Wished again at another price: a game wish's alerts start afresh (S36 C3); a card's memory
-  // stays as an upsert has always left it.
+  // Watched again at another target: a game wish's alerts start afresh (S36 C3); a card or sealed
+  // watch's target memory starts over and its Good price memory stays, as in the edit form
+  // (`docs/rules/alerts.md`, Memory; A14).
   if (!stored || stored.price === watch!.targetPriceBase) return watch!;
   return (
     (await writeWatch(db, eq(watches.id, watch!.id), (w) => {
       const wish = parseWishState(w.alertState?.wish);
-      return wish && wish !== 'invalid'
-        ? { alertState: { ...w.alertState, wish: restartWish(wish) } }
-        : null;
+      if (wish === 'invalid') return null;
+      if (wish) return { alertState: { ...w.alertState, wish: restartWish(wish) } };
+      if (w.alertState?.target === undefined) return null;
+      return { alertState: savedAlertState(w.alertState, false, true) };
     })) ?? watch!
   );
 }
@@ -175,7 +177,8 @@ export function savedAlertState(
 }
 
 /**
- * Writes one watch by compare-and-set on its stored alert memory (S36 C3): the closing step writing
+ * Writes one watch by compare-and-set on its stored alert memory, target and condition (S36 C3,
+ * A14): the closing step or another save writing
  * between the read and the write makes this read and compute again, 3 tries, then an error (a save
  * never silently drops the step's write, nor the step the save's). `next` gives the fields to set
  * (null: nothing to write); null when no row matches `where`.
@@ -196,7 +199,16 @@ export async function writeWatch(
     const [written] = await db
       .update(watches)
       .set(set)
-      .where(and(eq(watches.id, row.watch.id), sql`${watches.alertState} IS ${row.raw}`))
+      .where(
+        and(
+          eq(watches.id, row.watch.id),
+          sql`${watches.alertState} IS ${row.raw}`,
+          // And the target and condition `next` was computed from: two saves at once (fix round 1,
+          // item 2).
+          sql`${watches.targetPriceBase} IS ${row.watch.targetPriceBase}`,
+          eq(watches.bucket, row.watch.bucket),
+        ),
+      )
       .returning();
     if (written) return written;
   }

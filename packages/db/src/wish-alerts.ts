@@ -24,24 +24,18 @@ import {
 } from './alerts';
 import type { Db } from './client';
 import { loadSourceRegistry } from './registry';
-import { type Watch, appSettings, users, watches } from './schema';
+import { LEASE_MS, type LeaseOptions, holdLease } from './lease';
+import { type Watch, users, watches } from './schema';
 import { wishViews } from './wish-view';
 
 /**
  * One closing step at a time (plan 9.F): the after-run starts after every collect attempt, so two
- * can overlap. The lease is held 10 minutes and renewed before each person; a waiter waits until
- * the expiry plus a minute (a holder that died), then takes it, or gives up when it was renewed.
+ * can overlap. The lease (`lease.ts`) is renewed before each person.
  */
 export const WISH_LEASE_KEY = 'wishAlertLease';
-export const WISH_LEASE_MS = 10 * 60_000;
-const WISH_LEASE_GRACE_MS = 60_000;
-const WISH_LEASE_POLL_MS = 10_000;
+export const WISH_LEASE_MS = LEASE_MS;
 
-export interface WishPassOptions {
-  /** The lease's clock in ms and its wait (tests and the rehearsal); default the real ones. */
-  clock?: () => number;
-  sleep?: (ms: number) => Promise<void>;
-}
+export type WishPassOptions = LeaseOptions;
 
 export interface WishPassResult {
   /** Alerts for people with buy alerts on (sent or not), and messages a channel took. */
@@ -57,64 +51,6 @@ export interface WishPassResult {
   failed: number;
   /** `busy`: another pass held the lease; `lease_lost`: another took it during this one. */
   status: 'done' | 'busy' | 'lease_lost';
-}
-
-type LeaseDb = Pick<Db, 'insert' | 'select' | 'update'>;
-
-async function takeLease(db: LeaseDb, id: string, at: number): Promise<boolean> {
-  const value = { id, until: at + WISH_LEASE_MS };
-  const taken = await db
-    .insert(appSettings)
-    .values({ key: WISH_LEASE_KEY, value })
-    .onConflictDoUpdate({
-      target: appSettings.key,
-      set: { value },
-      // Taken a minute past the expiry (a holder that died); a broken value counts as expired.
-      setWhere: sql`coalesce(json_extract(${appSettings.value}, '$.until'), 0) <= ${at - WISH_LEASE_GRACE_MS}`,
-    })
-    .returning({ key: appSettings.key });
-  return taken.length > 0;
-}
-
-/** Renews (`until`) or releases (0) the lease, only while it is this pass's own. */
-async function setLease(db: LeaseDb, id: string, until: number): Promise<boolean> {
-  const own = await db
-    .update(appSettings)
-    .set({ value: { id, until } })
-    .where(
-      and(
-        eq(appSettings.key, WISH_LEASE_KEY),
-        sql`json_extract(${appSettings.value}, '$.id') = ${id}`,
-      ),
-    )
-    .returning({ key: appSettings.key });
-  return own.length > 0;
-}
-
-async function waitForLease(
-  db: LeaseDb,
-  id: string,
-  clock: () => number,
-  sleep: (ms: number) => Promise<void>,
-): Promise<boolean> {
-  let deadline: number | null = null;
-  for (;;) {
-    const at = clock();
-    if (await takeLease(db, id, at)) return true;
-    if (deadline === null) {
-      const [row] = await db
-        .select({ until: sql<unknown>`json_extract(${appSettings.value}, '$.until')` })
-        .from(appSettings)
-        .where(eq(appSettings.key, WISH_LEASE_KEY));
-      const until = typeof row?.until === 'number' ? row.until : at;
-      deadline = Math.max(until, at) + WISH_LEASE_GRACE_MS;
-      // Released (or expired) between the take and this read: take again at once (fix round 1,
-      // item 5), once; a holder that died waits out the grace.
-      if (until <= at) continue;
-    }
-    if (at >= deadline) return false;
-    await sleep(Math.min(WISH_LEASE_POLL_MS, deadline - at));
-  }
 }
 
 interface ReadRow {
@@ -175,8 +111,6 @@ export async function sendWishAlerts(
   now = new Date(),
   options: WishPassOptions = {},
 ): Promise<WishPassResult> {
-  const clock = options.clock ?? Date.now;
-  const sleep = options.sleep ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)));
   const result: WishPassResult = {
     alerts: 0,
     sent: 0,
@@ -186,8 +120,8 @@ export async function sendWishAlerts(
     failed: 0,
     status: 'done',
   };
-  const id = crypto.randomUUID();
-  if (!(await waitForLease(db, id, clock, sleep))) return { ...result, status: 'busy' };
+  const lease = await holdLease(db, WISH_LEASE_KEY, options);
+  if (!lease) return { ...result, status: 'busy' };
   try {
     const people = new Map(
       (
@@ -208,7 +142,7 @@ export async function sendWishAlerts(
       return c.own || !c.seller ? source : `${source}, ${c.seller}`;
     };
     for (const user of people.values()) {
-      if (!(await setLease(db, id, clock() + WISH_LEASE_MS))) {
+      if (!(await lease.renew())) {
         result.status = 'lease_lost';
         break;
       }
@@ -266,7 +200,7 @@ export async function sendWishAlerts(
           if (!(await writeIfSame(db, user.id, view.watch.id, from, next))) result.skipped++;
         }
         if (held.length === 0) continue;
-        if (!(await setLease(db, id, clock() + WISH_LEASE_MS))) {
+        if (!(await lease.renew())) {
           result.status = 'lease_lost';
           break;
         }
@@ -343,7 +277,7 @@ export async function sendWishAlerts(
       }
     }
   } finally {
-    await setLease(db, id, 0);
+    await lease.release();
   }
   return result;
 }
@@ -359,7 +293,7 @@ export async function nightAlerts(
   options: WishPassOptions & { afterBuy?: (buy: { sent: number; alerts: number }) => void } = {},
 ): Promise<{ buy: { sent: number; alerts: number }; wish: WishPassResult }> {
   const { afterBuy, ...wishOptions } = options;
-  const buy = await sendWatchAlerts(db, ctx, now);
+  const buy = await sendWatchAlerts(db, ctx, now, wishOptions);
   afterBuy?.(buy);
   return { buy, wish: await sendWishAlerts(db, ctx, now, wishOptions) };
 }

@@ -37,12 +37,13 @@ import {
   strategyOf,
   toLocalIso,
 } from '@tora/core';
-import { and, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { actionTotal, pendingActions } from './actions';
 import { lastActivity, markAlerted, recordActivity, unalerted } from './activity';
 import type { Db } from './client';
 import { DATA_CHECK_HREF, runDataCheck } from './data-check';
 import { checkDbBudget } from './db-usage';
+import { type Lease, type LeaseOptions, holdLease } from './lease';
 import { holdingBucket } from './valuation';
 import { loadSourceRegistry, readSetting, saveSetting } from './registry';
 import { VALUE_SERIES_BREAK_KEY, type ValueSeriesBreak } from './sales-recheck';
@@ -54,6 +55,7 @@ import {
   type AlertLogStatus,
   type Product,
   type User,
+  type Watch,
   activity,
   alertChannels,
   alertLog,
@@ -942,9 +944,38 @@ function failureCard(
 
 /**
  * Sends failed collects and backups (and missed-run checks) not alerted yet to admins, at most
- * once a day per kind (the schedule retries every hour); marks them alerted.
+ * once a day per kind (the schedule retries every hour); marks them alerted. One call at a time
+ * (`FAILURE_LEASE_KEY`, as the watch alerts): the morning check and a collect's after-run may
+ * overlap, and both would send the same entries before either marked them. A call that gives up
+ * waiting sends nothing; the entries stay unmarked for the next. Known limit: an admin whose send
+ * stalled past the lease (over about 11 minutes) may get an entry twice from the pass that took over.
  */
-export async function alertFailures(db: Db, ctx: AlertContext, since: string): Promise<number> {
+export async function alertFailures(
+  db: Db,
+  ctx: AlertContext,
+  since: string,
+  options: LeaseOptions = {},
+): Promise<number> {
+  const lease = await holdLease(db, FAILURE_LEASE_KEY, options);
+  if (!lease) {
+    ctx.log?.('failure alerts: skipped, another pass running');
+    return 0;
+  }
+  try {
+    return await failurePass(db, ctx, since, lease);
+  } finally {
+    await lease.release();
+  }
+}
+
+export const FAILURE_LEASE_KEY = 'failureAlertLease';
+
+async function failurePass(
+  db: Db,
+  ctx: AlertContext,
+  since: string,
+  lease: Lease,
+): Promise<number> {
   // A day back at least: an entry no channel took (all down) is sent by a later call, whose own
   // `since` is newer.
   const dayBack = toLocalIso(new Date(Date.now() - 24 * 3_600_000));
@@ -979,6 +1010,11 @@ export async function alertFailures(db: Db, ctx: AlertContext, since: string): P
     const base = await appUrl(db);
     let reachable = false;
     for (const admin of await adminsToAlert(db)) {
+      // Another pass took over (this one ran past its lease): it sends what is left unmarked.
+      if (!(await lease.renew())) {
+        ctx.log?.('failure alerts: stopped, another pass took over');
+        return sent;
+      }
       if ((await channelsOf(db, admin.id)).length) reachable = true;
       const t = await textsFor(db, admin, ctx);
       const money = await moneyFor(db, admin);
@@ -1340,10 +1376,17 @@ export async function checkMissedRuns(
     ctx.log?.(`alerts: morning check failed: ${errorText(error)}`);
     throw error;
   } finally {
-    await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)));
+    // A short wait at most: the hosted daily job is killed at 60 s and sends the summaries after
+    // this; a pass still holding the lease sends these entries, or the next call does.
+    await alertFailures(db, ctx, toLocalIso(new Date(now.getTime() - 3_600_000)), {
+      maxWaitMs: MISSED_RUNS_LEASE_WAIT_MS,
+    });
   }
   return missed;
 }
+
+/** How long the morning check waits for another failure alert pass (`checkMissedRuns`). */
+export const MISSED_RUNS_LEASE_WAIT_MS = 20_000;
 
 /** The morning check's hour on a long-lived server (app time). */
 export const MORNING_CHECK_HOUR = 8;
@@ -1597,15 +1640,45 @@ type WatchAlertState = { zone?: AlertState; target?: AlertState & { checked?: tr
  * today's numbers count (a collect that failed says nothing). Every watch's memory is kept up to
  * date, also for people without a channel or with these alerts off, so turning them on later
  * does not send old news; a watch whose alert no channel took keeps its old memory (tried again).
+ * One pass at a time (`WATCH_LEASE_KEY`): two collects ending close together would otherwise both
+ * read the memory before either wrote it, and send the same alert twice.
  */
 export async function sendWatchAlerts(
   db: Db,
   ctx: AlertContext,
   now = new Date(),
+  options: LeaseOptions = {},
+): Promise<{ sent: number; alerts: number }> {
+  const lease = await holdLease(db, WATCH_LEASE_KEY, options);
+  if (!lease) {
+    // The other pass is still going: it tells what it read (A15).
+    ctx.log?.('watch alerts: skipped, another pass running');
+    return { sent: 0, alerts: 0 };
+  }
+  try {
+    return await watchAlertPass(db, ctx, now, lease, options.clock ?? Date.now);
+  } finally {
+    await lease.release();
+  }
+}
+
+export const WATCH_LEASE_KEY = 'watchAlertLease';
+
+async function watchAlertPass(
+  db: Db,
+  ctx: AlertContext,
+  now: Date,
+  lease: Lease,
+  clock: () => number,
 ): Promise<{ sent: number; alerts: number }> {
   const today = localDate(now);
   const rows = await db
-    .select({ watch: watches, product: products, user: users })
+    .select({
+      watch: watches,
+      product: products,
+      user: users,
+      raw: sql<string | null>`${watches.alertState}`,
+    })
     .from(watches)
     .innerJoin(products, eq(products.id, watches.productId))
     .innerJoin(users, eq(users.id, watches.userId))
@@ -1630,11 +1703,27 @@ export async function sendWatchAlerts(
   );
   const byUser = new Map<
     string,
-    { user: User; items: BuyAlertData[]; states: { id: string; state: WatchAlertState }[] }
+    {
+      user: User;
+      items: BuyAlertData[];
+      states: { watch: Watch; raw: string | null; state: WatchAlertState }[];
+    }
   >();
   const reachable = new Map<string, boolean>();
   let alerts = 0;
-  for (const { watch, product, user } of rows) {
+  // Renewed at most once a minute while reading (each watch may cost a few reads), and before each
+  // person's message; a lease another pass took stops this one (what it held back goes next time).
+  let renewed = clock();
+  const stillOurs = async (every: number) => {
+    if (clock() - renewed < every) return true;
+    renewed = clock();
+    if (await lease.renew()) return true;
+    ctx.log?.('watch alerts: stopped, another pass took over');
+    return false;
+  };
+  for (const { watch, product, user, raw } of rows) {
+    // Nothing was sent: no alerts to count for the after-run's log (fix round 1, item 6).
+    if (!(await stillOurs(60_000))) return { sent: 0, alerts: 0 };
     // A wish on a game alerts by its own rules (S36 C3, `sendWishAlerts`): no zone, no target.
     if (checks.isGame(product.id)) continue;
     const state: WatchAlertState = { ...(watch.alertState ?? {}) };
@@ -1700,27 +1789,79 @@ export async function sendWatchAlerts(
     // A watch with an alert for someone with a channel keeps its old memory until a channel took
     // the alert (a failed send goes again on a rerun); every other watch's memory is kept now.
     const held = buy && reachable.get(user.id) === true;
-    if (changed && !held) {
-      await db.update(watches).set({ alertState: state }).where(eq(watches.id, watch.id));
-    }
+    if (changed && !held) await saveWatchState(db, watch, raw, state);
     if (!buy) continue;
     alerts += items.length;
     const entry = byUser.get(user.id) ?? { user, items: [], states: [] };
     entry.items.push(...items);
-    if (changed && held) entry.states.push({ id: watch.id, state });
+    if (changed && held) entry.states.push({ watch, raw, state });
     byUser.set(user.id, entry);
   }
   let sent = 0;
   for (const { user, items, states } of byUser.values()) {
+    if (!(await stillOurs(0))) break;
     const t = await textsFor(db, user, ctx);
     const delivered = await sendToUser(db, user.id, buyNotice(t, items), ctx);
     if (delivered === 0) continue;
     sent += delivered;
-    for (const s of states) {
-      await db.update(watches).set({ alertState: s.state }).where(eq(watches.id, s.id));
-    }
+    for (const s of states) await saveWatchState(db, s.watch, s.raw, s.state);
   }
   return { sent, alerts };
+}
+
+/**
+ * Writes a watch's alert memory by compare-and-set on what the pass read (A14, as the wish pass's
+ * `writeIfSame`): a save during the pass (a new target or condition restarts that memory) stands.
+ * One that left the condition and the zone memory as read (a note, a NULL memory saved as the
+ * empty one, a new target) keeps the pass's zone part, written on its fresh text once, so a Good
+ * price alert sent during the save is not sent again; the target part only when the target and
+ * its memory are as read too. Any other miss is skipped; the next pass computes again.
+ */
+async function saveWatchState(
+  db: Db,
+  watch: Watch,
+  raw: string | null,
+  state: WatchAlertState,
+): Promise<void> {
+  const write = async (
+    from: string | null,
+    alertState: Watch['alertState'],
+    price: number | null = watch.targetPriceBase,
+  ) =>
+    (
+      await db
+        .update(watches)
+        .set({ alertState })
+        .where(
+          and(
+            eq(watches.id, watch.id),
+            sql`${watches.alertState} IS ${from}`,
+            sql`${watches.targetPriceBase} IS ${price}`,
+            eq(watches.bucket, watch.bucket),
+          ),
+        )
+        .returning({ id: watches.id })
+    ).length > 0;
+  if (await write(raw, state)) return;
+  const [fresh] = await db
+    .select({
+      raw: sql<string | null>`${watches.alertState}`,
+      state: watches.alertState,
+      price: watches.targetPriceBase,
+      bucket: watches.bucket,
+    })
+    .from(watches)
+    .where(eq(watches.id, watch.id));
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  if (!fresh || fresh.bucket !== watch.bucket || !same(fresh.state?.zone, watch.alertState?.zone))
+    return;
+  const sameTarget =
+    fresh.price === watch.targetPriceBase && same(fresh.state?.target, watch.alertState?.target);
+  await write(
+    fresh.raw,
+    { ...fresh.state, zone: state.zone, ...(sameTarget && { target: state.target }) },
+    fresh.price,
+  );
 }
 
 /**

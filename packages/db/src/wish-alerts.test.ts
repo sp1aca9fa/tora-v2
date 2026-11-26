@@ -894,8 +894,10 @@ describe('a save beside the pass (plan 9.E, 9.K)', () => {
     const { watch } = await addWatch(db, ann, { productId: product.id }, { targetPriceBase: 9000 });
     const memory = { zone: { on: true, sent: N1 }, target: { on: true, sent: N1 } };
     await db.update(watches).set({ alertState: memory }).where(eq(watches.id, watch.id));
+    // Watched again at a new target: its target part starts over as in the edit form (A14).
     await addWatch(db, ann, { productId: product.id }, { targetPriceBase: 8000 });
-    expect((await stored(watch.id)).alertState).toEqual(memory);
+    expect(await rawOf(watch.id)).toBe(JSON.stringify({ zone: memory.zone }));
+    await db.update(watches).set({ alertState: memory }).where(eq(watches.id, watch.id));
     await updateWatch(db, ann, watch.id, { targetPriceBase: 7000 });
     expect(await rawOf(watch.id)).toBe(JSON.stringify({ zone: memory.zone }));
     await updateWatch(db, ann, watch.id, { targetPriceBase: 7000, note: 'n' });
