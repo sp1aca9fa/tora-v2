@@ -5,6 +5,7 @@ import {
   lastSale,
   sourceSummaries,
   valueUnit,
+  withoutExcludedTrades,
   withoutOutliers,
 } from './valuation';
 
@@ -277,5 +278,107 @@ describe('last sale and per-source summaries', () => {
       trendPct: 8,
     });
     expect(s[1]).toMatchObject({ medianBase: 9_000, sampleSize: 1, trendPct: 0 });
+  });
+});
+
+describe('withoutExcludedTrades (case V21)', () => {
+  const trade = (source: string, priceBase: number, observedAt: string, bucket = 'raw:A') => ({
+    source,
+    bucket,
+    priceBase,
+    observedAt,
+  });
+  it('drops one trade per sale marked excluded with the same source, condition, price and time', () => {
+    const at = '2026-10-09T12:00:00.000Z';
+    const recent = [
+      trade('snkrdunk', 5000, at),
+      trade('snkrdunk', 5000, at),
+      trade('snkrdunk', 5000, at, 'raw:B'),
+      trade('snkrdunk', 5001, at),
+      trade('mercari', 5000, at),
+      trade('snkrdunk', 4000, daysAgo(2)),
+    ];
+    // The same instant written with an offset is the same time.
+    const left = withoutExcludedTrades(recent, [
+      trade('snkrdunk', 5000, '2026-10-09T21:00:00+09:00'),
+    ]);
+    expect(left).toEqual([recent[1], recent[2], recent[3], recent[4], recent[5]]);
+    expect(withoutExcludedTrades(recent, [])).toEqual(recent);
+    expect(withoutExcludedTrades([], [trade('snkrdunk', 5000, at)])).toEqual([]);
+    // The last sale then skips it.
+    const last = lastSale(
+      [],
+      withoutExcludedTrades(
+        [trade('snkrdunk', 9000, at), trade('snkrdunk', 3000, daysAgo(2))],
+        [trade('snkrdunk', 9000, at)],
+      ),
+      'raw:A',
+      undefined,
+      now,
+    );
+    expect(last?.priceBase).toBe(3000);
+  });
+
+  it('matches an approximate time within a day, nearest first, one trade per sale', () => {
+    const h = 3_600_000;
+    const sale = '2026-10-09T12:00:00.000Z';
+    const at = (hours: number) => new Date(Date.parse(sale) + hours * h).toISOString();
+    const approx = (priceBase: number, hours: number, bucket = 'raw:A') => ({
+      ...trade('flea', priceBase, at(hours), bucket),
+      approximate: true,
+    });
+    // Read again the next night: "N hours ago" from a later clock moved the time by 5 hours.
+    const recent = [approx(50_000, 5), approx(50_000, -2), approx(50_000, 30), approx(40_000, 0)];
+    expect(withoutExcludedTrades(recent, [trade('flea', 50_000, sale)], now)).toEqual([
+      recent[0],
+      recent[2],
+      recent[3],
+    ]);
+    // Two sales: the two nearest trades go; one more than a day off stays.
+    expect(
+      withoutExcludedTrades(
+        recent,
+        [trade('flea', 50_000, sale), trade('flea', 50_000, at(4))],
+        now,
+      ),
+    ).toEqual([recent[2], recent[3]]);
+    // An exact-time trade is not moved: a few hours off is another trade.
+    expect(
+      withoutExcludedTrades([trade('flea', 50_000, at(5))], [trade('flea', 50_000, sale)], now),
+    ).toHaveLength(1);
+    // Another condition, a garbled time: no match.
+    expect(
+      withoutExcludedTrades([approx(50_000, 1, 'raw:B')], [trade('flea', 50_000, sale)], now),
+    ).toHaveLength(1);
+    expect(
+      withoutExcludedTrades([approx(50_000, 1)], [trade('flea', 50_000, 'garbled')], now),
+    ).toHaveLength(1);
+  });
+
+  it('matches an approximate trade over 30 days old within 30 days, nearest first', () => {
+    const at = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+    const approx = (priceBase: number, days: number) => ({
+      ...trade('flea', priceBase, at(days)),
+      approximate: true,
+    });
+    // Stored as "20日前"; read again later as "1ヶ月前": 24 days off, still that sale.
+    const sale = trade('flea', 50_000, at(55));
+    const recent = [approx(50_000, 31), approx(50_000, 56), approx(50_000, 90)];
+    expect(withoutExcludedTrades(recent, [sale], now)).toEqual([recent[0], recent[2]]);
+    expect(withoutExcludedTrades([recent[0]!], [sale], now)).toEqual([]);
+    // 35 days off is another trade; under 30 days old the window stays 1 day.
+    expect(
+      withoutExcludedTrades([approx(50_000, 31)], [trade('flea', 50_000, at(66))], now),
+    ).toHaveLength(1);
+    expect(
+      withoutExcludedTrades([approx(50_000, 20)], [trade('flea', 50_000, at(22))], now),
+    ).toHaveLength(1);
+    expect(
+      withoutExcludedTrades([approx(50_000, 20)], [trade('flea', 50_000, at(20.5))], now),
+    ).toEqual([]);
+    // An exact time never gets the window.
+    expect(
+      withoutExcludedTrades([trade('flea', 50_000, at(40))], [trade('flea', 50_000, at(45))], now),
+    ).toHaveLength(1);
   });
 });

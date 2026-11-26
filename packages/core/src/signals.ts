@@ -111,6 +111,11 @@ export interface SignalStats {
   year365?: number | null;
   /** The lowest ask now in this condition, per unit. */
   ask: number | null;
+  /**
+   * The day of the listing report `ask` comes from (null without an ask); missing on older rows,
+   * whose ask then counts as of unknown age (none shown).
+   */
+  askDay?: string | null;
   /** Days since release (S9 part 3's release date), and where that date came from. */
   ageDays: number | null;
   releaseFrom: 'set' | 'item' | 'first_sale' | null;

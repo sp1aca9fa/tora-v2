@@ -202,6 +202,109 @@ describe('recent sales', () => {
   });
 });
 
+describe('recent sales and hand exclusions (case V21)', () => {
+  it('drops a recent trade that is a stored sale marked excluded, for any reason', async () => {
+    const { pika } = await scenario();
+    const id = pika.product.id;
+    const at = ago(0.5);
+    // The same trade stored as a sale, then excluded by hand; one more trade alike stays.
+    const [row] = await db
+      .insert(priceObservations)
+      .values({ ...sold(id, 'raw:A', 50_000, 0), observedAt: at })
+      .returning();
+    await setObservationExcluded(db, row!.id, true);
+    // A sale marked excluded for another reason never counts either.
+    await db.insert(priceObservations).values({
+      ...sold(id, 'raw:A', 60_000, 0),
+      observedAt: ago(0.2),
+      excluded: true,
+      excludedReason: 'mismatch',
+    });
+    const trade = (priceBase: number, observedAt: string) => ({
+      bucket: 'raw:A',
+      priceBase,
+      observedAt,
+    });
+    await db.insert(productSources).values([
+      {
+        productId: id,
+        source: 'snkrdunk',
+        externalId: 'a',
+        recentSales: [
+          trade(50_000, new Date(at).toISOString()),
+          trade(60_000, ago(0.2)),
+          trade(3_000, ago(1)),
+        ],
+      },
+      // Another source's trade at the same price and time is not that sale.
+      { productId: id, source: 'mercari', externalId: 'b', recentSales: [trade(50_000, at)] },
+    ]);
+    for (const market of [
+      await loadMarketData(db, uid, [id], now),
+      await rawMarketData(db, uid, [id], now),
+    ]) {
+      const recent = market.recent.get(id) ?? [];
+      expect(recent.map((r) => `${r.source}:${r.priceBase}`).sort()).toEqual([
+        'mercari:50000',
+        'snkrdunk:3000',
+      ]);
+    }
+    // Taken back: the trade counts again.
+    await setObservationExcluded(db, row!.id, false);
+    const back = (await loadMarketData(db, uid, [id], now)).recent.get(id) ?? [];
+    expect(back.filter((r) => r.source === 'snkrdunk')).toHaveLength(2);
+  });
+
+  it('drops an approximate-time trade read again hours later', async () => {
+    const { pika } = await scenario();
+    const id = pika.product.id;
+    const at = ago(1);
+    await db.insert(priceObservations).values({
+      ...sold(id, 'raw:A', 50_000, 0),
+      source: 'snkrdunk',
+      observedAt: at,
+      excluded: true,
+      excludedReason: 'manual',
+    });
+    // The next night's read worked "N hours ago" out from a later clock: 6 hours later.
+    const moved = new Date(Date.parse(at) + 6 * 3_600_000).toISOString();
+    await db.insert(productSources).values({
+      productId: id,
+      source: 'snkrdunk',
+      externalId: 'm',
+      recentSales: [
+        { bucket: 'raw:A', priceBase: 50_000, observedAt: moved, approximate: true },
+        { bucket: 'raw:A', priceBase: 4_000, observedAt: ago(2), approximate: true },
+      ],
+    });
+    const recent = (await loadMarketData(db, uid, [id], now)).recent.get(id) ?? [];
+    expect(recent.map((r) => r.priceBase)).toEqual([4_000]);
+  });
+
+  it('drops an approximate trade over 30 days old read again weeks later', async () => {
+    const { pika } = await scenario();
+    const id = pika.product.id;
+    // Stored as "20日前" at a read 25 days before the trade's newest reading, "1ヶ月前".
+    await db.insert(priceObservations).values({
+      ...sold(id, 'raw:A', 50_000, 0),
+      observedAt: ago(55),
+      excluded: true,
+      excludedReason: 'manual',
+    });
+    await db.insert(productSources).values({
+      productId: id,
+      source: 'snkrdunk',
+      externalId: 'm',
+      recentSales: [
+        { bucket: 'raw:A', priceBase: 50_000, observedAt: ago(31), approximate: true },
+        { bucket: 'raw:A', priceBase: 4_000, observedAt: ago(32), approximate: true },
+      ],
+    });
+    const recent = (await loadMarketData(db, uid, [id], now)).recent.get(id) ?? [];
+    expect(recent.map((r) => r.priceBase)).toEqual([4_000]);
+  });
+});
+
 describe('portfolio (scenario 7)', () => {
   it('totals spent, value and unrealized P/L over owned holdings', async () => {
     const { amiibo } = await scenario();

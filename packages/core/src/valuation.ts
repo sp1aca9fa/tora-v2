@@ -299,6 +299,71 @@ export interface LastSale {
   approximate: boolean;
 }
 
+/** A stored sale marked excluded, as a recent trade is matched against it. */
+export interface ExcludedSale {
+  source: string;
+  bucket: string | null;
+  priceBase: number;
+  observedAt: string;
+}
+
+/**
+ * How far a trade's time may be from the stored sale's to be that sale: none for an exact time;
+ * for an approximate one ("5時間前", worked out again at every read), 1 day, or 30 days once the
+ * trade is more than 30 days old (the site then counts in months, "1ヶ月前", so a trade stored as
+ * "20日前" can come back up to about 30 days off).
+ */
+export function excludedMatchWindowMs(
+  trade: { observedAt: string; approximate?: boolean },
+  now: Date = new Date(),
+): number {
+  if (trade.approximate !== true) return 0;
+  return now.getTime() - Date.parse(trade.observedAt) > 30 * DAY ? 30 * DAY : DAY;
+}
+
+/**
+ * A listing's recent trades without those that are stored sales marked excluded, for any reason
+ * (case V21; docs/rules/values.md "a sale marked excluded never" counts). A recent trade carries
+ * no reference, so a trade is matched to a sale with the same source, condition and base price
+ * and a time within `excludedMatchWindowMs` (the stored sale keeps its first read's time).
+ * Nearest times first, one trade per sale, as `withoutFailing` does at collect for the sales that
+ * fail a game's rules. A foreign source's base price converted again at another rate no longer
+ * matches (a known limit, case V25: the recent trades keep no price in their own currency).
+ */
+export function withoutExcludedTrades<T extends RecentSaleInput>(
+  recent: readonly T[],
+  excluded: readonly ExcludedSale[],
+  now: Date = new Date(),
+): T[] {
+  if (!excluded.length || !recent.length) return [...recent];
+  const pairs: { r: number; e: number; gap: number }[] = [];
+  recent.forEach((r, ri) => {
+    const at = Date.parse(r.observedAt);
+    if (!Number.isFinite(at)) return;
+    const window = excludedMatchWindowMs(r, now);
+    excluded.forEach((e, ei) => {
+      const gap = Math.abs(Date.parse(e.observedAt) - at);
+      // A garbled sale time gives NaN: no match (never a guess).
+      if (
+        e.source === r.source &&
+        (e.bucket ?? null) === (r.bucket ?? null) &&
+        e.priceBase === r.priceBase &&
+        gap <= window
+      )
+        pairs.push({ r: ri, e: ei, gap });
+    });
+  });
+  pairs.sort((a, b) => a.gap - b.gap || a.r - b.r || a.e - b.e);
+  const dropped = new Set<number>();
+  const used = new Set<number>();
+  for (const p of pairs) {
+    if (dropped.has(p.r) || used.has(p.e)) continue;
+    dropped.add(p.r);
+    used.add(p.e);
+  }
+  return recent.filter((_, i) => !dropped.has(i));
+}
+
 /** Newest real sale in the bucket, from stored history or the fresher recent trades. */
 export function lastSale(
   observations: readonly ValuationObservation[],

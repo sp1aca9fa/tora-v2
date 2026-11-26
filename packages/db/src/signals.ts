@@ -3,6 +3,7 @@
 // read.
 import {
   type DayPrice,
+  ASK_FLOOR,
   type RuleTestResult,
   type SignalStats,
   type StrategyChoice,
@@ -34,7 +35,7 @@ import { productLines, releaseDates, similarKey } from './release';
 import { type Product, holdings, products, signals, users, watches } from './schema';
 import { fileSuggestion } from './suggestions';
 import { askChecks } from './ask-check';
-import { currentSupply, lowestAsk } from './supply';
+import { SUPPLY_FRESH_DAYS, currentSupply, lowestAsk } from './supply';
 import { holdingBucket, savedBucketValues } from './valuation';
 
 const DAY = 86_400_000;
@@ -311,22 +312,37 @@ export async function refreshSignals(
     const drop = firstYear ? byLine(line, others, (o) => typicalLowDrop(ageDays!, o, today)) : null;
     const lowDrop = drop && { ...drop, from: recentPrice(picked?.series ?? [], today) };
     if (pattern) withPattern++;
+    const stats = seriesStats(picked?.series ?? [], today, value?.valuation.unitBase ?? null);
     // Like for like (as Opportunities): the price source's own ask; another site's cheapest
-    // listing is too often something else (Mercari asks at a third of the sales price). A game's
+    // listing is too often something else (Mercari asks at a third of the sales price). With no
+    // daily prices on any source there is no price source, so no ask (case B8). A listing under
+    // half the fair value is more likely something else (parts, one pack): left out, as for
+    // alerts and Opportunities (`ASK_FLOOR`, docs/rules/buy-timing.md "Lowest ask"). A game's
     // unverified ask counts as no ask (S36 A2; cards and sealed: every ask, as before).
-    const ask = lowestAsk(
-      checks.usable(
-        (supply.get(product.id) ?? []).filter((x) => !picked || x.source === picked.source),
-      ),
-      bucket ?? '',
-    );
+    const ask = picked
+      ? lowestAsk(
+          checks.usable(
+            (supply.get(product.id) ?? []).filter(
+              (x) =>
+                x.source === picked.source &&
+                (stats.fair === null ||
+                  x.lowestAskBase === null ||
+                  x.lowestAskBase >= stats.fair * ASK_FLOOR),
+            ),
+          ),
+          bucket ?? '',
+        )
+      : null;
     rows.push({
       productId: product.id,
       bucket: bucket ?? '',
       source: picked?.source ?? null,
       stats: {
-        ...seriesStats(picked?.series ?? [], today, value?.valuation.unitBase ?? null),
+        ...stats,
         ask: ask?.lowestAskBase ?? null,
+        // The day of the report the ask comes from: a page drops the ask once it is more than
+        // SUPPLY_FRESH_DAYS before today (`withFreshAsk`).
+        askDay: ask?.day ?? null,
         ageDays,
         releaseFrom: r?.from ?? null,
         release: r?.date ?? null,
@@ -446,15 +462,37 @@ export async function suggestLines(
 /** Days after which an item's last numbers no longer count as today's. */
 export const SIGNAL_FRESH_DAYS = 3;
 
-/** The latest numbers (within 3 days) of item + condition pairs, by `product|bucket`. */
+type SignalRow = (typeof signals)['$inferSelect'];
+
+/**
+ * A saved row as a page shows it on `today`: its ask is dropped when the listing report it came
+ * from is more than SUPPLY_FRESH_DAYS before today, so a row up to SIGNAL_FRESH_DAYS old never
+ * shows a listing seen up to 6 days ago as for sale now (docs/rules/buy-timing.md "Lowest ask").
+ * A row saved before the report's day was kept (`askDay` missing) has an ask of unknown age: no
+ * ask, never a stale one shown as current.
+ */
+export function withFreshAsk<T extends Pick<SignalRow, 'stats'>>(row: T, today: string): T {
+  const { ask, askDay } = row.stats;
+  if (ask === null) return row;
+  const age = askDay
+    ? (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${askDay.slice(0, 10)}T00:00:00Z`)) / DAY
+    : NaN;
+  return age <= SUPPLY_FRESH_DAYS ? row : { ...row, stats: { ...row.stats, ask: null } };
+}
+
+/**
+ * The latest numbers (within 3 days) of item + condition pairs, by `product|bucket`; an ask from
+ * a report more than 3 days before today is dropped (`withFreshAsk`).
+ */
 export async function latestSignals(
   db: Db,
   wanted: { productId: string; bucket: string | null }[],
   now = new Date(),
-): Promise<Map<string, (typeof signals)['$inferSelect']>> {
-  const out = new Map<string, (typeof signals)['$inferSelect']>();
+): Promise<Map<string, SignalRow>> {
+  const out = new Map<string, SignalRow>();
   const ids = [...new Set(wanted.map((w) => w.productId))];
   if (ids.length === 0) return out;
+  const today = localDate(now);
   const from = localDate(new Date(now.getTime() - SIGNAL_FRESH_DAYS * DAY));
   const keys = new Set(wanted.map((w) => `${w.productId}|${w.bucket ?? ''}`));
   for (let i = 0; i < ids.length; i += 200) {
@@ -465,7 +503,7 @@ export async function latestSignals(
       .orderBy(desc(signals.day));
     for (const r of rows) {
       const key = `${r.productId}|${r.bucket}`;
-      if (keys.has(key) && !out.has(key)) out.set(key, r);
+      if (keys.has(key) && !out.has(key)) out.set(key, withFreshAsk(r, today));
     }
   }
   return out;

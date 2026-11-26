@@ -16,6 +16,7 @@ import {
   saveSuggestedRates,
   suggestedRateList,
   trackedBoxes,
+  openingBoxPrice,
 } from './opening';
 import { tcgSets } from './schema';
 import { createUser } from './users';
@@ -148,4 +149,14 @@ it("lists a person's boxes held or watched, not others'", async () => {
   await addWatch(db, uid, { productId: p.id }, {});
   expect((await trackedBoxes(db, uid)).map((b) => b.id)).toEqual([p.id]);
   expect(await trackedBoxes(db, other)).toEqual([]);
+});
+
+it("opening's box price: fair value, else the row's own-source ask, else unknown", () => {
+  expect(openingBoxPrice({ stats: { fair: 15_000, ask: 12_000 } })).toBe(15_000);
+  // No fair value: the row's ask (the price source's own cheapest listing, freshness-checked).
+  expect(openingBoxPrice({ stats: { fair: null, ask: 12_000 } })).toBe(12_000);
+  // No numbers, or no ask: unknown.
+  expect(openingBoxPrice({ stats: { fair: null, ask: null } })).toBeNull();
+  expect(openingBoxPrice(undefined)).toBeNull();
+  expect(openingBoxPrice(null)).toBeNull();
 });

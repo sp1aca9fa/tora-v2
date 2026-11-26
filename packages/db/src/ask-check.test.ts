@@ -79,14 +79,20 @@ const ask = (productId: string, source: string, price: number, bucket = BUCKET) 
 });
 
 /** Two sales a day for `days` days up to NOW at `source`. */
-async function sales(productId: string, days: number, price: number, source = 'shop') {
+async function sales(
+  productId: string,
+  days: number,
+  price: number,
+  source = 'shop',
+  bucket = BUCKET,
+) {
   const rows = Array.from({ length: days * 2 }, (_, i) => {
     const at = new Date(NOW.getTime() - Math.floor(i / 2) * DAY - (i % 2) * 3_600_000);
     return {
       productId,
       source,
       observationType: 'sold' as const,
-      bucket: BUCKET,
+      bucket,
       priceBase: price,
       priceOriginal: price,
       currency: 'JPY',
@@ -334,6 +340,9 @@ describe('readers', () => {
     }
     const at = (id: string, source: string, price: number) =>
       ask(id, source, price, buckets.get(id)!);
+    // Daily prices at the source whose ask is read (with none anywhere there is no ask, case B8).
+    for (const p of [c, s, onlySearch]) await sales(p.id, 10, 1000, 'market', buckets.get(p.id)!);
+    await sales(withShop.id, 10, 1000, 'shop', buckets.get(withShop.id)!);
     await saveSupply(db, [
       at(c.id, 'market', 500),
       at(s.id, 'market', 600),

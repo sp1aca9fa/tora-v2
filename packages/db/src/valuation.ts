@@ -24,6 +24,9 @@ import {
   marketCurrency,
   sourceInfo,
   valueUnit,
+  withoutExcludedTrades,
+  excludedMatchWindowMs,
+  type ExcludedSale,
   type Pools,
   conditionPools,
   itemTypes,
@@ -41,6 +44,7 @@ import {
   type PortfolioPoint,
   type RecentValues,
   type Product,
+  type RecentSale,
   appSettings,
   bucketValues,
   holdingEvents,
@@ -136,8 +140,59 @@ async function valuationSettings(
   };
 }
 
+/**
+ * The stored sales marked excluded (any reason: docs/rules/values.md "a sale marked excluded
+ * never" counts) that a listing's recent trades can match, by `product|source` (case V21,
+ * `withoutExcludedTrades`). Only from a little before each listing's oldest reach (each trade's
+ * time less its match window, less 1 more day for a time written with another offset), on the
+ * (product, source, time) index: the read stays as small as the recent trades.
+ */
+async function excludedSales(
+  db: Db,
+  links: { productId: string; source: string; recentSales: RecentSale[] | null }[],
+  now: Date,
+): Promise<Map<string, ExcludedSale[]>> {
+  const out = new Map<string, ExcludedSale[]>();
+  const ranges = links.flatMap((l) => {
+    const reach = (l.recentSales ?? [])
+      .map((r) => Date.parse(r.observedAt) - excludedMatchWindowMs(r, now))
+      .filter(Number.isFinite);
+    if (!reach.length) return [];
+    const from = new Date(Math.min(...reach) - DAY).toISOString();
+    return [
+      and(
+        eq(priceObservations.productId, l.productId),
+        eq(priceObservations.source, l.source),
+        gte(priceObservations.observedAt, from),
+      ),
+    ];
+  });
+  for (let i = 0; i < ranges.length; i += 200) {
+    for (const o of await db
+      .select({
+        productId: priceObservations.productId,
+        source: priceObservations.source,
+        bucket: priceObservations.bucket,
+        priceBase: priceObservations.priceBase,
+        observedAt: priceObservations.observedAt,
+      })
+      .from(priceObservations)
+      .where(
+        and(
+          or(...ranges.slice(i, i + 200)),
+          eq(priceObservations.observationType, 'sold'),
+          eq(priceObservations.excluded, true),
+        ),
+      )) {
+      const key = `${o.productId}|${o.source}`;
+      out.set(key, [...(out.get(key) ?? []), o]);
+    }
+  }
+  return out;
+}
+
 /** Each product's manual prices (of the user; none for null) and its listings' recent sales. */
-async function manualAndRecent(db: Db, userId: string | null, productIds: string[]) {
+async function manualAndRecent(db: Db, userId: string | null, productIds: string[], now: Date) {
   const valued = await valuedSource(db);
   const recent = new Map<string, RecentSaleInput[]>();
   const manual = new Map<string, { bucket: string; priceBase: number; setAt: string }[]>();
@@ -158,9 +213,18 @@ async function manualAndRecent(db: Db, userId: string | null, productIds: string
       })
       .from(productSources)
       .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
+    const excluded = await excludedSales(
+      db,
+      links.filter((l) => valued(l.source)),
+      now,
+    );
     for (const l of links) {
       if (!valued(l.source)) continue;
-      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
+      const sales = withoutExcludedTrades(
+        (l.recentSales ?? []).map((r) => ({ ...r, source: l.source })),
+        excluded.get(`${l.productId}|${l.source}`) ?? [],
+        now,
+      );
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }
@@ -193,7 +257,7 @@ export async function loadMarketData(
     );
     if (list.length) observations.set(productId, list);
   }
-  return { observations, ...(await manualAndRecent(db, userId, productIds)), ...settings };
+  return { observations, ...(await manualAndRecent(db, userId, productIds, now)), ...settings };
 }
 
 /** Market data for valuing these products' buckets today (see `loadMarketData`). */
@@ -270,9 +334,18 @@ export async function rawMarketData(
       })
       .from(productSources)
       .where(and(inArray(productSources.productId, ids), eq(productSources.active, true)));
+    const excluded = await excludedSales(
+      db,
+      links.filter((l) => valued(l.source)),
+      now,
+    );
     for (const l of links) {
       if (!valued(l.source)) continue;
-      const sales = (l.recentSales ?? []).map((r) => ({ ...r, source: l.source }));
+      const sales = withoutExcludedTrades(
+        (l.recentSales ?? []).map((r) => ({ ...r, source: l.source })),
+        excluded.get(`${l.productId}|${l.source}`) ?? [],
+        now,
+      );
       recent.set(l.productId, [...(recent.get(l.productId) ?? []), ...sales]);
     }
   }

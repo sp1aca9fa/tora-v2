@@ -22,6 +22,19 @@ import {
   watches,
 } from './schema';
 
+/**
+ * A box's price for its opening value (docs/rules/opportunities.md "Box opening value"): its fair
+ * value from its saved buy timing numbers, else the row's ask, as the Facts line shows it: the
+ * cheapest ask of the source its prices come from (another site's cheapest listing is too often
+ * something else), dropped by `latestSignals` once its report is more than 3 days old. No numbers:
+ * no price (unknown stays unknown).
+ */
+export function openingBoxPrice(
+  signal: { stats: { fair: number | null; ask: number | null } } | null | undefined,
+): number | null {
+  return signal?.stats.fair ?? signal?.stats.ask ?? null;
+}
+
 /** The selling fee taken off every card's price (share, admin setting). */
 const FEE_KEY = 'openingFee';
 export const DEFAULT_OPENING_FEE = 0.1;

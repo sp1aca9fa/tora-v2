@@ -1,7 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, expect, it } from 'vitest';
+import { type SignalStats, localDate } from '@tora/core';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createProduct, mergeProducts } from './mutations';
@@ -12,7 +13,9 @@ import {
   refreshRuleTests,
   refreshSignals,
   ruleTestFor,
+  withFreshAsk,
 } from './signals';
+import { saveSupply } from './supply';
 import { createUser } from './users';
 import { addWatch } from './watches';
 import { eq } from 'drizzle-orm';
@@ -219,4 +222,89 @@ it('tests the strategies on the whole history of similar items and saves them fo
     await ruleTestFor(db, boxes[0]!, 'sealed:shrink', { strategy: 'margin', margin: 30 }),
   ).toBeNull();
   expect(await ruleTestFor(db, boxes[0]!, 'sealed:shrink', { strategy: 'target' })).toBeNull();
+});
+
+describe('the lowest ask (docs/rules/buy-timing.md "Lowest ask")', () => {
+  const DAY = 86_400_000;
+  /** A lowest ask reported on `day` (local), in the box's condition. */
+  const report = (productId: string, source: string, price: number, day = localDate(NOW)) => ({
+    productId,
+    source,
+    bucket: 'sealed:shrink',
+    day,
+    lowestAskBase: price,
+    lowestAskOriginal: price,
+    currency: 'JPY',
+    fxRate: null,
+    listings: 1,
+    fetchedAt: NOW.toISOString(),
+  });
+  const watched = async (name: string) => {
+    const p = await box(name);
+    await addWatch(db, uid, { productId: p.id }, { packagingState: 'sealed_shrink' });
+    return p;
+  };
+  const askOf = async (productId: string) =>
+    (await refreshSignals(db, NOW, false)).rows.find((r) => r.productId === productId)!.stats;
+
+  it('is none when no source has daily prices (case B8)', async () => {
+    const p = await watched('No sales');
+    await saveSupply(db, [report(p.id, 'snkrdunk', 9000), report(p.id, 'mercari', 3000)]);
+    const s = await askOf(p.id);
+    expect(s.fair).toBeNull();
+    expect(s.ask).toBeNull();
+    expect(s.askDay).toBeNull();
+  });
+
+  it("is the price source's own, leaving out a listing under half the fair value", async () => {
+    const far = await watched('Far under');
+    const half = await watched('At half');
+    for (const p of [far, half]) await sales(p.id, 40, () => 10_000);
+    await saveSupply(db, [
+      report(far.id, 'snkrdunk', 4999),
+      // Another site's cheaper listing never counts.
+      report(far.id, 'mercari', 6000),
+      report(half.id, 'snkrdunk', 5000),
+    ]);
+    const s = await askOf(far.id);
+    expect(s.fair).toBe(10_000);
+    expect(s.ask).toBeNull();
+    const h = await askOf(half.id);
+    expect(h.ask).toBe(5000);
+    expect(h.askDay).toBe(localDate(NOW));
+  });
+
+  it('is dropped once its report is more than 3 days before today', async () => {
+    const p = await watched('Aging');
+    await sales(p.id, 40, () => 10_000);
+    const reportDay = localDate(new Date(NOW.getTime() - 3 * DAY));
+    await saveSupply(db, [report(p.id, 'snkrdunk', 9000, reportDay)]);
+    await refreshSignals(db, NOW);
+    const key = `${p.id}|sealed:shrink`;
+    const read = async (days: number) =>
+      (
+        await latestSignals(
+          db,
+          [{ productId: p.id, bucket: 'sealed:shrink' }],
+          new Date(NOW.getTime() + days * DAY),
+        )
+      ).get(key)!.stats;
+    // Saved today with a report 3 days old: shown today.
+    expect((await read(0)).askDay).toBe(reportDay);
+    expect((await read(0)).ask).toBe(9000);
+    // The same row read a day later: the report is 4 days old, the rest of the row stays.
+    const later = await read(1);
+    expect(later.ask).toBeNull();
+    expect(later.fair).toBe(10_000);
+  });
+
+  it('withFreshAsk: an ask of unknown age (older rows) is none; a row without one is unchanged', () => {
+    const stats = { fair: 100, ask: 90 } as SignalStats;
+    const today = '2026-10-16';
+    expect(withFreshAsk({ stats }, today).stats.ask).toBeNull();
+    expect(withFreshAsk({ stats: { ...stats, askDay: '2026-10-13' } }, today).stats.ask).toBe(90);
+    expect(withFreshAsk({ stats: { ...stats, askDay: '2026-10-12' } }, today).stats.ask).toBeNull();
+    const none = { stats: { ...stats, ask: null } };
+    expect(withFreshAsk(none, today)).toBe(none);
+  });
 });

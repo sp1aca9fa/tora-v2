@@ -5,10 +5,9 @@ import {
   type OpeningCardRow,
   type Product,
   type SetRates,
-  currentSupply,
   latestRates,
   latestSignals,
-  lowestAsk,
+  openingBoxPrice,
   openingCardsOf,
   openingFee,
   openingRates,
@@ -28,7 +27,7 @@ export interface BoxOpening {
   set: SetRates;
   cards: PricedCard[];
   value: OpeningValue;
-  /** Today's market value of the box, else its lowest ask (base currency). */
+  /** Today's market value of the box, else its prices' source's lowest ask (base currency). */
   boxPrice: number | null;
   fee: number;
   /** When the cards were last read; null before the first read. */
@@ -44,7 +43,7 @@ export async function loadOpenings(db: Db, products: Product[]): Promise<Map<str
   const out = new Map<string, BoxOpening>();
   if (!boxes.length) return out;
   const setIds = [...new Set(boxes.map((p) => p.setId!))];
-  const [rates, cardsBySet, fee, base, signals, supply] = await Promise.all([
+  const [rates, cardsBySet, fee, base, signals] = await Promise.all([
     openingRates(db, setIds),
     openingCardsOf(db, setIds),
     openingFee(db),
@@ -52,10 +51,6 @@ export async function loadOpenings(db: Db, products: Product[]): Promise<Map<str
     latestSignals(
       db,
       boxes.map((p) => ({ productId: p.id, bucket: BOX_BUCKET })),
-    ),
-    currentSupply(
-      db,
-      boxes.map((p) => p.id),
     ),
   ]);
   const currencies = [...new Set([...cardsBySet.values()].flat().map((c) => c.currency))].filter(
@@ -76,9 +71,8 @@ export async function loadOpenings(db: Db, products: Product[]): Promise<Map<str
             : Math.round(convertMinor(price, c.currency, base, rate) * (1 - fee)),
       };
     });
-    const ask = lowestAsk(supply.get(product.id) ?? [], BOX_BUCKET);
-    const boxPrice =
-      signals.get(`${product.id}|${BOX_BUCKET}`)?.stats.fair ?? ask?.lowestAskBase ?? null;
+    // Fair value, else the ask of the prices' own source (not every site's cheapest listing).
+    const boxPrice = openingBoxPrice(signals.get(`${product.id}|${BOX_BUCKET}`));
     const value = openingValue({
       packsPerBox: set.rates.packsPerBox,
       tiers: set.rates.tiers,
