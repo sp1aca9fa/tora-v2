@@ -21,7 +21,8 @@
     "plugins": "tsx src/cli/plugins.ts",
     "catalog-sync": "tsx src/cli/catalog-sync.ts",
     "recheck-sales": "tsx src/cli/recheck-sales.ts",
-    "item-check": "tsx src/cli/item-check.ts"
+    "item-check": "tsx src/cli/item-check.ts",
+    "confine-check": "tsx src/cli/confine-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

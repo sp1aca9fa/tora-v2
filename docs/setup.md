@@ -13,7 +13,7 @@ PC that collects prices every day. About an hour, plus writing plug-ins for your
 | A home PC with Linux or Windows + WSL2                                                                                | Runs the collectors (a residential connection), migrations, accounts | -            |
 | Node 22+ (24 LTS recommended), pnpm via Corepack (Node 25 and later ship without it: `npm install -g corepack` first) | Everything is TypeScript                                             | free         |
 | An authenticator app (phone)                                                                                          | Sign-in asks for a 6-digit code                                      | free         |
-| Optional: Claude Code with a Claude plan                                                                              | Reading screenshot imports and the data review on the home PC        | your plan    |
+| Optional: Claude Code 2.1.248 or later with a Claude plan                                                             | Reading screenshot imports and the data review on the home PC        | your plan    |
 
 The license is [PolyForm Noncommercial](../LICENSE.md): personal and other noncommercial use only.
 
