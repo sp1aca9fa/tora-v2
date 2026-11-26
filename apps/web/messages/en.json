@@ -49,7 +49,7 @@
     "errors": {
       "failed": "Login failed. If the account has alert channels, the reason was sent there.",
       "expired": "The sign-in took too long. Start over.",
-      "notConfigured": "Login is not configured (AUTH_SECRET missing, see README)."
+      "notConfigured": "Login is not configured (AUTH_SECRET missing or too short, see README)."
     }
   },
   "portfolio": {
@@ -58,9 +58,9 @@
     "qty": "Qty {qty}",
     "pulledFrom": "Pulled from {name}",
     "spent": "Total spent",
-    "itemsValue": "{units} items · {lots} entries",
+    "itemsValue": "{lots, plural, one {# lot} other {# lots}}, {units, plural, one {# unit} other {# units}}",
     "marketValue": "Market value",
-    "valuedOf": "{valued} of {total} entries valued",
+    "valuedOf": "{valued} of {total} lots valued",
     "unrealized": "Unrealized P/L",
     "vsCost": "{pct}% vs cost {cost}",
     "overTime": "Value over time",
@@ -119,7 +119,7 @@
     "intro": "Where your {total} of value sits, by group.",
     "atCost": "{market} market value + {cost} valued at what you paid ({count, plural, one {# lot has} other {# lots have}} no market price) = {total}; the percentages use this total.",
     "howTitle": "How this works",
-    "how": "Each lot counts at its market value, or at its cost with no price yet. A group holding {heavy} or more of the value is marked heavy (not a franchise: collecting one is normal, nor the only group there is), so is one item with {item} or more. Under item types and sets: those you hold under {little} of where Tora has items worth a look.",
+    "how": "Each lot counts at its market value, or at its cost with no price yet. A group holding {heavy} or more of the value is marked heavy (not a franchise: collecting one is normal, nor the unknown group, nor the only known group), so is one item with {item} or more (unless it is the only one). Under item types and sets: those you hold under {little} of where Tora has items worth a look.",
     "empty": "Nothing to spread yet: add items you own with a cost or a price.",
     "heavyItems": "Items holding much of the value on their own",
     "heavy": "Heavy: {share} of the value in one group.",
@@ -186,7 +186,7 @@
     "submit": "Register",
     "errors": {
       "pickProduct": "Pick an item from the search results.",
-      "pickCategory": "Choose TCG or Game.",
+      "pickCategory": "Choose the category.",
       "pickFranchise": "Choose the franchise.",
       "pickKind": "Choose what kind of item it is.",
       "pickSet": "Pick the set, or enter it manually."
@@ -263,7 +263,7 @@
     "openLot": "Open lot",
     "levels": "Change levels",
     "section": {
-      "tcg_main_source": "{count, plural, one {# TCG item} other {# TCG items}} without an identity link",
+      "tcg_main_source": "{count, plural, one {# card or sealed TCG item} other {# cards or sealed TCG items}} without an identity link",
       "game_main_source": "{count, plural, one {# game or item} other {# games and items}} without an identity link",
       "second_source": "{count, plural, one {# suggestion} other {# suggestions}} from another price source",
       "secondary_identity": "{count, plural, one {# item} other {# items}} without an identity link in the secondary market",
@@ -403,7 +403,7 @@
       },
       "notices": {
         "title": "Notices",
-        "info": "The colour and order of each kind of action."
+        "info": "The color and order of each kind of action."
       },
       "sources": {
         "title": "Price sources",
@@ -419,7 +419,7 @@
       },
       "admin": {
         "title": "Admin preferences",
-        "info": "Markets, price sources, identity pages, categories, languages, the time zone, the database's usage and the home PC's commands, for every account."
+        "info": "Accounts, markets, price sources, categories, schedules, the database and the server: the settings for every account."
       },
       "markets": {
         "title": "Markets",
@@ -502,7 +502,7 @@
     "minutes": "{m} min",
     "hoursMinutes": "{h} h {m} min",
     "nightTotal": "Last night: {total} of collecting, window {window}.",
-    "nightOver": "Longer than the window. Run one market or one collector at a time (pnpm collect --market us, --source x), spread across the night by the scheduler; the setup guide has an example.",
+    "nightOver": "Longer than the window. Run one market or one collector at a time (pnpm collect --market us, --source x), spread across the night by the scheduler; the Running collectors guide has an example.",
     "runTime": "Last run: {time}",
     "runTimeUsual": "Last run: {time} (usual {usual})",
     "runTimeLong": "Last run: {time}, much longer than usual ({usual})",
@@ -510,7 +510,7 @@
     "noBackup": "No database backup yet, so a failed disk would lose the data. The daily schedule makes one after each collect, or run pnpm backup on the home PC.",
     "dataCheck": {
       "title": "Self check",
-      "info": "Each morning Tora compares each source that reports sold prices with its usual numbers and with the others in its market. It changes nothing: an open finding is a cue to take a look.",
+      "info": "Each morning Tora compares each source that reports sold prices (sources kept from AI models aside) with its usual numbers and with the others in its market. It changes nothing: an open finding is a cue to take a look.",
       "lastRun": "Last checked {date}",
       "never": "Not run yet",
       "stale": "Has not run since {date}",
@@ -684,7 +684,7 @@
   },
   "sources": {
     "title": "Price sources",
-    "info": "Where this item's market prices come from. Prices are collected by the home PC once a day.",
+    "info": "Where this item's market prices come from. The home PC collects them each night; some marketplaces are also read during the day.",
     "open": "Open",
     "collected": "{count} trades collected · last run {date}",
     "waiting": "Linked. Trades are collected on the next run.",
@@ -769,7 +769,7 @@
     "manualHint": "Per unit, for this condition only. Always wins over market data.",
     "manual": "Manual price",
     "retail": "Retail price (no trades)",
-    "store": "{source} store price (no trades)",
+    "store": "{source} asking price (no trades)",
     "noData": "No market data",
     "samples": "{count, plural, one {# sale} other {# sales}} / {days}d",
     "age": "newest {days}d ago",
@@ -781,12 +781,12 @@
     "confidenceHint": {
       "high": "[[highConfidenceSales]]+ sales in the last [[highConfidenceDays]] days",
       "medium": "[[mediumConfidenceSales]]+ sales in the last [[mediumConfidenceDays]] days",
-      "low": "Few or old sales, a store price, or the retail price"
+      "low": "Few or old sales, an asking price, or the retail price"
     },
     "short": {
       "median": "Market",
       "manual": "Manual",
-      "store": "Store",
+      "store": "Ask",
       "retail": "Retail",
       "none": "No data"
     },
@@ -839,8 +839,8 @@
     "reason": {
       "deadline_missed": "The seller missed the shipping deadline: if you canceled this order, tick the box below.",
       "no_delivery": "Some purchases of this item have no delivery email: if this was one you canceled, tick the box below.",
-      "date_approx": "Date read from the listing (its last update, usually a few days after the purchase): correct it if you know the day.",
-      "new_product": "New item made from the listing title: check its name and details on its page.",
+      "date_approx": "The purchase date is a guess (a listing's last update, a date with no year, or, when none was shown, the day of the file or of the import): correct it if you know the day.",
+      "new_product": "New item made from the purchase's title or the row's item name: check its name and details on its page.",
       "price_far": "The price is far from what this item sells for: check the item and the price.",
       "check_product": "Claude matched this to an item the title may not support (or to a new one named like an item you have): check which item it is.",
       "ai_unsure": "Claude was not sure about part of this row (read from your files): check the details.",
@@ -849,7 +849,7 @@
     "purchasedOn": "Purchased on",
     "links": {
       "title": "Add purchases by link",
-      "intro": "For shops that send no receipt email: paste the links of things you bought, one per line (in the shop's app: your purchases > the item > share > copy link). The home PC reads them on the next collect; collectibles then show up above for review, other things are skipped.",
+      "intro": "For shops that send no receipt email: paste the links of things you bought, one per line (in the shop's app: your purchases > the item > share > copy link). The home PC reads them on the next collect; collectibles then wait in Review import, other things are skipped.",
       "label": "Purchase links",
       "add": "Add links",
       "added": "{count, plural, one {# link added} other {# links added}}",
@@ -877,7 +877,7 @@
       "allClear": "Nothing needs you right now.",
       "start": "Import purchases",
       "emailTitle": "Order emails",
-      "emailIntro": "Export the shop's order emails with Google Takeout, then run this on the home PC. Imported items show up here to review.",
+      "emailIntro": "Export the shop's order emails with Google Takeout, then run this on the home PC. Imported items then wait in Review import.",
       "emailLast": "Last email import: {date}",
       "emailNever": "No email import yet.",
       "history": "History",
@@ -907,7 +907,7 @@
         "left": "{count, plural, one {# left for next time} other {# left for next time}}"
       },
       "aiTitle": "Through Claude (any shop)",
-      "aiIntro": "Screenshots of order lists or order pages, PDFs, CSV or copied text from any shop: put them in one folder and run this on the home PC. Haiku reads them, Sonnet reads again what looks off, and everything lands here to review.",
+      "aiIntro": "Screenshots of order lists or order pages, PDFs, CSV or copied text from any shop: put them in one folder and run this on the home PC. Haiku reads them, Sonnet reads again what looks off, and everything then waits in Review import.",
       "aiLast": "Last import through Claude: {date}",
       "aiNever": "No import through Claude yet.",
       "otherActions": "{count, plural, one {# other thing needs} other {# other things need}} you on the Actions page"
@@ -915,16 +915,16 @@
     "removeLot": "Remove this lot (not one of my purchases)",
     "sameAs": "Same purchase as",
     "sameAsNone": "(a separate purchase)",
-    "sameAsHint": "This lot is merged into the one chosen: that one stays, taking this one's order ID, price or date where it has none.",
+    "sameAsHint": "This lot is merged into the one chosen: that one stays, taking this one's order ID or price where it has none, and its date when the chosen one's is a guess and this one's is not.",
     "upload": {
       "title": "Upload screenshots or files",
-      "introPc": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them on the home PC's next run (with its Claude login) and the purchases wait in Review.",
-      "introApi": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them right away and the purchases wait in Review.",
+      "introPc": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them on the home PC's next run (with its Claude login) and the purchases wait in Review import.",
+      "introApi": "Screenshots of orders, receipts as PDF, or copied text from any shop: Claude reads them right away and the purchases wait in Review import.",
       "send": "Upload",
       "sending": "Uploading {done} of {total}...",
       "limits": "Up to {files} files, {mb} MB each: images, PDF, text. One purchase may span several files (a listing and its order page).",
-      "readNow": "Uploaded. Claude is reading them now: the purchases show up in Review in a minute or two.",
-      "waiting": "Uploaded. They are read on the home PC's next run; the purchases then show up in Review.",
+      "readNow": "Uploaded. Claude is reading them now: the purchases show up in Review import in a minute or two.",
+      "waiting": "Uploaded. They are read on the home PC's next run; the purchases then show up in Review import.",
       "notSent": "Not uploaded: {files}",
       "files": "{count, plural, one {# file} other {# files}}",
       "open": "Open the import",
@@ -944,7 +944,7 @@
     },
     "sheet": {
       "title": "Spreadsheet",
-      "intro": "A CSV in the layout of <download>your lots download</download> (or <template>this empty one</template>), saved from Excel or any spreadsheet app. You see what each row would do before anything is added; new lots then wait in Review. Rows already in Tora are left alone. Other layouts: upload them above, Claude reads them.",
+      "intro": "A CSV in the layout of <download>your lots download</download> (or <template>this empty one</template>), saved from Excel or any spreadsheet app. You see what each row would do before anything is added; new lots then wait in Review import. Rows already in Tora are left alone. Other layouts: upload them above, Claude reads them.",
       "file": "Spreadsheet file",
       "check": "Check the file",
       "checking": "Checking...",
@@ -955,7 +955,7 @@
         "new": "New lot",
         "newItem": "New lot of a new item",
         "existing": "Already in Tora",
-        "skipped": "Skipped: not an owned lot (sold, opened or lost)"
+        "skipped": "Skipped: not an owned lot (sold, consumed or lost)"
       },
       "problem": {
         "missing_item": "No item name",
@@ -965,7 +965,7 @@
         "bad_region": "Region not known for this category",
         "bad_status": "Status not known (Owned, Sold, Consumed or Lost)",
         "bad_quantity": "Quantity must be a whole number, 1 or more",
-        "bad_cost": "Cost must be 0 or more in the app's currency, with no more decimals than it has (no other currency's sign)",
+        "bad_cost": "Cost must be 0 or more in the base currency, with no more decimals than it has (no other currency's sign)",
         "bad_date": "Date not readable or in the future (use 2026-10-16 or 2026/10/16)",
         "bad_condition": "Condition not known for this kind",
         "bad_packaging": "Packaging not known",
@@ -1039,7 +1039,7 @@
       "details": "Lots & details",
       "opening": "Opening"
     },
-    "noLots": "No lots registered: this item is on your wishlist.",
+    "noLots": "No lots registered.",
     "spentTotal": "Spent in all: {amount}",
     "details": "Item details",
     "editOrMerge": "Edit or merge",
@@ -1062,11 +1062,11 @@
     "into": "Keep",
     "sameListing": "The listing you picked is already linked to the item below, so the two are one item. Merge them to keep one item with all of the listing's sales (a listing's sales are kept once, under one item).",
     "submit": "Merge",
-    "confirm": "Move {lots, plural, one {# lot} other {# lots}} (and its sales data and listings) to \"{name}\" and delete the duplicate."
+    "confirm": "Move {lots, plural, one {# lot} other {# lots}} (and its sales data and listings) to \"{name}\" and delete the duplicate. Other people's lots of it move too."
   },
   "suggestions": {
     "title": "Suggestions",
-    "intro": "Fixes the data review proposes after a collect: a model looked at sales and searches the checks flagged. Nothing changes until you accept. Filled by `pnpm review` (or `pnpm collect --review`) on the home PC.",
+    "intro": "Fixes Tora proposes. The data review (`pnpm review`, or `pnpm collect --review`, on the home PC) has a model judge the sales and searches the checks flagged; Tora itself proposes catalog sets (when an item is added and on each collect) and set lines (on each collect). Nothing changes until you accept.",
     "none": "No suggestions right now.",
     "banner": "{count, plural, one {# suggestion to check} other {# suggestions to check}}",
     "kind": {
@@ -1110,7 +1110,7 @@
   "compare": {
     "title": "{primary} vs {secondary}",
     "info": "Same condition on both sides ({bucket}). {secondary} prices are shown for comparison only and never count in the value.",
-    "graded": "The foreign prices are for ungraded cards, so your graded cards are compared at this condition.",
+    "graded": "The other markets' prices are for ungraded cards, so your graded cards are compared at this condition.",
     "noJapan": "No {primary} price",
     "spread": "{pct}% vs {primary}",
     "converted": "{price} at {rate} per {currency} ({date})",
@@ -1126,7 +1126,7 @@
   },
   "notices": {
     "title": "Notice levels",
-    "info": "How urgent each kind of notice is: its colour and place on the Actions page. Quiet notices stay listed but are not counted in the badge.",
+    "info": "How urgent each kind of notice is: its color and place on the Actions page. Quiet notices stay listed but are not counted in the badge.",
     "level": {
       "red": "Urgent (red)",
       "orange": "High (orange)",
@@ -1135,7 +1135,7 @@
       "grey": "Quiet (grey)"
     },
     "type": {
-      "tcg_main_source": "TCG item without an identity link",
+      "tcg_main_source": "Card or sealed TCG item without an identity link",
       "game_main_source": "Game or other item without an identity link",
       "second_source": "Suggestions from another price source",
       "secondary_identity": "Item without an identity link in the secondary market",
@@ -1205,7 +1205,7 @@
   },
   "sourceRoles": {
     "title": "Price sources",
-    "info": "Where values come from, per kind of item: a reference source is valued first and is the source items should be linked to; supporting sources are used when the reference has too few sales; comparison sources are shown beside the value, never in it. The roles come from the sources' plug-ins (suggested) and apply to every account.",
+    "info": "Where values come from, per item type: a reference source is valued first; supporting sources are used when the reference has too few sales; comparison sources are shown beside the value, never in it. The roles come from the sources' plug-ins (suggested) and apply to every account.",
     "adminOnly": "Only an admin can change them.",
     "source": "Source",
     "class": {
@@ -1227,16 +1227,16 @@
       "buylist": "buy prices"
     },
     "quality": {
-      "agrees": "Agrees with {reference}: {pct}% {direction}, {count} items",
-      "disagrees": "{pct}% {direction} {reference} on {count} items: comparison only",
-      "unverified": "Unverified: {count} items in common with {reference} ([[qualityMinPairs]] needed)",
+      "agrees": "Agrees with {reference}: {pct}% {direction}, {count} item and condition pairs",
+      "disagrees": "{pct}% {direction} {reference} on {count} item and condition pairs: comparison only",
+      "unverified": "Unverified: {count} item and condition pairs in common with {reference} ([[qualityMinPairs]] needed)",
       "below": "below",
       "above": "above",
       "dismissed": "notice dismissed"
     },
     "suggestedRole": "Suggested: {role}",
     "suggestedWhy": "The role the source's plug-in suggests: its author's tested setup, not a measurement. The evidence is the check under each supporting source: how its sales compare with the reference's on the same items.",
-    "perClass": "Each kind of item has its own roles and order. Within a role, the arrows set the order: values try sources sharing a role in this order (with two references, the first one is the main one), and item pages list them in it. Values and the value history follow a change within seconds.",
+    "perClass": "Each item type has its own roles and order. Within a role, the arrows set the order: values try sources sharing a role in this order (with two references, the first one is the main one), and item pages list them in it. Values and the value history follow a change within seconds.",
     "identityNone": "None",
     "asksOnly": "Asking or store prices, not sales: usually above what items sell for.",
     "group": {
@@ -1266,7 +1266,7 @@
     "whatTitle": "Why identity pages matter",
     "what": "An identity page is one stable product page that says exactly what an item is: its name, set, number and picture (e.g. a card's page on a card marketplace).",
     "why": "It is the item's ID card. Once an item is linked to it, Tora knows precisely which item it is and can find the same item on every other source, so prices are matched to the right item. Without one, matches are guesses from the name.",
-    "how": "Pick one source per kind of item and market. Items without an identity page are listed under Actions. A product page from another source of the same market that has them counts too. It does not have to be the price reference.",
+    "how": "Pick one source per item type and market. Items you own without an identity page are listed under Actions (other items only above the amount below). A product page from another source of the same market that has them counts too. It does not have to be the price reference.",
     "primaryNotice": "Items without an identity page in {market} show under Actions as \"without an identity link\".",
     "secondaryNotice": "Items without an identity page in {market} show under Actions with their own notice type (blue by default).",
     "notListed": "Only sources with one product page per item can be identity pages. Search-based sources (flea markets, auctions, eBay) cannot, but they can still be any market's price reference: set that under Price sources.",
@@ -1290,18 +1290,18 @@
     "typedLabel": "1 {code} =",
     "rateInvalid": "Enter a number above zero, like 0.0067 or 1,234.5.",
     "save": "Save",
-    "manualInfo": "Used from today until changed; earlier days keep their rates.",
+    "manualInfo": "Used from today until changed; earlier days keep their own rates, and days with no earlier rate use it.",
     "confirm": "Convert every stored amount ({count}) from {from} to {to}, each with the exchange rate of its own date? Values are rebuilt right after. Do it while no collect is running.",
     "noPlugins": "No rate plug-in covers {code} yet. Plug-ins are listed after the home PC's next collect; until then you can type a rate."
   },
   "languages": {
     "title": "Languages",
     "info": "The app is shown in the primary language to anyone who has not chosen; everyone switches between the two with the language toggle. Picked from the installed translation files.",
-    "add": "{count, plural, one {# language installed} other {# languages installed}}. Another one is a translation of messages/en.json added to the app (the setup guide explains how).",
+    "add": "{count, plural, one {# language installed} other {# languages installed}}. Another one is a translation of messages/en.json added to the app (the Languages guide explains how).",
     "primary": "Primary language",
     "secondary": "Secondary language",
     "none": "None (no toggle)",
-    "primaryInfo": "Shown first, and to people signing in.",
+    "primaryInfo": "Shown to anyone who has not chosen, on the sign-in page too.",
     "secondaryInfo": "The other side of the toggle."
   },
   "boardTracking": {
@@ -1316,7 +1316,7 @@
     "maxDelay": "Longest delay in seconds",
     "toSeconds": "to",
     "seconds": "seconds",
-    "delayInfo": "Drawn again each day, so the tracker never starts or stops on the minute (up to an hour).",
+    "delayInfo": "Drawn again each day, so the tracker never starts or stops on the minute (up to [[maxTrackingDelay]] seconds).",
     "warning": "Tora may start late and finish early: it starts reading {min} to {max} seconds after {from} and stops {min} to {max} seconds before {to}, at another time each day.",
     "outside": "Outside the hours, the Stores pages say so in red, and admins can track for an hour or until the next start (once: the hours go on as usual after).",
     "save": "Save",
@@ -1342,7 +1342,7 @@
   "categories": {
     "title": "Categories",
     "info": "What kinds of items the app holds. Each category has kinds (e.g. booster box, single) and fields; each kind has a condition list, which decides how lots are described and which prices value them. Names are typed in the app's languages.",
-    "plugins": "Collectors say which categories they collect; a new category needs a collector that prices it (the setup guide explains how). Price sources and identity pages are set per category and condition list.",
+    "plugins": "Collectors say which categories they collect; a new category needs a collector that prices it (the Building a collector guide explains how). Price sources and identity pages are set per category and condition list.",
     "items": "{count, plural, =0 {no items} one {# item} other {# items}}",
     "lots": "{count, plural, =0 {no lots} one {# lot} other {# lots}}",
     "key": "Key: {key}",
@@ -1425,7 +1425,7 @@
     "written": "{written} rows written of {free} free",
     "budget": "Alert admins past",
     "millions": "{m} million rows read",
-    "budgetInfo": "The app's daily check sends an alert when the month passes this, or heads past it at this pace (from the [[paceFromDay]]th).",
+    "budgetInfo": "The app's morning check sends an alert when the month passes this, or heads past it at this pace (from the [[paceFromDay]]th).",
     "byOrigin": "By origin",
     "byDay": "By day (UTC)",
     "readWritten": "{read} read, {written} written",
@@ -1450,7 +1450,7 @@
     "memory": "Memory free {free} of {total} MB; load {load}.",
     "disk": "Disk ({name}): {free} GB free of {total} GB.",
     "diskName": {
-      "state": "logs and backups",
+      "state": "state folder (logs)",
       "database": "database"
     },
     "last": "Last collect {collect}; last backup {backup}.",
@@ -1500,7 +1500,7 @@
       "uploads": "Reads files uploaded in the app (Imports > Upload) with the home PC's Claude login.",
       "ai": "Imports purchases from screenshots, PDFs or text in a folder, through Claude.",
       "mail": "Imports purchases from order emails exported with Google Takeout.",
-      "review": "Asks Claude about flagged sales and searches; findings go to Imports > Suggestions."
+      "review": "Asks Claude about flagged sales and searches; its findings wait on the Actions page."
     },
     "accounts": {
       "title": "Accounts",
@@ -1517,17 +1517,17 @@
     "backups": {
       "title": "Backups",
       "backup": "Saves today's copy of the whole database (the schedule does it after each collect), and deletes copies no longer kept: the last 30 days and the first of each month for a year are.",
-      "list": "Lists the copies (or the folder in BACKUP_DIR).",
+      "list": "Lists the copies in the default folder (with BACKUP_DIR set, list that folder instead).",
       "restore": "Loads a copy into the new, empty database in DATABASE_URL; it refuses a database with data."
     },
     "alerts": {
       "title": "Alerts",
-      "afterRun": "Records a collect or backup that stopped before it could, and sends failures to admins at once. The schedule runs it after each collect and backup.",
+      "afterRun": "Records a collect or backup that stopped before it could record itself, and sends failures to admins at once. The schedule runs it after each collect and backup.",
       "check": "The app's morning check, run from the PC: \"nothing ran\" alerts and the daily summaries (each person at most once in [[summaryGapHours]] hours)."
     },
     "database": {
       "title": "Database and Claude",
-      "migrate": "Applies new database migrations. Run it right after pushing a change that adds one.",
+      "migrate": "Applies new database migrations. With a hosted database, run it right after pushing a change that adds one; a home server's update runs it itself.",
       "catalogFetch": "Refreshes the TCG set catalog files (then review and commit them).",
       "catalogSync": "Loads the plug-ins' set lists now (only the regions your set categories use); the collect does it by itself when they change.",
       "mcp": "Lets Claude Code read your data, read-only (sources marked no-AI are left out)."
@@ -1539,10 +1539,10 @@
     "lotsDownload": "Download the spreadsheet (CSV)",
     "lotsImport": "The same layout can be imported: <link>Imports > Spreadsheet</link>.",
     "allTitle": "All your data",
-    "allInfo": "One JSON file with your items, lots, their history, manual prices, wishlist, linked listings and imports: for keeping a copy, or for another program.",
+    "allInfo": "One JSON file with your items, lots, their history, manual prices, wishlist, linked listings, imports and preferences: for keeping a copy, or for another program.",
     "allDownload": "Download all (JSON)",
     "loadTitle": "Load a downloaded file",
-    "loadInfo": "This account is empty: a file downloaded here (from another install, or from this one) brings back its items, lots, history, manual prices, wishlist and imports. Items this install does not have are added; their prices come with the next collect.",
+    "loadInfo": "This account is empty: a file downloaded here (from another install, or from this one) brings back its items, lots, history, manual prices, wishlist, imports and preferences. Items this install does not have are added; their prices come with the next collect.",
     "load": "Load the file",
     "loading": "Loading…",
     "loaded": "Loaded: {lots} lots, {history} history entries, {watches} wishlist items and {items} items ({itemsAdded} new to this install).",
@@ -1595,7 +1595,7 @@
     "test": "Tora: test message. Alerts will arrive here.",
     "connected": "Tora: alerts will arrive in this chat.",
     "collectFailed": "Tora: the nightly collect finished, but some sources had problems:",
-    "collectStopped": "Tora: the nightly collect stopped before it finished, so no prices were saved this time.\nReason: {reason}\nIt tries again at the next hourly run.",
+    "collectStopped": "Tora: the nightly collect stopped before it finished, so tonight's prices were not updated (sales read before it stopped are kept).\nReason: {reason}\nIt tries again at the next hourly run.",
     "sourceLine": "{source}: {status}",
     "status_failed": "failed",
     "status_blocked": "blocked by the site",
@@ -1606,15 +1606,15 @@
     "backupFailed": "Tora: the backup failed: {error}",
     "noCollect": "Tora: no collect has run for {hours} hours (last: {last}). Is the home PC on?",
     "noBackup": "Tora: no backup for {hours} hours (last: {last}). Is the home PC on?",
-    "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan [[freeReadMillions]] million). See Settings > Admin > Database.",
+    "dbBudget": "Tora: the database read {read} million rows this month; at this pace {projected} million by the end of the month (budget {budget} million, free plan [[freeReadMillions]] million). See Settings > Admin preferences > Database.",
     "marketRefused": "Tora: {source} refused one of its extra reads. Its extra reads are now at most {perDay} a day, from {at}.",
     "marketStopped": "Tora: {source} refused its extra reads at [[marketFloor]] a day: they are stopped until an admin restarts them in Settings > Collectors.",
     "marketJobsFailed": "Tora: the extra reads could not run: {error}",
     "sourceQuiet": "Tora: {sources} found no new sales on its last [[quietDays]] days of runs, though it usually finds some. Its site may have changed: look at the collect log, or open one of its listings (Settings > Collectors).",
-    "selfCheck": "Tora: the nightly self-check found saved prices that did not match the collected sales, and rebuilt them: {items}. If this repeats, tell the developer.",
+    "selfCheck": "Tora: after the nightly collect, a re-check of a few items found saved prices that did not match the collected sales, and rebuilt them: {items}. If this repeats, tell the developer.",
     "dataCheckTitle": "Tora's self check found something odd in its data. It changed nothing; this needs a look.",
-    "dataCheckFar": "{source}: {share}% of this week's sales are over twice or under half their item's usual price (usually {usual}%).",
-    "dataCheckFarCeiling": "{source}: {share}% of this week's sales are over twice or under half their item's usual price. That is high for any source.",
+    "dataCheckFar": "{source}: of this week's sales that could be compared, {share}% are over twice or under half their item's usual price (usually {usual}%).",
+    "dataCheckFarCeiling": "{source}: of this week's sales that could be compared, {share}% are over twice or under half their item's usual price. That is high for any source.",
     "dataCheckKept": "{source}: {kept} sales kept this week, down from about {usual}. It may be losing sales.",
     "dataCheckRate": "{source}: keeps {rate}% of the sales it finds (usually {usual}%). A rule may be dropping too much.",
     "dataCheckBlind": "{source}: only {judged} of this week's sales could be judged (about {usual} before). Conditions may be getting lost.",
@@ -1696,19 +1696,19 @@
     "loginHeld": "{n} more failed since the last message.",
     "loginNotYou": "If this was not you: nothing got in.",
     "loginPasswordKnown": "The password was right: if this was not you, change it (Settings > Account) and check Settings > Devices.",
-    "loginPasswordKnownAdmin": "The password was right: if this was not its owner, turn the account off or give it a new setup link (Settings > Admin > Accounts).",
+    "loginPasswordKnownAdmin": "The password was right: if this was not its owner, turn the account off or give it a new setup link (Settings > Admin preferences > Accounts).",
     "login_password": "wrong password.",
-    "login_disabled": "the account is turned off (an admin can turn it on in Settings > Admin > Accounts).",
+    "login_disabled": "the account is turned off (an admin can turn it on in Settings > Admin preferences > Accounts).",
     "login_notSetUp": "the account is not set up yet (its setup link was not finished).",
     "login_devices": "the account is already signed in on [[maxDevices]] devices ({devices}). Sign out of one in Settings > Devices on the other, or ask the admin.",
     "login_code": "wrong authenticator or backup code.",
-    "login_locked": "too many failed attempts; sign-ins from there wait up to an hour.",
+    "login_locked": "too many failed attempts: further sign-ins are refused for a while, from that address or for this account.",
     "login_unknownUser": "no account has that name.",
     "loginUnknownName": "a name of {n} characters (not shown: it may be a password typed in the wrong field)"
   },
   "alerts": {
     "title": "Alerts",
-    "info": "Tora sends a message when something needs you: to admins at once when the collect or the backup fails or does not run, and to everyone a morning summary of imports that did not add every row and of what waits on Actions.",
+    "info": "Tora sends a message when something needs you: to admins when a run fails or does not happen, data looks odd or a server update fails, and to everyone a morning summary of imports that did not add every row and of what waits on Actions.",
     "channels": "Where alerts go",
     "none": "No channel yet. Add Telegram or Discord below.",
     "telegram": "Telegram",
@@ -1737,7 +1737,7 @@
     "forumNoMention": "In a forum channel only a message that mentions you notifies: add your Discord user ID (Settings > Advanced > Developer Mode, then right-click your name > Copy User ID).",
     "add": "Add",
     "what": "What to send",
-    "failures": "The collect or the backup failed or did not run (at once)",
+    "failures": "Problems for admins: a failed collect or backup, server updates and marketplace refusals (at once); nothing run, quiet sources, odd data and the database budget (morning check)",
     "imports": "Imports that did not add every row (morning summary)",
     "actions": "What waits on Actions (morning summary)",
     "language": "Language of the messages",
@@ -1854,9 +1854,9 @@
     "stale": "No check heard from the server since {last}: is it on, and is its hourly collect timer running?",
     "checks": "The server checks every {every} min: last {last}, next {next}.",
     "nextCollect": "Next daily collect: {at}",
-    "nextCollectUnknown": "Next daily collect: at the first check after midnight.",
+    "nextCollectUnknown": "Next daily collect: at the server's next check, or the first one after midnight once today's has run.",
     "doneToday": "Today's collect ran ({at}, {level}).",
-    "notToday": "Today's collect has not run yet (last: {at}, {level}): it runs at the next check.",
+    "notToday": "Today's collect is not done yet (last: {at}, {level}): it runs again at the next check.",
     "requested": "A \"collect now\" waits for the next check ({at}).",
     "level": {
       "ok": "fine",
@@ -1946,7 +1946,7 @@
     "noBackup": "No backup for {hours} hours (last {last})",
     "dbBudget": "Database: {read} million rows read this month, {projected} million at this pace (budget {budget} million)",
     "sourceQuiet": "{sources}: no new sales on the last [[quietDays]] days of runs (usually some)",
-    "selfCheck": "Self-check: saved prices differed from the sales and were rebuilt ({items})",
+    "selfCheck": "Saved prices differed from the sales and were rebuilt ({items})",
     "dataCheck": "Self check: {count, plural, one {# new finding} other {# new findings}}",
     "fromTo": "{from} to {to}",
     "none": "none",
@@ -2034,8 +2034,8 @@
     "conditionHint": "The condition you want to buy it in: prices are followed in this condition.",
     "submit": "Add to wishlist",
     "target": "Target price (per unit)",
-    "targetHint": "Optional. You get an alert when the price reaches it.",
-    "targetHintRetail": "Optional. You get an alert when the price reaches it. Retail price: {amount}.",
+    "targetHint": "Optional. You get an alert when a copy is listed at or under it.",
+    "targetHintRetail": "Optional. You get an alert when a copy is listed at or under it. Retail price: {amount}.",
     "noPrice": "No price yet",
     "underTarget": "At or under your target ({target})",
     "overTarget": "{amount} above your target ({target})",
@@ -2458,7 +2458,7 @@
       "quick_rise": "Its last [[quickRiseDays]] days: {jump} against the [[quickRiseBeforeDays]] days before.",
       "out_of_print": "Not expected to be made or sold again (marked by an admin, or a plug-in's guess).",
       "cheap_steady": "Cheaper than on {cheaper} of its past year's days, and its last [[holdDays]] days are {hold} against the [[holdBeforeDays]] before.",
-      "reprint_coming": "A reprint is expected (marked by an admin)."
+      "reprint_coming": "A reprint is expected (marked by an admin, or a plug-in's guess)."
     },
     "scope": {
       "set": "its set",
@@ -2478,7 +2478,7 @@
     "rankSame": "same as a week ago",
     "rankUp": "up {n} in a week",
     "rankDown": "down {n} in a week",
-    "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top [[candidateTop]] are added as candidates and collected while they stay there; how a rank change does as a signal is tested once enough days are saved.",
+    "popularIntro": "The site's own ranking, read with the collect of {day}. Items nobody tracked in its top [[candidateTop]] are added as candidates and collected while they stay there and for a month after; how a rank change does as a signal is tested once enough days are saved.",
     "colWeek": "Week",
     "candidate": "Suggested",
     "search": {
@@ -2513,7 +2513,7 @@
         "wait": "Wait ({count})",
         "none": "No price yet ({count})"
       },
-      "groupNoneNote": "Tora has no recent price for these, so they are left out of the total and of a suggested mix.",
+      "groupNoneNote": "These have no plan price: Tora has no recent price for them, or their type uses Own target only (no buy zone). They are left out of the total and of a suggested mix.",
       "boughtCount": "{count, plural, one {# ticked item was} other {# ticked items were}} bought this month (in what was spent).",
       "boughtMonth": "Bought this month",
       "save": "Save",
@@ -2574,7 +2574,7 @@
     "noneWithSignals": "No item has all of these on today.",
     "provenTitle": "With a proven signal ({count})",
     "restTitle": "Not worth a look yet ({count})",
-    "restNote": "No proven signal, or a warning outweighs it. Ranked by their other signals, then by how near their target they are.",
+    "restNote": "No proven signal, or its warnings outweigh it. Ranked by the record of their proven signals and warnings, then by how near their target they are.",
     "loading": "Loading...",
     "more": "{count, plural, one {# more} other {# more}}",
     "loadMore": "Load more",
@@ -2593,8 +2593,8 @@
     "fewGroups": "{count, plural, one {# group} other {# groups}} with few checks",
     "wait": "Wait",
     "waitUnder": "Wait, or buy at {price} or less",
-    "waitWhy": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} [[opportunityDays]] days after that. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
-    "waitWhyNow": "Prices of items like this have been falling ({signal}). In the past, prices had typically moved {change} [[opportunityDays]] days after that. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "waitWhy": "{signal} is on, a warning. In the past, prices of items like this had typically moved {change} [[opportunityDays]] days after it. So rather than paying the target ({target}), wait, or pay {price} or less: that leaves room for the usual further drop.",
+    "waitWhyNow": "{signal} is on, a warning. In the past, prices of items like this had typically moved {change} [[opportunityDays]] days after it. So rather than paying today's price, wait, or pay {price} or less: that leaves room for the usual further drop.",
     "popular": {
       "by": "Rank by:",
       "measure": {
@@ -2606,7 +2606,7 @@
       "about": {
         "site": "Each site's own ranking, read every night. Sites don't publish how they rank; they show listings and favorites next to it.",
         "sold": "The items Tora follows, by trades in the last [[popularDays]] days on every site it reads (as of {day}).",
-        "trending": "Trades up [[trendingRatio]]x or more against the [[popularBeforeDays]] days before, counting only sites Tora has read for [[popularFollowDays]]+ days (as of {day}).",
+        "trending": "Trades up [[trendingRatio]]x or more against the [[popularBeforeDays]] days before, counting only sites where its first sale of the past year was over [[popularFollowDays]] days ago (as of {day}).",
         "year": "Trades in the last [[popularYearDays]] days on every site Tora reads, since it started following each item (as of {day})."
       },
       "none": {
@@ -2636,7 +2636,7 @@
     },
     "targetPattern": "Lowered: similar items usually fell further at this age.",
     "targetYours": "Your strategy for this item type: {name}.",
-    "targetSuggested": "Tora's suggested strategy for this item type: {name} (choose your own in Wishlist > Strategy).",
+    "targetSuggested": "Tora's suggested strategy for this item type: {name} (choose your own on the Buy strategy page, from the Wishlist).",
     "waitWhyNoTarget": "{signal} is on. While it was, prices were typically {change} [[opportunityDays]] days later.",
     "noRankings": "No popularity rankings in the last [[rankingFreshDays]] days. They show here once a ranking source is set up (an admin task, in the collectors guide).",
     "showAll": "Show all {count}",
@@ -2722,7 +2722,7 @@
     },
     "about": {
       "steady": "Good price in the cheapest quarter of the last [[rangeDays]] days. With little history, [[defaultMargin]]% under the usual price. Waits while the price or its market falls fast, and while a new release is younger than the age similar items usually hit their low at.",
-      "bargain": "Only the cheapest tenth of the last year. Rare calls, deeper discounts. Waits while the price or its market falls fast, and on new releases.",
+      "bargain": "The cheapest tenth of the last year; with little history, [[defaultMargin]]% under the usual price. Rare calls, deeper discounts. Waits while the price or its market falls fast, and on new releases.",
       "margin": "{margin}% under the usual price (the median of the last [[rangeDays]] days). Waits while the price or its market falls fast, and on new releases.",
       "dip": "Like Steady, but still says good price while the price or its market falls fast, or on a new release, with a warning. Buys earlier; may buy before the bottom.",
       "target": "No zone: only the target prices you set on your wishes."
@@ -2826,7 +2826,7 @@
       "better": "Better than buying on any day, in the past.",
       "worse": "Worse than buying on any day, in the past: the zone paid less, but prices often kept falling for a while.",
       "same": "About the same as buying on any day, in the past.",
-      "how": "Past prices only: a test, not a promise. A signal is the first day of each stretch at Good price, each day judged on the prices before it (without the market check and the new-set pattern). Worked out {date}."
+      "how": "Past prices only: a test, not a promise. A signal is the first day of each stretch at Good price, each day judged on the prices up to it (without the market check, the new-set pattern or the new-release wait). Worked out {date}."
     }
   },
   "lines": {
@@ -2837,7 +2837,7 @@
   },
   "setLines": {
     "title": "Set lines",
-    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when there are enough ([[patternMinItems]] or more), else with the whole group. Japanese Pokemon sets get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary); other items are marked by hand on their edit page.",
+    "info": "A set's place in its franchise's releases. Group studies (the new-set pattern, the new-release wait, the market) compare an item with items of its own line when the line alone has enough for that study ([[patternMinItems]] or more; [[marketMinItems]] for the market), else with the whole group. Japanese Pokemon sets get their line from the official set title (拡張パック, 強化拡張パック, ハイクラスパック, anniversary) unless one is set by hand; other items are marked by hand on their edit page.",
     "builtIn": "Built in",
     "others": "Other lines, one per line",
     "saved": "Saved."
@@ -2848,7 +2848,7 @@
     "none": "No: out of print",
     "likely": "Yes: a reprint is coming",
     "since": "Since (optional)",
-    "hint": "Admins. Opportunities tests it as a signal on past prices from that day (no day: always, for an item never meant to be made again). Left unknown, a plug-in may guess (a shop's own boxes)."
+    "hint": "Admins. Opportunities tests it as a signal on past prices from that day; with no day it counts from today and is not tested on past prices. Left unknown, a plug-in may guess (a shop's own boxes)."
   },
   "lineField": {
     "label": "Set line",
@@ -2883,8 +2883,8 @@
     "share": "Part",
     "fromSales": "recent sales ({n})",
     "fromAsk": "lowest ask",
-    "noCards": "No cards found for these rarities: check the set code and rarities in Settings > Admin > Box opening.",
-    "notRead": "Cards not read yet: the next nightly collect reads them.",
+    "noCards": "No cards found for these rarities: check the set code and rarities in Settings > Admin preferences > Box opening.",
+    "notRead": "Cards not read yet: a nightly collect reads them (a few sets a night).",
     "notReadShort": "cards not read yet",
     "noRates": "No pull rates for this set yet.",
     "noSet": "This box is not linked to a catalog set, so its pull rates are unknown.",
@@ -2903,7 +2903,7 @@
     "inBoxes": "1 in {n} boxes",
     "footer": "{packs} packs a box; {fee}% selling fee taken off; cards read {read}.",
     "settingsTitle": "Box opening",
-    "settingsInfo": "Pull rates per set for the box opening value, the sets of the booster boxes anyone tracks. Rates are not official: Tora suggests community numbers, correct them here. Cards are read again once a week, and at the next collect after a change of code or rarities.",
+    "settingsInfo": "Pull rates per set for the box opening value, the sets of the booster boxes anyone tracks. Rates are not official: Tora suggests community numbers, correct them here. Cards are read again once a week, and soon after a change of code or rarities (a few sets each night).",
     "fee": "Selling fee taken off every card",
     "noBoxes": "No booster box with a catalog set is tracked yet.",
     "stateSaved": "Your rates.",
@@ -2971,7 +2971,7 @@
       "noLocation": "The browser did not give a location (allow it in the browser's settings)."
     },
     "addedByHand": "added by hand",
-    "noticesTo": "Notices for {stores, plural, one {# store} other {# stores}} go to {channels}, as soon as a feed brings a new post about one.",
+    "noticesTo": "Notices for {stores, plural, one {# store} other {# stores}} go to {channels}, following your choice on Stores > Area.",
     "noChannel": "No Discord or Telegram connected yet: notices have nowhere to go.",
     "alertsLink": "Settings > Alerts",
     "silentAfter": "Tell me when the feed is silent for",
@@ -2980,7 +2980,7 @@
     "from": "From",
     "to": "To",
     "unknownAlerts": "Tell me about posts naming no store or place Tora knows (questions and chat too)",
-    "feedAlertsInfo": "No silent failures: the app checks every [[feedCheckMinutes]] minutes while it runs on this PC. A whole page of new posts at once (posts maybe missed) is always told.",
+    "feedAlertsInfo": "No silent failures: a server on your own PC checks every [[feedCheckMinutes]] minutes; a hosted app only when an outside scheduler calls it. A whole page of new posts at once (posts maybe missed) is always told.",
     "addTitle": "Add a store or place",
     "addInfo": "For a chain or an area Tora has no list for. A place (an area's name or emoji, with its location) is matched on every board; a store only on its chain's board.",
     "chain": "Chain",
@@ -3021,7 +3021,7 @@
     "otherCodes": "Other codes (no store or place)",
     "noOtherCodes": "None yet.",
     "productCodes": "Product codes",
-    "productCodesInfo": "Named in notices next to the store. From the board's list and from admins; the board's one-letter codes count only among other codes.",
+    "productCodesInfo": "Named in notices next to the store. From the board's list, the store lists and admins; a board's or a list's codes of one or two letters or digits count only among other codes.",
     "wordKind": {
       "saleStart": "Sale start words",
       "saleStartInfo": "A post using one says a sale began, e.g. \"started\".",
@@ -3131,7 +3131,7 @@
     "noToday": "No posts about these stores today yet.",
     "noTodayDown": "Nothing received since {time}: Tora cannot see new posts right now.",
     "earlier": "{n, plural, one {Earlier (yesterday): # location} other {Earlier (yesterday): # locations}}",
-    "byLocationInfo": "Locations of your area with posts since yesterday ([[postDayStarts]]), nearest first, with how many; open one to see its posts, newest first.",
+    "byLocationInfo": "Locations of your area with posts since yesterday ([[postDayStarts]]), nearest first (by name when you pick stores), with how many; open one to see its posts, newest first.",
     "otherBoards": "Other boards",
     "allOfChain": "All its stores",
     "quietLocations": "{n, plural, one {# location without posts since yesterday} other {# locations without posts since yesterday}}",
@@ -3195,7 +3195,7 @@
     "error": {
       "invalid": "That code did not match (each code works once: wait for the next one).",
       "locked": "Too many attempts. Try again later.",
-      "notConfigured": "Login is not configured (AUTH_SECRET missing).",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing or too short).",
       "username": "Usernames: [[usernameMin]] to [[usernameMax]] characters, a-z 0-9 . _ -",
       "taken": "That username is taken.",
       "self": "Not your own account.",
@@ -3231,7 +3231,7 @@
     "error": {
       "expired": "This link no longer works (used, expired or replaced). Ask the admin for a new one.",
       "locked": "Too many attempts. Try again later.",
-      "notConfigured": "Login is not configured (AUTH_SECRET missing).",
+      "notConfigured": "Login is not configured (AUTH_SECRET missing or too short).",
       "short": "The password needs at least [[minPassword]] characters.",
       "mismatch": "The passwords do not match.",
       "signIn": "Wrong username or password, or this account is already signed in on [[maxDevices]] devices or not set up yet. Sign out on one of its devices, or ask the admin.",
@@ -3359,7 +3359,7 @@
     "save": "Save",
     "clearPc": "Clear on PC",
     "remove": "Remove",
-    "removeConfirm": "Stop tracking {name}? The item and its history stay; it is no longer read unless someone holds or wishes for it.",
+    "removeConfirm": "Stop tracking {name}? The item and its history stay; it is no longer read unless someone holds or wishes for it, or it enters a ranking's top.",
     "removeFailed": "Not removed. Try again."
   }
 }

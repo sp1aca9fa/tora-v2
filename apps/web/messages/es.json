@@ -47,7 +47,7 @@
     "codeHint": "De tu app de autenticación. ¿La perdiste? Introduce uno de tus códigos de respaldo.",
     "startOver": "Empezar de nuevo",
     "errors": {
-      "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET, ver README)."
+      "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET o es demasiado corto, ver README)."
     }
   },
   "portfolio": {
@@ -56,9 +56,9 @@
     "qty": "Cant. {qty}",
     "pulledFrom": "Sacada de {name}",
     "spent": "Total gastado",
-    "itemsValue": "{units} artículos · {lots} entradas",
+    "itemsValue": "{lots, plural, one {# lote} other {# lotes}}, {units, plural, one {# unidad} other {# unidades}}",
     "marketValue": "Valor de mercado",
-    "valuedOf": "{valued} de {total} entradas valoradas",
+    "valuedOf": "{valued} de {total} lotes valorados",
     "unrealized": "Ganancia/pérdida latente",
     "vsCost": "{pct}% frente al coste {cost}",
     "overTime": "Valor en el tiempo",
@@ -142,7 +142,7 @@
     "submit": "Registrar",
     "errors": {
       "pickProduct": "Elige un artículo de los resultados.",
-      "pickCategory": "Elige TCG o Juego.",
+      "pickCategory": "Elige la categoría.",
       "pickFranchise": "Elige la franquicia.",
       "pickKind": "Elige qué tipo de artículo es.",
       "pickSet": "Elige el set, o introdúcelo a mano."
@@ -210,13 +210,13 @@
     "yourItem": "Tu artículo",
     "owned": "{units, plural, one {# unidad} other {# unidades}} · pagado {amount}",
     "moreSuggestions": "{count, plural, one {# sugerencia más} other {# sugerencias más}}",
-    "broken": "Su página de {source} dejó de funcionar el {day} ({error}) y ya no se recoge: enlaza la nueva.",
+    "broken": "Su página de {source} dejó de funcionar el {day} ({error}) y ahora solo se prueba una vez por semana: enlaza la nueva.",
     "paste": "O pega la página de {source} de este artículo:",
     "openItem": "Abrir artículo",
     "openLot": "Abrir lote",
     "levels": "Cambiar niveles",
     "section": {
-      "tcg_main_source": "{count, plural, one {# artículo TCG} other {# artículos TCG}} sin enlace de identidad",
+      "tcg_main_source": "{count, plural, one {# carta o TCG sellado} other {# cartas o TCG sellados}} sin enlace de identidad",
       "game_main_source": "{count, plural, one {# juego o artículo} other {# juegos y artículos}} sin enlace de identidad",
       "second_source": "{count, plural, one {# sugerencia} other {# sugerencias}} de otra fuente de precios",
       "secondary_identity": "{count, plural, one {# artículo} other {# artículos}} sin enlace de identidad en el mercado secundario",
@@ -422,7 +422,7 @@
     "minutes": "{m} min",
     "hoursMinutes": "{h} h {m} min",
     "nightTotal": "Anoche: {total} de recogida, ventana {window}.",
-    "nightOver": "Más larga que la ventana. Ejecuta un mercado o un recolector cada vez (pnpm collect --market us, --source x), repartidos por la noche con el programador; la guía de instalación tiene un ejemplo.",
+    "nightOver": "Más larga que la ventana. Ejecuta un mercado o un recolector cada vez (pnpm collect --market us, --source x), repartidos por la noche con el programador; la guía para ejecutar los recolectores tiene un ejemplo.",
     "runTime": "Última ejecución: {time}",
     "runTimeUsual": "Última ejecución: {time} (normalmente {usual})",
     "runTimeLong": "Última ejecución: {time}, mucho más larga de lo normal ({usual})",
@@ -582,7 +582,7 @@
   },
   "sources": {
     "title": "Fuentes de precios",
-    "info": "De dónde vienen los precios de mercado de este artículo. El PC de casa recoge los precios una vez al día.",
+    "info": "De dónde vienen los precios de mercado de este artículo. El PC de casa los recoge cada noche; algunos mercados también se leen durante el día.",
     "open": "Abrir",
     "collected": "{count} ventas recogidas · última ejecución {date}",
     "waiting": "Enlazado. Las ventas se recogen en la próxima ejecución.",
@@ -853,7 +853,7 @@
         "new": "Lote nuevo",
         "newItem": "Lote nuevo de un artículo nuevo",
         "existing": "Ya en Tora",
-        "skipped": "Saltado: no es un lote en posesión (vendido, abierto o perdido)"
+        "skipped": "Saltado: no es un lote en posesión (vendido, consumido o perdido)"
       },
       "problem": {
         "missing_item": "Sin nombre de artículo",
@@ -863,7 +863,7 @@
         "bad_region": "Región desconocida para esta categoría",
         "bad_status": "Estado desconocido (Owned, Sold, Consumed o Lost)",
         "bad_quantity": "La cantidad debe ser un número entero, 1 o más",
-        "bad_cost": "El coste debe ser un importe entero, 0 o más",
+        "bad_cost": "El coste debe ser 0 o más en la moneda base, sin más decimales de los que tiene (sin el signo de otra moneda)",
         "bad_date": "Fecha ilegible o futura (usa 2026-10-16 o 2026/10/16)",
         "bad_condition": "Estado desconocido para este tipo",
         "bad_packaging": "Embalaje desconocido",
@@ -936,7 +936,7 @@
       "details": "Lotes y datos",
       "opening": "Apertura"
     },
-    "noLots": "Sin lotes registrados: sigues este artículo.",
+    "noLots": "Sin lotes registrados.",
     "spentTotal": "Gastado en total: {amount}",
     "details": "Datos del artículo",
     "editOrMerge": "Editar o fusionar",
@@ -1007,7 +1007,7 @@
   "compare": {
     "title": "{primary} frente a {secondary}",
     "info": "Mismo estado en ambos lados ({bucket}). Los precios de {secondary} se muestran solo para comparar y nunca cuentan en el valor.",
-    "graded": "Los precios extranjeros son de cartas sin gradear, así que tus cartas gradeadas se comparan en este estado.",
+    "graded": "Los precios de los otros mercados son de cartas sin gradear, así que tus cartas gradeadas se comparan en este estado.",
     "noJapan": "Sin precio en {primary}",
     "spread": "{pct}% frente a {primary}",
     "converted": "{price} a {rate} por {currency} ({date})",
@@ -1032,7 +1032,7 @@
       "grey": "Discreto (gris)"
     },
     "type": {
-      "tcg_main_source": "Artículo TCG sin enlace de identidad",
+      "tcg_main_source": "Carta o TCG sellado sin enlace de identidad",
       "game_main_source": "Juego u otro artículo sin enlace de identidad",
       "second_source": "Sugerencias de otra fuente de precios",
       "secondary_identity": "Artículo sin enlace de identidad en el mercado secundario",
@@ -1102,7 +1102,7 @@
   },
   "sourceRoles": {
     "title": "Fuentes de precios",
-    "info": "De dónde vienen los valores, por tipo de artículo: una fuente de referencia se valora primero y es la fuente a la que deben enlazarse los artículos; las fuentes de apoyo se usan cuando la referencia tiene muy pocas ventas; las de comparación se muestran junto al valor, nunca dentro. Los papeles vienen de los plug-ins de las fuentes (sugeridos) y se aplican a todas las cuentas.",
+    "info": "De dónde vienen los valores, por tipo de artículo: una fuente de referencia se valora primero; las fuentes de apoyo se usan cuando la referencia tiene muy pocas ventas; las de comparación se muestran junto al valor, nunca dentro. Los papeles vienen de los plug-ins de las fuentes (sugeridos) y se aplican a todas las cuentas.",
     "adminOnly": "Solo un administrador puede cambiarlos.",
     "source": "Fuente",
     "class": {
@@ -1186,7 +1186,7 @@
     "manual": "Tipo escrito a mano",
     "typedLabel": "1 {code} =",
     "save": "Guardar",
-    "manualInfo": "Se usa desde hoy hasta que lo cambies; los días anteriores conservan sus tipos.",
+    "manualInfo": "Se usa desde hoy hasta que lo cambies; los días anteriores conservan sus tipos, y los que no tienen ninguno usan este.",
     "confirm": "¿Convertir todos los importes guardados ({count}) de {from} a {to}, cada uno con el tipo de cambio de su fecha? Los valores se reconstruyen justo después. Hazlo mientras no haya una recogida en curso.",
     "noPlugins": "Aún ningún plug-in de tipos cubre {code}. Los plug-ins aparecen tras la próxima recogida del PC de casa; mientras, puedes escribir un tipo."
   },
@@ -1212,7 +1212,7 @@
     "maxDelay": "Retraso más largo en segundos",
     "toSeconds": "a",
     "seconds": "segundos",
-    "delayInfo": "Se sortea de nuevo cada día, así el seguimiento nunca empieza ni termina en el minuto exacto (hasta una hora).",
+    "delayInfo": "Se sortea de nuevo cada día, así el seguimiento nunca empieza ni termina en el minuto exacto (hasta [[maxTrackingDelay]] segundos).",
     "warning": "Tora puede empezar tarde y terminar antes: empieza a leer entre {min} y {max} segundos después de las {from} y se detiene entre {min} y {max} segundos antes de las {to}, a otra hora cada día.",
     "outside": "Fuera del horario, las páginas de Tiendas lo dicen en rojo, y los administradores pueden seguir una hora o hasta el próximo inicio (una vez: después sigue el horario de siempre).",
     "save": "Guardar",
@@ -1321,7 +1321,7 @@
     "written": "{written} filas escritas de {free} gratis",
     "budget": "Avisar a los administradores al pasar de",
     "millions": "{m} millones de filas leídas",
-    "budgetInfo": "La comprobación diaria de la app envía una alerta cuando el mes pasa de esto, o va camino de pasarlo a este ritmo (desde el día [[paceFromDay]]).",
+    "budgetInfo": "La comprobación matinal de la app envía una alerta cuando el mes pasa de esto, o va camino de pasarlo a este ritmo (desde el día [[paceFromDay]]).",
     "byOrigin": "Por origen",
     "byDay": "Por día (UTC)",
     "readWritten": "{read} leídas, {written} escritas",
@@ -1346,7 +1346,7 @@
     "memory": "Memoria libre {free} de {total} MB; carga {load}.",
     "disk": "Disco ({name}): {free} GB libres de {total} GB.",
     "diskName": {
-      "state": "registros y copias",
+      "state": "carpeta de estado (registros)",
       "database": "base de datos"
     },
     "last": "Última recogida {collect}; última copia {backup}.",
@@ -1396,7 +1396,7 @@
       "uploads": "Lee los archivos subidos en la app (Importar > Subir) con la sesión de Claude del PC de casa.",
       "ai": "Importa compras de capturas, PDF o texto de una carpeta, con Claude.",
       "mail": "Importa compras de correos de pedidos exportados con Google Takeout.",
-      "review": "Pregunta a Claude por ventas y búsquedas marcadas; lo que encuentra va a Importar > Sugerencias."
+      "review": "Pregunta a Claude por ventas y búsquedas marcadas; lo que encuentra espera en Pendientes."
     },
     "accounts": {
       "title": "Cuentas",
@@ -1412,7 +1412,7 @@
     },
     "backups": {
       "title": "Copias de seguridad",
-      "backup": "Guarda la copia de hoy de toda la base de datos (el horario la hace tras cada recogida) y borra las que ya no se conservan: se guardan los últimos 30 días y el día 1 de cada mes durante un año.",
+      "backup": "Guarda la copia de hoy de toda la base de datos (el horario la hace tras cada recogida) y borra las que ya no se conservan: se guardan los últimos 30 días y la primera copia de cada mes durante un año.",
       "list": "Lista las copias (o la carpeta de BACKUP_DIR).",
       "restore": "Carga una copia en la base de datos nueva y vacía de DATABASE_URL; rechaza una base de datos con datos."
     },
@@ -1431,7 +1431,7 @@
   },
   "myData": {
     "lotsTitle": "Tus lotes como hoja de cálculo",
-    "lotsInfo": "Cada lote en una fila: artículo, estado, cantidad, coste, fecha, tienda, número de pedido, estado, valor actual y ganancia; los lotes vendidos con su venta. Se abre en Excel, Numbers o Google Sheets.",
+    "lotsInfo": "Cada lote en una fila: artículo, estado, cantidad, coste, fecha, tienda, número de pedido, situación, valor actual y ganancia; los lotes vendidos con su venta. Se abre en Excel, Numbers o Google Sheets.",
     "lotsDownload": "Descargar la hoja de cálculo (CSV)",
     "lotsImport": "El mismo formato se puede importar: <link>Importar > Hoja de cálculo</link>.",
     "allTitle": "Todos tus datos",
@@ -1500,7 +1500,7 @@
     "backupFailed": "Tora: la copia de seguridad falló: {error}",
     "noCollect": "Tora: no se ha ejecutado ninguna recogida en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
     "noBackup": "Tora: ninguna copia de seguridad en {hours} horas (última: {last}). ¿Está encendido el PC de casa?",
-    "dbBudget": "Tora: la base de datos leyó {read} millones de filas este mes; a este ritmo, {projected} millones a fin de mes (presupuesto {budget} millones, plan gratuito [[freeReadMillions]] millones). Ver Ajustes > Administración > Base de datos.",
+    "dbBudget": "Tora: la base de datos leyó {read} millones de filas este mes; a este ritmo, {projected} millones a fin de mes (presupuesto {budget} millones, plan gratuito [[freeReadMillions]] millones). Ver Ajustes > Preferencias de administración > Base de datos.",
     "sourceQuiet": "Tora: {sources} no ha encontrado ventas nuevas en sus últimos [[quietDays]] días de recogida, aunque normalmente sí encuentra. Puede que su web haya cambiado: mira el registro de recogida o abre uno de sus anuncios (Ajustes > Recolectores).",
     "selfCheck": "Tora: la autocomprobación nocturna encontró precios guardados que no coincidían con las ventas recogidas, y los reconstruyó: {items}. Si se repite, avisa al desarrollador.",
     "summaryTitle": "Tora: resumen diario",
@@ -1537,7 +1537,7 @@
     "updateWaiting": "Tora: el servidor lleva 24 h sin actualizarse y sigue funcionando con {from}; la versión más reciente, {to}, espera el CI de GitHub ({status}). Revisa la pestaña Actions del repositorio (un commit en el que el CI nunca se ejecuta no se instala automáticamente) o ejecuta ops/update-server.sh a mano en el servidor.",
     "ciPending": "sin terminar o sin empezar",
     "ciUnknown": "sin respuesta útil de GitHub",
-    "listingsGone": "Tora: {count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}: el sitio dice que la página ya no existe [[listingBrokenNights]] noches seguidas. Esos artículos no reciben precios nuevos de él hasta que alguien enlace su página nueva (Pendientes).",
+    "listingsGone": "Tora: {count, plural, one {se apartó # anuncio} other {se apartaron # anuncios}}: el sitio dice que la página ya no existe [[listingBrokenNights]] noches seguidas. Esos artículos no reciben precios nuevos de él hasta que alguien enlace su página nueva (Pendientes), o hasta que la página vuelva a responder: Tora lo intenta una vez por semana.",
     "listingGoneLine": "{source}: {name} ({error})",
     "summaryGone": "{count, plural, one {# artículo espera} other {# artículos esperan}} un enlace a su página nueva (la anterior ya no existe)"
   },
@@ -1685,7 +1685,7 @@
     "nextCollect": "Próxima recogida diaria: {at}",
     "nextCollectUnknown": "Próxima recogida diaria: en la primera comprobación tras medianoche.",
     "doneToday": "La recogida de hoy se ejecutó ({at}, {level}).",
-    "notToday": "La recogida de hoy aún no se ha ejecutado (última: {at}, {level}): se ejecuta en la próxima comprobación.",
+    "notToday": "La recogida de hoy aún no está hecha (última: {at}, {level}): se ejecuta de nuevo en la próxima comprobación.",
     "requested": "Un \"recoger ahora\" espera a la próxima comprobación ({at}).",
     "level": {
       "ok": "bien",
@@ -1775,7 +1775,7 @@
     "noBackup": "Ninguna copia en {hours} horas (última {last})",
     "dbBudget": "Base de datos: {read} millones de filas leídas este mes, {projected} millones a este ritmo (presupuesto {budget} millones)",
     "sourceQuiet": "{sources}: sin ventas nuevas en los últimos [[quietDays]] días de recogida (normalmente hay)",
-    "selfCheck": "Autocomprobación: los precios guardados no coincidían con las ventas y se reconstruyeron ({items})",
+    "selfCheck": "Los precios guardados no coincidían con las ventas y se reconstruyeron ({items})",
     "fromTo": "de {from} a {to}",
     "none": "ninguno",
     "admin": {
@@ -1845,8 +1845,8 @@
     "conditionHint": "El estado en que lo quieres comprar: los precios se siguen en este estado.",
     "submit": "Seguir",
     "target": "Precio objetivo (por unidad)",
-    "targetHint": "Opcional. Recibes una alerta cuando el precio lo alcance.",
-    "targetHintRetail": "Opcional. Recibes una alerta cuando el precio lo alcance. Precio de venta al público: {amount}.",
+    "targetHint": "Opcional. Recibes una alerta cuando haya un anuncio a este precio o menos.",
+    "targetHintRetail": "Opcional. Recibes una alerta cuando haya un anuncio a este precio o menos. Precio de venta al público: {amount}.",
     "noPrice": "Aún sin precio",
     "underTarget": "En tu objetivo o por debajo ({target})",
     "overTarget": "{amount} por encima de tu objetivo ({target})",
@@ -1875,7 +1875,7 @@
   },
   "opportunities": {
     "title": "Oportunidades",
-    "intro": "Artículos que merece la pena mirar dentro de su grupo de artículos parecidos, a partir de los precios que recoge Tora. Solo las señales que funcionaron con precios pasados ordenan artículos: cada una muestra con qué frecuencia el precio estaba más alto 90 días después. Nunca es algo seguro.",
+    "intro": "Artículos que merece la pena mirar dentro de su grupo de artículos parecidos, a partir de los precios que recoge Tora. Solo las señales que funcionaron con precios pasados ordenan artículos. Nunca es algo seguro.",
     "updated": "Calculado tras la recogida del {day}.",
     "none": "Aún nada: las oportunidades se calculan tras la próxima recogida.",
     "noneProven": "Ningún artículo de este tipo tiene hoy una señal probada.",
@@ -1908,14 +1908,19 @@
       "weak_for_age": "Débil para su edad"
     },
     "why": {
-      "line_rising": "Su línea: {line} en [[trendWeeks]] semanas ({items} artículos).",
-      "line_falling": "Su línea: {line} en [[trendWeeks]] semanas ({items} artículos).",
-      "leader": "Sus [[trendWeeks]] semanas: {own}, las de su línea {line}.",
-      "laggard": "Sus [[trendWeeks]] semanas: {own}, las de su línea {line}.",
+      "line_rising": "{Scope}: {line} en [[trendWeeks]] semanas ({items} artículos).",
+      "line_falling": "{Scope}: {line} en [[trendWeeks]] semanas ({items} artículos).",
+      "leader": "Sus [[trendWeeks]] semanas: {own}; {scope}: {line}.",
+      "laggard": "Sus [[trendWeeks]] semanas: {own}; {scope}: {line}.",
       "sales_up": "{sales30} ventas en [[salesRecentDays]] días, {before} un mes antes.",
       "sales_down": "{sales30} ventas en [[salesRecentDays]] días, {before} un mes antes.",
       "strong_for_age": "Sus últimos [[ageChangeDays]] días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos).",
       "weak_for_age": "Sus últimos [[ageChangeDays]] días: {change}; artículos parecidos en el día {days}: {typical} ({items} artículos)."
+    },
+    "scope": {
+      "set": "su set",
+      "line": "su línea",
+      "group": "artículos parecidos"
     },
     "rankLine": "#{rank} en {label} ({move})",
     "rankNew": "nuevo",
@@ -2004,7 +2009,7 @@
     },
     "about": {
       "steady": "Buen precio en el cuarto más barato de los últimos [[rangeDays]] días. Con poco historial, un [[defaultMargin]]% por debajo del precio habitual. Espera mientras el precio o su mercado caen deprisa, y mientras una novedad es más joven que la edad a la que los artículos parecidos suelen tocar fondo.",
-      "bargain": "Solo la décima parte más barata del último año. Pocas señales, descuentos más profundos. Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
+      "bargain": "La décima parte más barata del último año; con poco historial, un [[defaultMargin]]% por debajo del precio habitual. Pocas señales, descuentos más profundos. Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
       "margin": "Un {margin}% por debajo del precio habitual (la mediana de los últimos [[rangeDays]] días). Espera mientras el precio o su mercado caen deprisa, y con las novedades.",
       "dip": "Como Constante, pero sigue diciendo buen precio mientras el precio o su mercado caen deprisa, o con una novedad, con una advertencia. Compra antes; puede comprar antes de tocar fondo.",
       "target": "Sin zona: solo los precios objetivo que pongas en tus seguimientos."
@@ -2104,7 +2109,7 @@
       "better": "Mejor que comprar cualquier día, en el pasado.",
       "worse": "Peor que comprar cualquier día, en el pasado: la zona pagó menos, pero los precios a menudo siguieron bajando un tiempo.",
       "same": "Más o menos igual que comprar cualquier día, en el pasado.",
-      "how": "Solo precios pasados: una prueba, no una promesa. Una señal es el primer día de cada tramo en Buen precio, cada día juzgado con los precios anteriores (sin la comprobación del mercado ni el patrón de sets nuevos). Calculado el {date}."
+      "how": "Solo precios pasados: una prueba, no una promesa. Una señal es el primer día de cada tramo en Buen precio, cada día juzgado con los precios hasta ese día (sin la comprobación del mercado, el patrón de sets nuevos ni la espera de novedad). Calculado el {date}."
     }
   },
   "lines": {
@@ -2115,7 +2120,7 @@
   },
   "setLines": {
     "title": "Líneas de sets",
-    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes ([[patternMinItems]] o más), y si no con todo el grupo. Los sets japoneses de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario); los demás se marcan a mano en su página de edición.",
+    "info": "El lugar de un set entre los lanzamientos de su franquicia. Los estudios de grupo (el patrón de sets nuevos, la espera de novedad, el mercado) comparan un artículo con los de su propia línea cuando hay bastantes para ese estudio ([[patternMinItems]] o más; [[marketMinItems]] para el mercado), y si no con todo el grupo. Los sets japoneses de Pokémon toman su línea del título oficial del set (拡張パック, 強化拡張パック, ハイクラスパック, aniversario) salvo que se marque a mano; los demás se marcan a mano en su página de edición.",
     "builtIn": "Incluidas",
     "others": "Otras líneas, una por línea",
     "saved": "Guardado."
@@ -2153,7 +2158,7 @@
     "share": "Parte",
     "fromSales": "ventas recientes ({n})",
     "fromAsk": "precio pedido más bajo",
-    "noCards": "No se encontraron cartas de estas rarezas: revisa el código del set y las rarezas en Ajustes > Administración > Apertura de cajas.",
+    "noCards": "No se encontraron cartas de estas rarezas: revisa el código del set y las rarezas en Ajustes > Preferencias de administración > Apertura de cajas.",
     "notRead": "Cartas aún sin leer: la próxima recogida nocturna las lee.",
     "notReadShort": "cartas aún sin leer",
     "noRates": "Aún no hay probabilidades para este set.",
@@ -2397,7 +2402,7 @@
     "error": {
       "invalid": "Ese código no coincide (cada código funciona una vez: espera al siguiente).",
       "locked": "Demasiados intentos. Inténtalo más tarde.",
-      "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET).",
+      "notConfigured": "El inicio de sesión no está configurado (falta AUTH_SECRET o es demasiado corto).",
       "username": "Usuarios: de [[usernameMin]] a [[usernameMax]] caracteres, a-z 0-9 . _ -",
       "taken": "Ese usuario ya existe.",
       "self": "No en tu propia cuenta.",
