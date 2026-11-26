@@ -124,6 +124,7 @@ pnpm user revoke <username> <device-id|all>
 pnpm user reset-password <username>
 pnpm user reset-2fa <username>     # lost phone: new authenticator + backup codes
 pnpm user disable|enable <username>
+pnpm user role <username> admin|member   # signs the account's devices out
 ```
 
 The first account is an admin; admins see **Settings > Admin preferences** (settings for the whole

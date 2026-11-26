@@ -55,8 +55,7 @@ from other addresses is refused once it has 10 failures within an hour.
 
 ## Roles and what each may do
 
-- An account is an **admin** or a **member**. The first account made is an admin; a later one is an admin or a member as its creator chooses (the Accounts page, or `pnpm user create --admin`). No command or
-  page changes a role afterwards.
+- An account is an **admin** or a **member**. The first account made is an admin; a later one is an admin or a member as its creator chooses (the Accounts page, or `pnpm user create --admin`). Afterwards a role is changed only at the command line (`pnpm user role <username> admin|member`), never from a page: a change signs the account's devices out, and the only admin who can sign in (an account that is set up and not turned off) cannot be made a member.
 - **Every page needs a session**, except the sign-in and setup-link pages and the app's icons.
   Admin pages answer "not found" to a member.
 - **Every action checks the session itself**; an admin's action checks the role too. A person can read and change only their own data, each kind [The data model](data-model.md#one-persons-or-shared) marks as one person's. The exceptions are an admin's: the account tasks below on another person (their devices, setup links, turning the account off or on), and on any person's game wish what its owner may do from its check page (the Wishlist chapter of the requirements), which changes the shared item, never the wish's own target, condition or estimate.
@@ -78,7 +77,7 @@ from other addresses is refused once it has 10 failures within an hour.
   an account off or on. Signing a person's devices out and stopping a link ask for a confirmation
   only. An admin cannot turn their own account off.
 - **The command line** (`pnpm user`, on a machine whose `.env` names the database and holds the app's `AUTH_SECRET`): list, create, reset
-  the password, reset the authenticator, list or revoke devices, turn off or on. Creating and
+  the password, reset the authenticator, list or revoke devices, turn off or on, change a role. Creating and
   resetting an authenticator need one valid code before anything is saved.
 - Every account task goes to the activity log.
 

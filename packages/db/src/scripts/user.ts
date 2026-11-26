@@ -7,6 +7,7 @@
 //   pnpm user devices <username>
 //   pnpm user revoke <username> <device-id|all>
 //   pnpm user disable|enable <username>
+//   pnpm user role <username> admin|member  also signs out every device of the account
 //
 // AUTH_SECRET in .env must equal the app's: it encrypts the authenticator secrets.
 import {
@@ -33,6 +34,7 @@ import {
   revokeAllDevices,
   revokeDevice,
   setUserDisabled,
+  setUserRole,
   updateCredentials,
 } from '../users';
 
@@ -204,8 +206,28 @@ switch (command) {
     console.log(command === 'disable' ? 'Disabled and signed out.' : 'Enabled.');
     break;
   }
+  case 'role': {
+    const role = args[1];
+    if (role !== 'admin' && role !== 'member')
+      fail('Usage: pnpm user role <username> admin|member');
+    const user = await requireUser(args[0]);
+    const outcome = await setUserRole(db, user.id, role);
+    const named = role === 'admin' ? 'an admin' : 'a member';
+    if (outcome === 'last_admin')
+      fail(
+        `"${user.username}" is the only admin who can sign in. Make another account an admin first. Nothing changed.`,
+      );
+    if (outcome === 'not_found') fail(`No account "${user.username}".`);
+    if (outcome === 'same') {
+      console.log(`"${user.username}" is already ${named}. Nothing changed.`);
+      break;
+    }
+    await audit('userRole', user.username, { role });
+    console.log(`"${user.username}" is now ${named}. Its devices were signed out.`);
+    break;
+  }
   default:
     console.log(
-      'Commands: list | create <username> [--admin] | reset-password <u> | reset-2fa <u> | devices <u> | revoke <u> <id|all> | disable <u> | enable <u>',
+      'Commands: list | create <username> [--admin] | reset-password <u> | reset-2fa <u> | devices <u> | revoke <u> <id|all> | disable <u> | enable <u> | role <u> admin|member',
     );
 }

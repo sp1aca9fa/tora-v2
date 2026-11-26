@@ -1970,6 +1970,7 @@
       "userDevices": "Devices signed out",
       "userDisabled": "Account disabled",
       "userEnabled": "Account enabled",
+      "userRole": "Account role changed",
       "setLines": "Set lines",
       "openingRates": "Box opening rates",
       "openingFee": "Box opening fee",

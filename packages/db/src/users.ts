@@ -7,7 +7,7 @@ import {
   type UserPreferences,
   toLocalIso,
 } from '@tora/core';
-import { and, asc, count, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { holdings, type User, type UserDevice, userDevices, users } from './schema';
 
@@ -98,6 +98,46 @@ export async function setUserDisabled(db: Db, userId: string, disabled: boolean)
     .set({ disabledAt: disabled ? toLocalIso() : null })
     .where(eq(users.id, userId));
   if (disabled) await revokeAllDevices(db, userId);
+}
+
+/**
+ * Changes an account's role (`pnpm user role`; no page does). `last_admin`: refused, since it would
+ * leave no admin who can sign in (the account is the only admin that is set up and not turned
+ * off). `same`: the account has that role already, nothing is written. On a change the account's
+ * devices are signed out in the same transaction, so no open page outlives the role.
+ */
+export async function setUserRole(
+  db: Db,
+  userId: string,
+  role: User['role'],
+): Promise<'changed' | 'same' | 'last_admin' | 'not_found'> {
+  if (role !== 'admin' && role !== 'member') throw new Error(`unknown role: ${String(role)}`);
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select().from(users).where(eq(users.id, userId));
+    if (!user) return 'not_found';
+    if (user.role === role) return 'same';
+    if (role === 'member') {
+      const [others] = await tx
+        .select({ n: count() })
+        .from(users)
+        .where(
+          and(
+            eq(users.role, 'admin'),
+            ne(users.id, userId),
+            isNull(users.disabledAt),
+            isNotNull(users.passwordHash),
+            ne(users.passwordHash, ''),
+          ),
+        );
+      if ((others?.n ?? 0) === 0) return 'last_admin';
+    }
+    await tx.update(users).set({ role }).where(eq(users.id, userId));
+    await tx
+      .update(userDevices)
+      .set({ revokedAt: toLocalIso() })
+      .where(and(eq(userDevices.userId, userId), isNull(userDevices.revokedAt)));
+    return 'changed';
+  });
 }
 
 /** Records the accepted TOTP step atomically; false if that step (or a later one) was used. */
