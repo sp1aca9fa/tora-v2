@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { submitWith } from '@/lib/submit-form';
 import { cn } from '@/lib/utils';
 import { type BulkState, bulkWishAction } from '../wish-actions';
+import { sameList } from './bulk-text';
 
 /**
  * Several games pasted at once (S36 B1): a line per game, `name | console`; a preview per line (a new
@@ -23,7 +24,7 @@ export function BulkForm({ max }: { max: number }) {
   // The list stays beside its preview (fix U10); edited after the preview, it is previewed again
   // before anything is added, so what is added is what was shown.
   const [text, setText] = useState(state.text ?? '');
-  const changed = !!lines && text !== (state.text ?? '');
+  const changed = !!lines && !sameList(text, state.text ?? '');
 
   if (state.results) {
     const ok = state.results.filter((r) => r.ok).length;
