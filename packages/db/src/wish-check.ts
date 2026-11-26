@@ -15,13 +15,15 @@ import {
   isGameItem,
   localDate,
   nearestMedianOf,
+  overlayQuery,
   rulesHash,
   toLocalIso,
 } from '@tora/core';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { listConsoles } from './consoles';
 import {
+  confirmations as itemConfirmations,
   confirmationsMany,
   currentRules,
   failureStands,
@@ -40,15 +42,18 @@ import {
   type Watch,
   itemChecks,
   itemRuleState,
+  itemRules,
   notItemMarks,
+  productSources,
   saleCoverage,
 } from './schema';
-import { setObservationExcluded } from './sources';
+import { QUERY_SOURCE_ID, setObservationExcluded, updateSourceQuery } from './sources';
 import { SUPPLY_FRESH_DAYS, type SupplyOffer } from './supply';
 import {
   type WishSale,
   awaitsRead,
   rowsItemOf,
+  searchEdited,
   wishForAction,
   wishOffers,
   wishSales,
@@ -114,6 +119,27 @@ export interface CheckListingsSource {
   failureStands: boolean;
 }
 
+/** One marketplace search of the item, as the check page shows it. */
+export interface CheckSearch {
+  source: string;
+  /** The stored words, as one line. */
+  words: string;
+  /** The words the item's rules add when the search is sent; none while the game rules do not apply. */
+  added: string[];
+  /** The search is sent inside a category (the console's, or one stored with the search). */
+  inCategory: boolean;
+}
+
+/** How long a search's words may be (as the item page's own search form). */
+export const SEARCH_WORDS_MAX = 200;
+
+/** Search words as typed: NFKC, single spaces, trimmed. */
+export const searchWordsOf = (text: unknown): string =>
+  String(text ?? '')
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 export interface RegistrationCheck {
   watch: Watch;
   product: Product;
@@ -136,6 +162,11 @@ export interface RegistrationCheck {
   nextCollect: string | null;
   sales: CheckSalesSource[];
   listings: CheckListingsSource[];
+  /**
+   * The active marketplace searches of the item whose rows are read (a boxed item's plain item),
+   * by source. Empty until the first collect made them.
+   */
+  searches: CheckSearch[];
   salesHash: string;
   salesConfirmed: boolean;
   salesFailureStands: boolean;
@@ -349,6 +380,38 @@ export async function registrationCheck(
       };
     });
 
+  // The searches as stored, and what the collect lays over them (S36 A1: only for a game by its
+  // rules, with the switch on; the stored search is never rewritten with it).
+  const links = await db
+    .select({ source: productSources.source, query: productSources.query })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, from),
+        eq(productSources.externalId, QUERY_SOURCE_ID),
+        eq(productSources.active, true),
+      ),
+    )
+    .orderBy(asc(productSources.source));
+  const searches: CheckSearch[] = links.flatMap(({ source, query }) => {
+    const keywords = query?.keywords;
+    if (!Array.isArray(keywords) || !keywords.length || keywords.some((w) => typeof w !== 'string'))
+      return [];
+    const stored = {
+      keywords,
+      ...(typeof query?.categoryId === 'string' && { categoryId: query.categoryId }),
+    };
+    const sent = switchOn && game && plainRules ? overlayQuery(stored, plainRules, source) : stored;
+    return [
+      {
+        source,
+        words: keywords.join(' '),
+        added: (sent.keywords ?? []).slice(keywords.length),
+        inCategory: !!sent.categoryId,
+      },
+    ];
+  });
+
   return {
     ...wish,
     own,
@@ -363,6 +426,7 @@ export async function registrationCheck(
     nextCollect: schedule.nextCollect,
     sales,
     listings,
+    searches,
     salesHash: confirmations.hashFor('sales', ''),
     salesConfirmed: confirmations.isConfirmed('sales', ''),
     salesFailureStands: fails('sales', ''),
@@ -466,6 +530,89 @@ export async function saveWishRules(
     },
     user.id,
   );
+}
+
+/**
+ * A search of the item was saved with other words: what was confirmed on the rows it read no longer
+ * counts (S36 Terms "Confirmed"). Takes away the confirmation of the item's sales and of that
+ * source's listings, for the item and for each boxed item reading its rows, by one `failed` row of
+ * the person (or the admin) under today's hash, noted "search edited". Nothing is written where
+ * nothing is confirmed, so an item that is not a game gets no row. A person's `failed` row never
+ * blocks a later confirmation (`failureStands` counts the labeled check's only). Called before the
+ * search is saved: a save that then fails leaves the item unconfirmed, never confirmed on rows
+ * that are gone.
+ */
+export async function unconfirmForSearch(
+  db: Db,
+  user: Who,
+  productId: string,
+  source: string,
+): Promise<number> {
+  const boxed = await db
+    .select({ id: itemRules.productId })
+    .from(itemRules)
+    .where(and(eq(itemRules.boxed, true), eq(itemRules.boxedOf, productId)));
+  let written = 0;
+  for (const id of [productId, ...boxed.map((b) => b.id)]) {
+    const current = await itemConfirmations(db, id);
+    if (!current) continue;
+    for (const [kind, at] of [
+      ['sales', ''],
+      ['listings', source],
+    ] as const) {
+      if (!current.isConfirmed(kind, at)) continue;
+      await recordItemCheck(db, {
+        productId: id,
+        kind,
+        source: at,
+        outcome: 'failed',
+        by: user.role === 'admin' ? 'admin' : 'person',
+        rulesHash: current.hashFor(kind, at),
+        userId: user.id,
+        note: 'search edited',
+      });
+      written++;
+    }
+  }
+  return written;
+}
+
+/**
+ * Changes the words one marketplace is searched with for the wish's item (the owner's request of
+ * 2026-11-26). The search is the item's, shared by everyone: the words came from the item's name
+ * when the search was first made, and a rename does not change them. A boxed item has no search of
+ * its own (`forbidden`: its plain item's is changed from the plain item's wish). Saving goes
+ * through `updateSourceQuery`: the item's stored rows at that source go (hand-excluded sales stay),
+ * its reads are forgotten and its deep read is queued again; the search is marked edited, so a new
+ * version of the plug-in's default never replaces it. The confirmations that rested on those rows
+ * go first (`unconfirmForSearch`). False: the words are the stored ones, nothing changed.
+ */
+export async function saveWishSearch(
+  db: Db,
+  user: Who,
+  input: { wishId: string; source: string; words: string },
+): Promise<boolean> {
+  const wish = await gameWish(db, user, input.wishId);
+  const { from } = await rowsItemOf(db, wish.product.id);
+  if (from !== wish.product.id) throw new DomainError('forbidden');
+  const words = searchWordsOf(input.words);
+  if (!words || words.length > SEARCH_WORDS_MAX) throw new DomainError('invalid_input');
+  const [link] = await db
+    .select()
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, wish.product.id),
+        eq(productSources.source, String(input.source ?? '').slice(0, 60)),
+        eq(productSources.externalId, QUERY_SOURCE_ID),
+        eq(productSources.active, true),
+      ),
+    );
+  if (!link) throw new DomainError('not_found');
+  if ((link.query?.keywords ?? []).join(' ') === words) return false;
+  await unconfirmForSearch(db, user, wish.product.id, link.source);
+  await updateSourceQuery(db, link.id, searchEdited({ ...link.query, keywords: [words] }));
+  return true;
 }
 
 async function rulesConsole(db: Db, product: Product): Promise<string | null> {

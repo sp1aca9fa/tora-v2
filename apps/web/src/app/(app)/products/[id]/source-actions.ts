@@ -2,6 +2,7 @@
 
 import { parseListingUrl } from '@tora/core';
 import {
+  SEARCH_WORDS_MAX,
   type SourceQuery,
   linkPageAs,
   managesLinkAt,
@@ -18,6 +19,9 @@ import {
   getProduct,
   itemWithListing,
   rejectCandidate,
+  searchEdited,
+  searchWordsOf,
+  unconfirmForSearch,
   unlinkSource,
   userHoldsProduct,
 } from '@tora/db';
@@ -141,24 +145,21 @@ export async function updateQueryAction(
   _prev: QueryFormState,
   formData: FormData,
 ): Promise<QueryFormState> {
-  const { db } = await authed();
+  const { db, user } = await authed();
   const link = await getProductSource(db, sourceId);
   if (!link || !(await allowed(link.productId))) return { error: 'not_found' };
-  const keywords = String(formData.get('keywords') ?? '')
-    .normalize('NFKC')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200);
+  const keywords = searchWordsOf(formData.get('keywords')).slice(0, SEARCH_WORDS_MAX);
   if (!keywords) return { error: 'check', fields: ['keywords'] };
-  const query: SourceQuery = {
+  // Edited by the user: never replaced by newer default queries (`searchEdited`).
+  const query: SourceQuery = searchEdited({
     ...link.query,
     keywords: [keywords],
     excludeKeywords: words(formData.get('excludeKeywords')),
     priceMin: yenOrUndefined(formData.get('priceMin')),
     priceMax: yenOrUndefined(formData.get('priceMax')),
-    // Edited by the user: never replaced by newer default queries.
-    extra: { ...link.query?.extra, auto: false, edited: true },
-  };
+  });
+  // The rows go with the save: what was confirmed on them no longer counts (a game's check).
+  await unconfirmForSearch(db, user, link.productId, link.source);
   await updateSourceQuery(db, sourceId, query);
   revalidatePath(`/products/${link.productId}`, 'layout');
   return { saved: true };

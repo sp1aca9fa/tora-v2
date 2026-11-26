@@ -2,6 +2,7 @@ import {
   type CheckListing,
   type CheckSale,
   type DropReason,
+  canEditProduct,
   nextWishToCheck,
   ownWish,
   registrationCheck,
@@ -27,6 +28,7 @@ import {
 } from '../../wish-actions';
 import { DroppedRows, OpenOnWide, SampleRows } from './expanders';
 import { RulesForm } from './rules-form';
+import { SearchForm } from './search-form';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getTranslations('wish.check'))('title') };
@@ -42,9 +44,10 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const wish = await ownWish(db, user.id, id);
   if (!wish) notFound();
-  const [c, t, money, sourceLabel, format] = await Promise.all([
+  const [c, t, tAll, money, sourceLabel, format] = await Promise.all([
     registrationCheck(db, wish),
     getTranslations('wish.check'),
+    getTranslations(),
     getMoney(),
     sourceLabels(),
     getFormatter(),
@@ -182,6 +185,16 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
           <ArrowLeft className="size-4" /> {t('back')}
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">{c.product.name}</h1>
+        {canEditProduct(user, c.product) && (
+          <p className="text-sm">
+            <Link
+              href={`/products/${c.product.id}/edit?from=/watchlist/${c.watch.id}/check`}
+              className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              {tAll('holding.editProduct')}
+            </Link>
+          </p>
+        )}
         <p className="max-w-3xl text-sm">{t('instruction')}</p>
         {next && (
           <p className="text-sm">
@@ -245,6 +258,44 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
                 excluded={c.own?.excluded ?? []}
               />
             ) : null}
+            {/* The item's searches (the owner, 2026-11-26): what each marketplace is asked for. */}
+            <div className="space-y-3 border-t pt-3">
+              <h3 className="text-sm font-medium">{t('searches')}</h3>
+              <p className="text-xs text-muted-foreground">{t('searchesHint')}</p>
+              {c.searches.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t('searchNone')}</p>
+              )}
+              {c.searches.map((s) => {
+                const note = [
+                  s.added.length > 0 && t('searchAdded', { words: s.added.join(' ') }),
+                  s.inCategory && t('searchCategory'),
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+                return c.game && !c.rowsOf ? (
+                  <SearchForm
+                    key={s.source}
+                    wishId={c.watch.id}
+                    source={s.source}
+                    label={sourceLabel(s.source)}
+                    words={s.words}
+                    note={note || undefined}
+                  />
+                ) : (
+                  <p key={s.source} className="text-sm">
+                    <span className="text-muted-foreground">{sourceLabel(s.source)}: </span>
+                    <span className="break-words">{s.words}</span>
+                    {note && <span className="block text-xs text-muted-foreground">{note}</span>}
+                  </p>
+                );
+              })}
+              {c.searches.length > 0 &&
+                (c.game && !c.rowsOf ? (
+                  <p className="text-xs text-amber-700 dark:text-amber-300">{t('searchWarn')}</p>
+                ) : (
+                  c.rowsOf && <p className="text-xs text-muted-foreground">{t('searchBoxed')}</p>
+                ))}
+            </div>
           </OpenOnWide>
         </section>
 

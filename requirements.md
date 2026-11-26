@@ -201,7 +201,9 @@ keeps what the Watchlist does today (S9's zone, target and alerts), unchanged.
   the registration check (B1). Its listings at a source are confirmed once that source's labeled check
   passed (A2) or a person confirmed that source's listings at the registration check. Sales never confirm
   listings. Checks count distinct sales and distinct listings. After a labeled check failed, only an admin
-  can confirm in its place.
+  can confirm in its place. Saving other search words for the item at a marketplace (B1) takes away the
+  confirmation of its sales and of that marketplace's listings, for the item and for each boxed item that
+  reads its rows; a person can confirm again after the next read.
 - Checked listing: a listing for sale that passes the item's rules, at a source whose listings are confirmed
   for the item. A source linked to the item by the item's own page there, not by a search (the identity
   shop's own copy and the outside sellers on that page), is checked by that link, in the bucket its plug-in
@@ -331,7 +333,14 @@ the registration check shows, for sales, the 20 cheapest matches, the 20 nearest
 rules dropped, and for each source's listings apart the 20 cheapest stored and what the rules dropped. The person confirms each, or changes a word and sees it
 again after the next read. Until its sales are confirmed a wish is marked "check needed", shows its sales as
 unconfirmed and has no level, record or alert. Game watches that exist when this step is built get the same
-check.
+check. The check also shows the words each marketplace is searched with for the item, with what the rules
+add when the search is sent (A1). The words are made from the item's name when the search is first made and
+do not follow a later rename; the wish's owner or an admin can change them there (not on a boxed item, which
+has no search of its own). Saving other words removes the item's stored sales and listings at that
+marketplace, except sales a person excluded by hand, and they are read again (its covered spans are dropped
+and its deep read is asked for again, as under "Covered day"); until the next read no confirmation can be
+made. A person holding a lot of the item saves its search from the item's page under the same rule. From the
+wish's page and its check, the item's maker or an admin opens the item's edit page (its name, its console).
 
 B2. The identity shop's prices kept every night for wishes: used, new, buyback and stock, the shop's own
 copy and outside sellers apart (A6).

@@ -13,6 +13,7 @@ import {
   type WishShopEntry,
   type WishSourceView,
   type WishView,
+  canEditProduct,
   gameShopPage,
   kindCases,
   wishView,
@@ -401,6 +402,17 @@ export default async function WishPage({ params }: { params: Promise<{ id: strin
         >
           {t('itemPage')} <ExternalLink className="size-3" aria-hidden />
         </Link>
+        {canEditProduct(user, v.product) && (
+          <>
+            {' · '}
+            <Link
+              href={`/products/${v.product.id}/edit?from=/watchlist/${v.watch.id}`}
+              className="underline-offset-2 hover:underline"
+            >
+              {tAll('holding.editProduct')}
+            </Link>
+          </>
+        )}
       </p>
       {factsLine}
       {/* The shop's page is linked by a person: until then its prices and facts are not read. */}

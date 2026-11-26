@@ -15,6 +15,7 @@ import {
   previewBulk,
   releaseWish,
   saveWishRules,
+  saveWishSearch,
   turnOnWishRules,
   unmarkWishSale,
 } from '@tora/db';
@@ -183,4 +184,29 @@ export async function saveRulesAction(
   revalidatePath(checkPath(wishId));
   revalidatePath('/watchlist');
   return { ok: true };
+}
+
+/**
+ * Saves the words one marketplace is searched with for the wish's item (`saveWishSearch`: the
+ * wish's owner or an admin). Its stored rows there go and are read again, so every page showing
+ * the item is made again.
+ */
+export async function saveSearchAction(
+  wishId: string,
+  source: string,
+  _prev: FormState & { ok?: boolean },
+  formData: FormData,
+): Promise<FormState & { ok?: boolean }> {
+  const { db, user } = await authed();
+  const result = await runDomain(() =>
+    saveWishSearch(db, user, {
+      wishId,
+      source,
+      words: String(formData.get('words') ?? '').slice(0, 1000),
+    }),
+  );
+  if (!result.ok) return result.state;
+  if (result.value) revalidatePath('/', 'layout');
+  // Unchanged words: nothing was saved, so the form says nothing.
+  return { ok: result.value };
 }

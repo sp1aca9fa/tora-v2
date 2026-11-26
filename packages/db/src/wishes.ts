@@ -18,6 +18,7 @@ import {
   normalizeTitle,
   pickName,
   rulesHash,
+  toLocalIso,
 } from '@tora/core';
 import { and, asc, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from './client';
@@ -28,17 +29,20 @@ import { DomainError, createProduct } from './mutations';
 import { type RuleHold, isHeld } from './rule-marks';
 import {
   type Product,
+  type SourceQuery,
   type User,
   type Watch,
   itemRuleState,
   itemRules,
   notItemMarks,
   priceObservations,
+  productSources,
   products,
   saleCoverage,
   supply,
   watches,
 } from './schema';
+import { QUERY_SOURCE_ID } from './sources';
 import { type SupplyOffer, searchOffers } from './supply';
 import { type WatchInput, addWatchOf, savedAlertState, writeWatch } from './watches';
 
@@ -161,9 +165,10 @@ export async function nextWishToCheck(
 
 /**
  * Whether a person's confirmation must wait for the next read (S36 Data rules: "A confirmation never
- * outlives the rules it was made under"; fix C6): the item's rules changed after Tora last read the
- * item whose rows it shows, so the sales and listings on the page were not read under them. Changed
- * at: the latest `item_rules.updated_at` of the item and, for a boxed item, of its plain item; a row
+ * outlives the rules it was made under"; fix C6): the item's rules, or the words of one of its
+ * searches, changed after Tora last read the item whose rows it shows, so the sales and listings on
+ * the page were not read under them. Changed at: the latest time a person saved one of the rows
+ * item's active searches (`searchEdited`), and the latest `item_rules.updated_at` of the item and, for a boxed item, of its plain item; a row
  * never changed since it was written that gives the same rules as no row (a game prefilled with its
  * platform's console and no words) is no change. Read at: the latest of the rows item's
  * `sale_coverage.updated_at` (a read night) and `item_rule_state.applied_at` (the rules applied).
@@ -188,6 +193,22 @@ export async function awaitsRead(db: Pick<Db, 'select'>, productId: string): Pro
       if (p && hashOf(null) === hashOf(rowRules(row))) continue;
     }
     changed = Math.max(changed, Date.parse(row.updatedAt));
+  }
+  // A search of the rows item saved with other words by a person (`searchEdited`): the rows on the
+  // page were read under the old words, or are gone.
+  const searches = await db
+    .select({ query: productSources.query })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, from),
+        eq(productSources.externalId, QUERY_SOURCE_ID),
+        eq(productSources.active, true),
+      ),
+    );
+  for (const { query } of searches) {
+    const at = Date.parse(String((query?.extra as { editedAt?: unknown } | undefined)?.editedAt));
+    if (!Number.isNaN(at)) changed = Math.max(changed, at);
   }
   if (changed === Number.NEGATIVE_INFINITY) return false;
   const [[covered], [state]] = await Promise.all([
@@ -215,6 +236,15 @@ const rowRules = (r: typeof itemRules.$inferSelect): ItemRulesRow => ({
   boxed: r.boxed,
   boxedOf: r.boxedOf,
   gameRules: r.gameRules === 0 || r.gameRules === 1 ? r.gameRules : null,
+});
+
+/**
+ * A stored search as a person saved it: marked edited, so a newer default of the plug-in never
+ * replaces it, with the time, which `awaitsRead` reads (a confirmation waits for the next read).
+ */
+export const searchEdited = (query: SourceQuery): SourceQuery => ({
+  ...query,
+  extra: { ...query.extra, auto: false, edited: true, editedAt: toLocalIso() },
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -349,6 +379,19 @@ export async function wishSales(
   );
 }
 
+/**
+ * A sale's title as a wish reads it: the `title` column, else the name its source kept in the raw
+ * row (`raw.name`, when it is a text). A marketplace plug-in may keep a sold listing's title only
+ * there (its `saleText` reads it from there for the game rules), and with no title a sale fails
+ * every rule that asks for a word or a box (`titlePasses`) and shows with no name on the check page.
+ * A raw row that is not JSON, or whose name is not a text, gives no title.
+ */
+const saleTitle = sql<string | null>`CASE
+  WHEN ${priceObservations.title} IS NOT NULL AND ${priceObservations.title} <> '' THEN ${priceObservations.title}
+  WHEN json_valid(${priceObservations.raw}) AND json_type(${priceObservations.raw}, '$.name') = 'text'
+    THEN json_extract(${priceObservations.raw}, '$.name')
+  ELSE ${priceObservations.title} END`;
+
 const saleColumns = (options: WishSalesOptions) => {
   const o = priceObservations;
   return {
@@ -356,7 +399,7 @@ const saleColumns = (options: WishSalesOptions) => {
     productId: o.productId,
     source: o.source,
     externalRef: o.externalRef,
-    title: o.title,
+    title: saleTitle,
     url: o.url,
     bucket: o.bucket,
     priceBase: o.priceBase,

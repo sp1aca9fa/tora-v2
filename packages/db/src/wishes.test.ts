@@ -15,12 +15,13 @@ import {
   itemRules,
   notItemMarks,
   priceObservations,
+  productSources,
   products,
   saleCoverage,
   watches,
 } from './schema';
 import { setGameRules } from './rule-marks';
-import { productsWithoutSource } from './sources';
+import { createQuerySource, productsWithoutSource } from './sources';
 import { type SupplyOffer, saveSupply } from './supply';
 import { createUser } from './users';
 import { addWatch } from './watches';
@@ -32,6 +33,7 @@ import {
   releaseWish,
   rulesApplied,
   saveWishRules,
+  saveWishSearch,
   turnOnWishRules,
   unmarkWishSale,
   wordsOf,
@@ -422,6 +424,267 @@ describe('boxed accessor', () => {
     await expect(markWishSale(db, ann, { wishId: w.id, saleId: z!.id })).rejects.toThrow(
       'not_found',
     );
+  });
+});
+
+describe('a sale whose title is only in its raw row', () => {
+  it('reads the raw name as the title: a boxed wish keeps it and the check page names it', async () => {
+    const {
+      product: boxed,
+      plain,
+      watch: w,
+    } = await addGameWish(db, ann.id, {
+      name: 'Star Rover',
+      console: 'alpha',
+      boxed: true,
+      watch: {},
+    });
+    const rows = await db
+      .insert(priceObservations)
+      .values([
+        sale(plain.id, '', 3000, { title: null, raw: { name: 'Star Rover 箱付' } }),
+        sale(plain.id, '', 1000, { title: null, raw: { name: 'Star Rover loose' } }),
+        // The column wins when both are there.
+        sale(plain.id, 'Star Rover 完品', 2500, { raw: { name: 'other words' } }),
+        // No title anywhere, a name that is not a text, a raw row that is not an object.
+        sale(plain.id, '', 2000, { title: null, raw: null }),
+        sale(plain.id, '', 2100, { title: null, raw: { name: 7 } }),
+        sale(plain.id, '', 2200, { title: null, raw: ['Star Rover 箱付'] }),
+      ])
+      .returning();
+    // A raw value that is not JSON at all (an old row) reads with no title, never an error.
+    await db.run(
+      sql`UPDATE price_observations SET raw = 'not json 箱付' WHERE id = ${rows[3]!.id}`,
+    );
+    const titles = (await wishSales(db, plain.id)).map((s) => s.title);
+    expect(titles.toSorted((a, b) => String(a).localeCompare(String(b)))).toEqual(
+      ['Star Rover 箱付', 'Star Rover loose', 'Star Rover 完品', null, null, null].toSorted(
+        (a, b) => String(a).localeCompare(String(b)),
+      ),
+    );
+    expect((await wishSales(db, boxed.id)).map((s) => s.title).toSorted()).toEqual([
+      'Star Rover 完品',
+      'Star Rover 箱付',
+    ]);
+    const check = await registrationCheck(db, (await ownWish(db, ann.id, w.id))!);
+    expect(check.sales[0]!.sample.map((s) => s.title).toSorted()).toEqual([
+      'Star Rover 完品',
+      'Star Rover 箱付',
+    ]);
+    // The stored rows are untouched: the title column stays empty.
+    const [stored] = await db
+      .select({ title: priceObservations.title })
+      .from(priceObservations)
+      .where(eq(priceObservations.id, rows[0]!.id));
+    expect(stored!.title).toBeNull();
+  });
+});
+
+describe('the search words', () => {
+  const searchOf = async (productId: string) =>
+    (
+      await db
+        .select({ query: productSources.query })
+        .from(productSources)
+        .where(eq(productSources.productId, productId))
+    )[0]!.query!;
+
+  it('shows each search as stored and what the rules add when it is sent', async () => {
+    await saveConsole(db, {
+      ...alpha,
+      key: 'gamma',
+      names: { en: 'Gamma' },
+      categories: { market: '77' },
+    });
+    const { product: g, watch: w } = await addGameWish(db, ann.id, {
+      name: 'Star Rover',
+      console: 'gamma',
+      watch: {},
+    });
+    const page = () => ownWish(db, ann.id, w.id).then((wish) => registrationCheck(db, wish!));
+    // No search before the first collect made one.
+    expect((await page()).searches).toEqual([]);
+    await createQuerySource(db, g.id, 'market', {
+      keywords: ['Star Rover'],
+      extra: { auto: true },
+    });
+    await saveWishRules(db, ann, {
+      wishId: w.id,
+      required: 'limited\nrover',
+      excluded: 'bad',
+      edition: '',
+    });
+    // The switch off: the search goes as stored.
+    expect((await page()).searches).toEqual([
+      { source: 'market', words: 'Star Rover', added: [], inCategory: false },
+    ]);
+    await setGameRules(db, true);
+    // On: the required word the stored words lack, inside the console's category; never the
+    // excluded words (S36 A1).
+    expect((await page()).searches).toEqual([
+      { source: 'market', words: 'Star Rover', added: ['limited'], inCategory: true },
+    ]);
+  });
+
+  it('saves other words: the rows and the confirmations go, and confirming waits for a read', async () => {
+    const {
+      product: boxed,
+      plain,
+      watch: wb,
+    } = await addGameWish(db, bob.id, {
+      name: 'Star Rover',
+      console: 'alpha',
+      boxed: true,
+      watch: {},
+    });
+    // The plain item the boxed one reads is the item ann wishes.
+    const { product: g, watch: w } = await addGameWish(db, ann.id, {
+      name: 'Star Rover',
+      console: 'alpha',
+      reuse: plain.id,
+      watch: {},
+    });
+    expect(g.id).toBe(plain.id);
+    await createQuerySource(db, g.id, 'market', {
+      keywords: ['Star Rover'],
+      excludeKeywords: ['poster'],
+      priceMin: 100,
+      extra: { auto: true, v: 2, references: ['https://example.test/1'] },
+    });
+    const [kept, byHand] = await db
+      .insert(priceObservations)
+      .values([
+        sale(g.id, 'Star Rover 箱付', 3000),
+        sale(g.id, 'Star Rover poster', 500, { excluded: true, excludedReason: 'manual' }),
+      ])
+      .returning();
+    await listings(g.id, [offer('a', 'Star Rover', 2500)]);
+    await readNow(g.id);
+    const hashOf = async (id: string, kind: 'sales' | 'listings', source: string) =>
+      (await currentRules(db, id))!.hashFor(kind, source);
+    await confirmWish(db, ann, {
+      wishId: w.id,
+      kind: 'sales',
+      hash: await hashOf(g.id, 'sales', ''),
+    });
+    await confirmWish(db, ann, {
+      wishId: w.id,
+      kind: 'listings',
+      source: 'market',
+      hash: await hashOf(g.id, 'listings', 'market'),
+    });
+    await confirmWish(db, bob, {
+      wishId: wb.id,
+      kind: 'sales',
+      hash: await hashOf(boxed.id, 'sales', ''),
+    });
+    const states = async () => {
+      const got = await wishStates(db, [g, boxed]);
+      return [got.get(g.id)!.state, got.get(boxed.id)!.state];
+    };
+    expect(await states()).toEqual(['confirmed', 'confirmed']);
+
+    // Who may: the wish's owner or an admin; a boxed wish has no search of its own; the words.
+    await expect(
+      saveWishSearch(db, bob, { wishId: w.id, source: 'market', words: 'x' }),
+    ).rejects.toThrow('not_found');
+    await expect(
+      saveWishSearch(db, bob, { wishId: wb.id, source: 'market', words: 'x' }),
+    ).rejects.toThrow('forbidden');
+    await expect(
+      saveWishSearch(db, ann, { wishId: w.id, source: 'other', words: 'x' }),
+    ).rejects.toThrow('not_found');
+    for (const words of ['', '   ', 'x'.repeat(201)])
+      await expect(
+        saveWishSearch(db, ann, { wishId: w.id, source: 'market', words }),
+      ).rejects.toThrow('invalid_input');
+    // The stored words again (spaces and width aside): nothing happens.
+    expect(
+      await saveWishSearch(db, ann, { wishId: w.id, source: 'market', words: ' Ｓtar  Rover ' }),
+    ).toBe(false);
+    expect(await states()).toEqual(['confirmed', 'confirmed']);
+    expect((await wishSales(db, g.id)).length).toBe(1);
+    expect((await searchOf(g.id)).extra).toEqual({
+      auto: true,
+      v: 2,
+      references: ['https://example.test/1'],
+    });
+
+    // Other words: saved as typed, the rest of the search kept, marked edited.
+    expect(
+      await saveWishSearch(db, ann, { wishId: w.id, source: 'market', words: 'スターローバー' }),
+    ).toBe(true);
+    const saved = await searchOf(g.id);
+    expect([saved.keywords, saved.excludeKeywords, saved.priceMin]).toEqual([
+      ['スターローバー'],
+      ['poster'],
+      100,
+    ]);
+    expect(saved.extra).toMatchObject({
+      auto: false,
+      edited: true,
+      v: 2,
+      references: ['https://example.test/1'],
+    });
+    expect(typeof saved.extra!.editedAt).toBe('string');
+    // The rows read under the old words are gone; the sale a person excluded by hand stays.
+    const left = await db
+      .select()
+      .from(priceObservations)
+      .where(eq(priceObservations.productId, g.id));
+    expect(left.map((r) => r.id)).toEqual([byHand!.id]);
+    expect(left.some((r) => r.id === kept!.id)).toBe(false);
+    // Nothing confirmed any more, for the item and for the boxed item reading its rows.
+    expect(await states()).toEqual(['check_needed', 'check_needed']);
+    const rows = await db
+      .select()
+      .from(itemChecks)
+      .orderBy(sql`rowid`);
+    expect(
+      rows.slice(-3).map((r) => [r.productId, r.kind, r.source, r.outcome, r.by, r.note]),
+    ).toEqual([
+      [g.id, 'sales', '', 'failed', 'person', 'search edited'],
+      [g.id, 'listings', 'market', 'failed', 'person', 'search edited'],
+      [boxed.id, 'sales', '', 'failed', 'person', 'search edited'],
+    ]);
+    // Until Tora reads the item again nobody confirms, the admin included: the stored listings on
+    // the page were read under the old words.
+    expect(await awaitsRead(db, g.id)).toBe(true);
+    expect(await awaitsRead(db, boxed.id)).toBe(true);
+    await expect(
+      confirmWish(db, admin, {
+        wishId: w.id,
+        kind: 'listings',
+        source: 'market',
+        hash: await hashOf(g.id, 'listings', 'market'),
+      }),
+    ).rejects.toThrow('invalid_input');
+    await new Promise((r) => setTimeout(r, 5));
+    await readNow(g.id);
+    expect(await awaitsRead(db, g.id)).toBe(false);
+    // A person's own row never blocks: after the read the person confirms again.
+    await db.insert(priceObservations).values(sale(g.id, 'スターローバー', 2800));
+    await confirmWish(db, ann, {
+      wishId: w.id,
+      kind: 'sales',
+      hash: await hashOf(g.id, 'sales', ''),
+    });
+    expect((await states())[0]).toBe('confirmed');
+    // Saving again with nothing confirmed at that source writes no row for it.
+    const before = (await db.select().from(itemChecks)).length;
+    expect(
+      await saveWishSearch(db, admin, {
+        wishId: w.id,
+        source: 'market',
+        words: 'スターローバー 64',
+      }),
+    ).toBe(true);
+    const after = await db
+      .select()
+      .from(itemChecks)
+      .orderBy(sql`rowid`);
+    expect(after.length).toBe(before + 1);
+    expect([after.at(-1)!.kind, after.at(-1)!.by]).toEqual(['sales', 'admin']);
   });
 });
 

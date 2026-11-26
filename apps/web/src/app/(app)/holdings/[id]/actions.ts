@@ -306,7 +306,8 @@ export async function editProductAction(
       }
       return product;
     },
-    () => (backTo.startsWith('/holdings/') ? backTo : '/'),
+    // Back to the lot or the wish the edit was opened from (a path of this app only).
+    () => (backTo.startsWith('/holdings/') || backTo.startsWith('/watchlist/') ? backTo : '/'),
   );
 }
 

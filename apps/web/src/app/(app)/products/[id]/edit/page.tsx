@@ -26,7 +26,12 @@ export default async function EditProductPage({
   // Products are shared: only the creator (or an admin) may edit one.
   if (!product || !canEditProduct(user, product)) notFound();
   const [t, taxonomy] = await Promise.all([getTranslations(), getTaxonomy()]);
-  const back = from?.startsWith('/holdings/') || from?.startsWith('/products/') ? from : '/';
+  const back =
+    from?.startsWith('/holdings/') ||
+    from?.startsWith('/products/') ||
+    from?.startsWith('/watchlist/')
+      ? from
+      : '/';
   // TCG keeps the franchise picked with chips (the set catalog); others type it.
   const isTcg = !!categoryDef(taxonomy, product.category)?.setCatalog;
   // The set line (S9): automatic unless set here.
