@@ -336,10 +336,11 @@ unconfirmed and has no level, record or alert. Game watches that exist when this
 check. The check also shows the words each marketplace is searched with for the item, with what the rules
 add when the search is sent (A1). The words are made from the item's name when the search is first made and
 do not follow a later rename; the wish's owner or an admin can change them there (not on a boxed item, which
-has no search of its own). Saving other words removes the item's stored sales and listings at that
-marketplace, except sales a person excluded by hand, and they are read again (its covered spans are dropped
-and its deep read is asked for again, as under "Covered day"); until the next read no confirmation can be
-made. A person holding a lot of the item saves its search from the item's page under the same rule. From the
+has no search of its own). Saving other words removes the item's stored sales at that
+marketplace, except sales a person excluded by hand, and sets its stored listings there aside (kept, not
+shown on the check); both are read again (its covered spans are dropped
+and its deep read is asked for again, as under "Covered day"); until that marketplace is read again no
+confirmation can be made. A save that changes nothing does nothing. A person holding a lot of the item saves its search from the item's page under the same rule. From the
 wish's page and its check, the item's maker or an admin opens the item's edit page (its name, its console).
 
 B2. The identity shop's prices kept every night for wishes: used, new, buyback and stock, the shop's own

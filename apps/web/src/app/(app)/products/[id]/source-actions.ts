@@ -12,16 +12,14 @@ import {
   reactivateSource,
   setSourceReferences,
   setObservationExcluded,
-  updateSourceQuery,
   getCandidate,
   getProductSource,
   canEditProduct,
   getProduct,
   itemWithListing,
   rejectCandidate,
-  searchEdited,
+  saveEditedSearch,
   searchWordsOf,
-  unconfirmForSearch,
   unlinkSource,
   userHoldsProduct,
 } from '@tora/db';
@@ -150,17 +148,17 @@ export async function updateQueryAction(
   if (!link || !(await allowed(link.productId))) return { error: 'not_found' };
   const keywords = searchWordsOf(formData.get('keywords')).slice(0, SEARCH_WORDS_MAX);
   if (!keywords) return { error: 'check', fields: ['keywords'] };
-  // Edited by the user: never replaced by newer default queries (`searchEdited`).
-  const query: SourceQuery = searchEdited({
+  const query: SourceQuery = {
     ...link.query,
     keywords: [keywords],
     excludeKeywords: words(formData.get('excludeKeywords')),
     priceMin: yenOrUndefined(formData.get('priceMin')),
     priceMax: yenOrUndefined(formData.get('priceMax')),
-  });
-  // The rows go with the save: what was confirmed on them no longer counts (a game's check).
-  await unconfirmForSearch(db, user, link.productId, link.source);
-  await updateSourceQuery(db, sourceId, query);
+  };
+  // Saved marked edited (never replaced by newer default queries); the rows go with the save, and
+  // what was confirmed on them no longer counts (a game's check). A save that changes nothing
+  // deletes nothing (`saveEditedSearch`).
+  await saveEditedSearch(db, user, link, query);
   revalidatePath(`/products/${link.productId}`, 'layout');
   return { saved: true };
 }

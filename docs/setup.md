@@ -117,14 +117,14 @@ for a person who lost both). Creating an account, making a setup link and turnin
 Activity. The terminal commands still work:
 
 ```bash
-pnpm user create <username>        # password, scan the QR code, confirm one code, keep the 8 backup codes
+pnpm user create <username> [--admin]   # password, scan the QR code, confirm one code, keep the 8 backup codes
 pnpm user list
 pnpm user devices <username>
 pnpm user revoke <username> <device-id|all>
 pnpm user reset-password <username>
 pnpm user reset-2fa <username>     # lost phone: new authenticator + backup codes
 pnpm user disable|enable <username>
-pnpm user role <username> admin|member   # signs the account's devices out
+pnpm user role <username> admin|member   # the rules: rules/accounts.md, "Roles and what each may do"
 ```
 
 The first account is an admin; admins see **Settings > Admin preferences** (settings for the whole

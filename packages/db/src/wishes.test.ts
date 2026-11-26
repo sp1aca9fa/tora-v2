@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { localDate, toLocalIso } from '@tora/core';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { type Db, createDb } from './client';
 import { saveConsole } from './consoles';
@@ -18,6 +18,7 @@ import {
   productSources,
   products,
   saleCoverage,
+  supply,
   watches,
 } from './schema';
 import { setGameRules } from './rule-marks';
@@ -32,6 +33,7 @@ import {
   registrationCheck,
   releaseWish,
   rulesApplied,
+  saveEditedSearch,
   saveWishRules,
   saveWishSearch,
   turnOnWishRules,
@@ -486,7 +488,7 @@ describe('the search words', () => {
       await db
         .select({ query: productSources.query })
         .from(productSources)
-        .where(eq(productSources.productId, productId))
+        .where(and(eq(productSources.productId, productId), eq(productSources.source, 'market')))
     )[0]!.query!;
 
   it('shows each search as stored and what the rules add when it is sent', async () => {
@@ -550,6 +552,10 @@ describe('the search words', () => {
       excludeKeywords: ['poster'],
       priceMin: 100,
       extra: { auto: true, v: 2, references: ['https://example.test/1'] },
+    });
+    await createQuerySource(db, g.id, 'bazaar', {
+      keywords: ['Star Rover'],
+      extra: { auto: true },
     });
     const [kept, byHand] = await db
       .insert(priceObservations)
@@ -659,6 +665,28 @@ describe('the search words', () => {
         hash: await hashOf(g.id, 'listings', 'market'),
       }),
     ).rejects.toThrow('invalid_input');
+    // The listings found under the old words are set aside on the check (their stored row stays).
+    expect((await wishOffers(db, g.id)).map((r) => r.source)).toEqual([]);
+    expect((await db.select().from(supply).where(eq(supply.productId, g.id))).length).toBe(1);
+    // A read of another marketplace says nothing about this one: still waiting.
+    await new Promise((r) => setTimeout(r, 5));
+    await db.insert(saleCoverage).values({
+      productId: g.id,
+      source: 'bazaar',
+      nights: [[localDate(), localDate()]],
+      updatedAt: toLocalIso(new Date(Date.now() + 1000)),
+    });
+    expect(await awaitsRead(db, g.id)).toBe(true);
+    await expect(
+      confirmWish(db, ann, {
+        wishId: w.id,
+        kind: 'listings',
+        source: 'market',
+        hash: await hashOf(g.id, 'listings', 'market'),
+      }),
+    ).rejects.toThrow('invalid_input');
+    // The marketplace itself read again: its new listings show, and confirming is open.
+    await listings(g.id, [offer('n', 'スターローバー', 2600)]);
     await new Promise((r) => setTimeout(r, 5));
     await readNow(g.id);
     expect(await awaitsRead(db, g.id)).toBe(false);
@@ -685,6 +713,66 @@ describe('the search words', () => {
       .orderBy(sql`rowid`);
     expect(after.length).toBe(before + 1);
     expect([after.at(-1)!.kind, after.at(-1)!.by]).toEqual(['sales', 'admin']);
+  });
+
+  it("the item page's save follows the same rule, and a save that changes nothing does nothing", async () => {
+    const { product: g, watch: w } = await addGameWish(db, ann.id, {
+      name: 'Star Rover',
+      console: 'alpha',
+      watch: {},
+    });
+    await createQuerySource(db, g.id, 'market', {
+      keywords: ['Star　Rover'],
+      excludeKeywords: ['poster'],
+      extra: { auto: true },
+    });
+    const [kept] = await db
+      .insert(priceObservations)
+      .values(sale(g.id, 'Star Rover', 3000))
+      .returning();
+    await readNow(g.id);
+    const hash = (await currentRules(db, g.id))!.hashFor('sales', '');
+    await confirmWish(db, ann, { wishId: w.id, kind: 'sales', hash });
+    const link = async () =>
+      (
+        await db
+          .select()
+          .from(productSources)
+          .where(and(eq(productSources.productId, g.id), eq(productSources.source, 'market')))
+      )[0]!;
+    const state = async () => (await wishStates(db, [g])).get(g.id)!.state;
+    // The same search, the stored words differing only by a wide space: nothing is saved.
+    const same = { ...(await link()).query, keywords: ['Star Rover'], excludeKeywords: ['poster'] };
+    expect(await saveEditedSearch(db, bob, await link(), same)).toBe(false);
+    expect(
+      await saveWishSearch(db, ann, { wishId: w.id, source: 'market', words: 'Star Rover' }),
+    ).toBe(false);
+    expect([(await wishSales(db, g.id)).map((s) => s.id), await state()]).toEqual([
+      [kept!.id],
+      'confirmed',
+    ]);
+    expect((await link()).query!.extra).toEqual({ auto: true });
+    // A price limit added from the item's page (a lot's holder, here bob): the rows go, the
+    // confirmation with them, and the check waits for a read of that marketplace.
+    expect(await saveEditedSearch(db, bob, await link(), { ...same, priceMax: 9000 })).toBe(true);
+    expect([(await wishSales(db, g.id)).length, await state()]).toEqual([0, 'check_needed']);
+    expect((await link()).query).toMatchObject({
+      priceMax: 9000,
+      extra: { auto: false, edited: true },
+    });
+    expect(await awaitsRead(db, g.id)).toBe(true);
+    const [row] = (
+      await db
+        .select()
+        .from(itemChecks)
+        .orderBy(sql`rowid`)
+    ).slice(-1);
+    expect([row!.outcome, row!.by, row!.userId, row!.note]).toEqual([
+      'failed',
+      'person',
+      bob.id,
+      'search edited',
+    ]);
   });
 });
 

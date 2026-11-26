@@ -38,6 +38,8 @@ import { RULE_MARK_PREFIX, type RuleHold, gameRulesOn, isHeld, releaseHeld } fro
 import { collectSchedule } from './schedule';
 import {
   type Product,
+  type ProductSource,
+  type SourceQuery,
   type User,
   type Watch,
   itemChecks,
@@ -609,9 +611,39 @@ export async function saveWishSearch(
       ),
     );
   if (!link) throw new DomainError('not_found');
-  if ((link.query?.keywords ?? []).join(' ') === words) return false;
-  await unconfirmForSearch(db, user, wish.product.id, link.source);
-  await updateSourceQuery(db, link.id, searchEdited({ ...link.query, keywords: [words] }));
+  return saveEditedSearch(db, user, link, { ...link.query, keywords: [words] });
+}
+
+const sameList = (a: readonly string[] | undefined, b: readonly string[] | undefined) =>
+  (a ?? []).join('\n') === (b ?? []).join('\n');
+
+/**
+ * Saves a search as a person changed it, from either page that can (the wish's check, the item's
+ * page): the confirmations that rested on its rows go first (`unconfirmForSearch`), then the search
+ * is saved marked edited (`searchEdited`, `updateSourceQuery`: its rows go and are read again). A
+ * search that reads the same (the same words once normalized, excluded words, price range and
+ * category) is not saved: nothing is deleted or un-confirmed for a save that changes nothing. The
+ * caller checked who may. False: nothing changed.
+ */
+export async function saveEditedSearch(
+  db: Db,
+  user: Who,
+  link: Pick<ProductSource, 'id' | 'productId' | 'source' | 'query'>,
+  query: SourceQuery,
+): Promise<boolean> {
+  const old = link.query;
+  if (
+    old &&
+    searchWordsOf((old.keywords ?? []).join(' ')) ===
+      searchWordsOf((query.keywords ?? []).join(' ')) &&
+    sameList(old.excludeKeywords, query.excludeKeywords) &&
+    (old.priceMin ?? null) === (query.priceMin ?? null) &&
+    (old.priceMax ?? null) === (query.priceMax ?? null) &&
+    (old.categoryId ?? null) === (query.categoryId ?? null)
+  )
+    return false;
+  await unconfirmForSearch(db, user, link.productId, link.source);
+  await updateSourceQuery(db, link.id, searchEdited(query));
   return true;
 }
 

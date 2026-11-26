@@ -167,8 +167,8 @@ export async function nextWishToCheck(
  * Whether a person's confirmation must wait for the next read (S36 Data rules: "A confirmation never
  * outlives the rules it was made under"; fix C6): the item's rules, or the words of one of its
  * searches, changed after Tora last read the item whose rows it shows, so the sales and listings on
- * the page were not read under them. Changed at: the latest time a person saved one of the rows
- * item's active searches (`searchEdited`), and the latest `item_rules.updated_at` of the item and, for a boxed item, of its plain item; a row
+ * the page were not read under them. A search a person saved (`searchEdited`) waits for a read of
+ * its own source (that source's `sale_coverage.updated_at` after the save). The rules changed at: the latest `item_rules.updated_at` of the item and, for a boxed item, of its plain item; a row
  * never changed since it was written that gives the same rules as no row (a game prefilled with its
  * platform's console and no words) is no change. Read at: the latest of the rows item's
  * `sale_coverage.updated_at` (a read night) and `item_rule_state.applied_at` (the rules applied).
@@ -194,26 +194,14 @@ export async function awaitsRead(db: Pick<Db, 'select'>, productId: string): Pro
     }
     changed = Math.max(changed, Date.parse(row.updatedAt));
   }
-  // A search of the rows item saved with other words by a person (`searchEdited`): the rows on the
-  // page were read under the old words, or are gone.
-  const searches = await db
-    .select({ query: productSources.query })
-    .from(productSources)
-    .where(
-      and(
-        eq(productSources.productId, from),
-        eq(productSources.externalId, QUERY_SOURCE_ID),
-        eq(productSources.active, true),
-      ),
-    );
-  for (const { query } of searches) {
-    const at = Date.parse(String((query?.extra as { editedAt?: unknown } | undefined)?.editedAt));
-    if (!Number.isNaN(at)) changed = Math.max(changed, at);
-  }
-  if (changed === Number.NEGATIVE_INFINITY) return false;
-  const [[covered], [state]] = await Promise.all([
+  // A search of the rows item a person saved again (`searchEdited`) waits for a read of its own
+  // source: until then that source's rows were read under the old search, or are gone. Another
+  // source's read says nothing about it (review round 1).
+  const edits = await searchEdits(db, from);
+  if (changed === Number.NEGATIVE_INFINITY && !edits.size) return false;
+  const [coverage, [state]] = await Promise.all([
     db
-      .select({ at: sql<string | null>`max(${saleCoverage.updatedAt})` })
+      .select({ source: saleCoverage.source, at: saleCoverage.updatedAt })
       .from(saleCoverage)
       .where(eq(saleCoverage.productId, from)),
     db
@@ -221,10 +209,41 @@ export async function awaitsRead(db: Pick<Db, 'select'>, productId: string): Pro
       .from(itemRuleState)
       .where(eq(itemRuleState.productId, from)),
   ]);
+  const readAt = new Map(coverage.map((c) => [c.source, Date.parse(c.at)]));
+  for (const [source, at] of edits)
+    if (!((readAt.get(source) ?? Number.NEGATIVE_INFINITY) > at)) return true;
+  if (changed === Number.NEGATIVE_INFINITY) return false;
   const read = Math.max(
-    ...[covered?.at, state?.at].map((at) => (at ? Date.parse(at) : Number.NEGATIVE_INFINITY)),
+    ...readAt.values(),
+    state?.at ? Date.parse(state.at) : Number.NEGATIVE_INFINITY,
   );
   return !(read > changed);
+}
+
+/**
+ * When a person last saved each active search of an item (`searchEdited`), by source, in
+ * milliseconds. A search never saved by a person is left out.
+ */
+export async function searchEdits(
+  db: Pick<Db, 'select'>,
+  productId: string,
+): Promise<Map<string, number>> {
+  const searches = await db
+    .select({ source: productSources.source, query: productSources.query })
+    .from(productSources)
+    .where(
+      and(
+        eq(productSources.productId, productId),
+        eq(productSources.externalId, QUERY_SOURCE_ID),
+        eq(productSources.active, true),
+      ),
+    );
+  const out = new Map<string, number>();
+  for (const { source, query } of searches) {
+    const at = Date.parse(String((query?.extra as { editedAt?: unknown } | undefined)?.editedAt));
+    if (!Number.isNaN(at)) out.set(source, at);
+  }
+  return out;
 }
 
 /** A stored rules row as the rules read it. */
@@ -513,7 +532,9 @@ export interface WishOfferRow {
  * A wished item's stored search listings (S36 B1, A2), rows of `since` (a day) and later: a plain
  * item's own rows; a boxed item's are its plain item's whose title passes the boxed item's rules.
  * The identity shop's entries are not listings (`searchOffers`). A listing marked "not the item" is
- * moved to `marked`: for a boxed item a mark on either item counts.
+ * moved to `marked`: for a boxed item a mark on either item counts. A source's rows fetched before a
+ * person last saved its search (`searchEdits`) are left out: they were found under the old search
+ * (the stored rows stay; the next read of that source brings its listings back).
  */
 export async function wishOffers(
   db: Pick<Db, 'select'>,
@@ -521,13 +542,14 @@ export async function wishOffers(
   options: { since?: string } = {},
 ): Promise<WishOfferRow[]> {
   const { from, rules } = await rowsItemOf(db, productId);
-  const [rows, marks] = await Promise.all([
+  const [all, marks, edits] = await Promise.all([
     db
       .select({
         source: supply.source,
         bucket: supply.bucket,
         day: supply.day,
         offers: supply.offers,
+        fetchedAt: supply.fetchedAt,
       })
       .from(supply)
       .where(
@@ -541,7 +563,12 @@ export async function wishOffers(
       .select({ source: notItemMarks.source, ref: notItemMarks.externalRef })
       .from(notItemMarks)
       .where(inArray(notItemMarks.productId, [...new Set([productId, from])])),
+    searchEdits(db, from),
   ]);
+  const rows = all.filter((r) => {
+    const edited = edits.get(r.source);
+    return edited === undefined || Date.parse(r.fetchedAt) > edited;
+  });
   const marked = new Set(marks.map((m) => `${m.source}|${m.ref}`));
   return rows.flatMap((r) => {
     const all = searchOffers(r);

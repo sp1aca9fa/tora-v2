@@ -265,6 +265,12 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
               {c.searches.length === 0 && (
                 <p className="text-sm text-muted-foreground">{t('searchNone')}</p>
               )}
+              {/* What saving does, read before any form is used (UX review). */}
+              {c.searches.length > 0 && c.game && !c.rowsOf && (
+                <p className="rounded-md border border-amber-500/50 bg-amber-50 px-3 py-2 text-xs dark:bg-amber-950/40">
+                  {t('searchWarn')}
+                </p>
+              )}
               {c.searches.map((s) => {
                 const note = [
                   s.added.length > 0 && t('searchAdded', { words: s.added.join(' ') }),
@@ -289,12 +295,9 @@ export default async function WishCheckPage({ params }: { params: Promise<{ id: 
                   </p>
                 );
               })}
-              {c.searches.length > 0 &&
-                (c.game && !c.rowsOf ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-300">{t('searchWarn')}</p>
-                ) : (
-                  c.rowsOf && <p className="text-xs text-muted-foreground">{t('searchBoxed')}</p>
-                ))}
+              {c.searches.length > 0 && c.rowsOf && (
+                <p className="text-xs text-muted-foreground">{t('searchBoxed')}</p>
+              )}
             </div>
           </OpenOnWide>
         </section>

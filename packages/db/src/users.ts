@@ -101,9 +101,8 @@ export async function setUserDisabled(db: Db, userId: string, disabled: boolean)
 }
 
 /**
- * Changes an account's role (`pnpm user role`; no page does). `last_admin`: refused, since it would
- * leave no admin who can sign in (the account is the only admin that is set up and not turned
- * off). `same`: the account has that role already, nothing is written. On a change the account's
+ * Changes an account's role (`pnpm user role`; no page does). `last_admin`: refused, since no other
+ * admin can sign in (none that is set up and not turned off), whether or not this account can. `same`: the account has that role already, nothing is written. On a change the account's
  * devices are signed out in the same transaction, so no open page outlives the role.
  */
 export async function setUserRole(

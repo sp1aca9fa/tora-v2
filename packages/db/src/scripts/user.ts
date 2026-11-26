@@ -215,7 +215,7 @@ switch (command) {
     const named = role === 'admin' ? 'an admin' : 'a member';
     if (outcome === 'last_admin')
       fail(
-        `"${user.username}" is the only admin who can sign in. Make another account an admin first. Nothing changed.`,
+        `No other admin can sign in, so "${user.username}" stays an admin. Make another account an admin first. Nothing changed.`,
       );
     if (outcome === 'not_found') fail(`No account "${user.username}".`);
     if (outcome === 'same') {
