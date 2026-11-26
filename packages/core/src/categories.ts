@@ -119,7 +119,12 @@ export const BUILT_IN_LISTS: ConditionList[] = [
 const BUILT_IN_LIST_KEYS = BUILT_IN_LISTS.map((l) => l.key);
 
 /** Bucket prefixes the ready-made lists use: an admin's list key may not be one. */
-const RESERVED_LIST_KEYS = [...BUILT_IN_LIST_KEYS, 'raw', 'graded', 'cond'];
+export const RESERVED_LIST_KEYS: readonly string[] = [
+  ...BUILT_IN_LIST_KEYS,
+  'raw',
+  'graded',
+  'cond',
+];
 
 const field = (key: ProductField, kinds?: readonly string[]): FieldDef => ({
   key,
@@ -365,4 +370,33 @@ export function holdingFieldsFor(cls: ProductClass): {
     return { condition: true, packaging: true, grading: false, value: null };
   }
   return { condition: false, packaging: false, grading: false, value: list };
+}
+
+/** Plain data with every object's keys sorted and undefined left out, so equal data reads the same. */
+const canonical = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(canonical)
+    : v && typeof v === 'object'
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+            .map((k) => [k, canonical((v as Record<string, unknown>)[k])]),
+        )
+      : v;
+
+/**
+ * The version of a saved taxonomy: FNV-1a, 64 bits, over its canonical JSON (the same on the
+ * server and in the browser, no crypto needed). The categories form sends the version it loaded;
+ * a save over a taxonomy saved since (another tab or admin) is refused, since the form's new keys
+ * were chosen against what it loaded and could reuse a key the other save gave out (G46).
+ */
+export function taxonomyVersion(t: Taxonomy): string {
+  const text = JSON.stringify(canonical(t));
+  let h = 0xcbf29ce484222325n;
+  for (let i = 0; i < text.length; i++) {
+    h ^= BigInt(text.charCodeAt(i));
+    h = (h * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return h.toString(16).padStart(16, '0');
 }

@@ -61,6 +61,11 @@ export async function saveSourceInfos(db: Db, infos: SourceInfo[]): Promise<void
 let cache = new WeakMap<object, { at: number; registry: SourceRegistry }>();
 const TTL_MS = 5_000;
 
+/** Forgets the cached registry (after a transaction commits: a read during it cached the old one). */
+export function forgetRegistry(): void {
+  cache = new WeakMap();
+}
+
 /** The registry: every described source with its role per class (chosen, else suggested). */
 export async function loadSourceRegistry(db: Pick<Db, 'select'>): Promise<SourceRegistry> {
   const hit = cache.get(db);

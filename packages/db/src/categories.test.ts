@@ -1,10 +1,10 @@
-import { type Taxonomy, resolveTaxonomy, toLocalIso } from '@tora/core';
+import { type Taxonomy, resolveTaxonomy, taxonomyVersion, toLocalIso } from '@tora/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { beforeEach, expect, it } from 'vitest';
-import { categoryUsage, saveTaxonomy } from './categories';
+import { categoryUsage, saveTaxonomy, sentTaxonomyRefusals } from './categories';
 import { type Db, createDb } from './client';
 import { migrateDb } from './migrate';
 import { createHolding } from './mutations';
@@ -191,4 +191,71 @@ it("takes the admin's own regions, refuses others, and clears a removed one afte
   await saveTaxonomy(db, withSpanish(['jp', 'en']), true);
   const [after] = await db.select().from(schema.products).where(eq(schema.products.id, product.id));
   expect(after!.region).toBeNull();
+});
+
+it('refuses a save over categories saved since the form loaded them (G46)', async () => {
+  // Tab A loads the stored taxonomy; tab B saves a new value (value3) in the meantime.
+  await saveTaxonomy(db, withWatches(), true);
+  const loadedA = (await loadSourceRegistry(db)).taxonomy!;
+  // What the page hands the browser: the same data through JSON, keys in another order.
+  const inBrowser = JSON.parse(JSON.stringify(loadedA)) as Taxonomy;
+  inBrowser.lists = inBrowser.lists.map((l) => {
+    const { values, key, ...rest } = l;
+    return { values, ...rest, key };
+  });
+  const versionA = taxonomyVersion(inBrowser);
+  const own = (t: Taxonomy) => t.lists.filter((l) => !l.builtIn);
+  expect(sentTaxonomyRefusals(loadedA, own(loadedA), versionA)).toEqual([]);
+
+  const withB = withWatches();
+  withB.lists = withB.lists.map((l) =>
+    l.key === 'watch_condition'
+      ? { ...l, values: [...l.values, { key: 'value3', names: { ja: '新品同様' } }] }
+      : l,
+  );
+  await saveTaxonomy(db, withB, true);
+  const stored = (await loadSourceRegistry(db)).taxonomy!;
+  expect(sentTaxonomyRefusals(stored, own(stored), versionA)).toEqual(['stale']);
+  // A form without a version (loaded before this check) is refused too.
+  expect(sentTaxonomyRefusals(stored, own(stored), undefined)).toEqual(['stale']);
+  // Reloaded, the form's version is the stored one again.
+  expect(sentTaxonomyRefusals(stored, own(stored), taxonomyVersion(stored))).toEqual([]);
+});
+
+it('checks the version again inside the write, so two saves from one version cannot both land', async () => {
+  await saveTaxonomy(db, withWatches(), true);
+  const v0 = taxonomyVersion((await loadSourceRegistry(db)).taxonomy!);
+  const withValue = (key: string, ja: string) => {
+    const t = withWatches();
+    t.lists = t.lists.map((l) =>
+      l.key === 'watch_condition' ? { ...l, values: [...l.values, { key, names: { ja } }] } : l,
+    );
+    return t;
+  };
+  // Both tabs passed the early check at v0; the first write lands, the second is refused.
+  expect((await saveTaxonomy(db, withValue('value3', '新品同様'), true, v0)).blocked).toEqual([]);
+  const second = await saveTaxonomy(db, withValue('value3', '美品'), true, v0);
+  expect(second.blocked).toEqual(['stale']);
+  const stored = (await loadSourceRegistry(db)).taxonomy!;
+  const list = stored.lists.find((l) => l.key === 'watch_condition')!;
+  expect(list.values.find((v) => v.key === 'value3')?.names).toEqual({ ja: '新品同様' });
+});
+
+it('refuses an own list on a key the app keeps instead of dropping it (G47)', async () => {
+  await saveTaxonomy(db, withWatches(), true);
+  const prev = (await loadSourceRegistry(db)).taxonomy!;
+  const raw = {
+    key: 'raw',
+    names: { en: 'Raw' },
+    values: [{ key: 'mint', names: { en: 'Mint' } }],
+  };
+  const lists = [...prev.lists.filter((l) => !l.builtIn), raw];
+  expect(sentTaxonomyRefusals(prev, lists, taxonomyVersion(prev))).toEqual(['list_key']);
+  // Resolved first, the list would be gone and the save would pass.
+  expect(resolveTaxonomy({ ...prev, lists }).lists.some((l) => l.key === 'raw')).toBe(false);
+  for (const key of ['graded', 'cond', 'card_grades']) {
+    expect(sentTaxonomyRefusals(prev, [{ ...raw, key }], taxonomyVersion(prev))).toEqual([
+      'list_key',
+    ]);
+  }
 });

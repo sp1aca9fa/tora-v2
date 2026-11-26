@@ -1411,7 +1411,8 @@
       "kind_list": "A kind uses a removed condition list.",
       "field_key": "Two fields have the same name.",
       "choice_empty": "A choice field needs at least one choice.",
-      "region_key": "Two regions have the same name."
+      "region_key": "Two regions have the same name.",
+      "stale": "The categories were saved elsewhere (another tab or admin) since this page loaded. Reload the page and make the change again; nothing was saved."
     },
     "regions": "Regions",
     "regionsInfo": "What the region field offers for this category (print language, game region, pressing country...), in order: the first is the default when an import cannot tell. Plug-ins read these keys.",

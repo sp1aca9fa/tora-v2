@@ -1,11 +1,20 @@
 // The admin's categories (requirements S16 part 3): how many items use each part, what a change
 // touches, and saving it (items follow: item types, removed fields and values cleared).
-import { type Taxonomy, checkTaxonomy, conditionListOf, itemTypeKey } from '@tora/core';
+import {
+  type ConditionList,
+  RESERVED_LIST_KEYS,
+  type Taxonomy,
+  checkTaxonomy,
+  conditionListOf,
+  itemTypeKey,
+  resolveTaxonomy,
+  taxonomyVersion,
+} from '@tora/core';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from './client';
 import { DomainError } from './mutations';
-import { loadSourceRegistry, setTaxonomy } from './registry';
-import { holdings, products } from './schema';
+import { forgetRegistry, loadSourceRegistry, setTaxonomy } from './registry';
+import { appSettings, holdings, products } from './schema';
 
 /** Items per category, kind, custom field and choice; lots per condition-list value. */
 export interface CategoryUsage {
@@ -132,6 +141,22 @@ export function taxonomyChange(
 }
 
 /**
+ * Refusals of a save from the categories form, checked on what it sent before it is resolved
+ * (`docs/categories.md`, "Keys"). `stale`: the stored taxonomy is no longer the one the form
+ * loaded (`loaded`, its `taxonomyVersion`; missing counts as stale), so the form's new keys may be
+ * ones another save gave out since (G46). `list_key`: an own list on a key the app keeps for its
+ * lists; `resolveTaxonomy` would drop it without a word (G47).
+ */
+export function sentTaxonomyRefusals(
+  prev: Taxonomy,
+  ownLists: readonly ConditionList[],
+  loaded: unknown,
+): string[] {
+  if (typeof loaded !== 'string' || loaded !== taxonomyVersion(prev)) return ['stale'];
+  return ownLists.some((l) => RESERVED_LIST_KEYS.includes(l.key)) ? ['list_key'] : [];
+}
+
+/**
  * Saves the admin's categories. Refused when blocked, or when it touches items and `confirmed`
  * is not set. Items follow: each kind's item type, removed custom fields and choices, removed
  * condition values (those lots get no value until a new one is set). Returns what it touched.
@@ -140,6 +165,8 @@ export async function saveTaxonomy(
   db: Db,
   next: Taxonomy,
   confirmed: boolean,
+  /** The form's `taxonomyVersion`: checked again inside the write, so two saves cannot both pass. */
+  loaded?: string,
 ): Promise<TaxonomyChange> {
   const prev = (await loadSourceRegistry(db)).taxonomy!;
   const change = taxonomyChange(prev, next, await categoryUsage(db));
@@ -147,7 +174,20 @@ export async function saveTaxonomy(
   if (change.touched.length && !confirmed) return change;
 
   // All or nothing, the setting last: items never follow a taxonomy that was not saved.
+  let stale = false;
   await db.transaction(async (tx) => {
+    if (loaded !== undefined) {
+      // Read fresh (not the cached registry): another save may have landed since the check.
+      const [row] = await tx
+        .select({ value: appSettings.value })
+        .from(appSettings)
+        .where(eq(appSettings.key, 'categories'));
+      const stored = resolveTaxonomy(row?.value as Partial<Taxonomy> | undefined);
+      if (taxonomyVersion(stored) !== loaded) {
+        stale = true;
+        return;
+      }
+    }
     // Removed custom fields, choices and regions leave the items.
     for (const c of next.categories) {
       const removed = (prev.categories.find((x) => x.key === c.key)?.regions ?? []).filter(
@@ -204,5 +244,7 @@ export async function saveTaxonomy(
     }
     await setTaxonomy(tx, next);
   });
-  return change;
+  // A registry read on another connection before the commit may have cached the old taxonomy.
+  forgetRegistry();
+  return stale ? { blocked: ['stale'], touched: [] } : change;
 }

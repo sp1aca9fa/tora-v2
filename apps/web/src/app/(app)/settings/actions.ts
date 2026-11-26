@@ -39,6 +39,7 @@ import {
   setLanguageSettings,
   categoryUsage,
   saveTaxonomy,
+  sentTaxonomyRefusals,
   taxonomyChange,
   setSourceOrder,
   setSourceRoles,
@@ -238,6 +239,8 @@ export interface CategoriesState {
 export async function saveCategoriesAction(
   next: Taxonomy,
   confirmed: boolean,
+  /** The `taxonomyVersion` of the taxonomy the form loaded: a save over a newer one is refused. */
+  loaded: string,
 ): Promise<CategoriesState> {
   const { db, user } = await authed();
   if (user.role !== 'admin') return {};
@@ -245,11 +248,14 @@ export async function saveCategoriesAction(
     categories: Array.isArray(next?.categories) ? next.categories : [],
     lists: Array.isArray(next?.lists) ? next.lists.filter((l) => !l.builtIn) : [],
   };
-  const full = resolveTaxonomy(taxonomy);
   const prev = (await loadSourceRegistry(db)).taxonomy!;
+  const refused = sentTaxonomyRefusals(prev, taxonomy.lists, loaded);
+  if (refused.length) return { blocked: refused };
+  const full = resolveTaxonomy(taxonomy);
   const check = taxonomyChange(prev, full, await categoryUsage(db));
   if (check.blocked.length) return { blocked: check.blocked };
-  const change = await saveTaxonomy(db, full, confirmed);
+  const change = await saveTaxonomy(db, full, confirmed, loaded);
+  if (change.blocked.length) return { blocked: change.blocked };
   if (change.touched.length && !confirmed) return { touched: change.touched };
   await recordAdminChange(
     db,
