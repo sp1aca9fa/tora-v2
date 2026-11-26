@@ -53,7 +53,7 @@ An item with no price is not saved.
 A signal or warning whose number is unknown is off; in Line falling, an unknown year position or Held counts as not cheap. A mark counts in tests only from the day the admin gave; a mark without a day, and a plug-in's hint, count today and on no past day, so a hint alone is never tested. Only the item's current mark is kept. Signal plug-ins add an admin's own signals, tested the same way; a plug-in that fails
 leaves its signal off.
 
-**Facts, shown and never tested.** A listing under the market (here: under the item's Price): Buy timing's lowest ask (the prices' own source, a report at most 3 days old, a game's unverified listing none; see [Buy timing](buy-timing.md)), in the studied condition, as listed (shipping not added), at 50 % to 85 % of the price (under half, it is too often something else). A shop buy price near the
+**Facts, shown and never tested.** A listing under the market (here: under the item's Price): the cheapest ask of the prices' own source, taken as [Buy timing](buy-timing.md#what-is-saved) takes it (a report at most 3 days old, a game's unverified listing none) but without its fair-value floor, in the studied condition, as listed (shipping not added), then in its own band of 50 % to 85 % of the Price (under half, it is too often something else). A shop buy price near the
 price: the newest buy-back price of the last 30 days, in that condition or with none, at 80 % of
 the price or more.
 

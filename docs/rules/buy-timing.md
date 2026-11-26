@@ -54,7 +54,7 @@ Quantiles (of daily prices, and of the falls below) are read by linear interpola
 what it needs is unknown.
 
 **Lowest ask.** Only listings of the source the prices come from (another site's cheapest listing
-is too often something else), from the source's latest report when the row's numbers were worked out, while that report is at most 3 days before today. With no daily prices on any source there is no lowest ask. A report whose cheapest listing is under half the fair value gives no ask, as for alerts (Opportunities' floor is half its Price instead). A
+is too often something else), from the source's latest report when the row's numbers were worked out, while that report is at most 3 days before today. With no daily prices on any source there is no lowest ask. A report whose cheapest listing is under half the fair value (`ASK_FLOOR`, [Alerts, Numbers](alerts.md#numbers)) gives no ask, as for alerts; with no fair value, no ask is left out (Opportunities has no fair-value floor; its band is of its own Price, [there](opportunities.md)). A
 game's listing not yet verified as the item counts as no ask. An ask is taken as listed, shipping not added.
 
 ## The market, the pattern and the new-release wait

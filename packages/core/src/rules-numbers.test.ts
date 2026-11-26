@@ -428,6 +428,30 @@ const WIRING: Record<string, Record<string, Row>> = {
     'Failed sign-in': { checks: [c('LOGIN_ALERT_QUIET_MS', per(MINUTE, ' minutes'))] },
     'History kept': { checks: [c('ALERT_LOG_DAYS', plain(' days'))] },
     "Store notices: a sent message's record kept": { checks: [c('MESSAGE_DAYS', plain(' days'))] },
+    'Store feed silence: the limit chosen; the default': {
+      checks: [
+        c('FEED_SILENT_MINUTES', (v) => {
+          const [a, b, z] = list()(v).split(', ');
+          return `${a}, ${b} or ${z}`;
+        }),
+      ],
+      notChecked: [['DEFAULT_FEED_PREFS', 'an object with text fields the reader cannot evaluate']],
+    },
+    "Store feed silence: a board's limit": {
+      checks: [c('BOARD_ROUND_FACTOR', plain('', 'times '))],
+      notChecked: [['boardSilentMinutes', NO_CONSTANT]],
+    },
+    'Store feed silence: a board counts as watched if visited within': {
+      checks: [c('WATCHED_RECENT_HOURS', plain(' hours'))],
+    },
+    'Store feed silence: told again every': {
+      checks: [c('REMIND_HOURS', plain(' hours'))],
+      notChecked: [['packages/db/src/stores.ts', 'the file, not a constant']],
+    },
+    'Store feed: the next visit a push may announce': {
+      checks: [c('NEXT_MAX_MS', per(HOUR, ' hours'))],
+      notChecked: [['packages/db/src/stores.ts', 'the file, not a constant']],
+    },
     'Settings: not collected, median moved': {
       checks: [
         c('HEALTH_STALE_DAYS', plain(' days')),
@@ -574,9 +598,7 @@ const WIRING: Record<string, Record<string, Row>> = {
     'Other reads per collect: rates, links, rankings, boxes, pictures': {
       notChecked: [['collect.ts', NO_CONSTANT]],
     },
-    'A challenge page: under': {
-      notChecked: [['PoliteHttp', 'the 50,000 is a literal in `request`']],
-    },
+    'A challenge page: under': { checks: [c('CHALLENGE_MAX_CHARS', plain(' characters'))] },
     'Set aside after, tried again every': {
       checks: [
         c('LISTING_BROKEN_NIGHTS', plain(' nights')),
@@ -614,7 +636,7 @@ const WIRING: Record<string, Record<string, Row>> = {
         c('MARKET_FAILURES_DAILY', plain('', ', ')),
       ],
     },
-    'Daytime: after a refused collect': { checks: [c('COLLECT_REFUSAL_MS', per(HOUR, ' hours'))] },
+    'Daytime: after a refused run': { checks: [c('COLLECT_REFUSAL_MS', per(HOUR, ' hours'))] },
     'Daytime: tries, an answer within': {
       notChecked: [['runSource', 'retries 0 and 20,000 ms are literals in its body']],
     },
@@ -765,6 +787,9 @@ const WIRING: Record<string, Record<string, Row>> = {
     'Longest look back': { checks: [c('LONG_WINDOW', plain(' days'))] },
     'Steps with similar conditions': { notChecked: [['valueUnit', NO_CONSTANT]] },
     Outliers: { notChecked: [['withoutOutliers', NO_CONSTANT]] },
+    'A recent trade matched to a sale marked excluded': {
+      notChecked: [['excludedMatchWindowMs', 'the 1 and 30 days are literals in its body']],
+    },
     'High confidence': {
       checks: [
         c('HIGH_CONFIDENCE_SALES', plain('+ sales')),
@@ -782,7 +807,7 @@ const WIRING: Record<string, Record<string, Row>> = {
 };
 
 /** The count of `notChecked` entries: adding one is a visible change here. */
-const NOT_CHECKED_COUNT = 37;
+const NOT_CHECKED_COUNT = 41;
 
 // ---------------------------------------------------------------------------------------------
 

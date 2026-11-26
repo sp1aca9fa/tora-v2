@@ -155,8 +155,9 @@ Nothing is written before you confirm; readings are cached in the folder (`.tora
 The same import runs from the app (**Imports > Upload**, up to 30 files of 4 MB): read on the home
 PC by the next `pnpm collect` or `pnpm import-uploads` (your Claude plan), or right away by the app
 when the app has an `ANTHROPIC_API_KEY` (a few cents per batch).
-On the home PC, both routes need Claude Code 2.1.248 or later (`claude --version`) for the
-confinement; an older one stops the import with "unknown option".
+On the home PC, both routes need Claude Code 2.1.257 or later (`claude --version`) for the
+confinement. Before 2.1.248 the import stops with "unknown option"; from 2.1.248 to 2.1.256 it
+runs without the block that keeps Claude out of other files, and Tora does not check the version.
 
 **A spreadsheet** (no command; **Imports > Spreadsheet**, in the app). A CSV in the layout of
 **Settings > Your data**'s lots download (or its empty template): headers and names (category,

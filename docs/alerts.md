@@ -70,8 +70,8 @@ be sent (per store, threads with replies or products first), and the threads tha
 It replays the same rules from when each post reached Tora: a post that arrived over 30 minutes
 late makes no message unless it is a start word under 2 hours old (both plus the board's lag), as in real use.
 
-A site refusing Tora counts as a failed collect, also when it refuses while reading rankings or box
-opening cards. A listing set aside (found gone on 3 nights) is tried again every 7 days ([Collecting](rules/collectors.md#what-is-read)) by its source's normal collect: a
+A site refusing Tora counts as a failed collect, also when it refuses while reading rankings, box
+opening cards, exchange rates, purchase links or pictures; a picture host no listing uses, or several sites share, records none ([Refusals](rules/collectors.md#refusals)). A listing set aside (found gone on 3 nights) is tried again every 7 days ([Collecting](rules/collectors.md#what-is-read)) by its source's normal collect: a
 success brings it back and its Actions card goes away, a failure waits for the next try and sends
 nothing. Known limit: it is not tried while its item has another active listing of that source, so
 an item with two good listings there, one of them set aside, keeps that one aside until someone
